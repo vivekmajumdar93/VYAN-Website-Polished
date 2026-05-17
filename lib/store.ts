@@ -21,20 +21,24 @@ export type Settings = {
   orbitSpeed: number
   gradientIntensity: number
   turbulence: number
+  spiralTightness: number
+  starBrightness: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  branches: 4,
-  spin: 1.1,
-  count: 160000,
-  bloom: 1.1,
-  coreGlow: 0.75,
-  dustDensity: 0.65,
-  nebulaStrength: 0.55,
+  branches: 8,
+  spin: 1.0,
+  count: 240000,
+  bloom: 0.75,
+  coreGlow: 0.45,
+  dustDensity: 0.5,
+  nebulaStrength: 0.2,
   warpSpeed: 1.0,
-  orbitSpeed: 0.6,
+  orbitSpeed: 0.55,
   gradientIntensity: 1.0,
-  turbulence: 1.0,
+  turbulence: 0.55,
+  spiralTightness: 3.2,
+  starBrightness: 1.0,
 }
 
 type State = {
@@ -66,10 +70,10 @@ export const useGalaxyStore = create<State>((set) => ({
 }))
 
 export const NODES: GalaxyNode[] = [
-  { id: 'sirius',   label: 'Sirius Cluster',    position: [3.2, 0.05, -1.8], color: '#9ec5ff', description: 'A dense, hot cluster of young blue giants near the galactic arm.' },
-  { id: 'nova',     label: 'Nova Prime',        position: [-2.8, 0.1, 2.4],  color: '#d4a4ff', description: 'A pulsating violet nova at the edge of the spiral arm.' },
-  { id: 'aether',   label: 'Aether Nebula',     position: [1.4, -0.08, 3.6], color: '#7ce8ff', description: 'A diffuse, glowing nebula of ionized gas and dust.' },
-  { id: 'orion',    label: 'Orion Gate',        position: [-3.6, 0.0, -2.6], color: '#ffd4f0', description: 'An ancient gateway formed at the intersection of two arms.' },
-  { id: 'helios',   label: 'Helios Beacon',     position: [4.2, -0.05, 1.2], color: '#ffb47a', description: 'A solitary amber beacon star, used for galactic navigation.' },
-  { id: 'verge',    label: 'The Verge',         position: [-1.6, 0.12, -4.2], color: '#b69eff', description: 'A faint, far cluster at the very rim of the galaxy.' },
+  { id: 'sirius',   label: 'Sirius Cluster',  position: [3.2, 0.05, -1.8], color: '#7ee0ff', description: 'A dense, hot cluster of young blue giants near the galactic arm.' },
+  { id: 'nova',     label: 'Nova Prime',      position: [-2.8, 0.1, 2.4],  color: '#b89dff', description: 'A pulsating violet nova at the edge of the spiral arm.' },
+  { id: 'aether',   label: 'Aether Nebula',   position: [1.4, -0.08, 3.6], color: '#5ec8ff', description: 'A diffuse, glowing nebula of ionized gas and dust.' },
+  { id: 'orion',    label: 'Orion Gate',      position: [-3.6, 0.0, -2.6], color: '#9dd6ff', description: 'An ancient gateway formed at the intersection of two arms.' },
+  { id: 'helios',   label: 'Helios Beacon',   position: [4.2, -0.05, 1.2], color: '#a896ff', description: 'A solitary violet beacon star, used for galactic navigation.' },
+  { id: 'verge',    label: 'The Verge',       position: [-1.6, 0.12, -4.2], color: '#7aa8ff', description: 'A faint, far cluster at the very rim of the galaxy.' },
 ]

@@ -11,7 +11,7 @@ export default function Galaxy() {
   const settings = useGalaxyStore((s) => s.settings)
   const materialRef = useRef<THREE.ShaderMaterial>(null!)
 
-  const { positions, scales, randomness, angles, radii, heights } = useMemo(() => {
+  const buffers = useMemo(() => {
     const count = Math.max(5000, Math.floor(settings.count))
     const branches = Math.max(2, Math.floor(settings.branches))
     const positions = new Float32Array(count * 3)
@@ -20,69 +20,78 @@ export default function Galaxy() {
     const angles = new Float32Array(count)
     const radii = new Float32Array(count)
     const heights = new Float32Array(count)
+    const stars = new Float32Array(count)
 
-    const randomnessFactor = 0.32
-    const randomnessPower = 3.1
+    const randomnessFactor = 0.11
+    const randomnessPower = 3.0
+
+    // Probability of an accent bright cyan star
+    const STAR_PROB = 0.012
 
     for (let i = 0; i < count; i++) {
-      // Bias toward the center for a luminous core
-      const r = Math.pow(Math.random(), 1.85) * GALAXY_RADIUS
+      // Distribute particles more evenly across the disk for a true disc shape
+      const r = Math.pow(Math.random(), 0.85) * GALAXY_RADIUS
       const branch = ((i % branches) / branches) * Math.PI * 2
 
       angles[i] = branch
       radii[i] = r
 
-      // disc thickness shrinks toward outside
-      const thickness = 0.18 * (1.0 - r / (GALAXY_RADIUS * 1.4))
-      heights[i] = (Math.random() - 0.5) * Math.max(thickness, 0.02) * 2.0
+      // Disc thickness shrinks toward outside
+      const thickness = 0.10 * (1.0 - r / (GALAXY_RADIUS * 1.5))
+      heights[i] = (Math.random() - 0.5) * Math.max(thickness, 0.012) * 2.0
 
-      const rx = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * (r * 0.65 + 0.2)
-      const ry = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * 0.18 * (r * 0.4 + 0.05)
-      const rz = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * (r * 0.65 + 0.2)
+      const armWidthScale = (r * 0.35 + 0.12)
+      const rx = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * armWidthScale
+      const ry = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * 0.08 * armWidthScale
+      const rz = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * armWidthScale
 
       randomness[i * 3 + 0] = rx
       randomness[i * 3 + 1] = ry
       randomness[i * 3 + 2] = rz
 
-      // Pre-positions (the shader rotates them dynamically)
       positions[i * 3 + 0] = Math.cos(branch) * r
       positions[i * 3 + 1] = 0
       positions[i * 3 + 2] = Math.sin(branch) * r
 
-      // Particle size: slightly larger near the core
-      const coreBias = Math.pow(1.0 - r / GALAXY_RADIUS, 1.4)
-      scales[i] = (Math.random() * 0.9 + 0.35) * (0.6 + coreBias * 1.4)
+      const coreBias = Math.pow(1.0 - r / GALAXY_RADIUS, 1.3)
+      scales[i] = (Math.random() * 0.8 + 0.3) * (0.55 + coreBias * 1.5)
+
+      // Accent bright cyan stars - more likely in the outer disk for the dotted look
+      const outerWeight = THREE.MathUtils.smoothstep(r, 1.0, GALAXY_RADIUS)
+      const starHit = Math.random() < STAR_PROB * (0.4 + outerWeight)
+      stars[i] = starHit ? 1.0 : 0.0
     }
 
-    return { positions, scales, randomness, angles, radii, heights }
+    return { positions, scales, randomness, angles, radii, heights, stars }
   }, [settings.count, settings.branches])
 
-  useFrame((state, deltaRaw) => {
+  useFrame((_, deltaRaw) => {
     const delta = Math.min(deltaRaw, 1 / 30)
     if (materialRef.current) {
       const u = materialRef.current.uniforms
       u.uTime.value += delta
-      // Live-tunable uniforms
       u.uSpin.value = settings.spin
       u.uCoreGlow.value = settings.coreGlow
       u.uDustDensity.value = settings.dustDensity
       u.uGradientIntensity.value = settings.gradientIntensity
       u.uTurbulence.value = settings.turbulence
+      u.uSpiralTightness.value = settings.spiralTightness
+      u.uStarBrightness.value = settings.starBrightness
     }
   })
 
-  // Stable key based on geometry-affecting params: triggers safe re-mount + disposal
   const geomKey = `${settings.count}-${settings.branches}`
 
   return (
     <points key={geomKey} frustumCulled={false}>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position"   args={[positions, 3]} count={positions.length / 3} />
-        <bufferAttribute attach="attributes-aScale"     args={[scales, 1]}    count={scales.length} />
-        <bufferAttribute attach="attributes-aRandomness" args={[randomness, 3]} count={randomness.length / 3} />
-        <bufferAttribute attach="attributes-aAngle"     args={[angles, 1]}    count={angles.length} />
-        <bufferAttribute attach="attributes-aRadius"    args={[radii, 1]}     count={radii.length} />
-        <bufferAttribute attach="attributes-aHeight"    args={[heights, 1]}   count={heights.length} />
+        <bufferAttribute attach="attributes-position"    args={[buffers.positions, 3]} count={buffers.positions.length / 3} />
+        <bufferAttribute attach="attributes-aScale"      args={[buffers.scales, 1]}    count={buffers.scales.length} />
+        <bufferAttribute attach="attributes-aRandomness" args={[buffers.randomness, 3]} count={buffers.randomness.length / 3} />
+        <bufferAttribute attach="attributes-aAngle"      args={[buffers.angles, 1]}    count={buffers.angles.length} />
+        <bufferAttribute attach="attributes-aRadius"     args={[buffers.radii, 1]}     count={buffers.radii.length} />
+        <bufferAttribute attach="attributes-aHeight"     args={[buffers.heights, 1]}   count={buffers.heights.length} />
+        <bufferAttribute attach="attributes-aStar"       args={[buffers.stars, 1]}     count={buffers.stars.length} />
       </bufferGeometry>
       <shaderMaterial
         ref={materialRef}
@@ -99,10 +108,14 @@ export default function Galaxy() {
           uCoreGlow: { value: settings.coreGlow },
           uDustDensity: { value: settings.dustDensity },
           uGradientIntensity: { value: settings.gradientIntensity },
+          uSpiralTightness: { value: settings.spiralTightness },
+          uStarBrightness: { value: settings.starBrightness },
           uMaxRadius: { value: GALAXY_RADIUS },
-          uColorCore:  { value: new THREE.Color('#ff2a3a') },  // intense blood red
-          uColorMid:   { value: new THREE.Color('#3a0d4f') },  // dark rich violet
-          uColorOuter: { value: new THREE.Color('#1a3cff') },  // deep cosmic blue
+          // White-violet core -> blue mid -> deep cobalt outer
+          uColorCore:  { value: new THREE.Color('#e6d8ff') },
+          uColorMid:   { value: new THREE.Color('#4a3aff') },
+          uColorOuter: { value: new THREE.Color('#0a1a8a') },
+          uStarColor:  { value: new THREE.Color('#7ee8ff') },
         }}
       />
     </points>

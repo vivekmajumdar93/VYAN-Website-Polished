@@ -12,7 +12,7 @@ export default function HUD() {
       <div className="pointer-events-none fixed top-6 left-6 z-10 select-none">
         <div className="text-[10px] uppercase tracking-[0.45em] text-white/40">Procedural · Neural Cosmos</div>
         <div className="text-3xl md:text-4xl font-light text-white/95 tracking-[0.05em]">
-          Galaxy <span className="bg-gradient-to-r from-rose-400 via-fuchsia-400 to-indigo-300 bg-clip-text text-transparent">Atlas</span>
+          Galaxy <span className="bg-gradient-to-r from-cyan-300 via-indigo-400 to-violet-400 bg-clip-text text-transparent">Atlas</span>
         </div>
         <div className="mt-2 text-xs text-white/40 max-w-sm font-light">
           Drag to orbit · Scroll to zoom · Click a glowing node to warp
@@ -24,7 +24,7 @@ export default function HUD() {
       </div>
 
       {hovered && !selected && (
-        <div className="pointer-events-none fixed bottom-6 right-6 z-10 text-xs tracking-widest uppercase text-rose-200/80">
+        <div className="pointer-events-none fixed bottom-6 right-6 z-10 text-xs tracking-widest uppercase text-cyan-200/80">
           // {hovered}
         </div>
       )}
@@ -32,16 +32,13 @@ export default function HUD() {
       {selected && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-20 w-[360px] max-w-[92vw]">
           <div className="relative rounded-2xl border border-white/10 bg-black/55 backdrop-blur-xl p-5 shadow-2xl">
-            <div className="absolute -top-px left-6 right-6 h-px bg-gradient-to-r from-transparent via-rose-400/70 to-transparent" />
+            <div className="absolute -top-px left-6 right-6 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
             <div className="flex items-center justify-between mb-3">
               <div
                 className="h-3 w-3 rounded-full shadow-[0_0_18px_currentColor]"
                 style={{ color: selected.color, backgroundColor: selected.color }}
               />
-              <button
-                onClick={() => clear(null)}
-                className="text-white/40 hover:text-white text-[10px] tracking-[0.3em] uppercase"
-              >
+              <button onClick={() => clear(null)} className="text-white/40 hover:text-white text-[10px] tracking-[0.3em] uppercase">
                 Close
               </button>
             </div>

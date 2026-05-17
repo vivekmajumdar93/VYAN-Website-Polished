@@ -19,10 +19,10 @@ const streakFrag = /* glsl */ `
     float y = abs(vUv.y - 0.5) * 2.0;
     float horiz = 1.0 - smoothstep(0.0, 1.0, x);
     float vert  = 1.0 - smoothstep(0.0, 1.0, y);
-    horiz = pow(horiz, 6.5);
-    vert = pow(vert, 1.25);
-    float shimmer = 0.85 + 0.15 * sin(uTime * 2.3 + vUv.y * 60.0);
-    float breathe = 0.85 + 0.15 * sin(uTime * 0.7);
+    horiz = pow(horiz, 7.0);
+    vert = pow(vert, 1.2);
+    float shimmer = 0.88 + 0.12 * sin(uTime * 2.3 + vUv.y * 60.0);
+    float breathe = 0.9 + 0.1 * sin(uTime * 0.7);
     float a = horiz * vert * shimmer * breathe * uIntensity;
     vec3 col = mix(uColorCold, uColorHot, horiz);
     gl_FragColor = vec4(col, a);
@@ -38,7 +38,7 @@ const ghostFrag = /* glsl */ `
     float d = distance(vUv, vec2(0.5));
     float a = smoothstep(0.5, 0.0, d);
     a = pow(a, 2.4);
-    float breathe = 0.8 + 0.2 * sin(uTime * 1.3);
+    float breathe = 0.85 + 0.15 * sin(uTime * 1.3);
     gl_FragColor = vec4(uColor * breathe, a * uIntensity);
   }
 `
@@ -49,14 +49,13 @@ export default function LensFlare() {
   const ghostMatA = useRef<THREE.ShaderMaterial>(null!)
   const ghostMatB = useRef<THREE.ShaderMaterial>(null!)
 
-  useFrame(({ camera, clock }, deltaRaw) => {
+  useFrame(({ camera }, deltaRaw) => {
     const delta = Math.min(deltaRaw, 1 / 30)
     if (ref.current) ref.current.quaternion.copy(camera.quaternion)
 
-    // Angle-reactive intensity: stronger when camera looks at galactic plane edge-on
     const dir = new THREE.Vector3()
     camera.getWorldDirection(dir)
-    const upDot = Math.abs(dir.y) // 0 = looking horizontal at plane, 1 = top-down
+    const upDot = Math.abs(dir.y)
     const angleFactor = THREE.MathUtils.clamp(1.0 - upDot, 0.25, 1.0)
 
     if (streakMat.current) {
@@ -65,19 +64,19 @@ export default function LensFlare() {
     }
     if (ghostMatA.current) {
       ghostMatA.current.uniforms.uTime.value += delta
-      ghostMatA.current.uniforms.uIntensity.value = 0.55 * angleFactor
+      ghostMatA.current.uniforms.uIntensity.value = 0.45 * angleFactor
     }
     if (ghostMatB.current) {
       ghostMatB.current.uniforms.uTime.value += delta + 1.2
-      ghostMatB.current.uniforms.uIntensity.value = 0.4 * angleFactor
+      ghostMatB.current.uniforms.uIntensity.value = 0.35 * angleFactor
     }
   })
 
   return (
     <group ref={ref} renderOrder={5}>
-      {/* Main vertical streak */}
+      {/* Main vertical white-violet streak */}
       <mesh>
-        <planeGeometry args={[1.4, 22]} />
+        <planeGeometry args={[1.1, 20]} />
         <shaderMaterial
           ref={streakMat}
           transparent
@@ -89,14 +88,14 @@ export default function LensFlare() {
           uniforms={{
             uTime: { value: 0 },
             uIntensity: { value: 0.9 },
-            uColorHot:  { value: new THREE.Color('#ffd6c4') },
-            uColorCold: { value: new THREE.Color('#7a55ff') },
+            uColorHot:  { value: new THREE.Color('#ffffff') },
+            uColorCold: { value: new THREE.Color('#6a5cff') },
           }}
         />
       </mesh>
-      {/* Soft horizontal ghost above center */}
-      <mesh position={[0.6, 1.3, 0]}>
-        <planeGeometry args={[1.0, 1.0]} />
+      {/* Soft violet ghost above center */}
+      <mesh position={[0.5, 1.1, 0]}>
+        <planeGeometry args={[0.9, 0.9]} />
         <shaderMaterial
           ref={ghostMatA}
           transparent
@@ -107,14 +106,14 @@ export default function LensFlare() {
           fragmentShader={ghostFrag}
           uniforms={{
             uTime: { value: 0 },
-            uIntensity: { value: 0.55 },
-            uColor: { value: new THREE.Color('#9b6dff') },
+            uIntensity: { value: 0.45 },
+            uColor: { value: new THREE.Color('#9b7dff') },
           }}
         />
       </mesh>
       {/* Cyan ghost below */}
-      <mesh position={[-0.8, -1.7, 0]}>
-        <planeGeometry args={[0.75, 0.75]} />
+      <mesh position={[-0.6, -1.4, 0]}>
+        <planeGeometry args={[0.65, 0.65]} />
         <shaderMaterial
           ref={ghostMatB}
           transparent
@@ -125,8 +124,8 @@ export default function LensFlare() {
           fragmentShader={ghostFrag}
           uniforms={{
             uTime: { value: 0 },
-            uIntensity: { value: 0.4 },
-            uColor: { value: new THREE.Color('#4dbfff') },
+            uIntensity: { value: 0.35 },
+            uColor: { value: new THREE.Color('#5ec8ff') },
           }}
         />
       </mesh>
