@@ -73,8 +73,9 @@ export const galaxyVertex = /* glsl */ `
   void main() {
     float r = aRadius;
 
-    // Differential rotation: faster near the core. Tightly-wound logarithmic spiral.
-    float omega = (1.0 / (r + 0.35)) * uTime * uSpin * 0.10;
+    // Differential rotation: MUCH faster near the core (inverse-square-ish falloff)
+    // At r=0.2 -> omega ~ 8x faster than at r=5
+    float omega = (1.0 / pow(r + 0.15, 1.6)) * uTime * uSpin * 0.22;
     float angle = aAngle + omega + r * uSpiralTightness;
 
     vec3 pos;
@@ -133,8 +134,8 @@ export const galaxyFragment = /* glsl */ `
     vec3 col = mix(uColorCore, uColorMid, t1);
     col = mix(col, uColorOuter, t2);
 
-    // Subtle inner sheen at the core - no scene-wide wash
-    float coreSheen = exp(-vDistance * 2.8) * uCoreGlow * 0.45;
+    // Subtle inner sheen at the core - keep tight so it doesn't bloom out
+    float coreSheen = exp(-vDistance * 3.8) * uCoreGlow * 0.22;
     col += coreSheen * uColorCore;
 
     // ---------- Dust lanes (dark concentric / angular streaks) ----------

@@ -115,7 +115,7 @@ export default function Galaxy() {
           uColorCore:  { value: new THREE.Color('#e6d8ff') },
           uColorMid:   { value: new THREE.Color('#4a3aff') },
           uColorOuter: { value: new THREE.Color('#0a1a8a') },
-          uStarColor:  { value: new THREE.Color('#7ee8ff') },
+          uStarColor:  { value: new THREE.Color('#ff2a44') },
         }}
       />
     </points>

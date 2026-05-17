@@ -48,7 +48,7 @@ export default function Core() {
 
   return (
     <mesh ref={innerRef}>
-      <planeGeometry args={[0.7, 0.7]} />
+      <planeGeometry args={[0.4, 0.4]} />
       <shaderMaterial
         ref={innerMat}
         transparent

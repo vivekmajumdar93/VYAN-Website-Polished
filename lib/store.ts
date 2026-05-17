@@ -27,10 +27,10 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   branches: 8,
-  spin: 1.0,
+  spin: 1.2,
   count: 240000,
-  bloom: 0.75,
-  coreGlow: 0.45,
+  bloom: 0.5,
+  coreGlow: 0.25,
   dustDensity: 0.5,
   nebulaStrength: 0.2,
   warpSpeed: 1.0,
@@ -38,7 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   gradientIntensity: 1.0,
   turbulence: 0.55,
   spiralTightness: 3.2,
-  starBrightness: 1.0,
+  starBrightness: 0.9,
 }
 
 type State = {
