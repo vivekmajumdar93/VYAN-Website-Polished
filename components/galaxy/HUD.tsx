@@ -1,11 +1,16 @@
 'use client'
 import { useGalaxyStore, getWorldPos } from '@/lib/store'
 import ControlPanel from './ControlPanel'
+import Minimap from './Minimap'
+import TourHUD from './TourHUD'
+import TouchControls from './TouchControls'
 
 export default function HUD() {
   const selected = useGalaxyStore((s) => s.selectedNode)
   const hovered = useGalaxyStore((s) => s.hoveredNode)
   const clear = useGalaxyStore((s) => s.setSelected)
+  const advance = useGalaxyStore((s) => s.advanceTour)
+  const tourIndex = useGalaxyStore((s) => s.tourIndex)
 
   return (
     <>
@@ -15,16 +20,27 @@ export default function HUD() {
           Galaxy <span className="bg-gradient-to-r from-cyan-300 via-indigo-400 to-violet-400 bg-clip-text text-transparent">Atlas</span>
         </div>
         <div className="mt-2 text-xs text-white/40 max-w-sm font-light">
-          Drag to orbit · Scroll to zoom · Click a glowing node to warp
+          Scroll / Swipe / ←→ to travel · Drag to rotate the cosmos
         </div>
+        {tourIndex < 0 && (
+          <button
+            onClick={() => advance(1)}
+            className="pointer-events-auto mt-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 backdrop-blur px-4 py-2 text-xs uppercase tracking-[0.3em] text-cyan-200 hover:text-white hover:border-cyan-300/60 transition-all"
+          >
+            Begin Tour
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="pointer-events-none fixed bottom-6 left-6 z-10 text-[10px] tracking-[0.35em] uppercase text-white/30">
-        R3F · Three.js · GLSL · Bloom · Sibling Galaxies
+        R3F · GLSL · Bloom · Sibling Galaxies
       </div>
 
       {hovered && !selected && (
-        <div className="pointer-events-none fixed bottom-6 right-6 z-10 text-xs tracking-widest uppercase text-cyan-200/80">
+        <div className="pointer-events-none fixed top-1/3 right-6 z-10 text-xs tracking-widest uppercase text-cyan-200/80">
           // {hovered}
         </div>
       )}
@@ -32,7 +48,7 @@ export default function HUD() {
       {selected && (() => {
         const w = getWorldPos(selected)
         return (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-20 w-[380px] max-w-[92vw]">
+          <div className="fixed top-1/2 left-6 -translate-y-1/2 z-20 w-[300px] max-w-[80vw]">
             <div className="relative rounded-2xl border border-white/10 bg-black/55 backdrop-blur-xl p-5 shadow-2xl">
               <div className="absolute -top-px left-6 right-6 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
               <div className="flex items-center justify-between mb-3">
@@ -48,7 +64,7 @@ export default function HUD() {
                   )}
                   {selected.galaxyId === 'void' && !selected.isPortal && (
                     <span className="text-[9px] uppercase tracking-[0.3em] px-1.5 py-0.5 rounded bg-pink-500/15 text-pink-300 border border-pink-500/30">
-                      Void Galaxy
+                      Void
                     </span>
                   )}
                 </div>
@@ -57,18 +73,21 @@ export default function HUD() {
                 </button>
               </div>
               <div className="text-[10px] uppercase tracking-[0.35em] text-white/40">Locked Node</div>
-              <div className="text-2xl font-light text-white mt-1">{selected.label}</div>
-              <div className="mt-3 text-sm text-white/70 leading-relaxed">{selected.description}</div>
+              <div className="text-xl font-light text-white mt-1">{selected.label}</div>
+              <div className="mt-3 text-xs text-white/65 leading-relaxed">{selected.description}</div>
               <div className="mt-4 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-widest text-white/40">
-                <div><div className="text-white/85 text-base font-light font-mono">{w.x.toFixed(1)}</div>X</div>
-                <div><div className="text-white/85 text-base font-light font-mono">{w.y.toFixed(2)}</div>Y</div>
-                <div><div className="text-white/85 text-base font-light font-mono">{w.z.toFixed(1)}</div>Z</div>
+                <div><div className="text-white/85 text-sm font-light font-mono">{w.x.toFixed(1)}</div>X</div>
+                <div><div className="text-white/85 text-sm font-light font-mono">{w.y.toFixed(2)}</div>Y</div>
+                <div><div className="text-white/85 text-sm font-light font-mono">{w.z.toFixed(1)}</div>Z</div>
               </div>
             </div>
           </div>
         )
       })()}
 
+      <TourHUD />
+      <Minimap />
+      <TouchControls />
       <ControlPanel />
     </>
   )

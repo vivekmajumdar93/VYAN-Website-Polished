@@ -60,21 +60,20 @@ export const galaxyVertex = /* glsl */ `
   attribute float aAngle;
   attribute float aRadius;
   attribute float aHeight;
-  attribute float aStar;     // 0 = gas particle, 1 = bright accent star
+  attribute float aStar;
+  attribute float aHue;
   attribute vec3  aRandomness;
 
   varying float vDistance;
   varying float vAngle;
   varying float vRandomSeed;
   varying float vStar;
+  varying float vHue;
 
   ${snoise3}
 
   void main() {
     float r = aRadius;
-
-    // Differential rotation: MUCH faster near the core (inverse-square-ish falloff)
-    // At r=0.2 -> omega ~ 8x faster than at r=5
     float omega = (1.0 / pow(r + 0.15, 1.6)) * uTime * uSpin * 0.22;
     float angle = aAngle + omega + r * uSpiralTightness;
 
@@ -82,10 +81,8 @@ export const galaxyVertex = /* glsl */ `
     pos.x = cos(angle) * r;
     pos.z = sin(angle) * r;
     pos.y = aHeight;
-
     pos += aRandomness;
 
-    // Subtle living distortion
     float n = snoise(vec3(pos.x * 0.22, pos.z * 0.22, uTime * 0.04));
     pos.y += n * 0.05 * uTurbulence;
 
@@ -93,8 +90,7 @@ export const galaxyVertex = /* glsl */ `
     vec4 viewPosition = viewMatrix * modelPosition;
     gl_Position = projectionMatrix * viewPosition;
 
-    // Bright accent stars get bigger
-    float starScale = mix(1.0, 3.4 * uStarBrightness, aStar);
+    float starScale = mix(1.0, 3.2 * uStarBrightness, aStar);
     gl_PointSize = uSize * aScale * starScale;
     gl_PointSize *= (1.0 / max(-viewPosition.z, 0.1));
 
@@ -102,6 +98,7 @@ export const galaxyVertex = /* glsl */ `
     vAngle = angle;
     vRandomSeed = n;
     vStar = aStar;
+    vHue = aHue;
   }
 `
 
@@ -113,6 +110,8 @@ export const galaxyFragment = /* glsl */ `
   uniform vec3  uColorCore;
   uniform vec3  uColorMid;
   uniform vec3  uColorOuter;
+  uniform vec3  uColorAccent;
+  uniform vec3  uColorTeal;
   uniform vec3  uStarColor;
   uniform float uMaxRadius;
 
@@ -120,42 +119,39 @@ export const galaxyFragment = /* glsl */ `
   varying float vAngle;
   varying float vRandomSeed;
   varying float vStar;
+  varying float vHue;
 
   void main() {
-    // Soft round point
     float d = distance(gl_PointCoord, vec2(0.5));
     float strength = 1.0 - smoothstep(0.0, 0.5, d);
     strength = pow(strength, 2.0);
 
-    // ---------- Radial gradient: violet-white core -> blue mid -> deep cobalt outer ----------
+    // Smooth radial gradient: white-pink core -> violet -> deep blue -> outer accents
     float rN = clamp(vDistance / uMaxRadius, 0.0, 1.0);
-    float t1 = smoothstep(0.0, 0.18, rN);   // core -> mid
-    float t2 = smoothstep(0.18, 0.85, rN);  // mid -> deep blue
+    float t1 = smoothstep(0.0, 0.18, rN);
+    float t2 = smoothstep(0.18, 0.85, rN);
     vec3 col = mix(uColorCore, uColorMid, t1);
     col = mix(col, uColorOuter, t2);
 
-    // Subtle inner sheen at the core - keep tight so it doesn't bloom out
-    float coreSheen = exp(-vDistance * 3.8) * uCoreGlow * 0.22;
-    col += coreSheen * uColorCore;
+    // Add per-particle colourful variation as we move outward
+    float colorfulness = smoothstep(0.25, 0.9, rN);
+    vec3 spice = mix(uColorAccent, uColorTeal, vHue);
+    col = mix(col, spice, colorfulness * 0.32 * (0.4 + vHue * 0.6));
 
-    // ---------- Dust lanes (dark concentric / angular streaks) ----------
+    // Tiny core sheen only - no large halo
+    float coreSheen = exp(-vDistance * 5.5) * uCoreGlow * 0.6;
+    col += coreSheen * vec3(1.0, 0.85, 1.0);
+
+    // Dust lanes
     float lane = 0.5 + 0.5 * sin(vAngle * 3.5 + vRandomSeed * 4.0 + vDistance * 1.2);
     lane = smoothstep(0.30, 0.95, lane);
     float dustMask = smoothstep(0.4, 3.0, vDistance) * smoothstep(uMaxRadius + 0.5, 2.5, vDistance);
-    float dustAttenuation = 1.0 - uDustDensity * 0.7 * lane * dustMask;
-    dustAttenuation = clamp(dustAttenuation, 0.18, 1.0);
-    col *= dustAttenuation;
+    float dust = 1.0 - uDustDensity * 0.7 * lane * dustMask;
+    col *= clamp(dust, 0.18, 1.0);
 
-    // ---------- Subtle chromatic variation ----------
-    col.b += vRandomSeed * 0.06;
-    col.g += vRandomSeed * 0.02;
-
-    // Atmospheric density falloff at rim
     float atm = smoothstep(uMaxRadius + 1.0, uMaxRadius * 0.5, vDistance);
 
-    // ---------- Bright cyan accent star override ----------
     if (vStar > 0.5) {
-      // Hot cyan-white star with crisp center
       float hot = pow(strength, 1.6);
       vec3 starCol = mix(uStarColor, vec3(1.0), pow(hot, 4.0));
       gl_FragColor = vec4(starCol, hot);
@@ -165,13 +161,11 @@ export const galaxyFragment = /* glsl */ `
 
     col *= uGradientIntensity;
     float alpha = strength * mix(0.55, 1.0, atm);
-
     gl_FragColor = vec4(col, alpha);
     #include <colorspace_fragment>
   }
 `
 
-// ---------- Faint blue nebula haze ----------
 export const nebulaVertex = /* glsl */ `
   varying vec2 vUv;
   void main() {
@@ -205,14 +199,11 @@ export const nebulaFragment = /* glsl */ `
     float r = length(c);
     float radial = smoothstep(0.45, 0.05, r);
     radial = pow(radial, 1.8);
-
     vec3 q = vec3(vUv * 2.4, uTime * 0.02);
     float n = fbm(q);
-
     vec3 col = mix(uColorInner, uColorOuter, smoothstep(0.0, 0.4, r));
     float density = smoothstep(0.1, 0.95, n * 0.7);
     float alpha = density * radial * uStrength * 0.25;
-
     gl_FragColor = vec4(col, alpha);
     #include <colorspace_fragment>
   }
