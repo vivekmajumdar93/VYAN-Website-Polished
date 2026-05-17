@@ -3,95 +3,106 @@ import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useFrame } from '@react-three/fiber'
 import { galaxyVertex, galaxyFragment } from './shaders'
+import { useGalaxyStore } from '@/lib/store'
 
-type Props = {
-  count?: number
-  radius?: number
-  branches?: number
-  spin?: number
-  randomness?: number
-  randomnessPower?: number
-  insideColor?: string
-  outsideColor?: string
-}
+const GALAXY_RADIUS = 5.5
 
-export default function Galaxy({
-  count = 220000,
-  radius = 5,
-  branches = 4,
-  spin = 1.1,
-  randomness = 0.35,
-  randomnessPower = 3.2,
-  insideColor = '#ffd6ff',
-  outsideColor = '#3a6dff',
-}: Props) {
+export default function Galaxy() {
+  const settings = useGalaxyStore((s) => s.settings)
   const materialRef = useRef<THREE.ShaderMaterial>(null!)
 
-  const { positions, colors, scales, randomnessAttr } = useMemo(() => {
+  const { positions, scales, randomness, angles, radii, heights } = useMemo(() => {
+    const count = Math.max(5000, Math.floor(settings.count))
+    const branches = Math.max(2, Math.floor(settings.branches))
     const positions = new Float32Array(count * 3)
-    const colors = new Float32Array(count * 3)
     const scales = new Float32Array(count)
-    const randomnessAttr = new Float32Array(count * 3)
+    const randomness = new Float32Array(count * 3)
+    const angles = new Float32Array(count)
+    const radii = new Float32Array(count)
+    const heights = new Float32Array(count)
 
-    const colorInside = new THREE.Color(insideColor)
-    const colorOutside = new THREE.Color(outsideColor)
+    const randomnessFactor = 0.32
+    const randomnessPower = 3.1
 
     for (let i = 0; i < count; i++) {
-      const i3 = i * 3
+      // Bias toward the center for a luminous core
+      const r = Math.pow(Math.random(), 1.85) * GALAXY_RADIUS
+      const branch = ((i % branches) / branches) * Math.PI * 2
 
-      // Bias particles toward the center for a bright luminous core
-      const r = Math.pow(Math.random(), 1.7) * radius
-      const spinAngle = r * spin
-      const branchAngle = ((i % branches) / branches) * Math.PI * 2
+      angles[i] = branch
+      radii[i] = r
 
-      const rx = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomness * r
-      const ry = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomness * r * 0.35
-      const rz = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomness * r
+      // disc thickness shrinks toward outside
+      const thickness = 0.18 * (1.0 - r / (GALAXY_RADIUS * 1.4))
+      heights[i] = (Math.random() - 0.5) * Math.max(thickness, 0.02) * 2.0
 
-      positions[i3] = Math.cos(branchAngle + spinAngle) * r
-      positions[i3 + 1] = 0
-      positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * r
+      const rx = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * (r * 0.65 + 0.2)
+      const ry = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * 0.18 * (r * 0.4 + 0.05)
+      const rz = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomnessFactor * (r * 0.65 + 0.2)
 
-      randomnessAttr[i3] = rx
-      randomnessAttr[i3 + 1] = ry
-      randomnessAttr[i3 + 2] = rz
+      randomness[i * 3 + 0] = rx
+      randomness[i * 3 + 1] = ry
+      randomness[i * 3 + 2] = rz
 
-      const mixed = colorInside.clone().lerp(colorOutside, r / radius)
-      colors[i3] = mixed.r
-      colors[i3 + 1] = mixed.g
-      colors[i3 + 2] = mixed.b
+      // Pre-positions (the shader rotates them dynamically)
+      positions[i * 3 + 0] = Math.cos(branch) * r
+      positions[i * 3 + 1] = 0
+      positions[i * 3 + 2] = Math.sin(branch) * r
 
-      scales[i] = Math.random() * 1.3 + 0.2
+      // Particle size: slightly larger near the core
+      const coreBias = Math.pow(1.0 - r / GALAXY_RADIUS, 1.4)
+      scales[i] = (Math.random() * 0.9 + 0.35) * (0.6 + coreBias * 1.4)
     }
 
-    return { positions, colors, scales, randomnessAttr }
-  }, [count, radius, branches, spin, randomness, randomnessPower, insideColor, outsideColor])
+    return { positions, scales, randomness, angles, radii, heights }
+  }, [settings.count, settings.branches])
 
-  useFrame((state) => {
+  useFrame((state, deltaRaw) => {
+    const delta = Math.min(deltaRaw, 1 / 30)
     if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = state.clock.elapsedTime
+      const u = materialRef.current.uniforms
+      u.uTime.value += delta
+      // Live-tunable uniforms
+      u.uSpin.value = settings.spin
+      u.uCoreGlow.value = settings.coreGlow
+      u.uDustDensity.value = settings.dustDensity
+      u.uGradientIntensity.value = settings.gradientIntensity
+      u.uTurbulence.value = settings.turbulence
     }
   })
 
+  // Stable key based on geometry-affecting params: triggers safe re-mount + disposal
+  const geomKey = `${settings.count}-${settings.branches}`
+
   return (
-    <points frustumCulled={false}>
+    <points key={geomKey} frustumCulled={false}>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} />
-        <bufferAttribute attach="attributes-color" args={[colors, 3]} count={count} />
-        <bufferAttribute attach="attributes-aScale" args={[scales, 1]} count={count} />
-        <bufferAttribute attach="attributes-aRandomness" args={[randomnessAttr, 3]} count={count} />
+        <bufferAttribute attach="attributes-position"   args={[positions, 3]} count={positions.length / 3} />
+        <bufferAttribute attach="attributes-aScale"     args={[scales, 1]}    count={scales.length} />
+        <bufferAttribute attach="attributes-aRandomness" args={[randomness, 3]} count={randomness.length / 3} />
+        <bufferAttribute attach="attributes-aAngle"     args={[angles, 1]}    count={angles.length} />
+        <bufferAttribute attach="attributes-aRadius"    args={[radii, 1]}     count={radii.length} />
+        <bufferAttribute attach="attributes-aHeight"    args={[heights, 1]}   count={heights.length} />
       </bufferGeometry>
       <shaderMaterial
         ref={materialRef}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
-        vertexColors
         transparent
         vertexShader={galaxyVertex}
         fragmentShader={galaxyFragment}
         uniforms={{
           uTime: { value: 0 },
-          uSize: { value: 28 * (typeof window !== 'undefined' ? window.devicePixelRatio : 1) },
+          uSize: { value: 32 * (typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1) },
+          uSpin: { value: settings.spin },
+          uTurbulence: { value: settings.turbulence },
+          uCoreGlow: { value: settings.coreGlow },
+          uDustDensity: { value: settings.dustDensity },
+          uGradientIntensity: { value: settings.gradientIntensity },
+          uMaxRadius: { value: GALAXY_RADIUS },
+          uColorCore:  { value: new THREE.Color('#ff2a3a') },  // intense blood red
+          uColorMid:   { value: new THREE.Color('#3a0d4f') },  // dark rich violet
+          uColorOuter: { value: new THREE.Color('#1a3cff') },  // deep cosmic blue
         }}
       />
     </points>
