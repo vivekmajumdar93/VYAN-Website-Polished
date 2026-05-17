@@ -48,11 +48,12 @@ export default function CameraRig({ controls }: Props) {
     warpStartTarget.current.copy(c.target)
 
     const nodePos = new THREE.Vector3(...selected.position)
-    // End target = the node itself; End position = slightly offset from node toward current view dir
+    // End target = the node itself; End position = offset along current view dir
+    // Pulled back to ~5.2 so the bloomed NanoOrb (~3 units across) frames cinematically
     const viewDir = new THREE.Vector3().subVectors(camera.position, c.target).normalize()
-    const dist = 3.2
+    const dist = 5.2
     warpEndTarget.current.copy(nodePos)
-    warpEndPos.current.copy(nodePos).add(viewDir.multiplyScalar(dist)).add(new THREE.Vector3(0, 0.6, 0))
+    warpEndPos.current.copy(nodePos).add(viewDir.multiplyScalar(dist))
 
     warpProgress.current = 0
     warping.current = true
