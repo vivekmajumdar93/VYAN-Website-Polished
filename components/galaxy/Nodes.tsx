@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useFrame } from '@react-three/fiber'
-import { NODES, useGalaxyStore, type GalaxyNode } from '@/lib/store'
+import { NODES, useGalaxyStore, type GalaxyNode, type GalaxyId } from '@/lib/store'
 
 function rand(min: number, max: number) {
   return min + Math.random() * (max - min)
@@ -20,25 +20,22 @@ type OrbBuffers = {
   dustCol: Float32Array
   satellites: {
     pos: [number, number, number]
-    speed: number
-    seed: number
     pts: Float32Array
     lines: Float32Array
   }[]
 }
 
-const NODE_COUNT = 220
-const CORE_COUNT = 1400
-const HAZE_COUNT = 900
-const DUST_COUNT = 900
-const SAT_COUNT = 10
+const NODE_COUNT = 200
+const CORE_COUNT = 1300
+const HAZE_COUNT = 800
+const DUST_COUNT = 800
+const SAT_COUNT = 8
 
 function buildOrbBuffers(colorA: string, colorB: string): OrbBuffers {
   const cA = new THREE.Color(colorA)
   const cB = new THREE.Color(colorB)
   const violet = new THREE.Color('#5200ff')
 
-  // ---- 1. Network nodes (sphere distribution) ----
   const nodePos = new Float32Array(NODE_COUNT * 3)
   const nodeCols = new Float32Array(NODE_COUNT * 3)
   const nodeBase: { x: number; y: number; z: number; phase: number }[] = []
@@ -58,7 +55,6 @@ function buildOrbBuffers(colorA: string, colorB: string): OrbBuffers {
     nodeCols[i * 3] = c.r; nodeCols[i * 3 + 1] = c.g; nodeCols[i * 3 + 2] = c.b
   }
 
-  // ---- 2. Connection web ----
   const lineList: number[] = []
   for (let i = 0; i < NODE_COUNT; i++) {
     for (let j = i + 1; j < NODE_COUNT; j++) {
@@ -70,7 +66,6 @@ function buildOrbBuffers(colorA: string, colorB: string): OrbBuffers {
   }
   const linePts = new Float32Array(lineList)
 
-  // ---- 3. Quantum stardust core ----
   const coreDustPos = new Float32Array(CORE_COUNT * 3)
   const coreDustCol = new Float32Array(CORE_COUNT * 3)
   for (let i = 0; i < CORE_COUNT; i++) {
@@ -88,7 +83,6 @@ function buildOrbBuffers(colorA: string, colorB: string): OrbBuffers {
     coreDustCol[i * 3] = c.r; coreDustCol[i * 3 + 1] = c.g; coreDustCol[i * 3 + 2] = c.b
   }
 
-  // ---- 4. Inner haze ----
   const hazePos = new Float32Array(HAZE_COUNT * 3)
   for (let i = 0; i < HAZE_COUNT; i++) {
     const r = Math.pow(Math.random(), 1.9) * 0.62
@@ -99,7 +93,6 @@ function buildOrbBuffers(colorA: string, colorB: string): OrbBuffers {
     hazePos[i * 3 + 2] = r * Math.cos(phi)
   }
 
-  // ---- 5. Outer stardust cloud ----
   const dustPos = new Float32Array(DUST_COUNT * 3)
   const dustCol = new Float32Array(DUST_COUNT * 3)
   for (let i = 0; i < DUST_COUNT; i++) {
@@ -113,12 +106,11 @@ function buildOrbBuffers(colorA: string, colorB: string): OrbBuffers {
     dustCol[i * 3] = c.r; dustCol[i * 3 + 1] = c.g; dustCol[i * 3 + 2] = c.b
   }
 
-  // ---- 6. Floating satellite clusters ----
   const satellites: OrbBuffers['satellites'] = []
   for (let s = 0; s < SAT_COUNT; s++) {
     const pts: number[] = []
     const ptsVec: THREE.Vector3[] = []
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 7; i++) {
       const p = new THREE.Vector3(rand(-0.18, 0.18), rand(-0.18, 0.18), rand(-0.18, 0.18))
       pts.push(p.x, p.y, p.z)
       ptsVec.push(p)
@@ -133,8 +125,6 @@ function buildOrbBuffers(colorA: string, colorB: string): OrbBuffers {
     }
     satellites.push({
       pos: [rand(-1.6, 1.6), rand(-1.2, 1.2), rand(-1.0, 1.0)],
-      speed: rand(0.1, 0.4),
-      seed: Math.random() * 100,
       pts: new Float32Array(pts),
       lines: new Float32Array(lines),
     })
@@ -159,11 +149,10 @@ function NanoOrb({ node }: { node: GalaxyNode }) {
   const setSelected = useGalaxyStore((s) => s.setSelected)
   const setHovered = useGalaxyStore((s) => s.setHovered)
   const seed = useMemo(() => Math.random() * 1000, [])
-  const scaleRef = useRef(0.13)
+  const scaleRef = useRef(node.isPortal ? 0.18 : 0.14)
 
-  // colorA = node accent, colorB = violet companion
   const colorA = node.color
-  const colorB = '#a066ff'
+  const colorB = node.isPortal ? '#ff7090' : '#a066ff'
 
   const bufs = useMemo(() => buildOrbBuffers(colorA, colorB), [colorA, colorB])
 
@@ -172,17 +161,15 @@ function NanoOrb({ node }: { node: GalaxyNode }) {
     const t = clock.elapsedTime
     if (!groupRef.current) return
 
-    // Scale: small dot in galaxy view, blooms into full neural sphere when selected
-    const target = isSelected ? 1.0 : hover ? 0.22 : 0.16
+    const baseIdle = node.isPortal ? 0.20 : 0.14
+    const target = isSelected ? 1.0 : hover ? 0.26 : baseIdle
     scaleRef.current += (target - scaleRef.current) * Math.min(delta * 4, 0.25)
     groupRef.current.scale.setScalar(scaleRef.current)
 
-    // Whole-orb tumble
     groupRef.current.rotation.y += delta * 0.18
     groupRef.current.rotation.x = Math.sin(t * 0.18 + seed) * 0.18
     groupRef.current.rotation.z = Math.cos(t * 0.11 + seed) * 0.08
 
-    // Node turbulence (only when selected -> saves perf when 5 other orbs are tiny)
     if (isSelected && nodePtsRef.current) {
       const posAttr = nodePtsRef.current.geometry.attributes.position as THREE.BufferAttribute
       const arr = posAttr.array as Float32Array
@@ -195,11 +182,8 @@ function NanoOrb({ node }: { node: GalaxyNode }) {
       posAttr.needsUpdate = true
     }
 
-    // Network shimmer
     if (webMatRef.current) webMatRef.current.opacity = 0.3 + Math.sin(t * 2.4 + seed) * 0.1
     if (nodeMatRef.current) nodeMatRef.current.opacity = 0.82 + Math.sin(t * 1.7 + seed) * 0.08
-
-    // Core turbulence
     if (coreDustRef.current) {
       coreDustRef.current.rotation.y += delta * 0.55
       coreDustRef.current.rotation.x -= delta * 0.22
@@ -213,8 +197,6 @@ function NanoOrb({ node }: { node: GalaxyNode }) {
       dustRef.current.rotation.y += delta * 0.06
       dustRef.current.rotation.x += delta * 0.02
     }
-
-    // Satellites
     if (satellitesRef.current) {
       satellitesRef.current.children.forEach((c, i) => {
         c.rotation.x += delta * (0.4 + i * 0.04)
@@ -226,7 +208,6 @@ function NanoOrb({ node }: { node: GalaxyNode }) {
 
   return (
     <group ref={groupRef} position={node.position}>
-      {/* Hit mesh for interaction (invisible sphere) */}
       <mesh
         onClick={(e) => { e.stopPropagation(); setSelected(node) }}
         onPointerOver={(e) => { e.stopPropagation(); setHover(true); setHovered(node.id); document.body.style.cursor = 'pointer' }}
@@ -236,77 +217,39 @@ function NanoOrb({ node }: { node: GalaxyNode }) {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* 1. Network nodes (200+) */}
       <points ref={nodePtsRef} frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[bufs.nodePos, 3]} count={NODE_COUNT} />
           <bufferAttribute attach="attributes-color"    args={[bufs.nodeCols, 3]} count={NODE_COUNT} />
         </bufferGeometry>
-        <pointsMaterial
-          ref={nodeMatRef}
-          size={0.055}
-          vertexColors
-          transparent
-          opacity={0.92}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          sizeAttenuation
-        />
+        <pointsMaterial ref={nodeMatRef} size={0.055} vertexColors transparent opacity={0.92} blending={THREE.AdditiveBlending} depthWrite={false} sizeAttenuation />
       </points>
 
-      {/* 2. Connection web */}
       {bufs.linePts.length > 0 && (
-        // @ts-ignore - lineSegments JSX element
+        // @ts-ignore
         <lineSegments frustumCulled={false}>
           <bufferGeometry>
             <bufferAttribute attach="attributes-position" args={[bufs.linePts, 3]} count={bufs.linePts.length / 3} />
           </bufferGeometry>
-          <lineBasicMaterial
-            ref={webMatRef}
-            color={colorB}
-            transparent
-            opacity={0.42}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
+          <lineBasicMaterial ref={webMatRef} color={colorB} transparent opacity={0.42} blending={THREE.AdditiveBlending} depthWrite={false} />
         </lineSegments>
       )}
 
-      {/* 3. Quantum stardust core */}
       <points ref={coreDustRef} frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[bufs.coreDustPos, 3]} count={CORE_COUNT} />
           <bufferAttribute attach="attributes-color"    args={[bufs.coreDustCol, 3]} count={CORE_COUNT} />
         </bufferGeometry>
-        <pointsMaterial
-          ref={coreDustMatRef}
-          size={0.03}
-          vertexColors
-          transparent
-          opacity={0.92}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          sizeAttenuation
-        />
+        <pointsMaterial ref={coreDustMatRef} size={0.03} vertexColors transparent opacity={0.92} blending={THREE.AdditiveBlending} depthWrite={false} sizeAttenuation />
       </points>
 
-      {/* 4. Inner haze */}
       <points ref={hazeRef} frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[bufs.hazePos, 3]} count={HAZE_COUNT} />
         </bufferGeometry>
-        <pointsMaterial
-          color={colorB}
-          size={0.018}
-          transparent
-          opacity={0.18}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          sizeAttenuation
-        />
+        <pointsMaterial color={colorB} size={0.018} transparent opacity={0.18} blending={THREE.AdditiveBlending} depthWrite={false} sizeAttenuation />
       </points>
 
-      {/* 5. Floating satellites */}
       <group ref={satellitesRef}>
         {bufs.satellites.map((s, i) => (
           <group key={i} position={s.pos}>
@@ -314,18 +257,10 @@ function NanoOrb({ node }: { node: GalaxyNode }) {
               <bufferGeometry>
                 <bufferAttribute attach="attributes-position" args={[s.pts, 3]} count={s.pts.length / 3} />
               </bufferGeometry>
-              <pointsMaterial
-                color={colorB}
-                size={0.045}
-                transparent
-                opacity={0.9}
-                blending={THREE.AdditiveBlending}
-                depthWrite={false}
-                sizeAttenuation
-              />
+              <pointsMaterial color={colorB} size={0.045} transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} sizeAttenuation />
             </points>
             {s.lines.length > 0 && (
-              // @ts-ignore - lineSegments JSX element
+              // @ts-ignore
               <lineSegments frustumCulled={false}>
                 <bufferGeometry>
                   <bufferAttribute attach="attributes-position" args={[s.lines, 3]} count={s.lines.length / 3} />
@@ -337,30 +272,22 @@ function NanoOrb({ node }: { node: GalaxyNode }) {
         ))}
       </group>
 
-      {/* 6. Outer stardust cloud */}
       <points ref={dustRef} frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[bufs.dustPos, 3]} count={DUST_COUNT} />
           <bufferAttribute attach="attributes-color"    args={[bufs.dustCol, 3]} count={DUST_COUNT} />
         </bufferGeometry>
-        <pointsMaterial
-          size={0.022}
-          vertexColors
-          transparent
-          opacity={0.32}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          sizeAttenuation
-        />
+        <pointsMaterial size={0.022} vertexColors transparent opacity={0.32} blending={THREE.AdditiveBlending} depthWrite={false} sizeAttenuation />
       </points>
     </group>
   )
 }
 
-export default function Nodes() {
+export default function Nodes({ filterGalaxy }: { filterGalaxy?: GalaxyId }) {
+  const list = filterGalaxy ? NODES.filter((n) => n.galaxyId === filterGalaxy) : NODES
   return (
     <group>
-      {NODES.map((n) => (
+      {list.map((n) => (
         <NanoOrb key={n.id} node={n} />
       ))}
     </group>

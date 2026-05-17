@@ -5,14 +5,19 @@ import { useFrame } from '@react-three/fiber'
 import { galaxyVertex, galaxyFragment } from './shaders'
 import { useGalaxyStore } from '@/lib/store'
 
-const GALAXY_RADIUS = 5.5
+type Props = {
+  radius?: number
+  countOverride?: number
+  intensity?: number
+}
 
-export default function Galaxy() {
+export default function Galaxy({ radius = 5.5, countOverride, intensity = 1.0 }: Props) {
   const settings = useGalaxyStore((s) => s.settings)
   const materialRef = useRef<THREE.ShaderMaterial>(null!)
+  const effectiveCount = countOverride ?? settings.count
 
   const buffers = useMemo(() => {
-    const count = Math.max(5000, Math.floor(settings.count))
+    const count = Math.max(5000, Math.floor(effectiveCount))
     const branches = Math.max(2, Math.floor(settings.branches))
     const positions = new Float32Array(count * 3)
     const scales = new Float32Array(count)
@@ -24,20 +29,15 @@ export default function Galaxy() {
 
     const randomnessFactor = 0.11
     const randomnessPower = 3.0
-
-    // Probability of an accent bright cyan star
     const STAR_PROB = 0.012
 
     for (let i = 0; i < count; i++) {
-      // Distribute particles more evenly across the disk for a true disc shape
-      const r = Math.pow(Math.random(), 0.85) * GALAXY_RADIUS
+      const r = Math.pow(Math.random(), 0.85) * radius
       const branch = ((i % branches) / branches) * Math.PI * 2
-
       angles[i] = branch
       radii[i] = r
 
-      // Disc thickness shrinks toward outside
-      const thickness = 0.10 * (1.0 - r / (GALAXY_RADIUS * 1.5))
+      const thickness = 0.10 * (1.0 - r / (radius * 1.5))
       heights[i] = (Math.random() - 0.5) * Math.max(thickness, 0.012) * 2.0
 
       const armWidthScale = (r * 0.35 + 0.12)
@@ -53,17 +53,16 @@ export default function Galaxy() {
       positions[i * 3 + 1] = 0
       positions[i * 3 + 2] = Math.sin(branch) * r
 
-      const coreBias = Math.pow(1.0 - r / GALAXY_RADIUS, 1.3)
+      const coreBias = Math.pow(1.0 - r / radius, 1.3)
       scales[i] = (Math.random() * 0.8 + 0.3) * (0.55 + coreBias * 1.5)
 
-      // Accent bright cyan stars - more likely in the outer disk for the dotted look
-      const outerWeight = THREE.MathUtils.smoothstep(r, 1.0, GALAXY_RADIUS)
+      const outerWeight = THREE.MathUtils.smoothstep(r, 1.0, radius)
       const starHit = Math.random() < STAR_PROB * (0.4 + outerWeight)
       stars[i] = starHit ? 1.0 : 0.0
     }
 
     return { positions, scales, randomness, angles, radii, heights, stars }
-  }, [settings.count, settings.branches])
+  }, [effectiveCount, settings.branches, radius])
 
   useFrame((_, deltaRaw) => {
     const delta = Math.min(deltaRaw, 1 / 30)
@@ -71,16 +70,16 @@ export default function Galaxy() {
       const u = materialRef.current.uniforms
       u.uTime.value += delta
       u.uSpin.value = settings.spin
-      u.uCoreGlow.value = settings.coreGlow
+      u.uCoreGlow.value = settings.coreGlow * intensity
       u.uDustDensity.value = settings.dustDensity
-      u.uGradientIntensity.value = settings.gradientIntensity
+      u.uGradientIntensity.value = settings.gradientIntensity * intensity
       u.uTurbulence.value = settings.turbulence
       u.uSpiralTightness.value = settings.spiralTightness
       u.uStarBrightness.value = settings.starBrightness
     }
   })
 
-  const geomKey = `${settings.count}-${settings.branches}`
+  const geomKey = `${effectiveCount}-${settings.branches}-${radius}`
 
   return (
     <points key={geomKey} frustumCulled={false}>
@@ -110,8 +109,7 @@ export default function Galaxy() {
           uGradientIntensity: { value: settings.gradientIntensity },
           uSpiralTightness: { value: settings.spiralTightness },
           uStarBrightness: { value: settings.starBrightness },
-          uMaxRadius: { value: GALAXY_RADIUS },
-          // White-violet core -> blue mid -> deep cobalt outer
+          uMaxRadius: { value: radius },
           uColorCore:  { value: new THREE.Color('#e6d8ff') },
           uColorMid:   { value: new THREE.Color('#4a3aff') },
           uColorOuter: { value: new THREE.Color('#0a1a8a') },

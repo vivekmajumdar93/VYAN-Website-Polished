@@ -21,7 +21,7 @@ export default function Nebula() {
 
   return (
     <mesh ref={meshRef} renderOrder={-1} position={[0, 0, -0.2]}>
-      <planeGeometry args={[12, 12, 1, 1]} />
+      <planeGeometry args={[10, 10, 1, 1]} />
       <shaderMaterial
         ref={matRef}
         transparent
@@ -33,8 +33,8 @@ export default function Nebula() {
         uniforms={{
           uTime: { value: 0 },
           uStrength: { value: strength },
-          uColorInner: { value: new THREE.Color('#3a2dff') }, // violet-blue inner
-          uColorOuter: { value: new THREE.Color('#08124a') }, // dark cosmic blue
+          uColorInner: { value: new THREE.Color('#2a1eff') },
+          uColorOuter: { value: new THREE.Color('#020a3a') },
         }}
       />
     </mesh>
