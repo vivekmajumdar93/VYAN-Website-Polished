@@ -7,8 +7,7 @@ constructor(private root: HTMLElement) {
 this.el.className = 'intro-cover';
 this.logo.className = 'intro-logo';
 this.logo.alt = 'VYAN Technologies Logo';
-this.logo.src =
-'https://raw.githubusercontent.com/vivekmajumdar93/VYAN-Technologies-Logo/main/IMG_9695.png';
+this.logo.src = '/logo.png';
 this.title.className = 'intro-title';
 this.title.textContent = 'VYAN';
 this.el.appendChild(this.logo);

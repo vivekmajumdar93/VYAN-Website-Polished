@@ -13,8 +13,10 @@ private interaction: InteractionManager;
 private quality: QualityManager;
 private overlay: Overlay;
 private intro: IntroDirector;
-constructor(private root: HTMLElement) {
-this.scroll = new ScrollJourney();
+private skipIntro: boolean;
+  constructor(private root: HTMLElement, opts: { skipIntro?: boolean } = {}) {
+    this.skipIntro = !!opts.skipIntro;
+    this.scroll = new ScrollJourney();
 this.audio = new AudioReactive();
 this.interaction = new InteractionManager(root);
 this.quality = new QualityManager();
@@ -40,12 +42,21 @@ overlay: this.overlay,
 }
 start() {
 this.overlay.mount();
-this.intro.play(() => {
+const afterIntro = () => {
 this.overlay.endIntro();
 this.scroll.setEnabled(true);
 void this.audio.init();
 this.overlay.setSoundMuted(this.audio.muted);
 this.world.start();
-});
+};
+if (this.skipIntro) {
+afterIntro();
+} else {
+this.intro.play(afterIntro);
+}
+}
+destroy() {
+this.world?.destroy?.();
+try { this.overlay?.unmount?.(); } catch {}
 }
 }

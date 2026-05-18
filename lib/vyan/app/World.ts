@@ -22,6 +22,7 @@ export class World {
   private deps!: Deps;
   private composerBundle!: ComposerBundle;
   private raf = 0;
+  private stopped = false;
 
   constructor(private root: HTMLElement, private quality: QualityManager) {
     this.scene.background = new THREE.Color(0x000000);
@@ -80,6 +81,7 @@ export class World {
 
   start() {
     const tick = () => {
+      if (this.stopped) return;
       const dt = Math.min(this.clock.getDelta(), 0.033);
       const t = this.clock.elapsedTime;
 
@@ -119,6 +121,13 @@ export class World {
   }
 
   jumpToOrb(_index: number) {}
+
+  destroy() {
+    this.stopped = true;
+    cancelAnimationFrame(this.raf);
+    try { this.renderer.dispose(); } catch {}
+    try { this.renderer.domElement.remove(); } catch {}
+  }
 
   closePanel() {
     this.realms.closePanel();

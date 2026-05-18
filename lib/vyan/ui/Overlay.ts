@@ -120,6 +120,10 @@ this.callbacks = callbacks;
 mount() {
 this.root.appendChild(this.element);
 }
+unmount() {
+try { this.element.remove(); } catch {}
+try { this.soundOverlay.remove(); } catch {}
+}
 endIntro() {
 this.introComplete = true;
 }
