@@ -65,7 +65,7 @@ export class World {
     this.bindResize();
   }
 
-  bind(deps: Deps) {
+  bind(deps: Deps, callbacks: { onEnterVoid?: () => void; onOrbActivate?: (key: any) => void } = {}) {
     this.deps = deps;
     this.cameraRig.bind({
       scroll: this.deps.scroll,
@@ -76,8 +76,12 @@ export class World {
       ...deps,
       camera: this.camera,
       cameraRig: this.cameraRig,
-    });
+    }, callbacks);
   }
+
+  setMode(mode: any) { this.realms.setMode(mode); }
+  focusShunyaOrb(key: any, immediate = false) { this.realms.focusShunyaOrb(key, immediate); }
+  getMode() { return this.realms.mode; }
 
   start() {
     const tick = () => {

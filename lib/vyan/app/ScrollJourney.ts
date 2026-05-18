@@ -15,6 +15,11 @@ window.addEventListener('touchmove', this.onTouchMove, { passive: true });
 setEnabled(v: boolean) {
 this.enabled = v;
 }
+dispose() {
+window.removeEventListener('wheel', this.onWheel);
+window.removeEventListener('touchstart', this.onTouchStart);
+window.removeEventListener('touchmove', this.onTouchMove);
+}
 freeze() {
 this.enabled = false;
 }

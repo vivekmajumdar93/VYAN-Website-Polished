@@ -21,31 +21,54 @@ user_problem_statement: |
 
 ## Phase Tracker
 
-phase_1_foundation_transplant:
+phase_1_foundation_transplant: { status: USER_VERIFIED }
+
+phase_2_shunya_void:
   status: USER_VERIFICATION_PENDING
   visual_checks_done: true
   http_checks_done: true
   notes:
-    - Wiped prior Vite scaffold, set up Next.js 14 App Router.
-    - Ported /lib/vyan/{app,objects,post,scenes,shaders,ui} (Firebase already stripped).
-    - Added skipIntro option to App + destroy method on App/World/Overlay for clean unmount.
-    - Loader page (/) uses GSAP timeline: emerge → breath 1 → breath 2 → fade.
-    - Loader prefetches /vyoma via router.prefetch for instant transition.
-    - /vyoma renders GatewayRealm canvas + Overlay UI unmodified.
-  files_created:
-    - /app/package.json (Next 14.2.5, three 0.163, gsap 3.13)
-    - /app/tsconfig.json
-    - /app/next.config.js
-    - /app/tailwind.config.ts
-    - /app/postcss.config.js
-    - /app/app/layout.tsx
-    - /app/app/page.tsx + /app/app/LoaderClient.tsx
-    - /app/app/vyoma/page.tsx + /app/app/vyoma/VyomaClient.tsx
-    - /app/app/globals.css
-    - /app/lib/vyan/** (ported from user zip)
-    - /app/public/logo.png (downloaded from user's GitHub)
-
-phase_2_shunya_void: { status: NOT_STARTED }
+    - 5 orbs (Udbhava, Vistāra, Vyūha, Medhā, Sandhi) created with NanoOrb + colored tints.
+    - PathCurve.ts — closed CatmullRom curve with 5 waypoints offset from orb positions.
+    - SceneManager promoted to multi-realm with mode switching (gateway ↔ shunya).
+    - CameraRig.updateShunya() follows the path based on scroll.loopProgress with pointer parallax.
+    - ScrollJourney already supports wheel + touch swipe; drives camera traversal.
+    - Orb captions (red name + cosmic silver tagline) fade based on focus proximity.
+    - Right-edge depth rail shows 5 nodes (extras hidden) with active glow.
+    - Drag rotates the focused orb (when interaction.down and focus > 0.6).
+    - GatewayRealm.triggerBurst → fadeToBlack → emits onEnterVoid → router.push('/shunya').
+    - ShunyaRealm.onEnter calls fadeFromBlack(1.6s) for cinematic emergence from the void.
+    - Shared (cosmic) route group layout = canvas mounts ONCE, /vyoma ↔ /shunya navigates without remount.
+    - Deep-link to /shunya/<orb> snaps camera to that orb instantly on initial mount.
+    - Browser back/forward integrated natively via Next.js history.
+    - Cascade prefetch: loader prefetches /vyoma; CosmicCanvas prefetches /vyoma + /shunya on mount.
+  routes:
+    - "/"               (loader)
+    - "/vyoma"          (gateway, Vyōma orb)
+    - "/shunya"         (parent void, 5 orbs, starts at Udbhava)
+    - "/shunya/udbhava" (focused)
+    - "/shunya/vistara" (focused)
+    - "/shunya/vyuha"   (focused)
+    - "/shunya/medha"   (focused)
+    - "/shunya/sandhi"  (focused)
+  files_created_or_modified:
+    - /app/lib/vyan/scenes/PathCurve.ts                 (NEW)
+    - /app/lib/vyan/scenes/realms/ShunyaRealm.ts        (NEW)
+    - /app/lib/vyan/scenes/RealmManager.ts              (rewrite for multi-realm)
+    - /app/lib/vyan/app/CameraRig.ts                    (rewrite, gateway + shunya modes)
+    - /app/lib/vyan/app/App.ts                          (public setMode/focusShunyaOrb/getMode)
+    - /app/lib/vyan/app/World.ts                        (callbacks pass-through, setMode/focusShunyaOrb)
+    - /app/lib/vyan/app/ScrollJourney.ts                (added dispose())
+    - /app/lib/vyan/ui/Overlay.ts                       (setShunyaCaption, setShunyaRail, fadeFromBlack, clearFade)
+    - /app/lib/vyan/ui/styles.css                       (Shunya caption + depth-node.near styles)
+    - /app/lib/vyan/scenes/realms/GatewayRealm.ts       (onEnterVoid callback, clearFade on re-entry)
+    - /app/app/(cosmic)/layout.tsx                      (NEW shared layout)
+    - /app/app/(cosmic)/CosmicCanvas.tsx                (NEW persistent canvas mount)
+    - /app/app/(cosmic)/vyoma/page.tsx                  (signals gateway)
+    - /app/app/(cosmic)/shunya/page.tsx                 (signals shunya)
+    - /app/app/(cosmic)/shunya/[orb]/page.tsx           (deep link, validates orb key)
+    - /app/public/audio/ambient.mp3                     (silence placeholder, suppresses 404)
+    - REMOVED: /app/app/vyoma/{page.tsx,VyomaClient.tsx} (replaced by route group)
 phase_3_glass_slabs: { status: NOT_STARTED }
 phase_4_vistara_subvoid: { status: NOT_STARTED }
 phase_5_medha_subvoid: { status: NOT_STARTED }

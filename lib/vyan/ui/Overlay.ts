@@ -35,10 +35,14 @@ private panelClose = document.createElement('button');
 private gatewayHint = document.createElement('div');
 private cursorHint = document.createElement('div');
 private distanceLabel = document.createElement('div');
+private shunyaCaption = document.createElement('div');
+private shunyaName = document.createElement('div');
+private shunyaTag = document.createElement('div');
   private introComplete = false;
   private voidMode = false;
   private currentApproach = 0;
   private cursorHovered = false;
+  private fadeOverlay: HTMLDivElement | null = null;
   constructor(private root: HTMLElement) {
 this.element.className = 'vyan-ui';
 this.soundConsole.className = 'sound-console';
@@ -78,6 +82,12 @@ this.gatewayHint.className = 'gateway-hint';
     this.cursorHint.style.opacity = '0';
     this.distanceLabel.className = 'distance-label';
     this.distanceLabel.style.opacity = '0';
+    this.shunyaCaption.className = 'shunya-caption';
+    this.shunyaName.className = 'shunya-name';
+    this.shunyaTag.className = 'shunya-tag';
+    this.shunyaCaption.appendChild(this.shunyaName);
+    this.shunyaCaption.appendChild(this.shunyaTag);
+    this.shunyaCaption.style.opacity = '0';
     this.panel.className = 'glass-panel';
     this.panel.innerHTML = `
       <div class="glass-panel-inner">
@@ -112,6 +122,7 @@ this.element.appendChild(this.rail);
 this.element.appendChild(this.gatewayHint);
 this.element.appendChild(this.cursorHint);
 this.element.appendChild(this.distanceLabel);
+this.element.appendChild(this.shunyaCaption);
 this.element.appendChild(this.panel);
 }
 bind(callbacks: OverlayCallbacks) {
@@ -264,6 +275,8 @@ this.distanceLabel.style.opacity = on ? '1' : '0';
 if (on) {
 this.gatewayHint.style.opacity = '0';
 this.cursorHint.style.opacity = '0';
+} else {
+this.shunyaCaption.style.opacity = '0';
 }
 }
 setDistance(approach: number) {
@@ -282,7 +295,9 @@ this.rail.classList.toggle('visible', enabled);
 this.rail.style.pointerEvents = 'none';
 }
 fadeToBlack(durationSeconds: number) {
+this.clearFade();
 const darkness = document.createElement('div');
+darkness.dataset.vyanFade = '1';
 darkness.style.position = 'fixed';
 darkness.style.top = '0';
 darkness.style.left = '0';
@@ -294,11 +309,49 @@ darkness.style.pointerEvents = 'none';
 darkness.style.zIndex = '10000';
 darkness.style.transition = `opacity ${durationSeconds}s ease-in-out`;
 document.body.appendChild(darkness);
+this.fadeOverlay = darkness;
 darkness.getBoundingClientRect();
 darkness.style.opacity = '1';
 this.element.style.transition = `opacity ${durationSeconds}s ease-in-out`;
 this.element.style.opacity = '0';
 this.element.style.pointerEvents = 'none';
+}
+clearFade() {
+  document.querySelectorAll('[data-vyan-fade="1"]').forEach(el => el.remove());
+  this.fadeOverlay = null;
+  // Restore overlay visibility
+  this.element.style.transition = 'opacity 0.6s ease-out';
+  this.element.style.opacity = '1';
+  this.element.style.pointerEvents = 'auto';
+}
+fadeFromBlack(durationSeconds = 1.4) {
+  // Ensures a black overlay exists, then fades it out (used when emerging into a void).
+  let darkness = this.fadeOverlay;
+  if (!darkness) {
+    darkness = document.createElement('div');
+    darkness.dataset.vyanFade = '1';
+    darkness.style.position = 'fixed';
+    darkness.style.top = '0';
+    darkness.style.left = '0';
+    darkness.style.width = '100vw';
+    darkness.style.height = '100vh';
+    darkness.style.background = '#000000';
+    darkness.style.opacity = '1';
+    darkness.style.pointerEvents = 'none';
+    darkness.style.zIndex = '10000';
+    document.body.appendChild(darkness);
+    this.fadeOverlay = darkness;
+    darkness.getBoundingClientRect();
+  }
+  // Restore overlay UI visibility in parallel
+  this.element.style.transition = `opacity ${durationSeconds}s ease-out`;
+  this.element.style.opacity = '1';
+  this.element.style.pointerEvents = 'auto';
+  // Then fade the darkness out
+  darkness.style.transition = `opacity ${durationSeconds}s ease-out`;
+  darkness.style.opacity = '0';
+  const el = darkness;
+  setTimeout(() => { try { el.remove(); } catch {} if (this.fadeOverlay === el) this.fadeOverlay = null; }, (durationSeconds + 0.1) * 1000);
 }
 openPanel(info: ProductInfo, origin?: PanelOrigin) {
 if (origin) {
@@ -312,5 +365,32 @@ this.panel.classList.add('open');
 }
 closePanel() {
 this.panel.classList.remove('open');
+}
+
+setShunyaCaption(name: string, tagline: string, focus: number) {
+  if (!this.voidMode) {
+    this.shunyaCaption.style.opacity = '0';
+    return;
+  }
+  if (this.shunyaName.textContent !== name) this.shunyaName.textContent = name;
+  if (this.shunyaTag.textContent !== tagline) this.shunyaTag.textContent = tagline;
+  // smoothstep
+  const f = focus * focus * (3 - 2 * focus);
+  this.shunyaCaption.style.opacity = String(f);
+  this.shunyaCaption.style.transform = `translate(-50%, ${(1 - f) * 14}px)`;
+  this.shunyaCaption.style.filter = `blur(${(1 - f) * 6}px)`;
+}
+
+setShunyaRail(activeIndex: number, focus: number, total: number) {
+  if (!this.voidMode) return;
+  this.railNodes.forEach((node, i) => {
+    const inRange = i < total;
+    node.style.display = inRange ? '' : 'none';
+    node.classList.toggle('active', i === activeIndex);
+    node.classList.toggle('near', i === activeIndex && focus > 0.4);
+  });
+  // Fill height roughly tracks progress through orbs
+  const pct = ((activeIndex + focus) / total) * 100;
+  this.railFill.style.height = `${Math.max(2, Math.min(100, pct))}%`;
 }
 }

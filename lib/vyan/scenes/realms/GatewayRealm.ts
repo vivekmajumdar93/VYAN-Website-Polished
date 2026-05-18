@@ -48,15 +48,18 @@ export class GatewayRealm {
   onEnter() {
     this.exploded = false;
     this.group.visible = true;
+    this.group.scale.setScalar(1);
     this.core.setVisible(true);
     this.core.reset();
-    
-    if (this.deps.cameraRig) {
-      this.deps.cameraRig.locked = false;
-    }
+    if (this.deps?.cameraRig) this.deps.cameraRig.locked = false;
+    this.deps?.overlay?.setVoidMode?.(false);
+    this.deps?.overlay?.clearFade?.();
   }
 
-  onExit() {}
+  onExit() {
+    this.group.visible = false;
+    this.core.setVisible(false);
+  }
 
   update(_: number, t: number, progress: number, audio: any) {
     if (!this.deps) return;
@@ -93,49 +96,32 @@ export class GatewayRealm {
 
     this.deps.scroll.freeze();
     this.core.burst();
-    
-    if (this.deps.cameraRig) {
-      this.deps.cameraRig.locked = true;
-    }
+    if (this.deps.cameraRig) this.deps.cameraRig.locked = true;
 
     gsap.to(this.deps.camera.position, {
-      z: 4.8,
-      duration: 0.9,
-      ease: 'power4.in',
-      overwrite: true,
+      z: 4.8, duration: 0.9, ease: 'power4.in', overwrite: true,
     });
-
     gsap.to(this.deps.camera.position, {
-      x: '+=0.18',
-      y: '+=0.1',
-      duration: 0.55,
-      yoyo: true,
-      repeat: 1,
-      ease: 'sine.inOut',
-      overwrite: true,
+      x: '+=0.18', y: '+=0.1', duration: 0.55,
+      yoyo: true, repeat: 1, ease: 'sine.inOut', overwrite: true,
     });
-
     gsap.to(this.deps.camera, {
-      fov: 30,
-      duration: 0.75,
-      ease: 'power3.inOut',
+      fov: 30, duration: 0.75, ease: 'power3.inOut',
       onUpdate: () => this.deps.camera.updateProjectionMatrix(),
     });
 
-    // Final Fade to darkness
     setTimeout(() => {
       gsap.to(this.group.scale, {
-        x: 0.001,
-        y: 0.001,
-        z: 0.001,
-        duration: 2.0,
-        ease: 'power4.inOut',
-        onComplete: () => {
-          this.group.visible = false;
-        }
+        x: 0.001, y: 0.001, z: 0.001,
+        duration: 2.0, ease: 'power4.inOut',
+        onComplete: () => { this.group.visible = false; },
       });
-
       this.deps.overlay.fadeToBlack?.(2.5);
+
+      // After the fade fully blacks out, hand control to the React page.
+      setTimeout(() => {
+        try { this.deps.onEnterVoid?.(); } catch {}
+      }, 2500);
     }, 900);
   }
 }
