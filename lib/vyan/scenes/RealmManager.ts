@@ -12,7 +12,7 @@ type Callbacks = {
 
 export class SceneManager {
   private gateway!: GatewayRealm;
-  private shunya!: ShunyaRealm;
+  public shunya!: ShunyaRealm;
   private deps: any = {};
   private callbacks: Callbacks = {};
 
@@ -68,7 +68,7 @@ export class SceneManager {
     } else {
       this.shunya.update(dt, t, progress, audio);
       this.activeIndex = this.shunya.activeIndex;
-      this.panelOpen = false;
+      this.panelOpen = this.shunya.magnifiedIdx !== null;
       this.activeApproach = this.shunya.activeFocus;
     }
   }
@@ -81,5 +81,7 @@ export class SceneManager {
     }
   }
 
-  closePanel() {}
+  closePanel() {
+    if (this.mode === 'shunya') this.shunya.closePanel();
+  }
 }

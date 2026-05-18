@@ -325,6 +325,17 @@ export class NanoOrb {
     });
   }
 
+  // Cinematic magnify (smaller, contained). Used when a Shunya orb is clicked
+  // to open its glass slab — exactly mirrors the Vyōma orb's behaviour scale
+  // pattern but stops at a slab-friendly size instead of warping.
+  public magnifyFactor = 1.0;
+  magnify(target = 2.6, duration = 0.55) {
+    gsap.to(this, { magnifyFactor: target, duration, ease: 'power3.out', overwrite: true });
+  }
+  contract(duration = 0.55) {
+    gsap.to(this, { magnifyFactor: 1.0, duration, ease: 'power3.in', overwrite: true });
+  }
+
   open() {}
   close() {}
 
@@ -365,7 +376,7 @@ export class NanoOrb {
     if (this.scale < 10) {
         this.scale += (targetScale - this.scale) * 0.08;
     }
-    this.group.scale.setScalar(this.scale * (panelOpen ? 1.08 : 1.0));
+    this.group.scale.setScalar(this.scale * (panelOpen ? 1.08 : 1.0) * this.magnifyFactor);
 
     // ORB MOTION
     this.group.rotation.y += 0.15 * motion * 0.016; // Approx dt=.016

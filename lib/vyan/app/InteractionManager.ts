@@ -4,10 +4,13 @@ public pointerRaw = { x: 0, y: 0 };
 public down = false;
 public clicked = false;
 public dragDelta = { x: 0, y: 0 };
+public swipeDir: -1 | 0 | 1 = 0; // -1 = swipe-down (prev), 1 = swipe-up (next), 0 = none
 private target = { x: 0, y: 0 };
 private current = { x: 0, y: 0 };
 private touchX = 0;
 private touchY = 0;
+private touchStartY = 0;
+private touchStartTime = 0;
 constructor(private root: HTMLElement) {
 root.addEventListener('pointermove', this.onMove, { passive: true });
 root.addEventListener('pointerdown', this.onDown, { passive: true });
@@ -15,7 +18,7 @@ root.addEventListener('pointerup', this.onUp, { passive: true });
 root.addEventListener('pointerleave', this.onUp, { passive: true });
 root.addEventListener('touchstart', this.onTouchStart, { passive: true });
 root.addEventListener('touchmove', this.onTouchMove, { passive: true });
-root.addEventListener('touchend', this.onUp, { passive: true });
+root.addEventListener('touchend', this.onTouchEnd, { passive: true });
 }
 private onMove = (e: PointerEvent) => {
 this.pointerRaw.x = e.clientX;
@@ -37,8 +40,18 @@ const t = e.touches[0];
 if (!t) return;
 this.touchX = t.clientX;
 this.touchY = t.clientY;
+this.touchStartY = t.clientY;
+this.touchStartTime = performance.now();
 this.down = true;
 this.clicked = true;
+};
+private onTouchEnd = () => {
+const dy = this.touchStartY - this.touchY; // positive = swiped up
+const dt = performance.now() - this.touchStartTime;
+if (Math.abs(dy) > 30 && dt < 600) {
+  this.swipeDir = dy > 0 ? 1 : -1;
+}
+this.down = false;
 };
 private onTouchMove = (e: TouchEvent) => {
 const t = e.touches[0];

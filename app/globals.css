@@ -17,6 +17,15 @@ html, body {
   font-family: 'Inter', system-ui, sans-serif;
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
+  /* CRITICAL for mobile/iframe: stop the browser from interpreting touch as page-scroll/zoom */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#vyan-root, canvas {
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 * { box-sizing: border-box; }

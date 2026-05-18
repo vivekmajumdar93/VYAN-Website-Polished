@@ -27,7 +27,7 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
     tagline: 'Expansion · the unfurling of products',
     colorA: '#3a90ff',
     colorB: '#ff2a4a',
-    position: new THREE.Vector3(70, 24, -70),
+    position: new THREE.Vector3(120, 30, -90),
   },
   {
     key: 'vyuha',
@@ -35,7 +35,7 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
     tagline: 'Architecture · the lattice of intent',
     colorA: '#9a55ff',
     colorB: '#ff3a3a',
-    position: new THREE.Vector3(95, -22, -190),
+    position: new THREE.Vector3(160, -30, -240),
   },
   {
     key: 'medha',
@@ -43,7 +43,7 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
     tagline: 'Cognition · the mind that understands',
     colorA: '#22e0d4',
     colorB: '#ff2a4a',
-    position: new THREE.Vector3(15, 40, -290),
+    position: new THREE.Vector3(30, 50, -360),
   },
   {
     key: 'sandhi',
@@ -51,33 +51,29 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
     tagline: 'Convergence · the seam between worlds',
     colorA: '#ff8a3a',
     colorB: '#ff2a4a',
-    position: new THREE.Vector3(-90, 6, -170),
+    position: new THREE.Vector3(-120, 10, -220),
   },
 ];
 
-// Camera follows a closed CatmullRom curve through 3D space, with each
-// waypoint OFFSET from the corresponding orb so the orb is visible to one side
-// of the camera as it flies past. Offset angle rotates per orb for variety.
+// Camera path — each waypoint sits ~26 units OUT from its corresponding orb, exactly
+// matching the Vyōma gateway's closest-approach distance (z=26). This makes Shunya
+// orbs appear at the same on-screen size and behave the same as the gateway orb.
 export class PathCurve {
   public curve: THREE.CatmullRomCurve3;
-  public lookAtCurve: THREE.CatmullRomCurve3;
+  public orbCount = SHUNYA_ORBS.length;
+  private static CAM_DIST = 26;
 
   constructor(orbs: ShunyaOrbDef[] = SHUNYA_ORBS) {
     const cameraPts: THREE.Vector3[] = orbs.map((orb, i) => {
       const angle = (i / orbs.length) * Math.PI * 2;
       const offset = new THREE.Vector3(
-        Math.cos(angle) * 22,
-        Math.sin(angle * 0.7) * 8 + 4,
-        Math.sin(angle) * 22
+        Math.cos(angle) * PathCurve.CAM_DIST,
+        Math.sin(angle * 0.7) * 6 + 3,
+        Math.sin(angle) * PathCurve.CAM_DIST
       );
       return orb.position.clone().add(offset);
     });
-
-    // The lookAt path is simply the orb positions — we always look at orbs.
-    const lookPts: THREE.Vector3[] = orbs.map(o => o.position.clone());
-
     this.curve = new THREE.CatmullRomCurve3(cameraPts, true, 'catmullrom', 0.5);
-    this.lookAtCurve = new THREE.CatmullRomCurve3(lookPts, true, 'catmullrom', 0.5);
   }
 
   static wrap(v: number): number {
@@ -88,19 +84,26 @@ export class PathCurve {
     return this.curve.getPointAt(PathCurve.wrap(progress));
   }
 
-  lookAt(progress: number): THREE.Vector3 {
-    // Look slightly AHEAD of the camera along the orb curve for cinematic feel.
-    return this.lookAtCurve.getPointAt(PathCurve.wrap(progress + 0.02));
+  // The look-at target follows the actual focused orb's HOME position, smoothly
+  // lerped between adjacent orbs as we travel — keeps the orb dead-centre in view.
+  lookAt(progress: number, orbInstances?: Array<{ position: THREE.Vector3 }>): THREE.Vector3 {
+    const p = PathCurve.wrap(progress);
+    const total = SHUNYA_ORBS.length;
+    const f = p * total;
+    const idx = Math.floor(f) % total;
+    const frac = f - Math.floor(f);
+    const ease = frac * frac * (3 - 2 * frac);
+    const a = orbInstances ? orbInstances[idx].position : SHUNYA_ORBS[idx].position;
+    const b = orbInstances ? orbInstances[(idx + 1) % total].position : SHUNYA_ORBS[(idx + 1) % total].position;
+    return new THREE.Vector3().lerpVectors(a, b, ease);
   }
 
-  // Returns { index, focus }. focus is 0..1 where 1 = camera centered on that orb.
+  // Returns { index, focus }. focus is 0..1 where 1 = camera centred on that orb.
   nearestOrb(progress: number, orbCount: number): { index: number; focus: number } {
     const p = PathCurve.wrap(progress);
     const f = p * orbCount;
     const index = Math.round(f) % orbCount;
-    // Distance to nearest integer slot (0 → exactly on, 0.5 → mid-way between)
     const dist = Math.min(Math.abs(f - index), Math.abs(f - index - orbCount), Math.abs(f - index + orbCount));
-    // focus 0..1 across +- 0.45 around the slot
     const focus = THREE.MathUtils.clamp(1 - dist / 0.45, 0, 1);
     return { index, focus };
   }
