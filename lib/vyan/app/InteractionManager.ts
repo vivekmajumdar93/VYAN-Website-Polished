@@ -72,20 +72,10 @@ export class InteractionManager {
     // only register a click if the gesture qualifies as a tap.
   };
 
-  private onUp = (e: PointerEvent) => {
+  private onUp = (_e: PointerEvent) => {
     if (!this.down) return;
     this.down = false;
-    const dt = performance.now() - this.downStartTime;
-    const dx = (e?.clientX ?? this.lastX) - this.downStartX;
-    const dy = (e?.clientY ?? this.lastY) - this.downStartY;
-    const totalMove = Math.hypot(dx, dy);
-
-    if (totalMove < InteractionManager.TAP_MOVE_PX && dt < InteractionManager.TAP_MAX_MS) {
-      this.clicked = true;
-    } else if (Math.abs(dy) > InteractionManager.SWIPE_MIN_PX && dt < InteractionManager.SWIPE_MAX_MS) {
-      // Vertical swipe → snap to next/prev orb (negative dy = swipe up = forward)
-      this.swipeDir = dy < 0 ? 1 : -1;
-    }
+    this.detectGestureEnd();
   };
 
   private onTouchStart = (e: TouchEvent) => {
@@ -119,16 +109,8 @@ export class InteractionManager {
   private onTouchEnd = () => {
     if (!this.down) return;
     this.down = false;
-    const dt = performance.now() - this.downStartTime;
-    const dx = this.lastX - this.downStartX;
-    const dy = this.lastY - this.downStartY;
-    const totalMove = Math.hypot(dx, dy);
-
-    if (totalMove < InteractionManager.TAP_MOVE_PX && dt < InteractionManager.TAP_MAX_MS) {
-      this.clicked = true;
-    } else if (Math.abs(dy) > InteractionManager.SWIPE_MIN_PX) {
-      this.swipeDir = dy < 0 ? 1 : -1;
-    }
+    this.detectGestureEnd();
+  };
   };
 
   private wasDown = false;
@@ -139,7 +121,9 @@ export class InteractionManager {
     const totalMove = Math.hypot(dx, dy);
     if (totalMove < InteractionManager.TAP_MOVE_PX && dt < InteractionManager.TAP_MAX_MS) {
       this.clicked = true;
-    } else if (Math.abs(dy) > InteractionManager.SWIPE_MIN_PX) {
+    } else if (Math.abs(dy) > InteractionManager.SWIPE_MIN_PX && Math.abs(dy) > Math.abs(dx) * 1.2) {
+      // Vertical-dominant gesture = orb navigation. Horizontal-dominant gestures
+      // are reserved for orbiting the focused orb (handled per-frame in the realm).
       this.swipeDir = dy < 0 ? 1 : -1;
     }
   }

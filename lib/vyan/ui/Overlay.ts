@@ -81,8 +81,8 @@ this.callbacks?.onJumpToOrb(idx);
 this.gatewayHint.className = 'gateway-hint';
     this.gatewayHint.innerHTML = `
       <div class="gateway-line-1">VYŌMA</div>
-      <div class="gateway-line-2">The Primordial Core</div>
-      <div class="gateway-line-3">Engage to Transcend Realities</div>
+      <div class="gateway-line-2">The Primordial Core of VYAN</div>
+      <div class="gateway-line-3">Initiate Displacement</div>
     `;
     this.gatewayHint.style.opacity = '0';
     this.cursorHint.className = 'cursor-hint';
@@ -364,14 +364,18 @@ fadeFromBlack(durationSeconds = 1.4) {
   const el = darkness;
   setTimeout(() => { try { el.remove(); } catch {} if (this.fadeOverlay === el) this.fadeOverlay = null; }, (durationSeconds + 0.1) * 1000);
 }
-openPanel(info: ProductInfo, origin?: PanelOrigin) {
+openPanel(info: ProductInfo & { html?: string }, origin?: PanelOrigin) {
 if (origin) {
 this.panel.style.setProperty('--origin-x', `${origin.x}px`);
 this.panel.style.setProperty('--origin-y', `${origin.y}px`);
 }
 this.panelTitle.textContent = info.title;
 this.panelSubtitle.textContent = info.subtitle;
-this.panelBody.textContent = info.description;
+if (info.html) {
+  this.panelBody.innerHTML = info.html;
+} else {
+  this.panelBody.textContent = info.description;
+}
 this.panel.classList.add('open');
 }
 closePanel() {

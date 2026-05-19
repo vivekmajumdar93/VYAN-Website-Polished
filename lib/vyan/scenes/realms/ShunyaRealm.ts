@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { NanoOrb } from '../../objects/NanoOrb';
 import { PathCurve, SHUNYA_ORBS, ShunyaOrbDef, ShunyaOrbKey } from '../PathCurve';
+import { SLAB_UDBHAVA_HTML, SLAB_SANDHI_HTML } from '../../ui/slabContent';
 
 type BindDeps = {
   interaction: any;
@@ -113,11 +114,13 @@ export class ShunyaRealm {
     if (this.deps?.scroll?.freeze) this.deps.scroll.freeze();
     orb.magnify(2.6, 0.55);
     setTimeout(() => {
+      const html = this.getSlabHTML(def.key);
       this.deps?.overlay?.openPanel?.({
         title: def.name,
         subtitle: def.tagline,
-        description: this.getSlabBody(def.key),
-      }, undefined);
+        description: '',
+        html,
+      } as any, undefined);
       this.deps?.onOrbActivate?.(def.key);
     }, 480);
   }
@@ -134,15 +137,15 @@ export class ShunyaRealm {
     }, 580);
   }
 
-  private getSlabBody(key: ShunyaOrbKey): string {
-    const bodies: Record<ShunyaOrbKey, string> = {
-      udbhava: 'Emergence is the first breath of being — the moment cognition condenses from the void into form. VYAN begins here, where intention becomes architecture.',
-      vistara: 'Vistāra is the unfurling — the lattice of products that radiate outward from the core. Tap to dive into the product void.',
-      vyuha:   'Vyūha is the design discipline — the lattice of intent, the geometry of decision. Every product passes through this seam.',
-      medha:   'Medhā is the cognition that understands. Multiple minds, one resonance. Tap to enter Medhā.',
-      sandhi:  'Sandhi is the convergence — where voids meet, where transitions resolve into one continuous breath.',
+  private getSlabHTML(key: ShunyaOrbKey): string {
+    if (key === 'udbhava') return SLAB_UDBHAVA_HTML;
+    if (key === 'sandhi') return SLAB_SANDHI_HTML;
+    const placeholders: Partial<Record<ShunyaOrbKey, string>> = {
+      vistara: '<p class="vy-p">Vist\u0101ra is the unfurling \u2014 the lattice of products that radiate outward from the core. <em>Sub-void content arrives in Phase 4.</em></p>',
+      vyuha:   '<p class="vy-p">Vy\u016bha is the design discipline \u2014 the lattice of intent, the geometry of decision. Every product passes through this seam.</p>',
+      medha:   '<p class="vy-p">Medh\u0101 is the cognition that understands. Multiple minds, one resonance. <em>Sub-void content arrives in Phase 5.</em></p>',
     };
-    return bodies[key];
+    return placeholders[key] ?? '';
   }
 
   update(_dt: number, t: number, progress: number, audio: any) {
@@ -178,6 +181,18 @@ export class ShunyaRealm {
 
     this.starfield.rotation.y += 0.00015 + Math.abs(this.deps.scroll.speed) * 0.0009;
     this.nebula.rotation.y -= 0.0001;
+
+    // Click-and-drag orbits the focused orb in any direction.
+    // (Vertical-dominant swipes are still consumed by the swipeDir handler above,
+    // so this only kicks in for in-place / horizontal / diagonal drags.)
+    if (this.magnifiedIdx === null && this.deps.interaction.down && this.activeFocus > 0.55) {
+      const drag = this.deps.interaction.dragDelta;
+      const focused = this.orbs[this.activeIndex];
+      if (Math.abs(drag.x) + Math.abs(drag.y) > 0.4) {
+        focused.group.rotation.y += drag.x * 0.005;
+        focused.group.rotation.x += drag.y * 0.005;
+      }
+    }
 
     const def = this.defs[this.activeIndex];
     this.deps.overlay?.setShunyaCaption?.(def.name, def.tagline, this.magnifiedIdx !== null ? 1 : this.activeFocus);

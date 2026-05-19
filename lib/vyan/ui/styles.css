@@ -576,3 +576,255 @@ color: rgba(255, 255, 255, 1);
 }
 /* Hide the central distance label \u2014 we now show LY on the rail */
 .distance-label { display: none !important; }
+
+/* ============================================================
+   Slab content typography (.vy-slab) — premium, premium-readable
+   ============================================================ */
+.glass-body { padding: 0 !important; }
+.vy-slab {
+  padding: 28px 32px 36px;
+  color: rgba(232, 232, 240, 0.92);
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  font-weight: 300;
+  line-height: 1.68;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.vy-slab__hero {
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 22px;
+  margin-bottom: 26px;
+}
+.vy-slab__hero--center { text-align: center; }
+.vy-slab__brand {
+  font-size: clamp(22px, 2.4vw, 30px);
+  letter-spacing: 0.36em;
+  font-weight: 600;
+  color: #ff2a4a;
+  text-shadow: 0 0 22px rgba(255, 50, 80, 0.45);
+  margin-bottom: 10px;
+}
+.vy-slab__tag {
+  font-size: 12px;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(230, 232, 238, 0.65);
+  font-weight: 300;
+}
+.vy-slab .vy-p {
+  font-size: 14.5px;
+  line-height: 1.78;
+  margin: 0 0 16px 0;
+  color: rgba(232, 232, 240, 0.86);
+}
+.vy-slab .vy-p em {
+  font-style: italic;
+  color: rgba(255, 220, 230, 0.88);
+}
+.vy-slab .vy-p strong {
+  color: #ff8aa2;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.vy-slab .vy-h3 {
+  margin: 28px 0 14px;
+  font-size: 12px;
+  letter-spacing: 0.46em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: #ff5a72;
+  border-left: 2px solid #ff2a4a;
+  padding-left: 12px;
+}
+.vy-slab .vy-list {
+  list-style: none;
+  padding: 0; margin: 0 0 18px 0;
+}
+.vy-slab .vy-list li {
+  position: relative;
+  padding: 4px 0 4px 22px;
+  font-size: 14px;
+  color: rgba(232, 232, 240, 0.85);
+}
+.vy-slab .vy-list li::before {
+  content: '';
+  position: absolute;
+  left: 2px; top: 14px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff2a4a, #b03cff);
+  box-shadow: 0 0 10px rgba(255, 60, 92, 0.55);
+}
+.vy-slab .vy-quote {
+  margin: 22px 0;
+  padding: 18px 22px;
+  border-left: 2px solid #ff2a4a;
+  background: linear-gradient(90deg, rgba(255,42,74,0.07), rgba(120,60,255,0.04) 60%, transparent);
+  font-style: italic;
+  color: rgba(255, 235, 240, 0.94);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.vy-slab__foot {
+  margin-top: 32px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  text-align: center;
+}
+.vy-slab__sig {
+  font-size: 13px;
+  letter-spacing: 0.42em;
+  font-weight: 600;
+  color: #ff2a4a;
+  text-shadow: 0 0 18px rgba(255,60,90,0.4);
+}
+.vy-slab__sigsub {
+  margin-top: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.46em;
+  text-transform: uppercase;
+  color: rgba(230,232,238,0.55);
+}
+
+/* ============================================================
+   Sandhi 4-card translucent grid
+   ============================================================ */
+.vy-slab--sandhi { max-width: 780px; }
+.vy-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 8px auto 4px;
+}
+@media (max-width: 640px) {
+  .vy-card-grid { grid-template-columns: 1fr; }
+}
+.vy-card {
+  position: relative;
+  border-radius: 14px;
+  padding: 22px 22px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  box-shadow: 0 12px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+  transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
+  text-align: center;
+}
+.vy-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 90, 120, 0.34);
+  box-shadow: 0 18px 46px rgba(0,0,0,0.55), 0 0 24px rgba(255, 60, 100, 0.18), inset 0 1px 0 rgba(255,255,255,0.10);
+}
+/* Slightly different hues per card to match cosmic palette */
+.vy-card--hue-1 { background: linear-gradient(160deg, rgba(255, 42, 74, 0.08), rgba(120, 60, 255, 0.03)); }
+.vy-card--hue-2 { background: linear-gradient(160deg, rgba(120, 60, 255, 0.08), rgba(58, 144, 255, 0.04)); }
+.vy-card--hue-3 { background: linear-gradient(160deg, rgba(255, 138, 58, 0.08), rgba(255, 42, 74, 0.04)); }
+.vy-card--hue-4 { background: linear-gradient(160deg, rgba(34, 224, 212, 0.06), rgba(120, 60, 255, 0.04)); }
+
+.vy-card__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 8px;
+}
+.vy-card__name {
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 0 18px rgba(255,255,255,0.15);
+}
+.vy-card__role {
+  font-size: 10.5px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(230,232,238,0.62);
+  margin-bottom: 14px;
+}
+.vy-card__mail {
+  display: inline-block;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.3);
+  color: #ff8aa2;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+.vy-card__mail:hover {
+  background: rgba(255, 42, 74, 0.18);
+  border-color: rgba(255, 42, 74, 0.4);
+  color: #fff;
+}
+.vy-card__pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.vy-card__pill--bottom { margin-top: 12px; }
+.vy-card__dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #1ad17d;
+  box-shadow: 0 0 8px rgba(26, 209, 125, 0.7);
+  animation: vy-pulse 2.4s ease-in-out infinite;
+}
+.vy-card[data-status="inactive"] .vy-card__dot {
+  background: #555;
+  box-shadow: none;
+  animation: none;
+}
+.vy-card[data-status="inactive"] .vy-card__pill-label::after {
+  content: ' · inactive';
+  opacity: 0.6;
+}
+.vy-card[data-status="inactive"] {
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+@keyframes vy-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.18); opacity: 0.78; }
+}
+
+/* Brand card (4th) */
+.vy-card--brand { padding-top: 24px; }
+.vy-card__logo {
+  width: 56px; height: 56px;
+  margin: 0 auto 12px;
+  display: block;
+  filter: drop-shadow(0 0 22px rgba(255, 60, 90, 0.4));
+}
+.vy-card__brandname {
+  font-size: 14px;
+  letter-spacing: 0.36em;
+  font-weight: 600;
+  color: #ff2a4a;
+  margin-bottom: 4px;
+}
+.vy-card__brandtag {
+  font-size: 10.5px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(230,232,238,0.55);
+  margin-bottom: 14px;
+}
+.vy-card__site {
+  display: inline-block;
+  font-size: 12.5px;
+  letter-spacing: 0.18em;
+  color: #ff8aa2;
+  text-decoration: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 100, 130, 0.22);
+  background: rgba(0,0,0,0.35);
+}
+.vy-card__site:hover { background: rgba(255, 60, 100, 0.18); color: #fff; }

@@ -16,7 +16,7 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
   {
     key: 'udbhava',
     name: 'UDBHAVA',
-    tagline: 'Emergence · the first breath of being',
+    tagline: 'The Emergence of VYAN',
     colorA: '#7a5cff',
     colorB: '#ff2a4a',
     position: new THREE.Vector3(0, 0, 0),
@@ -24,7 +24,7 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
   {
     key: 'vistara',
     name: 'VISTĀRA',
-    tagline: 'Expansion · the unfurling of products',
+    tagline: 'The Manifestations of VYAN',
     colorA: '#3a90ff',
     colorB: '#ff2a4a',
     position: new THREE.Vector3(120, 30, -90),
@@ -32,7 +32,7 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
   {
     key: 'vyuha',
     name: 'VYŬHA',
-    tagline: 'Architecture · the lattice of intent',
+    tagline: 'The Continuum of VYAN',
     colorA: '#9a55ff',
     colorB: '#ff3a3a',
     position: new THREE.Vector3(160, -30, -240),
@@ -40,7 +40,7 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
   {
     key: 'medha',
     name: 'MEDHĀ',
-    tagline: 'Cognition · the mind that understands',
+    tagline: 'The Consciousness of VYAN',
     colorA: '#22e0d4',
     colorB: '#ff2a4a',
     position: new THREE.Vector3(30, 50, -360),
@@ -48,7 +48,7 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
   {
     key: 'sandhi',
     name: 'SANDHI',
-    tagline: 'Convergence · the seam between worlds',
+    tagline: 'The Communiqué of VYAN',
     colorA: '#ff8a3a',
     colorB: '#ff2a4a',
     position: new THREE.Vector3(-120, 10, -220),
