@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PathCurve, SHUNYA_ORBS } from '../scenes/PathCurve';
+import { SpringV3, randomArrivalOffset } from './Spring';
 
 type Deps = {
   scroll: { progress: number; speed: number; loopProgress: number };
@@ -17,6 +18,11 @@ export class CameraRig {
   private shunyaPath = new PathCurve(SHUNYA_ORBS);
   private currentLookAt = new THREE.Vector3();
   private currentCamPos = new THREE.Vector3();
+  private posSpring = new SpringV3();
+  private lookSpring = new SpringV3();
+  private arrivalOffset = new THREE.Vector3();
+  private arrivalSpring = new SpringV3();
+  private arrivalActive = false;
 
   constructor(private camera: THREE.PerspectiveCamera) {}
 
@@ -29,6 +35,8 @@ export class CameraRig {
   setMode(mode: CameraMode) {
     this.mode = mode;
     this.locked = false;
+    this.posSpring.reset();
+    this.lookSpring.reset();
     if (mode === 'shunya') {
       const p = this.shunyaPath.cameraAt(0);
       this.camera.position.copy(p);
@@ -44,6 +52,19 @@ export class CameraRig {
   }
 
   getMode() { return this.mode; }
+
+  /**
+   * Cinematic arrival — camera springs in from an off-axis offset.
+   * Called by ShunyaRealm.onEnter to give the camera an "arrogant" entrance.
+   */
+  triggerArrival() {
+    // Magnitude 5 — enough to feel like a non-linear drift-in but small
+    // enough that the focused orb stays well within the frame the whole time.
+    this.arrivalOffset.copy(randomArrivalOffset(5));
+    this.arrivalSpring.reset();
+    this.arrivalSpring.velocity.copy(this.arrivalOffset.clone().multiplyScalar(-0.4));
+    this.arrivalActive = true;
+  }
 
   public locked = false;
 
@@ -82,28 +103,40 @@ export class CameraRig {
     const px = this.deps.interaction.pointer.x;
     const py = this.deps.interaction.pointer.y;
 
-    // Camera position follows the offset path.
+    // Camera position springs toward the path target — arrogant feel
+    // (stiffness 6, damping 3.5 gives a confident, slight-overshoot arrival).
     const targetPos = this.shunyaPath.cameraAt(progress);
-    this.currentCamPos.lerp(targetPos, 1 - Math.pow(0.001, dt * 60));
+    this.posSpring.step(this.currentCamPos, targetPos, dt, 6.0, 3.5);
 
     // Look-at follows the focused orb's CURRENT world position (drift included).
-    // This keeps the orb dead-centre in view even as it does its Vyōma-style dance.
     const shunyaRealm = (this.deps.realms as any).shunya;
     let lookTarget: THREE.Vector3;
     if (shunyaRealm && shunyaRealm.getFocusedWorldPosition) {
       const focusedHome = SHUNYA_ORBS[shunyaRealm.activeIndex].position;
       const focusedLive = shunyaRealm.getFocusedWorldPosition();
-      // Blend home + live for stability when far away, accuracy when close.
       const focus = shunyaRealm.activeFocus ?? 0;
       lookTarget = new THREE.Vector3().lerpVectors(focusedHome, focusedLive, focus);
     } else {
       lookTarget = this.shunyaPath.lookAt(progress);
     }
-    this.currentLookAt.lerp(lookTarget, 1 - Math.pow(0.0008, dt * 60));
+    // Tighter spring on look-at so the orb stays crisp on screen.
+    this.lookSpring.step(this.currentLookAt, lookTarget, dt, 9.0, 4.5);
+
+    // Decay the arrival offset (if active) — stiffer than the path spring so
+    // it settles in ~1.2s (instead of dragging the camera off-axis for 8s).
+    if (this.arrivalActive) {
+      const ZERO = new THREE.Vector3(0, 0, 0);
+      this.arrivalSpring.step(this.arrivalOffset, ZERO, dt, 16.0, 7.8);
+      if (this.arrivalOffset.lengthSq() < 0.001 && this.arrivalSpring.velocity.lengthSq() < 0.001) {
+        this.arrivalOffset.set(0, 0, 0);
+        this.arrivalSpring.reset();
+        this.arrivalActive = false;
+      }
+    }
 
     // Tiny pointer parallax sway, matching the gateway's subtle camera drift.
     const sway = new THREE.Vector3(px * 0.8, py * 0.5, 0);
-    this.camera.position.copy(this.currentCamPos).add(sway);
+    this.camera.position.copy(this.currentCamPos).add(sway).add(this.arrivalOffset);
     this.camera.lookAt(this.currentLookAt);
     this.camera.fov = 38;    // identical to Vyōma
     this.camera.updateProjectionMatrix();

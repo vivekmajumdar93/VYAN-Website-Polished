@@ -111,7 +111,6 @@ export class InteractionManager {
     this.down = false;
     this.detectGestureEnd();
   };
-  };
 
   private wasDown = false;
   private detectGestureEnd() {

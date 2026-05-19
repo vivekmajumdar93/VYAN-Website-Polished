@@ -8,6 +8,7 @@ type BindDeps = {
   cameraRig?: any;
   overlay: any;
   scroll: any;
+  audio?: any;
   onEnterVoid?: () => void;
 };
 
@@ -100,6 +101,9 @@ export class GatewayRealm {
     this.core.burst();
     if (this.deps.cameraRig) this.deps.cameraRig.locked = true;
 
+    // Audio: punch on burst → swell during the warp → duck into the fade.
+    this.deps.audio?.swell?.(1.1, 0.35);
+
     gsap.to(this.deps.camera.position, {
       z: 4.8, duration: 0.9, ease: 'power4.in', overwrite: true,
     });
@@ -119,6 +123,8 @@ export class GatewayRealm {
         onComplete: () => { this.group.visible = false; },
       });
       this.deps.overlay.fadeToBlack?.(2.5);
+      // Duck audio in sync with the fade-to-black (silence at the threshold).
+      this.deps.audio?.duck?.(0.05, 2.4);
 
       // After the fade fully blacks out, hand control to the React page.
       setTimeout(() => {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { OrbDustTrail } from './OrbDustTrail';
+import { SpringV3 } from '../app/Spring';
 
 export type NanoOrbData = {
   id: string;
@@ -31,6 +32,12 @@ export class NanoOrb {
   private scale = 1;
   private visibleState = false;
   private seed: number;
+
+  // Cinematic arrival — orb starts offset from home and springs in non-linearly.
+  private arrival = new THREE.Vector3();        // current live offset (decays to 0)
+  private arrivalSpring = new SpringV3();
+  private arrivalActive = false;
+  private lastT = -1;
 
   private trail: OrbDustTrail;
 
@@ -315,6 +322,24 @@ export class NanoOrb {
     this.group.scale.setScalar(1);
     this.trail.reset(this.home);
     this.group.position.copy(this.home);
+    this.arrival.set(0, 0, 0);
+    this.arrivalSpring.reset();
+    this.arrivalActive = false;
+    this.lastT = -1;
+  }
+
+  /**
+   * Trigger a non-linear arrival — orb floats in from `offset` and springs
+   * back to home using critically-damped physics (stiffness/damping defaults
+   * are the "arrogant" feel: 6.0 / 3.5).
+   */
+  setArrivalOffset(offset: THREE.Vector3, _duration = 1.6) {
+    this.arrival.copy(offset);
+    this.arrivalSpring.reset();
+    // Give it a tiny inward velocity so it eases in instead of starting still.
+    const inward = offset.clone().multiplyScalar(-0.35);
+    this.arrivalSpring.velocity.copy(inward);
+    this.arrivalActive = true;
   }
 
   burst() {
@@ -350,6 +375,10 @@ export class NanoOrb {
   ) {
     if (!this.visibleState) return;
 
+    // Derive frame delta from t (the caller passes the global clock time).
+    const dt = this.lastT < 0 ? 0.016 : Math.max(0.001, Math.min(0.05, t - this.lastT));
+    this.lastT = t;
+
     const presence = panelOpen ? 1 : THREE.MathUtils.clamp(focus, 0, 1);
 
     if (overridePosition) {
@@ -368,6 +397,21 @@ export class NanoOrb {
       ).multiplyScalar(motion);
 
       this.group.position.copy(this.home).add(drift).add(circle);
+    }
+
+    // Apply arrogant-spring arrival decay. The arrival vector itself springs
+    // toward (0,0,0) — stiffer arrival params (12 / 6.8) for ~1.4s settle,
+    // while the continuous path-following spring (in CameraRig) stays at the
+    // user-specified soft (6 / 3.5) "arrogant" feel.
+    if (this.arrivalActive) {
+      const ZERO = new THREE.Vector3(0, 0, 0);
+      this.arrivalSpring.step(this.arrival, ZERO, dt, 12.0, 6.8);
+      this.group.position.add(this.arrival);
+      if (this.arrival.lengthSq() < 0.0006 && this.arrivalSpring.velocity.lengthSq() < 0.0008) {
+        this.arrival.set(0, 0, 0);
+        this.arrivalSpring.reset();
+        this.arrivalActive = false;
+      }
     }
 
     const pulse = 1 + Math.sin(t * 1.5 + this.seed) * 0.045 + energy * 0.06;

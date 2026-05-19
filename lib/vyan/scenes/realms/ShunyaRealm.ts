@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { NanoOrb } from '../../objects/NanoOrb';
 import { PathCurve, SHUNYA_ORBS, ShunyaOrbDef, ShunyaOrbKey } from '../PathCurve';
 import { SLAB_UDBHAVA_HTML, SLAB_SANDHI_HTML } from '../../ui/slabContent';
+import { randomArrivalOffset } from '../../app/Spring';
 
 type BindDeps = {
   interaction: any;
@@ -9,6 +10,7 @@ type BindDeps = {
   cameraRig?: any;
   overlay: any;
   scroll: any;
+  audio?: any;
   onOrbActivate?: (key: ShunyaOrbKey) => void;
 };
 
@@ -77,9 +79,23 @@ export class ShunyaRealm {
       o.reset();
       (o as any).magnifyFactor = 1.0;
     }
-    if (this.deps?.cameraRig) this.deps.cameraRig.locked = false;
+    // Cinematic non-linear arrivals — each orb floats in from a random off-axis
+    // direction and springs back to its home position with the "arrogant" curve.
+    // Magnitude kept small (~10 units) so the orb never leaves the frame.
+    for (const orb of this.orbs) {
+      orb.setArrivalOffset(randomArrivalOffset(10), 1.5);
+    }
+    if (this.deps?.cameraRig) {
+      this.deps.cameraRig.locked = false;
+      // Tell the camera to spring-arrive too (slight off-axis nudge).
+      if (typeof this.deps.cameraRig.triggerArrival === 'function') {
+        this.deps.cameraRig.triggerArrival();
+      }
+    }
     this.deps?.overlay?.setVoidMode?.(true);
     this.deps?.overlay?.fadeFromBlack?.(1.6);
+    // Audio swell on void emergence — matches the 1.6s fade-from-black.
+    this.deps?.audio?.swell?.(0.9, 1.6);
     if (this.deps?.scroll?.reset) this.deps.scroll.reset(0);
     if (this.deps?.scroll) this.deps.scroll.snapSlots = this.defs.length;
     this.magnifiedIdx = null;
@@ -113,6 +129,8 @@ export class ShunyaRealm {
     this.magnifiedIdx = idx;
     if (this.deps?.scroll?.freeze) this.deps.scroll.freeze();
     orb.magnify(2.6, 0.55);
+    // Audio: punchy swell as the orb expands → settle when slab is open.
+    this.deps?.audio?.swell?.(1.05, 0.35);
     setTimeout(() => {
       const html = this.getSlabHTML(def.key);
       this.deps?.overlay?.openPanel?.({
@@ -121,6 +139,7 @@ export class ShunyaRealm {
         description: '',
         html,
       } as any, undefined);
+      this.deps?.audio?.duck?.(0.55, 0.6); // calm the music while reading
       this.deps?.onOrbActivate?.(def.key);
     }, 480);
   }
@@ -131,6 +150,8 @@ export class ShunyaRealm {
     const orb = this.orbs[this.magnifiedIdx];
     this.deps?.overlay?.closePanel?.();
     orb.contract(0.55);
+    // Audio: swell back to the void baseline as the orb returns.
+    this.deps?.audio?.swell?.(0.9, 0.6);
     setTimeout(() => {
       this.magnifiedIdx = null;
       if (this.deps?.scroll?.setEnabled) this.deps.scroll.setEnabled(true);

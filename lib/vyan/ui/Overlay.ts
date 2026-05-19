@@ -119,7 +119,9 @@ const inner = this.panel.querySelector('.glass-panel-inner') as HTMLElement;
 inner.appendChild(this.panelTitle);
 inner.appendChild(this.panelSubtitle);
 inner.appendChild(this.panelBody);
-inner.appendChild(this.panelClose);
+// Close lives OUTSIDE the scrollable inner so it stays anchored top-right
+// even when the user scrolls long-form content.
+this.panel.appendChild(this.panelClose);
     this.soundConsole.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this.toggleSoundPanel(true);

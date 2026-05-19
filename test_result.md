@@ -89,3 +89,29 @@ frontend:
 
   - agent: main
     message: "Phase 1 complete. Loader → /vyoma transition verified via screenshot. HTTP 200 on both routes. Awaiting user approval to proceed to Phase 2 (Shunya void)."
+
+  - agent: main
+    message: |
+      Surgical changes batch (session resume):
+      - Fixed syntax error in InteractionManager.ts (stray `};`).
+      - Glass panel: max-height + custom-scroll on .glass-panel-inner; CLOSE
+        button moved OUT of scroll container and floats top-right of .glass-panel
+        (always visible regardless of scroll position).
+      - Floating Arrivals (#2): new lib/vyan/app/Spring.ts. NanoOrb.setArrivalOffset
+        + ShunyaRealm.onEnter triggers each orb to spring in from random off-axis
+        offset (magnitude 10). Settles in ~1.5s via stiffness 12 / damping 6.8.
+      - Arrogant Spring (#3): CameraRig now uses SpringV3 for path position
+        (stiffness 6 / damping 3.5 — user-specified arrogant feel) and tighter
+        look-at spring (stiffness 9 / damping 4.5). Camera also gets its own
+        smaller arrival offset (magnitude 5).
+      - Audio sync: AudioReactive rebuilt with duck/swell/fadeIn/fadeOut/unlock
+        envelope API. Auto-unlocks on first pointerdown with 2.4s fade-in.
+        Hooks wired across the full lifecycle:
+          • Gateway burst         → swell(1.1, 0.35s)
+          • fadeToBlack           → duck(0.05, 2.4s)
+          • ShunyaRealm.onEnter   → swell(0.9, 1.6s)  (matches fadeFromBlack)
+          • Orb activate (magnify)→ swell(1.05, 0.35s) → duck(0.55, 0.6s) at slab open
+          • Slab close            → swell(0.9, 0.6s)
+      - Visual verification screenshots taken for Udbhava (long-form scroll),
+        Sandhi (4-card translucent grid), and Shunya entry arrivals at T+0.5,
+        T+1.3 and T+3.5s.

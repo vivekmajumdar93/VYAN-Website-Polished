@@ -65,6 +65,18 @@ export class App {
       void this.audio.init();
       this.overlay.setSoundMuted(this.audio.muted);
       this.world.start();
+
+      // Audio: auto-unlock on first user gesture (browser autoplay policy).
+      // The soundtrack fades in over 2.4s so it doesn't blast.
+      const unlock = () => {
+        void this.audio.unlock(true);
+        this.overlay.setSoundMuted(this.audio.muted);
+        this.root.removeEventListener('pointerdown', unlock);
+        this.root.removeEventListener('touchstart', unlock);
+      };
+      this.root.addEventListener('pointerdown', unlock, { once: true });
+      this.root.addEventListener('touchstart', unlock, { once: true } as any);
+
       // If the page told us to boot directly into a void, switch now.
       if (this.opts.initialMode && this.opts.initialMode !== 'gateway') {
         this.setMode(this.opts.initialMode);
