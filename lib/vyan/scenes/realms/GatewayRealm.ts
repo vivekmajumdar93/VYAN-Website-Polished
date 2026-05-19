@@ -54,6 +54,7 @@ export class GatewayRealm {
     if (this.deps?.cameraRig) this.deps.cameraRig.locked = false;
     this.deps?.overlay?.setVoidMode?.(false);
     this.deps?.overlay?.clearFade?.();
+    if (this.deps?.scroll) this.deps.scroll.snapSlots = 0;
   }
 
   onExit() {
@@ -64,7 +65,8 @@ export class GatewayRealm {
   update(_: number, t: number, progress: number, audio: any) {
     if (!this.deps) return;
 
-    const approach = THREE.MathUtils.clamp(progress, 0, 1);
+    // Vyōma always sits at the click zone — caption + click are always live.
+    const approach = 1;
     const energy = audio.energy ?? 0;
 
     this.core.setVisible(true);

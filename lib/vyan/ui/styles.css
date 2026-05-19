@@ -497,3 +497,82 @@ color: rgba(255, 255, 255, 1);
 .depth-node.near {
   box-shadow: 0 0 22px rgba(255, 80, 110, 0.6);
 }
+
+/* ===== Gateway 3-line caption (red / white / faint-breathing) ===== */
+.gateway-hint {
+  text-align: center !important;
+}
+.gateway-hint .gateway-line-1 {
+  font-size: clamp(28px, 4.4vw, 56px);
+  letter-spacing: 0.34em;
+  font-weight: 600;
+  color: #ff2a4a;
+  text-shadow: 0 0 22px rgba(255, 60, 92, 0.55), 0 0 60px rgba(255, 30, 60, 0.35);
+  margin-bottom: 22px;
+}
+.gateway-hint .gateway-line-2 {
+  font-size: clamp(14px, 1.4vw, 18px);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: #ffffff;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.25);
+  margin-bottom: 22px;
+}
+.gateway-hint .gateway-line-3 {
+  font-size: clamp(11px, 1.0vw, 14px);
+  letter-spacing: 0.46em;
+  text-transform: uppercase;
+  font-weight: 300;
+  color: rgba(230, 232, 238, 0.55);
+  animation: gateway-breath 3.6s ease-in-out infinite;
+}
+@keyframes gateway-breath {
+  0%, 100% { opacity: 0.42; }
+  50%      { opacity: 0.88; }
+}
+/* Cursor hint redundant now */
+.cursor-hint { display: none !important; }
+
+/* ===== Neural depth rail v2: gradient fill + tooltips + integrated LY ===== */
+.neural-depth .depth-tooltip {
+  position: absolute;
+  right: 22px;
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #e6e8ee;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  text-shadow: 0 0 12px rgba(0,0,0,0.9);
+  transform: translateY(-50%);
+}
+.neural-depth .depth-tooltip.show { opacity: 0.92; }
+.neural-depth .depth-ly-rail {
+  position: absolute;
+  right: 22px;
+  bottom: 0;
+  font-size: 9px;
+  letter-spacing: 0.32em;
+  color: rgba(230,232,238,0.6);
+  white-space: nowrap;
+  transform: translateY(0);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  text-shadow: 0 0 10px rgba(0,0,0,0.9);
+}
+.neural-depth.visible .depth-ly-rail { opacity: 0.9; }
+.neural-depth-fill {
+  background: linear-gradient(180deg, #ff2a4a 0%, #b03cff 50%, #3a90ff 100%) !important;
+  box-shadow: 0 0 18px rgba(255, 60, 92, 0.55), 0 0 36px rgba(120, 60, 255, 0.35);
+}
+.depth-node.active {
+  background: #ff2a4a;
+  box-shadow: 0 0 18px rgba(255, 60, 92, 0.75), 0 0 38px rgba(255, 60, 92, 0.45);
+  transform: scale(1.45);
+}
+/* Hide the central distance label \u2014 we now show LY on the rail */
+.distance-label { display: none !important; }

@@ -61,8 +61,9 @@ export class CameraRig {
     const py = this.deps.interaction.pointer.y;
     const t = performance.now() * 0.001;
 
-    const p = this.deps.realms.activeApproach;
-    const z = THREE.MathUtils.lerp(280, 26, p);
+    // Vy\u014dma sits at the SAME distance as Shunya orbs (z=26) from arrival \u2014
+    // no fly-in. This matches the click-zone size users see in the void.
+    const z = 26;
 
     this.targetOffset.set(
       px * 1.8 + Math.sin(t * 0.4) * 0.8,
@@ -72,7 +73,7 @@ export class CameraRig {
     this.offset.lerp(this.targetOffset, 1 - Math.pow(0.005, dt * 60));
     this.camera.position.set(this.offset.x, this.offset.y, z);
     this.camera.lookAt(0, 0, 0);
-    this.camera.fov = 38 + Math.min(p * 5.5, 5.5);
+    this.camera.fov = 38;
     this.camera.updateProjectionMatrix();
   }
 

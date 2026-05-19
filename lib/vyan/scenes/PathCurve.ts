@@ -64,14 +64,12 @@ export class PathCurve {
   private static CAM_DIST = 26;
 
   constructor(orbs: ShunyaOrbDef[] = SHUNYA_ORBS) {
-    const cameraPts: THREE.Vector3[] = orbs.map((orb, i) => {
-      const angle = (i / orbs.length) * Math.PI * 2;
-      const offset = new THREE.Vector3(
-        Math.cos(angle) * PathCurve.CAM_DIST,
-        Math.sin(angle * 0.7) * 6 + 3,
-        Math.sin(angle) * PathCurve.CAM_DIST
-      );
-      return orb.position.clone().add(offset);
+    // UNIFORM camera offset: every orb is approached front-on at the SAME
+    // distance (z=26) and SAME slight elevation (y=3). This makes the click
+    // zone identical for every orb — Udbhava, Vistāra, Vyūha, Medhā, Sandhi
+    // all sit dead-centre at the same on-screen size.
+    const cameraPts: THREE.Vector3[] = orbs.map((orb) => {
+      return orb.position.clone().add(new THREE.Vector3(0, 3, 26));
     });
     this.curve = new THREE.CatmullRomCurve3(cameraPts, true, 'catmullrom', 0.5);
   }

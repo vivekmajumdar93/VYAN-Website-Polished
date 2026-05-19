@@ -38,6 +38,7 @@ private distanceLabel = document.createElement('div');
 private shunyaCaption = document.createElement('div');
 private shunyaName = document.createElement('div');
 private shunyaTag = document.createElement('div');
+private depthLy!: HTMLDivElement;
   private introComplete = false;
   private voidMode = false;
   private currentApproach = 0;
@@ -55,6 +56,11 @@ for (let i = 0; i < 7; i++) {
 const node = document.createElement('button');
 node.type = 'button';
 node.className = 'depth-node';
+const tip = document.createElement('span');
+tip.className = 'depth-tooltip';
+node.appendChild(tip);
+node.addEventListener('pointerenter', () => tip.classList.add('show'));
+node.addEventListener('pointerleave', () => tip.classList.remove('show'));
 node.addEventListener('pointerdown', (e) => {
 e.stopPropagation();
 this.callbacks?.onJumpToOrb(i);
@@ -62,6 +68,10 @@ this.callbacks?.onJumpToOrb(i);
 this.rail.appendChild(node);
 this.railNodes.push(node);
 }
+// LY counter rendered ON the rail (not in the centre of screen).
+this.depthLy = document.createElement('div');
+this.depthLy.className = 'depth-ly-rail';
+this.rail.appendChild(this.depthLy);
 this.rail.addEventListener('pointerdown', (e) => {
 const rect = this.rail.getBoundingClientRect();
 const y = (e.clientY - rect.top) / rect.height;
@@ -70,8 +80,9 @@ this.callbacks?.onJumpToOrb(idx);
 });
 this.gatewayHint.className = 'gateway-hint';
     this.gatewayHint.innerHTML = `
-      <div class="gateway-title" style="margin-bottom: 16px;">Vyōma- The Primordial Core</div>
-      <div class="gateway-cta">Engage to Transcend Realities.</div>
+      <div class="gateway-line-1">VYŌMA</div>
+      <div class="gateway-line-2">The Primordial Core</div>
+      <div class="gateway-line-3">Engage to Transcend Realities</div>
     `;
     this.gatewayHint.style.opacity = '0';
     this.cursorHint.className = 'cursor-hint';
@@ -381,16 +392,26 @@ setShunyaCaption(name: string, tagline: string, focus: number) {
   this.shunyaCaption.style.filter = `blur(${(1 - f) * 6}px)`;
 }
 
-setShunyaRail(activeIndex: number, focus: number, total: number) {
+setShunyaRail(activeIndex: number, focus: number, total: number, names: string[] = []) {
   if (!this.voidMode) return;
   this.railNodes.forEach((node, i) => {
     const inRange = i < total;
     node.style.display = inRange ? '' : 'none';
     node.classList.toggle('active', i === activeIndex);
     node.classList.toggle('near', i === activeIndex && focus > 0.4);
+    if (inRange) {
+      const tip = node.querySelector('.depth-tooltip') as HTMLElement | null;
+      if (tip && names[i] && tip.textContent !== names[i]) tip.textContent = names[i];
+    }
   });
-  // Fill height roughly tracks progress through orbs
   const pct = ((activeIndex + focus) / total) * 100;
   this.railFill.style.height = `${Math.max(2, Math.min(100, pct))}%`;
+  // LY on the rail, climbing alongside the gradient.
+  if (this.depthLy) {
+    const ly = Math.max(0, Math.round((1 - focus) * 420));
+    this.depthLy.textContent = ly === 0 ? `0 LY · ${names[activeIndex] ?? ''}` : `${ly} LY`;
+    // Position next to the active node (top of fill)
+    this.depthLy.style.bottom = `calc(${pct}% + 6px)`;
+  }
 }
 }

@@ -55,9 +55,28 @@ html, body {
   font-size: 11px;
   letter-spacing: 0.42em;
   text-transform: uppercase;
-  color: rgba(230, 232, 238, 0.55);
   opacity: 0;
   font-weight: 300;
+  text-align: center;
+  color: #ff2a4a;
+}
+.vyan-loader__brand {
+  font-size: clamp(20px, 2.6vw, 30px);
+  letter-spacing: 0.36em;
+  font-weight: 600;
+  color: #ff2a4a;
+  text-shadow:
+    0 0 22px rgba(255, 50, 80, 0.55),
+    0 0 60px rgba(255, 20, 50, 0.32);
+  margin-bottom: 14px;
+}
+.vyan-loader__sub {
+  font-size: clamp(10px, 1.05vw, 13px);
+  letter-spacing: 0.36em;
+  font-weight: 300;
+  color: #ff5a72;
+  text-shadow: 0 0 16px rgba(255, 70, 100, 0.35);
+  opacity: 0.92;
 }
 
 /* ===== Imported from /lib/vyan/ui/styles.css equivalents are loaded inline via Overlay ===== */

@@ -80,6 +80,7 @@ export class ShunyaRealm {
     this.deps?.overlay?.setVoidMode?.(true);
     this.deps?.overlay?.fadeFromBlack?.(1.6);
     if (this.deps?.scroll?.reset) this.deps.scroll.reset(0);
+    if (this.deps?.scroll) this.deps.scroll.snapSlots = this.defs.length;
     this.magnifiedIdx = null;
   }
 
@@ -180,7 +181,7 @@ export class ShunyaRealm {
 
     const def = this.defs[this.activeIndex];
     this.deps.overlay?.setShunyaCaption?.(def.name, def.tagline, this.magnifiedIdx !== null ? 1 : this.activeFocus);
-    this.deps.overlay?.setShunyaRail?.(this.activeIndex, this.magnifiedIdx !== null ? 1 : this.activeFocus, total);
+    this.deps.overlay?.setShunyaRail?.(this.activeIndex, this.magnifiedIdx !== null ? 1 : this.activeFocus, total, this.defs.map(d => d.name));
 
     if (this.magnifiedIdx === null && this.deps.interaction.clicked && this.activeFocus > 0.55) {
       this.ndc.set(this.deps.interaction.pointer.x, this.deps.interaction.pointer.y);

@@ -64,7 +64,8 @@ export class SceneManager {
       this.gateway.update(dt, t, progress, audio);
       this.activeIndex = 0;
       this.panelOpen = false;
-      this.activeApproach = THREE.MathUtils.clamp(progress, 0, 1);
+      // Vy\u014dma always sits at the click zone (no fly-in approach gauge).
+      this.activeApproach = 1;
     } else {
       this.shunya.update(dt, t, progress, audio);
       this.activeIndex = this.shunya.activeIndex;
