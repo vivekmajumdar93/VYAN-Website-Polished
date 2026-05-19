@@ -65,7 +65,14 @@ export class World {
     this.bindResize();
   }
 
-  bind(deps: Deps, callbacks: { onEnterVoid?: () => void; onOrbActivate?: (key: any) => void } = {}) {
+  bind(deps: Deps, callbacks: {
+    onEnterVoid?: () => void;
+    onOrbActivate?: (key: any) => void;
+    onEnterVistara?: () => void;
+    onProductActivate?: (key: any) => void;
+    onExitVistara?: () => void;
+    onEnterMedha?: () => void;
+  } = {}) {
     this.deps = deps;
     this.cameraRig.bind({
       scroll: this.deps.scroll,
@@ -81,6 +88,8 @@ export class World {
 
   setMode(mode: any) { this.realms.setMode(mode); }
   focusShunyaOrb(key: any, immediate = false) { this.realms.focusShunyaOrb(key, immediate); }
+  focusVistaraProduct(key: any, immediate = false) { this.realms.focusVistaraProduct(key, immediate); }
+  triggerVistaraExit(cb: () => void) { this.realms.triggerVistaraExit(cb); }
   getMode() { return this.realms.mode; }
 
   start() {

@@ -7,12 +7,17 @@ import { Overlay } from '../ui/Overlay';
 import { IntroDirector } from './IntroDirector';
 import type { RealmMode } from '../scenes/RealmManager';
 import type { ShunyaOrbKey } from '../scenes/PathCurve';
+import type { VistaraProductKey } from '../scenes/VistaraPath';
 
 export type AppOptions = {
   skipIntro?: boolean;
   initialMode?: RealmMode;
   onEnterVoid?: () => void;
   onOrbActivate?: (key: ShunyaOrbKey) => void;
+  onEnterVistara?: () => void;
+  onProductActivate?: (key: VistaraProductKey) => void;
+  onExitVistara?: () => void;
+  onEnterMedha?: () => void;
 };
 
 export class App {
@@ -54,6 +59,10 @@ export class App {
     }, {
       onEnterVoid: () => this.opts.onEnterVoid?.(),
       onOrbActivate: (k) => this.opts.onOrbActivate?.(k),
+      onEnterVistara: () => this.opts.onEnterVistara?.(),
+      onProductActivate: (k) => this.opts.onProductActivate?.(k),
+      onExitVistara: () => this.opts.onExitVistara?.(),
+      onEnterMedha: () => this.opts.onEnterMedha?.(),
     });
   }
 
@@ -92,6 +101,12 @@ export class App {
   }
   focusShunyaOrb(key: ShunyaOrbKey, immediate = false) {
     this.world.focusShunyaOrb(key, immediate);
+  }
+  focusVistaraProduct(key: VistaraProductKey, immediate = false) {
+    this.world.focusVistaraProduct(key, immediate);
+  }
+  triggerVistaraExit(cb: () => void) {
+    this.world.triggerVistaraExit(cb);
   }
   getMode(): RealmMode {
     return this.world.getMode();

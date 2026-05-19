@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { PathCurve, SHUNYA_ORBS } from '../scenes/PathCurve';
+import { VistaraPath, VISTARA_PRODUCTS } from '../scenes/VistaraPath';
 import { SpringV3, randomArrivalOffset } from './Spring';
 
 type Deps = {
   scroll: { progress: number; speed: number; loopProgress: number };
   interaction: { pointer: { x: number; y: number } };
-  realms: { activeApproach: number; mode?: string; shunya?: any };
+  realms: { activeApproach: number; mode?: string; shunya?: any; vistara?: any };
 };
 
-export type CameraMode = 'gateway' | 'shunya';
+export type CameraMode = 'gateway' | 'shunya' | 'vistara';
 
 export class CameraRig {
   private deps!: Deps;
@@ -16,6 +17,7 @@ export class CameraRig {
   private targetOffset = new THREE.Vector3();
   private mode: CameraMode = 'gateway';
   private shunyaPath = new PathCurve(SHUNYA_ORBS);
+  private vistaraPath = new VistaraPath(VISTARA_PRODUCTS);
   private currentLookAt = new THREE.Vector3();
   private currentCamPos = new THREE.Vector3();
   private posSpring = new SpringV3();
@@ -41,9 +43,16 @@ export class CameraRig {
       const p = this.shunyaPath.cameraAt(0);
       this.camera.position.copy(p);
       this.currentCamPos.copy(p);
-      this.camera.fov = 38;     // matches Vyōma at-orb FOV (38 + 5.5 = ~38)
+      this.camera.fov = 38;
       this.camera.updateProjectionMatrix();
       this.currentLookAt.copy(SHUNYA_ORBS[0].position);
+    } else if (mode === 'vistara') {
+      const p = this.vistaraPath.cameraAt(0);
+      this.camera.position.copy(p);
+      this.currentCamPos.copy(p);
+      this.camera.fov = 38;
+      this.camera.updateProjectionMatrix();
+      this.currentLookAt.copy(VISTARA_PRODUCTS[0].position);
     } else {
       this.camera.position.set(0, 0, 280);
       this.camera.fov = 38;
@@ -71,7 +80,11 @@ export class CameraRig {
   update(dt: number) {
     if (this.locked) return;
     if (this.mode === 'shunya') {
-      this.updateShunya(dt);
+      this.updateVoid(dt, this.shunyaPath, (this.deps.realms as any).shunya, SHUNYA_ORBS);
+      return;
+    }
+    if (this.mode === 'vistara') {
+      this.updateVoid(dt, this.vistaraPath, (this.deps.realms as any).vistara, VISTARA_PRODUCTS);
       return;
     }
     this.updateGateway(dt);
@@ -98,32 +111,34 @@ export class CameraRig {
     this.camera.updateProjectionMatrix();
   }
 
-  private updateShunya(dt: number) {
+  private updateVoid(
+    dt: number,
+    path: { cameraAt: (p: number) => THREE.Vector3; lookAt: (p: number, oi?: any) => THREE.Vector3 },
+    realm: any,
+    defs: Array<{ position: THREE.Vector3 }>
+  ) {
     const progress = this.deps.scroll.loopProgress;
     const px = this.deps.interaction.pointer.x;
     const py = this.deps.interaction.pointer.y;
 
-    // Camera position springs toward the path target — arrogant feel
-    // (stiffness 6, damping 3.5 gives a confident, slight-overshoot arrival).
-    const targetPos = this.shunyaPath.cameraAt(progress);
+    // Camera position springs toward the path target \u2014 user-specified
+    // arrogant feel (stiffness 6 / damping 3.5 = confident slight overshoot).
+    const targetPos = path.cameraAt(progress);
     this.posSpring.step(this.currentCamPos, targetPos, dt, 6.0, 3.5);
 
-    // Look-at follows the focused orb's CURRENT world position (drift included).
-    const shunyaRealm = (this.deps.realms as any).shunya;
+    // Look-at follows focused orb's live world position (drift included).
     let lookTarget: THREE.Vector3;
-    if (shunyaRealm && shunyaRealm.getFocusedWorldPosition) {
-      const focusedHome = SHUNYA_ORBS[shunyaRealm.activeIndex].position;
-      const focusedLive = shunyaRealm.getFocusedWorldPosition();
-      const focus = shunyaRealm.activeFocus ?? 0;
+    if (realm && realm.getFocusedWorldPosition) {
+      const focusedHome = defs[realm.activeIndex].position;
+      const focusedLive = realm.getFocusedWorldPosition();
+      const focus = realm.activeFocus ?? 0;
       lookTarget = new THREE.Vector3().lerpVectors(focusedHome, focusedLive, focus);
     } else {
-      lookTarget = this.shunyaPath.lookAt(progress);
+      lookTarget = path.lookAt(progress);
     }
-    // Tighter spring on look-at so the orb stays crisp on screen.
     this.lookSpring.step(this.currentLookAt, lookTarget, dt, 9.0, 4.5);
 
-    // Decay the arrival offset (if active) — stiffer than the path spring so
-    // it settles in ~1.2s (instead of dragging the camera off-axis for 8s).
+    // Decay the arrival offset (if active).
     if (this.arrivalActive) {
       const ZERO = new THREE.Vector3(0, 0, 0);
       this.arrivalSpring.step(this.arrivalOffset, ZERO, dt, 16.0, 7.8);
@@ -134,11 +149,14 @@ export class CameraRig {
       }
     }
 
-    // Tiny pointer parallax sway, matching the gateway's subtle camera drift.
     const sway = new THREE.Vector3(px * 0.8, py * 0.5, 0);
     this.camera.position.copy(this.currentCamPos).add(sway).add(this.arrivalOffset);
     this.camera.lookAt(this.currentLookAt);
-    this.camera.fov = 38;    // identical to Vyōma
+    this.camera.fov = 38;
     this.camera.updateProjectionMatrix();
+  }
+
+  private updateShunya(dt: number) {
+    this.updateVoid(dt, this.shunyaPath, (this.deps.realms as any).shunya, SHUNYA_ORBS);
   }
 }

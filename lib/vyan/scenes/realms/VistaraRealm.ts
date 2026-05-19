@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { NanoOrb } from '../../objects/NanoOrb';
-import { PathCurve, SHUNYA_ORBS, ShunyaOrbDef, ShunyaOrbKey } from '../PathCurve';
-import { SLAB_UDBHAVA_HTML, SLAB_SANDHI_HTML } from '../../ui/slabContent';
+import { VistaraPath, VISTARA_PRODUCTS, VistaraProductDef, VistaraProductKey } from '../VistaraPath';
 import { randomArrivalOffset } from '../../app/Spring';
 
 type BindDeps = {
@@ -11,32 +10,32 @@ type BindDeps = {
   overlay: any;
   scroll: any;
   audio?: any;
-  onOrbActivate?: (key: ShunyaOrbKey) => void;
-  onEnterVistara?: () => void;
-  onEnterMedha?: () => void;
+  onProductActivate?: (key: VistaraProductKey) => void;
 };
 
-export class ShunyaRealm {
+/**
+ * Vistāra — the Product sub-void. 7 orbs in a golden-angle spiral.
+ * Mirror of ShunyaRealm with sub-void-specific arrivals and cinematics.
+ */
+export class VistaraRealm {
   public group = new THREE.Group();
-  public id = 'shunya';
+  public id = 'vistara';
 
   public orbs: NanoOrb[] = [];
-  public defs: ShunyaOrbDef[] = SHUNYA_ORBS;
-  public path = new PathCurve(SHUNYA_ORBS);
+  public defs: VistaraProductDef[] = VISTARA_PRODUCTS;
+  public path = new VistaraPath(VISTARA_PRODUCTS);
 
   public activeIndex = 0;
   public activeFocus = 0;
-  public magnifiedIdx: number | null = null;       // current orb showing slab (locks camera)
+  public magnifiedIdx: number | null = null;
 
   private raycaster = new THREE.Raycaster();
   private ndc = new THREE.Vector2();
   private deps!: BindDeps;
   private starfield!: THREE.Points;
-  private nebula!: THREE.Points;
+  private spiralDust!: THREE.Points;
 
   constructor() {
-    // 5 orbs at native NanoOrb scale (radius 1.9 — EXACTLY like the Vyōma gateway orb).
-    // No wrapper magnification — we just place them at their world positions.
     for (const def of this.defs) {
       const orb = new NanoOrb(
         {
@@ -47,8 +46,8 @@ export class ShunyaRealm {
           colorA: def.colorA,
           colorB: def.colorB,
         },
-        1.9,    // matches Vyōma gateway core
-        3000,   // matches Vyōma gateway core
+        1.9,
+        3000,
       );
       orb.setHomePosition(def.position);
       this.group.add(orb.group);
@@ -56,10 +55,10 @@ export class ShunyaRealm {
       this.orbs.push(orb);
     }
 
-    this.starfield = this.buildStarfield(7000, 600);
+    this.starfield = this.buildStarfield(8000, 720);
     this.group.add(this.starfield);
-    this.nebula = this.buildNebula(2200);
-    this.group.add(this.nebula);
+    this.spiralDust = this.buildSpiralDust(2600);
+    this.group.add(this.spiralDust);
 
     this.group.visible = false;
   }
@@ -68,7 +67,6 @@ export class ShunyaRealm {
     this.deps = deps;
   }
 
-  // Expose focused orb live world position so CameraRig can lock onto it.
   getFocusedWorldPosition(): THREE.Vector3 {
     const idx = this.activeIndex;
     return this.orbs[idx]?.group.position.clone() ?? new THREE.Vector3();
@@ -81,23 +79,25 @@ export class ShunyaRealm {
       o.reset();
       (o as any).magnifyFactor = 1.0;
     }
-    // Cinematic non-linear arrivals — each orb floats in from a random off-axis
-    // direction and springs back to its home position with the "arrogant" curve.
-    // Magnitude kept small (~10 units) so the orb never leaves the frame.
-    for (const orb of this.orbs) {
-      orb.setArrivalOffset(randomArrivalOffset(10), 1.5);
+    // CINEMATIC SPIRAL ARRIVAL — each orb arrives from a position rotated
+    // around the Z axis from its home, simulating an unfurling spiral.
+    for (let i = 0; i < this.orbs.length; i++) {
+      const orb = this.orbs[i];
+      // Slight randomness on top of a base spiral-inward offset.
+      const base = randomArrivalOffset(12);
+      base.x *= 1.2;
+      base.z *= 0.6;
+      orb.setArrivalOffset(base, 1.6);
     }
     if (this.deps?.cameraRig) {
       this.deps.cameraRig.locked = false;
-      // Tell the camera to spring-arrive too (slight off-axis nudge).
       if (typeof this.deps.cameraRig.triggerArrival === 'function') {
         this.deps.cameraRig.triggerArrival();
       }
     }
     this.deps?.overlay?.setVoidMode?.(true);
     this.deps?.overlay?.fadeFromBlack?.(1.6);
-    // Audio swell on void emergence — matches the 1.6s fade-from-black.
-    this.deps?.audio?.swell?.(0.9, 1.6);
+    this.deps?.audio?.swell?.(0.95, 1.6);
     if (this.deps?.scroll?.reset) this.deps.scroll.reset(0);
     if (this.deps?.scroll) this.deps.scroll.snapSlots = this.defs.length;
     this.magnifiedIdx = null;
@@ -108,7 +108,7 @@ export class ShunyaRealm {
     for (const o of this.orbs) o.setVisible(false);
   }
 
-  focusOrb(key: ShunyaOrbKey, immediate = false) {
+  focusProduct(key: VistaraProductKey, immediate = false) {
     const idx = this.defs.findIndex(d => d.key === key);
     if (idx < 0) return;
     const total = this.defs.length;
@@ -122,70 +122,33 @@ export class ShunyaRealm {
     }
   }
 
-  // Triggered when user clicks a focused orb. Magnifies orb, then opens slab.
   activateFocused() {
     if (this.magnifiedIdx !== null) return;
     const idx = this.activeIndex;
     const orb = this.orbs[idx];
     const def = this.defs[idx];
-
-    // Special case \u2014 Vist\u0101ra is a sub-void portal. Burst + fade \u2192 enter Vist\u0101ra.
-    if (def.key === 'vistara') {
-      this.magnifiedIdx = idx;
-      this.deps?.scroll?.freeze?.();
-      orb.magnify(4.2, 0.55);
-      this.deps?.audio?.swell?.(1.15, 0.4);
-      setTimeout(() => {
-        this.deps?.audio?.duck?.(0.05, 1.8);
-        this.deps?.overlay?.fadeToBlack?.(1.8);
-      }, 480);
-      setTimeout(() => {
-        try { this.deps?.onEnterVistara?.(); } catch {}
-      }, 2350);
-      return;
-    }
-
-    // Special case \u2014 Medh\u0101 is the cognitive cockpit portal. Burst + fade \u2192 enter HUD.
-    if (def.key === 'medha') {
-      this.magnifiedIdx = idx;
-      this.deps?.scroll?.freeze?.();
-      orb.magnify(3.6, 0.55);
-      this.deps?.audio?.swell?.(1.1, 0.4);
-      setTimeout(() => {
-        this.deps?.audio?.duck?.(0.05, 1.6);
-        this.deps?.overlay?.fadeToBlack?.(1.6);
-      }, 480);
-      setTimeout(() => {
-        try { this.deps?.onEnterMedha?.(); } catch {}
-      }, 2100);
-      return;
-    }
-
     this.magnifiedIdx = idx;
     if (this.deps?.scroll?.freeze) this.deps.scroll.freeze();
     orb.magnify(2.6, 0.55);
-    // Audio: punchy swell as the orb expands \u2192 settle when slab is open.
     this.deps?.audio?.swell?.(1.05, 0.35);
     setTimeout(() => {
-      const html = this.getSlabHTML(def.key);
+      const html = this.getSlabHTML(def);
       this.deps?.overlay?.openPanel?.({
         title: def.name,
         subtitle: def.tagline,
         description: '',
         html,
       } as any, undefined);
-      this.deps?.audio?.duck?.(0.55, 0.6); // calm the music while reading
-      this.deps?.onOrbActivate?.(def.key);
+      this.deps?.audio?.duck?.(0.55, 0.6);
+      this.deps?.onProductActivate?.(def.key);
     }, 480);
   }
 
-  // Triggered when slab close button fires.
   closePanel() {
     if (this.magnifiedIdx === null) return;
     const orb = this.orbs[this.magnifiedIdx];
     this.deps?.overlay?.closePanel?.();
     orb.contract(0.55);
-    // Audio: swell back to the void baseline as the orb returns.
     this.deps?.audio?.swell?.(0.9, 0.6);
     setTimeout(() => {
       this.magnifiedIdx = null;
@@ -193,15 +156,43 @@ export class ShunyaRealm {
     }, 580);
   }
 
-  private getSlabHTML(key: ShunyaOrbKey): string {
-    if (key === 'udbhava') return SLAB_UDBHAVA_HTML;
-    if (key === 'sandhi') return SLAB_SANDHI_HTML;
-    const placeholders: Partial<Record<ShunyaOrbKey, string>> = {
-      vistara: '<p class="vy-p">Vist\u0101ra is the unfurling \u2014 the lattice of products that radiate outward from the core. <em>Sub-void content arrives in Phase 4.</em></p>',
-      vyuha:   '<p class="vy-p">Vy\u016bha is the design discipline \u2014 the lattice of intent, the geometry of decision. Every product passes through this seam.</p>',
-      medha:   '<p class="vy-p">Medh\u0101 is the cognition that understands. Multiple minds, one resonance. <em>Sub-void content arrives in Phase 5.</em></p>',
-    };
-    return placeholders[key] ?? '';
+  /** Cinematic exit — swirls the void inward, then routes back to Shunya. */
+  triggerExit(onComplete: () => void) {
+    this.deps?.scroll?.freeze?.();
+    if (this.deps?.cameraRig) this.deps.cameraRig.locked = true;
+    // Audio dim
+    this.deps?.audio?.duck?.(0.05, 1.8);
+    // Shrink all orbs simultaneously
+    for (const orb of this.orbs) {
+      orb.contract(1.6);
+    }
+    this.deps?.overlay?.closePanel?.();
+    this.deps?.overlay?.fadeToBlack?.(2.0);
+    setTimeout(() => {
+      try { onComplete(); } catch {}
+    }, 2050);
+  }
+
+  private getSlabHTML(def: VistaraProductDef): string {
+    const isPlaceholder = def.key === 'placeholder';
+    const status = isPlaceholder
+      ? '<span class="vy-card__pill vy-card__pill--bottom"><span class="vy-card__dot"></span><span class="vy-card__pill-label">Awaiting Manifestation</span></span>'
+      : '<span class="vy-card__pill vy-card__pill--bottom"><span class="vy-card__dot"></span><span class="vy-card__pill-label">In Cognition</span></span>';
+    return `
+      <div class="vy-slab vy-slab--product">
+        <header class="vy-slab__hero vy-slab__hero--center">
+          <div class="vy-slab__brand">${def.name}</div>
+          <div class="vy-slab__tag">${def.tagline}</div>
+        </header>
+        <p class="vy-p">
+          ${isPlaceholder
+            ? 'A future cognition orbits in dark wait. Its purpose has not yet crystallized into the manifest layer of VYAN. Return after the next emergence.'
+            : 'A bespoke cognitive product engineered by VYAN Labs. The full manifestation arrives in the next phase — specifications, demos and access tier will fold in as the void unfurls.'
+          }
+        </p>
+        <div style="text-align:center; margin-top: 24px;">${status}</div>
+      </div>
+    `;
   }
 
   update(_dt: number, t: number, progress: number, audio: any) {
@@ -209,7 +200,6 @@ export class ShunyaRealm {
 
     const total = this.defs.length;
 
-    // While magnified, freeze active index; do NOT consume scroll.
     if (this.magnifiedIdx === null) {
       const swipe = this.deps.interaction.swipeDir;
       if (swipe !== 0) {
@@ -235,12 +225,10 @@ export class ShunyaRealm {
       orb.update(t, energy, focusForOrb > 0.5, false, focusForOrb, motion);
     }
 
-    this.starfield.rotation.y += 0.00015 + Math.abs(this.deps.scroll.speed) * 0.0009;
-    this.nebula.rotation.y -= 0.0001;
+    this.starfield.rotation.y += 0.00018 + Math.abs(this.deps.scroll.speed) * 0.0011;
+    this.starfield.rotation.x = Math.sin(t * 0.05) * 0.02;
+    this.spiralDust.rotation.z += 0.0003 + this.deps.scroll.speed * 0.0006;
 
-    // Click-and-drag orbits the focused orb in any direction.
-    // (Vertical-dominant swipes are still consumed by the swipeDir handler above,
-    // so this only kicks in for in-place / horizontal / diagonal drags.)
     if (this.magnifiedIdx === null && this.deps.interaction.down && this.activeFocus > 0.55) {
       const drag = this.deps.interaction.dragDelta;
       const focused = this.orbs[this.activeIndex];
@@ -270,7 +258,7 @@ export class ShunyaRealm {
     const geo = new THREE.BufferGeometry();
     const pos: number[] = [];
     const col: number[] = [];
-    const tints = ['#9b8aff', '#ffffff', '#ffd7b3', '#7fbfff'];
+    const tints = ['#ffd7b3', '#7fbfff', '#ffffff', '#9b8aff', '#a0e8ff'];
     for (let i = 0; i < count; i++) {
       const r = radius * (0.55 + Math.random() * 0.45);
       const theta = Math.random() * Math.PI * 2;
@@ -278,7 +266,7 @@ export class ShunyaRealm {
       pos.push(
         r * Math.sin(phi) * Math.cos(theta),
         r * Math.sin(phi) * Math.sin(theta) * 0.6,
-        r * Math.cos(phi) - 150
+        r * Math.cos(phi) - 180
       );
       const c = new THREE.Color(tints[(Math.random() * tints.length) | 0]);
       col.push(c.r, c.g, c.b);
@@ -286,7 +274,7 @@ export class ShunyaRealm {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     const mat = new THREE.PointsMaterial({
-      size: 0.18,
+      size: 0.2,
       sizeAttenuation: true,
       transparent: true,
       opacity: 0.85,
@@ -297,34 +285,36 @@ export class ShunyaRealm {
     return new THREE.Points(geo, mat);
   }
 
-  private buildNebula(count: number) {
+  /** Spiral dust matching the orb path — evokes the unfurling product constellation. */
+  private buildSpiralDust(count: number) {
     const geo = new THREE.BufferGeometry();
     const pos: number[] = [];
     const col: number[] = [];
-    const violet = new THREE.Color('#5d2dff');
-    const ember = new THREE.Color('#ff2a4a');
-    const teal = new THREE.Color('#22d4e0');
+    const amber = new THREE.Color('#ffb84d');
+    const cyan = new THREE.Color('#3ad4ff');
+    const indigo = new THREE.Color('#9a55ff');
     for (let i = 0; i < count; i++) {
-      const r = 80 + Math.random() * 380;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 2 - 1);
+      const turn = i / count;
+      const angle = turn * Math.PI * 14 + Math.random() * 0.4;
+      const r = 60 + turn * 180 + (Math.random() - 0.5) * 30;
+      const z = -turn * 380 + (Math.random() - 0.5) * 40;
       pos.push(
-        r * Math.sin(phi) * Math.cos(theta) * 0.9,
-        r * Math.sin(phi) * Math.sin(theta) * 0.35,
-        r * Math.cos(phi) - 130
+        Math.cos(angle) * r,
+        (Math.random() - 0.5) * 50,
+        Math.sin(angle) * r + z
       );
       const mix = Math.random();
-      const c = mix < 0.45 ? violet.clone().lerp(ember, Math.random() * 0.45)
-             : mix < 0.75 ? violet.clone().lerp(teal, Math.random() * 0.55)
-                          : ember.clone().lerp(teal, Math.random() * 0.35);
+      const c = mix < 0.4 ? amber.clone().lerp(cyan, Math.random() * 0.5)
+              : mix < 0.75 ? cyan.clone().lerp(indigo, Math.random() * 0.5)
+              : indigo.clone().lerp(amber, Math.random() * 0.4);
       col.push(c.r, c.g, c.b);
     }
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     const mat = new THREE.PointsMaterial({
-      size: 0.6,
+      size: 0.55,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.26,
       vertexColors: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
