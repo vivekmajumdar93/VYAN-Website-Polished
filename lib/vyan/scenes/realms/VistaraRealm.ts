@@ -79,15 +79,12 @@ export class VistaraRealm {
       o.reset();
       (o as any).magnifyFactor = 1.0;
     }
-    // CINEMATIC SPIRAL ARRIVAL — each orb arrives from a position rotated
-    // around the Z axis from its home, simulating an unfurling spiral.
+    // CINEMATIC RANDOM ARRIVAL — each orb arrives from a truly random off-axis
+    // direction (mirroring Shunya). No biased X/Z weighting.
     for (let i = 0; i < this.orbs.length; i++) {
       const orb = this.orbs[i];
-      // Slight randomness on top of a base spiral-inward offset.
-      const base = randomArrivalOffset(12);
-      base.x *= 1.2;
-      base.z *= 0.6;
-      orb.setArrivalOffset(base, 1.6);
+      const base = randomArrivalOffset(14 + Math.random() * 6);
+      orb.setArrivalOffset(base, 1.4 + Math.random() * 0.6);
     }
     if (this.deps?.cameraRig) {
       this.deps.cameraRig.locked = false;

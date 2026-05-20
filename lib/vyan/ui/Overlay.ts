@@ -39,6 +39,8 @@ private shunyaCaption = document.createElement('div');
 private shunyaName = document.createElement('div');
 private shunyaTag = document.createElement('div');
 private depthLy!: HTMLDivElement;
+private gatewayInfo!: HTMLButtonElement;
+private gatewayInfoPanel!: HTMLDivElement;
   private introComplete = false;
   private voidMode = false;
   private currentApproach = 0;
@@ -78,19 +80,75 @@ const y = (e.clientY - rect.top) / rect.height;
 const idx = Math.max(0, Math.min(6, Math.floor(y * 7)));
 this.callbacks?.onJumpToOrb(idx);
 });
-this.gatewayHint.className = 'gateway-hint';
+    this.gatewayHint.className = 'gateway-hint';
     this.gatewayHint.innerHTML = `
       <div class="gateway-line-1">VYŌMA</div>
       <div class="gateway-line-2">The Primordial Core of VYAN</div>
-      <div class="gateway-line-3">Initiate Displacement</div>
     `;
     this.gatewayHint.style.opacity = '0';
     this.cursorHint.className = 'cursor-hint';
     this.cursorHint.innerHTML = `
       <span>initiate displacement</span>
       <div class="scroll-indicator"></div>
+      <span class="cursor-hint__sub">scroll · swipe · drag</span>
     `;
     this.cursorHint.style.opacity = '0';
+    // ---- Gateway-only instructions icon (cinematic guide, replaces dormant rail) ----
+    const gatewayInfo = document.createElement('button');
+    gatewayInfo.className = 'gateway-info';
+    gatewayInfo.type = 'button';
+    gatewayInfo.setAttribute('aria-label', 'Guide to the cosmos');
+    gatewayInfo.innerHTML = `
+      <span class="gateway-info__halo"></span>
+      <span class="gateway-info__glyph">i</span>
+      <span class="gateway-info__orbit"></span>
+    `;
+    this.gatewayInfo = gatewayInfo;
+    const gatewayPanel = document.createElement('div');
+    gatewayPanel.className = 'gateway-info-panel';
+    gatewayPanel.innerHTML = `
+      <div class="gateway-info-panel__inner">
+        <div class="gateway-info-panel__kicker">A Traveler's Codex</div>
+        <h3 class="gateway-info-panel__title">How to wander VYAN</h3>
+        <div class="gateway-info-panel__step"><span class="gp-n">i.</span><div>
+          <strong>Scroll, swipe, or drag</strong> to begin displacement. Vyōma — the primordial gateway — will draw closer until it accepts you.</div></div>
+        <div class="gateway-info-panel__step"><span class="gp-n">ii.</span><div>
+          <strong>Click the core</strong> when it settles centre-frame. The veil parts and you emerge into the <em>Shunya Mandala</em> — the void of beginnings.</div></div>
+        <div class="gateway-info-panel__step"><span class="gp-n">iii.</span><div>
+          Inside a void, <strong>three scrolls</strong> (or <strong>two swipes</strong>) traverse to the next orb. The <em>neural rail</em> on the right of your screen marks the depth you've crossed.</div></div>
+        <div class="gateway-info-panel__step"><span class="gp-n">iv.</span><div>
+          <strong>Click any orb</strong> to enter its slab. <strong>Vistāra</strong> unfurls into seven products. <strong>Medhā</strong> opens a cognitive cockpit — five minds, one conversation.</div></div>
+        <div class="gateway-info-panel__step"><span class="gp-n">v.</span><div>
+          The <strong>Concierge orb</strong> (top-right, always present) guides you. The <strong>Sound Console</strong> (top-left) tunes the music of the spheres.</div></div>
+        <div class="gateway-info-panel__foot">
+          <span>esc to close</span><span>press <em>i</em> to summon again</span>
+        </div>
+        <button type="button" class="gateway-info-panel__x" aria-label="close">✕</button>
+      </div>
+    `;
+    this.gatewayInfoPanel = gatewayPanel;
+    gatewayInfo.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      gatewayPanel.classList.toggle('open');
+    });
+    (gatewayPanel.querySelector('.gateway-info-panel__x') as HTMLElement)?.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      gatewayPanel.classList.remove('open');
+    });
+    gatewayPanel.addEventListener('pointerdown', (e) => {
+      // click outside the inner card closes
+      if (e.target === gatewayPanel) gatewayPanel.classList.remove('open');
+    });
+    // Keyboard shortcut "i" to summon the codex (only on gateway).
+    window.addEventListener('keydown', (e) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (this.voidMode) return;
+      if (e.key === 'i' || e.key === 'I') {
+        gatewayPanel.classList.toggle('open');
+      }
+      if (e.key === 'Escape') gatewayPanel.classList.remove('open');
+    });
     this.distanceLabel.className = 'distance-label';
     this.distanceLabel.style.opacity = '0';
     this.shunyaCaption.className = 'shunya-caption';
@@ -136,6 +194,8 @@ this.element.appendChild(this.gatewayHint);
 this.element.appendChild(this.cursorHint);
 this.element.appendChild(this.distanceLabel);
 this.element.appendChild(this.shunyaCaption);
+this.element.appendChild(this.gatewayInfo);
+this.element.appendChild(this.gatewayInfoPanel);
 this.element.appendChild(this.panel);
 }
 bind(callbacks: OverlayCallbacks) {
@@ -150,6 +210,8 @@ try { this.soundOverlay.remove(); } catch {}
 }
 endIntro() {
 this.introComplete = true;
+// Immediately show the INITIATE hint so the user knows what to do.
+this.updateHintVisibility();
 }
   private createSoundPanel() {
     this.soundOverlay.className = 'sound-panel-overlay';
@@ -249,42 +311,46 @@ this.introComplete = true;
   }
 
   private updateHintVisibility() {
-    // Gateway Hint (Cinematic Fade & Scale)
+    // ---- VYŌMA caption (appears only AFTER user starts displacing) ----
+    // Threshold pushed to 0.18 so it never overlaps the INITIATE hint.
+    const fadeIn = 0.18;
+    const fadeFull = 0.55;
     let gatewayOpacity = 0;
-    let gatewayBlur = 12;
-    
-    if (this.currentApproach > 0.01) {
-      gatewayOpacity = Math.min((this.currentApproach - 0.01) / 0.15, 1);
-      gatewayBlur = 12 * (1 - gatewayOpacity);
+    if (this.currentApproach > fadeIn) {
+      gatewayOpacity = Math.min((this.currentApproach - fadeIn) / (fadeFull - fadeIn), 1);
+      gatewayOpacity = gatewayOpacity * gatewayOpacity * (3 - 2 * gatewayOpacity);
     }
-    
-    // Smoothstep easing for cinematic feel
-    gatewayOpacity = gatewayOpacity * gatewayOpacity * (3 - 2 * gatewayOpacity);
-    
+    const blurPx = 12 * (1 - gatewayOpacity);
     this.gatewayHint.style.opacity = String(gatewayOpacity);
-    this.gatewayHint.style.filter = `blur(${gatewayBlur}px)`;
-    
-    // Subtle cinematic scale & lift
-    const scaleVal = 1 + (this.currentApproach * 0.1);
-    const yOffset = this.currentApproach * 25;
-    this.gatewayHint.style.transform = `translateX(-50%) translateY(${-yOffset}px) scale(${scaleVal})`;
-    
-    // Cursor Hint (Initiate displacement)
+    this.gatewayHint.style.filter = `blur(${blurPx}px)`;
+    // Move VYŌMA UPWARD into the centre of the viewport as the orb arrives.
+    // bottom: 180px → ~50vh as approach → 1.
+    const liftPx = this.currentApproach * 220;
+    const scaleVal = 1 + this.currentApproach * 0.18;
+    this.gatewayHint.style.transform = `translateX(-50%) translateY(${-liftPx}px) scale(${scaleVal})`;
+
+    // ---- INITIATE hint (shown first, pulses, fades as user starts scrolling) ----
+    // Visible immediately after intro completes (no mouse-move gating).
     let cursorOpacity = 0;
-    if (this.cursorHovered) {
-      // Crossfade: as gateway text fades in, cursor text fades out
-      cursorOpacity = Math.max(1 - (gatewayOpacity * 2.5), 0);
+    if (this.introComplete && !this.voidMode) {
+      // Full visibility from approach 0 → 0.10, then fade out by 0.30.
+      if (this.currentApproach < 0.1) cursorOpacity = 1;
+      else if (this.currentApproach < 0.3) cursorOpacity = 1 - (this.currentApproach - 0.1) / 0.2;
+      else cursorOpacity = 0;
     }
-    
     this.cursorHint.style.opacity = String(cursorOpacity);
     this.cursorHint.style.pointerEvents = cursorOpacity > 0.5 ? 'auto' : 'none';
   }
 setVoidMode(on: boolean) {
 this.voidMode = on;
 this.rail.classList.toggle('visible', on);
-this.rail.style.pointerEvents = on ?
-'auto' : 'none';
+// FULLY remove the rail from the gateway (not even a dormant background).
+this.rail.style.display = on ? '' : 'none';
+this.rail.style.pointerEvents = on ? 'auto' : 'none';
 this.distanceLabel.style.opacity = on ? '1' : '0';
+// Gateway-only Codex icon — visible only when NOT inside a void.
+if (this.gatewayInfo) this.gatewayInfo.style.display = on ? 'none' : '';
+if (on && this.gatewayInfoPanel) this.gatewayInfoPanel.classList.remove('open');
 if (on) {
 this.gatewayHint.style.opacity = '0';
 this.cursorHint.style.opacity = '0';

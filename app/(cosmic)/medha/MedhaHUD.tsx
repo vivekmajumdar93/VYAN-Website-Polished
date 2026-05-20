@@ -9,6 +9,7 @@ import {
   getMode,
 } from '@/lib/medha/cognitive';
 import { chatStream, type ChatMessage } from '@/lib/medha/MedhaClient';
+import { renderMarkdown, isForbiddenQuery, SANDHI_REDIRECT_MARKDOWN } from '@/lib/medha/markdown';
 import './medha.css';
 
 type Msg = {
@@ -96,6 +97,18 @@ export default function MedhaHUD() {
     if (!text || busy) return;
     setDraft('');
     const userMsg: Msg = { id: uid(), role: 'user', content: text, mode: activeMode };
+
+    // ---- Guardrail: VYAN internals are not Medh\u0101's domain. Redirect to Sandhi.
+    if (isForbiddenQuery(text)) {
+      const aiId = uid();
+      setMessages(prev => [
+        ...prev,
+        userMsg,
+        { id: aiId, role: 'assistant', content: SANDHI_REDIRECT_MARKDOWN, mode: activeMode, streaming: false },
+      ]);
+      return;
+    }
+
     const aiId = uid();
     setMessages(prev => [
       ...prev,
@@ -266,8 +279,25 @@ export default function MedhaHUD() {
                   )}
                 </div>
                 <div className="medha-msg__body">
-                  {m.content || (m.streaming ? <span className="medha-msg__cursor">▌</span> : null)}
-                  {m.streaming && m.content && <span className="medha-msg__cursor">▌</span>}
+                  {m.role === 'assistant' ? (
+                    m.content ? (
+                      <div
+                        className="medha-md"
+                        dangerouslySetInnerHTML={{
+                          __html:
+                            renderMarkdown(m.content) +
+                            (m.streaming ? '<span class="medha-msg__cursor">▌</span>' : ''),
+                        }}
+                      />
+                    ) : (
+                      m.streaming ? <span className="medha-msg__cursor">▌</span> : null
+                    )
+                  ) : (
+                    <>
+                      {m.content}
+                      {m.streaming && m.content && <span className="medha-msg__cursor">▌</span>}
+                    </>
+                  )}
                 </div>
               </div>
             );

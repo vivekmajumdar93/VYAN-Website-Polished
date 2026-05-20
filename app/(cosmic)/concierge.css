@@ -1,4 +1,7 @@
-/* Concierge Orb — always-present top-right cosmic guide */
+/* ================================================================
+   Concierge Orb — mini plexus version (mirrors main NanoOrb visual)
+   Floats gently in its zone, hover-reacts, click opens the nav.
+   ================================================================ */
 
 .concierge-root {
   position: fixed;
@@ -6,11 +9,20 @@
   right: 18px;
   z-index: 70;
   pointer-events: none;
-  width: 56px;
-  height: 56px;
+  width: 78px;
+  height: 78px;
+  /* gentle drift in place (NOT bound rigidly) */
+  animation: concierge-drift 14s ease-in-out infinite;
+}
+@keyframes concierge-drift {
+  0%, 100% { transform: translate(0, 0); }
+  20%      { transform: translate(-4px, 5px); }
+  45%      { transform: translate(3px, -3px); }
+  70%      { transform: translate(-2px, -5px); }
+  90%      { transform: translate(4px, 3px); }
 }
 
-/* The orb itself */
+/* ---------- The mini plexus orb ---------- */
 .concierge-orb {
   position: absolute;
   inset: 0;
@@ -18,60 +30,133 @@
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
-  width: 56px;
-  height: 56px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.05);
+  transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.05);
 }
-.concierge-orb:hover {
-  transform: scale(1.12);
-}
-.concierge-orb.is-open {
-  transform: scale(1.05);
-}
+.concierge-orb:hover { transform: scale(1.10); }
+.concierge-orb.is-open { transform: scale(1.04); }
+
 .concierge-orb__halo {
   position: absolute;
-  inset: -8px;
+  inset: -10px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(190, 150, 255, 0.55) 0%, rgba(190, 150, 255, 0) 70%);
-  filter: blur(8px);
-  animation: concierge-pulse 3s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(190, 150, 255, 0.45) 0%, rgba(190, 150, 255, 0) 70%);
+  filter: blur(10px);
+  animation: concierge-pulse 3.4s ease-in-out infinite;
   pointer-events: none;
-}
-.concierge-orb__core {
-  position: relative;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, #ffffff 0%, rgba(255,255,255,0.55) 30%, rgba(190, 150, 255, 0.85) 60%, rgba(120, 70, 200, 1) 100%);
-  box-shadow:
-    0 0 14px rgba(196, 144, 255, 0.95),
-    0 0 30px rgba(160, 100, 240, 0.5);
-}
-.concierge-orb__ring {
-  position: absolute;
-  inset: 6px;
-  border-radius: 50%;
-  border: 1px solid rgba(220, 190, 255, 0.45);
-  opacity: 0.8;
-  animation: concierge-rotate 14s linear infinite;
 }
 @keyframes concierge-pulse {
   0%, 100% { transform: scale(1); opacity: 0.85; }
-  50% { transform: scale(1.25); opacity: 0.45; }
-}
-@keyframes concierge-rotate {
-  to { transform: rotate(360deg); }
+  50%      { transform: scale(1.25); opacity: 0.45; }
 }
 
-/* Speech bubble — lean glass slab to the LEFT of the orb */
+.concierge-orb__shell {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: visible;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 0 10px rgba(180, 130, 255, 0.45));
+}
+
+/* Rotating outer ring (slow) + inner ring (faster, opposite) */
+.concierge-orb__ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(220, 190, 255, 0.32);
+  opacity: 0.85;
+  pointer-events: none;
+}
+.concierge-orb__ring--outer {
+  inset: 0;
+  border-color: rgba(220, 190, 255, 0.28);
+  animation: concierge-rotate 22s linear infinite;
+}
+.concierge-orb__ring--inner {
+  inset: 10px;
+  border-color: rgba(255, 200, 230, 0.18);
+  border-top-color: rgba(255, 240, 255, 0.65);
+  border-style: dashed;
+  animation: concierge-rotate-rev 9s linear infinite;
+}
+@keyframes concierge-rotate { to { transform: rotate(360deg); } }
+@keyframes concierge-rotate-rev { to { transform: rotate(-360deg); } }
+
+/* Plexus pattern: two counter-rotating SVG layers */
+.concierge-orb__plexus {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: concierge-plexus-rot 28s linear infinite;
+  opacity: 0.95;
+}
+.concierge-orb__plexus--counter {
+  animation: concierge-plexus-rot-rev 36s linear infinite;
+  opacity: 0.55;
+  transform: scale(0.86);
+}
+@keyframes concierge-plexus-rot     { to { transform: rotate(360deg); } }
+@keyframes concierge-plexus-rot-rev { to { transform: rotate(-360deg); } }
+.concierge-plexus { width: 100%; height: 100%; }
+.concierge-plexus__lines line { opacity: 0.7; }
+
+/* The luminous core */
+.concierge-orb__core {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #ffffff 0%, rgba(255,255,255,0.7) 30%, rgba(206, 168, 255, 0.92) 60%, rgba(120, 70, 200, 1) 100%);
+  box-shadow:
+    0 0 14px rgba(220, 180, 255, 0.95),
+    0 0 30px rgba(160, 100, 240, 0.55);
+  animation: concierge-core-breath 2.4s ease-in-out infinite;
+}
+@keyframes concierge-core-breath {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.18); filter: brightness(1.15); }
+}
+
+/* Two tiny orbiting satellites */
+.concierge-orb__satellite {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: #ffd6ff;
+  box-shadow: 0 0 8px rgba(255, 200, 255, 0.85);
+  margin: -1.5px 0 0 -1.5px;
+  pointer-events: none;
+}
+.concierge-orb__satellite--a { animation: concierge-orbit-a 5.2s linear infinite; }
+.concierge-orb__satellite--b { animation: concierge-orbit-b 7.6s linear infinite; }
+@keyframes concierge-orbit-a {
+  from { transform: rotate(0deg)   translateX(26px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(26px) rotate(-360deg); }
+}
+@keyframes concierge-orbit-b {
+  from { transform: rotate(120deg) translateX(22px) rotate(0deg); }
+  to   { transform: rotate(480deg) translateX(22px) rotate(-360deg); }
+}
+
+/* On hover — subtle reactive rotate/scale of the entire root */
+.concierge-root.is-hovered .concierge-orb__shell { transform: rotate(8deg); }
+.concierge-root.is-hovered .concierge-orb__core  { transform: scale(1.32); }
+.concierge-orb__shell { transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.05); }
+.concierge-orb__core  { transition: transform 0.4s ease; }
+
+/* ---------- Speech bubble (left of orb) ---------- */
 .concierge-bubble {
   position: absolute;
   top: 50%;
-  right: 72px;
+  right: 84px;
   transform: translateY(-50%);
   pointer-events: auto;
   max-width: 340px;
@@ -102,7 +187,7 @@
   border-right: 1px solid rgba(206, 173, 255, 0.18);
   border-top: 1px solid rgba(206, 173, 255, 0.18);
 }
-.concierge-bubble--fact { border-color: rgba(120, 200, 255, 0.28); }
+.concierge-bubble--fact  { border-color: rgba(120, 200, 255, 0.28); }
 .concierge-bubble--greet { border-color: rgba(206, 173, 255, 0.28); }
 .concierge-bubble--stuck { border-color: rgba(255, 150, 180, 0.28); }
 .concierge-bubble--nudge { border-color: rgba(255, 200, 120, 0.28); }
@@ -121,17 +206,15 @@
 }
 .concierge-bubble__cta:hover { background: rgba(70, 40, 110, 0.9); }
 @keyframes concierge-bubble-in {
-  0% { opacity: 0; transform: translate(8px, -50%) scale(0.96); }
+  0%   { opacity: 0; transform: translate(8px, -50%) scale(0.96); }
   100% { opacity: 1; transform: translate(0, -50%) scale(1); }
 }
 
-/* Signal orbs — mini particles that fly in to exchange data with the concierge */
+/* ---------- Signal-orb cinematic ---------- */
 .concierge-signal {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 7px;
-  height: 7px;
+  top: 50%; left: 50%;
+  width: 7px; height: 7px;
   border-radius: 50%;
   pointer-events: none;
   background: radial-gradient(circle, #ffffff 0%, rgba(190, 150, 255, 0.8) 50%, rgba(190, 150, 255, 0) 100%);
@@ -140,53 +223,39 @@
   animation: concierge-signal 3.3s cubic-bezier(0.3, 0.8, 0.3, 1.05) forwards;
 }
 @keyframes concierge-signal {
-  0% {
-    transform: translate(-50%, -50%) rotate(var(--ang)) translateX(220px) scale(0.7);
-    opacity: 0;
-  }
-  10% { opacity: 1; }
-  55% {
-    transform: translate(-50%, -50%) rotate(var(--ang)) translateX(8px) scale(1.4);
-    opacity: 1;
-  }
-  72% {
-    transform: translate(-50%, -50%) rotate(var(--ang)) translateX(8px) scale(0.6);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translate(-50%, -50%) rotate(calc(var(--ang) + 90deg)) translateX(280px) scale(0.4);
-    opacity: 0;
-  }
+  0%   { transform: translate(-50%, -50%) rotate(var(--ang)) translateX(220px) scale(0.7); opacity: 0; }
+  10%  { opacity: 1; }
+  55%  { transform: translate(-50%, -50%) rotate(var(--ang)) translateX(8px)   scale(1.4); opacity: 1; }
+  72%  { transform: translate(-50%, -50%) rotate(var(--ang)) translateX(8px)   scale(0.6); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) rotate(calc(var(--ang) + 90deg)) translateX(280px) scale(0.4); opacity: 0; }
 }
 
-/* Quick-nav glass panel */
+/* ---------- Quick-nav glass panel ---------- */
 .concierge-nav {
   position: absolute;
-  top: 70px;
+  top: 90px;
   right: 0;
-  width: 280px;
+  width: 296px;
   pointer-events: auto;
   padding: 14px 14px 12px;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(15, 10, 30, 0.92), rgba(8, 6, 18, 0.92));
+  background: linear-gradient(180deg, rgba(15, 10, 30, 0.94), rgba(8, 6, 18, 0.94));
   border: 1px solid rgba(206, 173, 255, 0.22);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
   box-shadow: 0 24px 60px -20px rgba(120, 80, 200, 0.55);
   animation: concierge-nav-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.05);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 80vh;
+  gap: 6px;
+  max-height: 70vh;
   overflow-y: auto;
 }
 @keyframes concierge-nav-in {
-  0% { opacity: 0; transform: translateY(-6px) scale(0.97); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0)    scale(1); }
 }
 .concierge-nav__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex; align-items: center; gap: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
@@ -198,8 +267,8 @@
   animation: concierge-pulse-dot 1.6s ease-in-out infinite;
 }
 @keyframes concierge-pulse-dot {
-  0%,100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
 }
 .concierge-nav__title {
   font-size: 12px;
@@ -216,46 +285,84 @@
   margin-top: 2px;
 }
 .concierge-nav__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: flex; flex-direction: column; gap: 2px;
 }
+.concierge-nav__sec { display: flex; flex-direction: column; }
+.concierge-nav__sec-head { position: relative; display: flex; align-items: center; }
 .concierge-nav__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 10px;
+  flex: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px;
   border-radius: 10px;
-  border: 0;
-  background: transparent;
-  color: rgba(244, 235, 255, 0.85);
-  font-size: 12px;
-  letter-spacing: 0.02em;
+  border: 0; background: transparent;
+  color: rgba(244, 235, 255, 0.92);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
   cursor: pointer;
   text-align: left;
   transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 .concierge-nav__item:hover {
-  background: rgba(40, 24, 64, 0.6);
+  background: rgba(40, 24, 64, 0.65);
   color: #fff;
   transform: translateX(2px);
 }
-.concierge-nav__item--shunya-sub,
-.concierge-nav__item--vistara-sub {
-  font-size: 11.5px;
-  color: rgba(244, 235, 255, 0.65);
-  padding-left: 18px;
-}
-.concierge-nav__item--gateway { color: rgba(255, 200, 220, 0.92); }
-.concierge-nav__item--medha { color: rgba(180, 230, 255, 0.92); }
+.concierge-nav__sec--gateway .concierge-nav__item { color: rgba(255, 200, 220, 0.95); }
+.concierge-nav__sec--medha   .concierge-nav__item { color: rgba(180, 230, 255, 0.95); }
 .concierge-nav__arrow {
   opacity: 0.5;
   transition: transform 0.18s ease, opacity 0.18s ease;
 }
-.concierge-nav__item:hover .concierge-nav__arrow {
-  transform: translateX(2px);
-  opacity: 0.95;
+.concierge-nav__item:hover .concierge-nav__arrow { transform: translateX(2px); opacity: 0.95; }
+.concierge-nav__chev {
+  background: transparent;
+  border: 0;
+  color: rgba(220, 200, 255, 0.65);
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: transform 0.25s ease, background 0.18s ease, color 0.18s ease;
 }
+.concierge-nav__chev:hover { color: #fff; background: rgba(255,255,255,0.05); }
+.concierge-nav__chev.is-open { transform: rotate(180deg); color: #fff; }
+
+.concierge-nav__children {
+  display: flex; flex-direction: column;
+  margin: 2px 0 6px 6px;
+  border-left: 1px solid rgba(255,255,255,0.06);
+  padding-left: 6px;
+  animation: concierge-section-in 0.28s ease-out;
+}
+@keyframes concierge-section-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.concierge-nav__sub-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 0; background: transparent;
+  color: rgba(232, 222, 255, 0.78);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+.concierge-nav__sub-item:hover {
+  background: rgba(40, 24, 64, 0.45);
+  color: #fff;
+  transform: translateX(2px);
+}
+.concierge-nav__bullet {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: rgba(206, 173, 255, 0.5);
+  flex-shrink: 0;
+}
+.concierge-nav__sub-item:hover .concierge-nav__bullet { background: #fff; box-shadow: 0 0 6px #fff; }
+
 .concierge-nav__foot {
   margin-top: 8px;
   padding-top: 10px;
@@ -268,12 +375,8 @@
 }
 
 @media (max-width: 640px) {
-  .concierge-bubble {
-    right: 70px;
-    max-width: 220px;
-    font-size: 11.5px;
-  }
-  .concierge-nav {
-    width: 240px;
-  }
+  .concierge-bubble { right: 84px; max-width: 220px; font-size: 11.5px; }
+  .concierge-nav { width: 260px; }
+  .concierge-root { width: 64px; height: 64px; }
+  .concierge-orb__shell { width: 52px; height: 52px; }
 }

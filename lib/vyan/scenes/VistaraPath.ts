@@ -17,6 +17,12 @@ export type VistaraProductDef = {
 
 const SILVER_A = '#b8b8c8';
 const SILVER_B = '#6a6a8a';
+// Two subtly-tinted "extended-branch" orbs — like coloured shimmer-stardust
+// among the silver constellation. Very subtle hue, the silhouette stays silver.
+const NETRA_A = '#a64a4a';   // blood-red whisper
+const NETRA_B = '#3a1a1a';
+const MUDRA_A = '#4aa67a';   // deep-green pulse
+const MUDRA_B = '#0a2a1a';
 const RING_RADIUS = 140;
 const RING_Y_TILT = 28;
 
@@ -34,9 +40,9 @@ export const VISTARA_PRODUCTS: VistaraProductDef[] = [
   { key: 'ojas',        name: 'VYAN Ojas',         tagline: 'Tracking Your Pr\u0101\u1e47ic Rhythm',
     colorA: SILVER_A, colorB: SILVER_B, position: ringPos(1, 7) },
   { key: 'mudra',       name: 'VYAN Mudr\u0101',   tagline: 'The Ko\u015ba of Global Entities',
-    colorA: SILVER_A, colorB: SILVER_B, position: ringPos(2, 7) },
+    colorA: MUDRA_A, colorB: MUDRA_B, position: ringPos(2, 7) },
   { key: 'netra',       name: 'VYAN Netra',        tagline: 'The Conscious Eye Across Tantras',
-    colorA: SILVER_A, colorB: SILVER_B, position: ringPos(3, 7) },
+    colorA: NETRA_A, colorB: NETRA_B, position: ringPos(3, 7) },
   { key: 'akriti',      name: 'VYAN \u0100k\u1e5bti', tagline: 'Creating Digital Anubhava Through Your D\u1e5b\u1e63\u1e6di',
     colorA: SILVER_A, colorB: SILVER_B, position: ringPos(4, 7) },
   { key: 'sutra',       name: 'VYAN S\u016btra',   tagline: 'Weaving Sa\u1e45gama Through Viveka',

@@ -639,3 +639,48 @@
   .medha-node__provider { font-size: 7.5px; }
   .medha-greeting__line { font-size: 22px; }
 }
+
+/* ---------- Markdown rendering inside Medhā assistant messages ---------- */
+.medha-md { color: rgba(232, 232, 240, 0.92); font-size: 14.5px; line-height: 1.72; }
+.medha-md .md-p { margin: 0 0 12px 0; }
+.medha-md .md-p:last-child { margin-bottom: 0; }
+.medha-md strong { color: #ffd9e4; font-weight: 600; letter-spacing: 0.01em; }
+.medha-md em { color: rgba(216, 200, 255, 0.92); font-style: italic; }
+.medha-md code {
+  background: rgba(120, 80, 200, 0.18);
+  border: 1px solid rgba(180, 130, 255, 0.18);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  color: #f0e6ff;
+}
+.medha-md .md-ul, .medha-md .md-ol { margin: 6px 0 12px 0; padding-left: 22px; }
+.medha-md .md-ul li, .medha-md .md-ol li { margin-bottom: 4px; }
+.medha-md .md-ul { list-style: none; padding-left: 4px; }
+.medha-md .md-ul li { position: relative; padding-left: 18px; }
+.medha-md .md-ul li::before {
+  content: ''; position: absolute; left: 4px; top: 9px;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: linear-gradient(135deg, #b18bff, #ff8aa2);
+  box-shadow: 0 0 8px rgba(180, 130, 255, 0.6);
+}
+.medha-md .md-h { margin: 14px 0 8px; letter-spacing: 0.03em; color: #fff; font-weight: 600; }
+.medha-md .md-h1 { font-size: 18px; }
+.medha-md .md-h2 { font-size: 16px; }
+.medha-md .md-h3 { font-size: 14px; letter-spacing: 0.06em; color: #ffd9e4; }
+.medha-md .md-h4, .medha-md .md-h5, .medha-md .md-h6 { font-size: 13px; color: rgba(232, 232, 240, 0.85); }
+.medha-md .md-quote {
+  margin: 10px 0 14px;
+  padding: 10px 14px;
+  border-left: 2px solid rgba(180, 130, 255, 0.55);
+  background: linear-gradient(90deg, rgba(180, 130, 255, 0.06), transparent);
+  font-style: italic;
+  color: rgba(232, 232, 240, 0.92);
+}
+.medha-md a.md-mail, .medha-md a.md-link {
+  color: #b18bff; text-decoration: none;
+  border-bottom: 1px dashed rgba(180, 130, 255, 0.5);
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.medha-md a.md-mail:hover, .medha-md a.md-link:hover { color: #fff; border-color: #fff; }
