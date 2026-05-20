@@ -95,14 +95,16 @@ export class CameraRig {
     const py = this.deps.interaction.pointer.y;
     const t = performance.now() * 0.001;
 
-    // Vy\u014dma sits at the SAME distance as Shunya orbs (z=26) from arrival \u2014
-    // no fly-in. This matches the click-zone size users see in the void.
-    const z = 26;
+    // Vy\u014dma is DISTANT from arrival \u2014 so "Initiate Displacement" actually
+    // means something: the user is far away and the click warps them in.
+    // Camera sits at z=88 (instead of z=26 in the void) so the orb appears
+    // small but central, hover-pulsing in the dark like a beckoning star.
+    const z = 88;
 
     this.targetOffset.set(
-      px * 1.8 + Math.sin(t * 0.4) * 0.8,
-      py * 1.1 + Math.cos(t * 0.3) * 0.8,
-      0
+      px * 3.2 + Math.sin(t * 0.4) * 1.6,
+      py * 2.0 + Math.cos(t * 0.3) * 1.2,
+      0,
     );
     this.offset.lerp(this.targetOffset, 1 - Math.pow(0.005, dt * 60));
     this.camera.position.set(this.offset.x, this.offset.y, z);

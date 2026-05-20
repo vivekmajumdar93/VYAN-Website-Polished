@@ -133,7 +133,7 @@ export class World {
     tick();
   }
 
-  jumpToOrb(_index: number) {}
+  jumpToOrb(index: number) { this.realms.jumpToOrb(index); }
 
   destroy() {
     this.stopped = true;

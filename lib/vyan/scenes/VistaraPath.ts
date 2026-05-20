@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 
-// Vistāra — the unfurling. 7 product orbs arranged in a golden-angle
-// logarithmic spiral, descending into the void. The path is closed so
-// scroll loops endlessly through the product constellation.
+// Vist\u0101ra \u2014 the unfurling. 7 product orbs arranged in a flat ring so every
+// orb sits at IDENTICAL camera distance (no near/far variance). The "unfurling"
+// expression comes from the arrival physics, not the resting layout.
+//
+// Branding: plain romanized titles (per user spec). No diacritic codepoints.
 
 export type VistaraProductKey =
-  | 'rtam' | 'ojas' | 'mudra' | 'netra' | 'akrti' | 'sutra' | 'placeholder';
+  | 'ritam' | 'ojas' | 'mudra' | 'netra' | 'akriti' | 'sutra' | 'placeholder';
 
 export type VistaraProductDef = {
   key: VistaraProductKey;
@@ -16,92 +18,96 @@ export type VistaraProductDef = {
   position: THREE.Vector3;
 };
 
-// Golden angle in radians (~137.508°) — the canonical spiral phyllotaxis.
-const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+// All orbs share the silver/grey palette of the original placeholder \u2014 per user.
+const SILVER_A = '#b8b8c8';
+const SILVER_B = '#6a6a8a';
 
-function spiralPos(i: number, total: number): THREE.Vector3 {
-  const t = i / Math.max(1, total - 1);
-  const angle = i * GOLDEN;
-  // radius grows from 70 → 220; depth descends from 0 → -380
-  const r = 70 + t * 150;
-  const z = -t * 380;
-  const y = Math.sin(i * 0.7) * 22; // gentle vertical undulation
+const RING_RADIUS = 140;
+const RING_Y_TILT = 28; // small vertical wave so the ring doesn't look totally flat
+
+function ringPos(i: number, total: number): THREE.Vector3 {
+  const angle = (i / total) * Math.PI * 2;
+  const y = Math.sin(i * 1.13) * RING_Y_TILT;
   return new THREE.Vector3(
-    Math.cos(angle) * r,
+    Math.cos(angle) * RING_RADIUS,
     y,
-    Math.sin(angle) * r + z
+    Math.sin(angle) * RING_RADIUS,
   );
 }
 
 export const VISTARA_PRODUCTS: VistaraProductDef[] = [
   {
-    key: 'rtam',
-    name: 'VYAN ṚTAM',
-    tagline: 'Conscious Living Through Pravāha',
-    colorA: '#ffb84d',     // amber
-    colorB: '#ff2a4a',
-    position: spiralPos(0, 7),
+    key: 'ritam',
+    name: 'VYAN RITAM',
+    tagline: 'Conscious Living Through Prav\u0101ha',
+    colorA: SILVER_A,
+    colorB: SILVER_B,
+    position: ringPos(0, 7),
   },
   {
     key: 'ojas',
     name: 'VYAN OJAS',
-    tagline: 'Tracking Your Prāṇic Rhythm',
-    colorA: '#22e0a4',     // emerald-teal
-    colorB: '#ff2a4a',
-    position: spiralPos(1, 7),
+    tagline: 'Tracking Your Pr\u0101\u1e47ic Rhythm',
+    colorA: SILVER_A,
+    colorB: SILVER_B,
+    position: ringPos(1, 7),
   },
   {
     key: 'mudra',
-    name: 'VYAN MUDRĀ',
-    tagline: 'The Kośa of Global Entities',
-    colorA: '#e066ff',     // magenta-violet
-    colorB: '#ff2a4a',
-    position: spiralPos(2, 7),
+    name: 'VYAN MUDRA',
+    tagline: 'The Ko\u015ba of Global Entities',
+    colorA: SILVER_A,
+    colorB: SILVER_B,
+    position: ringPos(2, 7),
   },
   {
     key: 'netra',
     name: 'VYAN NETRA',
     tagline: 'The Conscious Eye Across Tantras',
-    colorA: '#3ad4ff',     // cyan
-    colorB: '#ff2a4a',
-    position: spiralPos(3, 7),
+    colorA: SILVER_A,
+    colorB: SILVER_B,
+    position: ringPos(3, 7),
   },
   {
-    key: 'akrti',
-    name: 'VYAN ĀKṚTI',
-    tagline: 'Creating Digital Anubhava Through Your Dṛṣṭi',
-    colorA: '#ff6688',     // rose
-    colorB: '#ff2a4a',
-    position: spiralPos(4, 7),
+    key: 'akriti',
+    name: 'VYAN AKRITI',
+    tagline: 'Creating Digital Anubhava Through Your D\u1e5b\u1e63\u1e6di',
+    colorA: SILVER_A,
+    colorB: SILVER_B,
+    position: ringPos(4, 7),
   },
   {
     key: 'sutra',
-    name: 'VYAN SŪTRA',
-    tagline: 'Weaving Saṅgama Through Viveka',
-    colorA: '#9a55ff',     // indigo-violet
-    colorB: '#ff2a4a',
-    position: spiralPos(5, 7),
+    name: 'VYAN SUTRA',
+    tagline: 'Weaving Sa\u1e45gama Through Viveka',
+    colorA: SILVER_A,
+    colorB: SILVER_B,
+    position: ringPos(5, 7),
   },
   {
     key: 'placeholder',
-    name: 'VYAN ···',
+    name: 'VYAN \u00b7\u00b7\u00b7',
     tagline: 'Awaiting Initiation',
-    colorA: '#b8b8c8',     // silver-grey
-    colorB: '#6a6a8a',
-    position: spiralPos(6, 7),
+    colorA: SILVER_A,
+    colorB: SILVER_B,
+    position: ringPos(6, 7),
   },
 ];
 
 export class VistaraPath {
   public curve: THREE.CatmullRomCurve3;
   public orbCount = VISTARA_PRODUCTS.length;
-  private static CAM_DIST = 26;
 
   constructor(products: VistaraProductDef[] = VISTARA_PRODUCTS) {
-    // Every orb is approached at the SAME distance (z=26) and slight
-    // elevation (y=3) — identical click-zone size to Shunya orbs.
+    // Camera waypoint = orb home + (0, 3, 26). Identical distance to Shunya.
     const cameraPts: THREE.Vector3[] = products.map((p) => {
-      return p.position.clone().add(new THREE.Vector3(0, 3, 26));
+      // Offset OUTWARD from ring centre (not just +z) so camera is always
+      // on the OUTSIDE of the ring looking inward. This guarantees equal
+      // visual distance from camera to its target orb.
+      const radial = p.position.clone().setY(0).normalize();
+      return p.position.clone()
+        .add(radial.multiplyScalar(26))   // outward from ring centre
+        .add(new THREE.Vector3(0, 3, 0));
     });
     this.curve = new THREE.CatmullRomCurve3(cameraPts, true, 'catmullrom', 0.5);
   }

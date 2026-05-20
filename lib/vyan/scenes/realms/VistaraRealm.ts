@@ -57,7 +57,7 @@ export class VistaraRealm {
 
     this.starfield = this.buildStarfield(8000, 720);
     this.group.add(this.starfield);
-    this.spiralDust = this.buildSpiralDust(2600);
+    this.spiralDust = this.buildTravelNebula(4200);
     this.group.add(this.spiralDust);
 
     this.group.visible = false;
@@ -100,6 +100,8 @@ export class VistaraRealm {
     this.deps?.audio?.swell?.(0.95, 1.6);
     if (this.deps?.scroll?.reset) this.deps.scroll.reset(0);
     if (this.deps?.scroll) this.deps.scroll.snapSlots = this.defs.length;
+    // Re-enable scroll right at entry (was frozen during portal transit).
+    this.deps?.scroll?.setEnabled?.(true);
     this.magnifiedIdx = null;
   }
 
@@ -201,16 +203,7 @@ export class VistaraRealm {
     const total = this.defs.length;
 
     if (this.magnifiedIdx === null) {
-      const swipe = this.deps.interaction.swipeDir;
-      if (swipe !== 0) {
-        const cycle = Math.floor(this.deps.scroll.target);
-        const baseFrac = this.deps.scroll.target - cycle;
-        const baseIdx = Math.round(baseFrac * total);
-        const nextIdx = baseIdx + swipe;
-        this.deps.scroll.target = cycle + (nextIdx / total);
-        this.deps.interaction.swipeDir = 0;
-      }
-
+      // ScrollJourney now handles tick/swipe advancement directly.
       const { index, focus } = this.path.nearestOrb(progress, total);
       this.activeIndex = index;
       this.activeFocus = focus;
@@ -284,6 +277,39 @@ export class VistaraRealm {
     });
     return new THREE.Points(geo, mat);
   }
+
+  /** Travel nebula — soft volumetric clouds inside the ring that drift past
+   *  the camera as scroll progresses. Gives a "flying through space" feel.
+   */
+  private buildTravelNebula(count: number) {
+    const geo = new THREE.BufferGeometry();
+    const pos: number[] = [];
+    const col: number[] = [];
+    const tints = ['#b8b8ff', '#9a9ad2', '#dcdcff', '#7a7aa8', '#c8c8e8'];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radial = Math.random() < 0.7
+        ? 30 + Math.random() * 110
+        : 150 + Math.random() * 80;
+      const yJitter = (Math.random() - 0.5) * 90;
+      pos.push(Math.cos(angle) * radial, yJitter, Math.sin(angle) * radial);
+      const c = new THREE.Color(tints[(Math.random() * tints.length) | 0]);
+      col.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 1.6,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.18,
+      vertexColors: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    return new THREE.Points(geo, mat);
+  }
+
 
   /** Spiral dust matching the orb path — evokes the unfurling product constellation. */
   private buildSpiralDust(count: number) {

@@ -100,6 +100,9 @@ export class ShunyaRealm {
     this.deps?.audio?.swell?.(0.9, 1.6);
     if (this.deps?.scroll?.reset) this.deps.scroll.reset(0);
     if (this.deps?.scroll) this.deps.scroll.snapSlots = this.defs.length;
+    // Critical: scroll is frozen during the burst/portal transition. Re-enable
+    // it immediately on void entry so users can navigate without first clicking.
+    this.deps?.scroll?.setEnabled?.(true);
     this.magnifiedIdx = null;
   }
 
@@ -211,16 +214,9 @@ export class ShunyaRealm {
 
     // While magnified, freeze active index; do NOT consume scroll.
     if (this.magnifiedIdx === null) {
-      const swipe = this.deps.interaction.swipeDir;
-      if (swipe !== 0) {
-        const cycle = Math.floor(this.deps.scroll.target);
-        const baseFrac = this.deps.scroll.target - cycle;
-        const baseIdx = Math.round(baseFrac * total);
-        const nextIdx = baseIdx + swipe;
-        this.deps.scroll.target = cycle + (nextIdx / total);
-        this.deps.interaction.swipeDir = 0;
-      }
-
+      // Touch swipes & wheel ticks are now handled directly in ScrollJourney
+      // (3 wheel ticks or 2 swipes = one orb). We just observe the progress
+      // and snap-detect the focused orb here.
       const { index, focus } = this.path.nearestOrb(progress, total);
       this.activeIndex = index;
       this.activeFocus = focus;

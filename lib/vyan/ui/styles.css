@@ -51,7 +51,7 @@ flex-direction: column;
 justify-content: center;
 align-items: center;
 gap: 22px;
-opacity: 0.16;
+opacity: 0.32;
 transition: opacity 0.35s ease;
 }
 .neural-depth.visible {
@@ -63,38 +63,49 @@ position: absolute;
 top: 6%;
 bottom: 6%;
 left: 50%;
-width: 1px;
+width: 2px;
 transform: translateX(-50%);
 background: linear-gradient(
-to bottom,
-rgba(180, 140, 255, 0.05),
-rgba(180, 140, 255, 0.26),
-rgba(180, 140, 255, 0.05)
+  to bottom,
+  rgba(180, 140, 255, 0.22),
+  rgba(190, 150, 255, 0.55),
+  rgba(180, 140, 255, 0.22)
 );
+box-shadow: 0 0 10px rgba(180, 140, 255, 0.18);
 }
 .neural-depth-fill {
 position: absolute;
 left: 50%;
 bottom: 6%;
-width: 2px;
+width: 3px;
 transform: translateX(-50%);
-background: linear-gradient(to top, rgba(173, 109, 255, 0.15), rgba(194, 154, 255, 0.88));
-box-shadow: 0 0 18px rgba(177, 122, 255, 0.42);
+background: linear-gradient(to top,
+  rgba(176, 112, 255, 0.45),
+  rgba(212, 168, 255, 1.0));
+box-shadow:
+  0 0 22px rgba(196, 144, 255, 0.85),
+  0 0 44px rgba(176, 112, 255, 0.45);
 border-radius: 999px;
 height: 0%;
 }
 .depth-node {
-width: 10px;
-height: 10px;
+width: 12px;
+height: 12px;
 border-radius: 50%;
-border: 1px solid rgba(220, 190, 255, 0.25);
-background: rgba(210, 170, 255, 0.18);
+border: 1px solid rgba(220, 190, 255, 0.6);
+background: rgba(210, 170, 255, 0.42);
 box-shadow: 0 0 0 rgba(190, 140, 255, 0);
 cursor: pointer;
 position: relative;
 z-index: 2;
 pointer-events: auto;
-transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.depth-node:hover {
+background: rgba(228, 200, 255, 0.78);
+border-color: rgba(255, 220, 255, 0.9);
+box-shadow: 0 0 14px rgba(208, 160, 255, 0.7);
+transform: scale(1.12);
 }
 .depth-node.active {
 background: rgba(215, 184, 255, 0.95);
