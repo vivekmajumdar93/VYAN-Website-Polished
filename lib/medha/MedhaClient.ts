@@ -1,7 +1,6 @@
-// MedhaClient — Pollinations.ai free anonymous text endpoint.
-// Anonymous GET on text.pollinations.ai is documented as free, no-auth, unlimited.
-// The /openai POST variant on gen.* now requires auth (deprecation in Nov 2025),
-// so we use the simple GET prompt format for guaranteed free access.
+// MedhaClient — Pollinations.ai anonymous text endpoint.
+// GET-only (POST is currently failing with ENOSPC on the free tier).
+// Uses ?system=... query param for mode tuning; inlines prior turns into the prompt.
 
 import { CognitiveMode } from './cognitive';
 
@@ -17,47 +16,89 @@ export type StreamCallbacks = {
 };
 
 const POLLINATIONS_BASE = 'https://text.pollinations.ai';
+const MAX_PROMPT_CHARS = 1200;        // keep total URL well under server limits
+const MAX_SYSTEM_CHARS = 320;          // very short to avoid bloat
 
-function buildPromptFromHistory(mode: CognitiveMode, history: ChatMessage[]): string {
-  // Inline-format the conversation so it works through a single GET prompt.
-  // This preserves the mode's system tone + multi-turn context.
-  const lines: string[] = [];
-  lines.push(`[System]: ${mode.systemPrompt}`);
-  for (const m of history) {
-    if (m.role === 'user') lines.push(`[User]: ${m.content}`);
-    else if (m.role === 'assistant') lines.push(`[Assistant]: ${m.content}`);
-  }
-  // Cue the model for the next assistant turn.
-  lines.push('[Assistant]:');
-  return lines.join('\n\n');
+function trim(s: string, n: number): string {
+  if (s.length <= n) return s;
+  return s.slice(0, n - 1).trimEnd() + '…';
 }
 
-/**
- * Anonymous one-shot completion via Pollinations GET endpoint.
- * Returns the model's generated text. Free, no key, no signup.
- */
+function buildUserPrompt(history: ChatMessage[]): string {
+  // The LAST user message is the actual prompt; prior turns become brief context.
+  const turns = history.filter(m => m.role !== 'system');
+  if (turns.length === 0) return '';
+  const lastUser = [...turns].reverse().find(m => m.role === 'user');
+  if (!lastUser) return '';
+
+  // Build short context summary from prior assistant/user pairs (skip the last user).
+  const prior = turns.slice(0, turns.length - 1);
+  let context = '';
+  for (const m of prior) {
+    const tag = m.role === 'user' ? 'U' : 'A';
+    context += `(${tag}: ${trim(m.content, 240)}) `;
+  }
+  context = context.trim();
+
+  let prompt = lastUser.content.trim();
+  if (context) {
+    prompt = `${context}\n\nNow respond to: ${prompt}`;
+  }
+  return trim(prompt, MAX_PROMPT_CHARS);
+}
+
+function isPollinationsError(text: string): boolean {
+  if (!text) return true;
+  const t = text.trim();
+  if (t.length === 0) return true;
+  // Server-side error responses come back as JSON envelopes.
+  if (t.startsWith('{') && t.includes('"error"') && t.includes('"status"')) return true;
+  if (t.includes('IMPORTANT NOTICE') && t.includes('deprecated')) return true;
+  return false;
+}
+
+async function fetchPollinations(
+  mode: CognitiveMode,
+  history: ChatMessage[],
+  signal?: AbortSignal,
+): Promise<string> {
+  const userPrompt = buildUserPrompt(history);
+  if (!userPrompt) throw new Error('Empty prompt');
+
+  const params = new URLSearchParams({
+    model: mode.pollinationsModel,
+    system: trim(mode.systemPrompt, MAX_SYSTEM_CHARS),
+    seed: String(Math.floor(Math.random() * 1e9)),
+  });
+
+  const url = `${POLLINATIONS_BASE}/${encodeURIComponent(userPrompt)}?${params.toString()}`;
+  const res = await fetch(url, { signal });
+  const text = await res.text();
+  if (!res.ok || isPollinationsError(text)) {
+    throw new Error('Pollinations transient error');
+  }
+  return text.trim();
+}
+
+/** One-shot completion with single retry on transient failure. */
 export async function chatComplete(
   mode: CognitiveMode,
   history: ChatMessage[],
   signal?: AbortSignal,
 ): Promise<string> {
-  const prompt = buildPromptFromHistory(mode, history);
-  const params = new URLSearchParams({
-    model: mode.pollinationsModel,
-    seed: String(Math.floor(Math.random() * 1e9)),
-    private: 'true',
-  });
-  const url = `${POLLINATIONS_BASE}/${encodeURIComponent(prompt)}?${params.toString()}`;
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Pollinations ${res.status}`);
-  const text = await res.text();
-  return text.trim();
+  try {
+    return await fetchPollinations(mode, history, signal);
+  } catch (_) {
+    // Back off briefly and retry once.
+    await new Promise(r => setTimeout(r, 2400));
+    if (signal?.aborted) throw new Error('aborted');
+    return await fetchPollinations(mode, history, signal);
+  }
 }
 
 /**
- * Streaming chat. Pollinations GET returns the full body — we simulate
- * the cinematic letter-by-letter reveal locally for that "thinking" feel.
- * If the response is short, this gives a satisfying ribbon-unfurl effect.
+ * Cinematic streaming reveal. Pollinations GET is non-streaming, so we
+ * fetch the full response then unfurl it locally for the loom effect.
  */
 export async function chatStream(
   mode: CognitiveMode,
@@ -68,15 +109,13 @@ export async function chatStream(
   try {
     const full = await chatComplete(mode, history, signal);
     if (!full || full.length === 0) {
-      cb.onError(new Error('Empty response from cognition'));
+      cb.onError(new Error('Cognition returned no signal — try again in a moment.'));
       return;
     }
-    // Cinematic reveal — chunks of 4–8 chars at a time, ~12–20ms per chunk.
-    // Total reveal time scales with response length but caps to feel snappy.
-    const totalChunks = Math.max(20, Math.min(120, Math.floor(full.length / 5)));
+    // Letter-by-letter reveal — speed scales with length, capped to feel snappy.
+    const totalChunks = Math.max(24, Math.min(160, Math.floor(full.length / 4)));
     const chunkSize = Math.max(1, Math.ceil(full.length / totalChunks));
-    const delayMs = Math.max(8, Math.min(24, 1800 / totalChunks));
-
+    const delayMs = Math.max(8, Math.min(22, 1600 / totalChunks));
     for (let i = 0; i < full.length; i += chunkSize) {
       if (signal?.aborted) return;
       cb.onChunk(full.slice(i, i + chunkSize));
@@ -84,6 +123,13 @@ export async function chatStream(
     }
     cb.onDone(full);
   } catch (e: any) {
-    cb.onError(e instanceof Error ? e : new Error(String(e)));
+    const msg = e?.message ?? String(e);
+    if (msg === 'aborted') return;
+    cb.onError(
+      new Error(
+        'Cognition is busy on the free Pollinations channel right now. ' +
+        'Wait a few seconds and try again, or switch to another cognitive mode.',
+      ),
+    );
   }
 }

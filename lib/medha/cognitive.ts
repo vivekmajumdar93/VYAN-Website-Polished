@@ -24,7 +24,7 @@ export const COGNITIVE_MODES: CognitiveMode[] = [
     name: 'Pr\u0101j\u00f1a',
     englishName: 'Strategic Cognition Engine',
     provider: 'OpenAI',
-    pollinationsModel: 'openai',
+    pollinationsModel: 'openai-fast',
     purpose: 'Reasoning, system architecture & long-form cognition.',
     capabilities: [
       'Structured intelligence',
@@ -47,7 +47,7 @@ export const COGNITIVE_MODES: CognitiveMode[] = [
     name: 'Dhy\u0101na',
     englishName: 'Reflective Interpretation Engine',
     provider: 'Claude',
-    pollinationsModel: 'claude-hybridspace',
+    pollinationsModel: 'openai-fast',
     purpose: 'Reflective writing, philosophical & emotional depth.',
     capabilities: [
       'Deep contextual understanding',
@@ -70,7 +70,7 @@ export const COGNITIVE_MODES: CognitiveMode[] = [
     name: 'Ak\u1e63aya',
     englishName: 'Infinite Knowledge Engine',
     provider: 'Gemini',
-    pollinationsModel: 'gemini',
+    pollinationsModel: 'openai-fast',
     purpose: 'Research synthesis, multimodal & expansive recall.',
     capabilities: [
       'Multimodal intelligence',
@@ -93,7 +93,7 @@ export const COGNITIVE_MODES: CognitiveMode[] = [
     name: 'Jav\u0101',
     englishName: 'Velocity Processing Engine',
     provider: 'Groq',
-    pollinationsModel: 'mistral',
+    pollinationsModel: 'openai-fast',
     purpose: 'Ultra-fast inference and real-time response.',
     capabilities: [
       'Ultra-fast inference',
@@ -115,7 +115,7 @@ export const COGNITIVE_MODES: CognitiveMode[] = [
     name: 'Sa\u00f1c\u0101ra',
     englishName: 'Interconnectivity Gateway Engine',
     provider: 'OpenRouter',
-    pollinationsModel: 'searchgpt',
+    pollinationsModel: 'openai-fast',
     purpose: 'Model routing & multi-provider orchestration.',
     capabilities: [
       'Model routing',

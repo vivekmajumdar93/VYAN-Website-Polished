@@ -92,7 +92,48 @@ frontend:
 
   - agent: main
     message: |
-      Surgical changes batch (session resume):
+      Phase 4 (Vist\u0101ra Product sub-void) + Phase 5 (Medh\u0101 chat HUD) shipped.
+
+      PHASE 4 \u2014 VIST\u0100RA
+      - 7 product orbs in golden-angle spiral path: V\u0303YAN \u1e6cTAM, OJAS, MUDR\u0100,
+        NETRA, \u0100K\u1e5aTI, S\u016aTRA, + placeholder
+      - Each orb gets a distinct cosmic-tinted colour palette + Sanskrit-correct
+        glyphs (Ṛ vs Ṭ vs Ṙ codepoint bug fixed: \u1e5a everywhere)
+      - Routes: /vistara, /vistara/<key> deep-linkable
+      - Click VIST\u0100RA orb in Shunya \u2192 cinematic burst + fadeToBlack \u2192 enter sub-void
+      - Each product opens a slab with In Cognition status pill (placeholder = Awaiting Manifestation)
+      - VistaraPath spiral-dust particle field added behind the orbs
+
+      PHASE 5 \u2014 MEDH\u0100 (Resonance Loom HUD)
+      - Unique full-screen "2050 cockpit": top spine with 5-mode arc selector,
+        center thread (Pollinations-fed letter-reveal stream), right info-card,
+        bottom composer with mode-bound glyph
+      - 5 cognitive modes: Pr\u0101j\u00f1a, Dhy\u0101na, Ak\u1e63aya, Jav\u0101, Sa\u00f1c\u0101ra
+        \u2014 each with own colour palette that re-tints the entire HUD on switch
+      - Hover/click any node \u2192 active mode switches + system prompt rotates
+      - Integration: Pollinations.ai free anonymous GET /text/{prompt}?model=openai-fast
+        with ?system= param. NO API KEYS, NO VAULT (user choice: Option B).
+      - All 5 modes route through openai-fast underneath; differentiation is via system prompts.
+      - Graceful degradation: detects deprecation banners / queue-full / ENOSPC and
+        shows a friendly "cognition busy" message. Single retry with 2.4s backoff.
+      - SHUNYA exit button returns to /shunya/medha (focused on Medh\u0101 orb)
+
+      KNOWN: Pollinations free tier currently has server-side ENOSPC issues from
+      our cloud IP; on real residential ISPs the API is more reliable. The HUD UI
+      is rock-solid regardless.
+
+      Files added/changed (key ones):
+      - NEW: lib/vyan/scenes/VistaraPath.ts
+      - NEW: lib/vyan/scenes/realms/VistaraRealm.ts
+      - NEW: lib/medha/cognitive.ts
+      - NEW: lib/medha/MedhaClient.ts
+      - NEW: app/(cosmic)/vistara/{page,[product]/page}.tsx
+      - NEW: app/(cosmic)/medha/{page,MedhaHUD,medha.css}
+      - CHANGED: ShunyaRealm (vistara + medha portal special-cases), RealmManager
+        (added vistara realm), CameraRig (vistara mode + arrivals), App + World
+        (callbacks), CosmicCanvas (route \u2194 mode mapping incl. /vistara, /medha)
+      - FIXED: U+1E6C/U+1E58 mis-encoded glyphs in Vist\u0101ra names
+      - FIXED: JSX \u005Cu escape literals rendering as raw text in MedhaHUD
       - Fixed syntax error in InteractionManager.ts (stray `};`).
       - Glass panel: max-height + custom-scroll on .glass-panel-inner; CLOSE
         button moved OUT of scroll container and floats top-right of .glass-panel
