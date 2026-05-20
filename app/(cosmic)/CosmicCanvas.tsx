@@ -64,6 +64,8 @@ export default function CosmicCanvas() {
       });
       appInstance.start();
       (window as any).__vyan = appInstance;
+      // Expose audio engine separately so the Sound Console can find it.
+      (window as any).__vyan.audio = appInstance.audioEngine;
 
       // Apply initial focus immediately (snap) if route is deep-linked.
       if (initialMode === 'shunya') {

@@ -46,13 +46,49 @@ export default function MedhaHUD() {
   // Focus the composer on mount; Esc returns to /shunya.
   useEffect(() => {
     inputRef.current?.focus();
+
+    // CRITICAL: when the user lands on /medha via the portal burst, the
+    // previous route's fade-to-black overlay is still alive at z-index 10000.
+    // Since modeFromPath('/medha') === 'shunya' (canvas backdrop), setMode is
+    // a no-op (we were already in shunya), so fadeFromBlack is never fired
+    // by the realm. We clear the fade overlay manually so the HUD is visible.
+    const clearFade = () => {
+      try {
+        document.querySelectorAll('[data-vyan-fade="1"]').forEach((el) => {
+          (el as HTMLElement).style.transition = 'opacity 0.7s ease-out';
+          (el as HTMLElement).style.opacity = '0';
+          setTimeout(() => el.remove(), 800);
+        });
+        const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
+        if (ui) {
+          ui.style.transition = 'opacity 0.6s ease-out';
+          ui.style.opacity = '0';
+          ui.style.pointerEvents = 'none';
+        }
+      } catch {}
+    };
+    clearFade();
+    // Also run once more after the first frame in case the overlay was added
+    // mid-flight by an in-progress portal transition.
+    const id = setTimeout(clearFade, 250);
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         router.push('/shunya/medha');
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener('keydown', onKey);
+      // Restore .vyan-ui on unmount so Shunya/Vistara HUD comes back.
+      const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
+      if (ui) {
+        ui.style.transition = 'opacity 0.6s ease-out';
+        ui.style.opacity = '1';
+        ui.style.pointerEvents = 'auto';
+      }
+    };
   }, [router]);
 
   async function send() {

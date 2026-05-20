@@ -68,6 +68,14 @@ export class SceneManager {
     if (this.mode === 'shunya') this.shunya.onExit();
     if (this.mode === 'vistara') this.vistara.onExit();
     this.mode = next;
+    // Configure scroll mode for each realm:
+    //   gateway: snapSlots = 0 \u2192 continuous fly-in
+    //   shunya:  snapSlots = 5 \u2192 discrete tick navigation
+    //   vistara: snapSlots = 7 \u2192 discrete tick navigation
+    if (this.deps?.scroll) {
+      if (next === 'gateway') this.deps.scroll.snapSlots = 0;
+      // shunya & vistara each set their own snapSlots inside onEnter
+    }
     if (next === 'gateway') this.gateway.onEnter();
     if (next === 'shunya') this.shunya.onEnter();
     if (next === 'vistara') this.vistara.onEnter();
@@ -95,7 +103,9 @@ export class SceneManager {
       this.gateway.update(dt, t, progress, audio);
       this.activeIndex = 0;
       this.panelOpen = false;
-      this.activeApproach = 1;
+      // Restored from canonical zip: activeApproach is the user's scroll
+      // progress, clamped 0..1. Drives the gateway camera fly-in.
+      this.activeApproach = Math.max(0, Math.min(1, progress));
     } else if (this.mode === 'shunya') {
       this.shunya.update(dt, t, progress, audio);
       this.activeIndex = this.shunya.activeIndex;

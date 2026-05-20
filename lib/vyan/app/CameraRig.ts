@@ -95,21 +95,22 @@ export class CameraRig {
     const py = this.deps.interaction.pointer.y;
     const t = performance.now() * 0.001;
 
-    // Vy\u014dma is DISTANT from arrival \u2014 so "Initiate Displacement" actually
-    // means something: the user is far away and the click warps them in.
-    // Camera sits at z=88 (instead of z=26 in the void) so the orb appears
-    // small but central, hover-pulsing in the dark like a beckoning star.
-    const z = 88;
+    // ORIGINAL gateway fly-in (per user request, restored from canonical zip):
+    // Camera lerps from z=280 (Vy\u014dma is a distant glint) \u2192 z=26 (full Vy\u014dma
+    // mesh fills the frame, ready for "Initiate Displacement").
+    // Drive: realms.activeApproach (0..1) derived from scroll progress.
+    const p = (this.deps.realms as any).activeApproach ?? 0;
+    const z = THREE.MathUtils.lerp(280, 26, p);
 
     this.targetOffset.set(
-      px * 3.2 + Math.sin(t * 0.4) * 1.6,
-      py * 2.0 + Math.cos(t * 0.3) * 1.2,
+      px * 1.8 + Math.sin(t * 0.4) * 0.8,
+      py * 1.1 + Math.cos(t * 0.3) * 0.8,
       0,
     );
     this.offset.lerp(this.targetOffset, 1 - Math.pow(0.005, dt * 60));
     this.camera.position.set(this.offset.x, this.offset.y, z);
     this.camera.lookAt(0, 0, 0);
-    this.camera.fov = 38;
+    this.camera.fov = 38 + Math.min(p * 5.5, 5.5);
     this.camera.updateProjectionMatrix();
   }
 

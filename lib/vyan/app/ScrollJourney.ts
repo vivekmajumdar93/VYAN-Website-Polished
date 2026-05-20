@@ -96,8 +96,18 @@ export class ScrollJourney {
     if (!this.enabled) return;
     e.preventDefault();
     const now = performance.now();
-    if (Math.abs(e.deltaY) < ScrollJourney.WHEEL_MIN_DELTA) return;
 
+    // CONTINUOUS mode (snapSlots = 0) \u2014 gateway fly-in. Each wheel tick adds
+    // proportional progress so the user can scroll Vy\u014dma closer organically.
+    if (this.snapSlots === 0) {
+      this.target += e.deltaY * 0.00045;
+      this.lastInputAt = now;
+      this.snapped = false;
+      return;
+    }
+
+    // DISCRETE mode (void) \u2014 3 ticks per orb advance.
+    if (Math.abs(e.deltaY) < ScrollJourney.WHEEL_MIN_DELTA) return;
     const dir = e.deltaY > 0 ? 1 : -1;
     if (dir !== this.wheelLastDir || now - this.wheelLastAt > ScrollJourney.WHEEL_DIR_RESET_MS) {
       this.wheelDirCount = 0;
@@ -106,7 +116,6 @@ export class ScrollJourney {
     this.wheelLastDir = dir;
     this.wheelLastAt = now;
     this.lastInputAt = now;
-
     if (Math.abs(this.wheelDirCount) >= ScrollJourney.WHEEL_TICKS_PER_ORB) {
       this.advanceOneOrb(dir);
       this.wheelDirCount = 0;
@@ -125,14 +134,19 @@ export class ScrollJourney {
     if (!this.enabled) return;
     e.preventDefault();
     const y = e.touches[0]?.clientY ?? 0;
-    const dy = this.touchPrevY - y;            // up swipe = positive (next)
+    const dy = this.touchPrevY - y;
     this.touchPrevY = y;
-    this.touchAccum += dy;
     this.lastInputAt = performance.now();
 
-    // Once one continuous touch accumulates beyond TOUCH_MIN_DELTA, count
-    // that as ONE swipe in that direction. Subsequent travel within the
-    // same touch doesn't double-count until the user lifts and re-swipes.
+    // CONTINUOUS gateway mode \u2014 directly accumulate.
+    if (this.snapSlots === 0) {
+      this.target += dy * 0.006;
+      this.snapped = false;
+      return;
+    }
+
+    // DISCRETE void mode \u2014 2 swipes per orb.
+    this.touchAccum += dy;
     if (Math.abs(this.touchAccum) >= ScrollJourney.TOUCH_MIN_DELTA) {
       const dir = this.touchAccum > 0 ? 1 : -1;
       this.recordTouchSwipe(dir);
@@ -167,21 +181,28 @@ export class ScrollJourney {
       return;
     }
 
-    const diff = this.target - this.progress;
-    if (this.snapSlots > 0) {
-      // Fast critically-damped approach to the discrete target slot.
-      this.progress += diff * (1 - Math.pow(0.0008, dt));
-      if (Math.abs(this.target - this.progress) < 0.0008) {
-        this.progress = this.target;
-        this.snapped = true;
-      }
-      this.velocity = 0;
-    } else {
+    // GATEWAY (continuous): exponential decay toward target with auto-snap
+    // disabled. CLAMP target to [0,1] so we never overshoot Vy\u014dma.
+    if (this.snapSlots === 0) {
+      this.target = Math.max(0, Math.min(1, this.target));
+      const diff = this.target - this.progress;
       this.velocity += diff * 14.0 * dt;
       this.velocity *= Math.pow(0.00001, dt);
       this.progress += this.velocity;
+      this.speed = (this.progress - this.lastProgress) / Math.max(dt, 0.0001);
+      this.lastProgress = this.progress;
+      this.loopProgress = this.wrap(this.progress);
+      return;
     }
 
+    // VOID (discrete): fast critically-damped approach to the slot target.
+    const diff = this.target - this.progress;
+    this.progress += diff * (1 - Math.pow(0.0008, dt));
+    if (Math.abs(this.target - this.progress) < 0.0008) {
+      this.progress = this.target;
+      this.snapped = true;
+    }
+    this.velocity = 0;
     this.speed = (this.progress - this.lastProgress) / Math.max(dt, 0.0001);
     this.lastProgress = this.progress;
     this.loopProgress = this.wrap(this.progress);

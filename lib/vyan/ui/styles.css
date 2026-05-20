@@ -87,6 +87,27 @@ box-shadow:
   0 0 44px rgba(176, 112, 255, 0.45);
 border-radius: 999px;
 height: 0%;
+overflow: visible;
+}
+.neural-depth-fill::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 9px;
+  height: 22px;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0.9), rgba(255,255,255,0));
+  filter: blur(2px);
+  animation: rail-shimmer 1.9s ease-in-out infinite;
+  pointer-events: none;
+  opacity: 0.85;
+}
+@keyframes rail-shimmer {
+  0%   { top: 100%; opacity: 0; }
+  10%  { opacity: 0.9; }
+  90%  { opacity: 0.9; }
+  100% { top: -6%; opacity: 0; }
 }
 .depth-node {
 width: 12px;

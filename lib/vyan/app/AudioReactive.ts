@@ -49,8 +49,40 @@ export class AudioReactive {
       this.gain = this.ctx.createGain();
       this.gain.gain.value = 0.0;
 
+      // Sound-console processing chain:
+      //   src \u2192 analyser \u2192 bass \u2192 treble \u2192 lowpass \u2192 (dry + wet via reverb) \u2192 panner \u2192 gain \u2192 out
+      this.bassFilter = this.ctx.createBiquadFilter();
+      this.bassFilter.type = 'lowshelf';
+      this.bassFilter.frequency.value = 250;
+      this.bassFilter.gain.value = 0;
+
+      this.trebleFilter = this.ctx.createBiquadFilter();
+      this.trebleFilter.type = 'highshelf';
+      this.trebleFilter.frequency.value = 4000;
+      this.trebleFilter.gain.value = 0;
+
+      this.lowpass = this.ctx.createBiquadFilter();
+      this.lowpass.type = 'lowpass';
+      this.lowpass.frequency.value = 18000; // bypassed
+      this.lowpass.Q.value = 0.8;
+
+      this.reverb = this.ctx.createConvolver();
+      this.reverb.buffer = this.synthImpulseResponse(this.ctx, 2.4, 2.0);
+
+      this.dryGain = this.ctx.createGain();
+      this.dryGain.gain.value = 1.0;
+      this.wetGain = this.ctx.createGain();
+      this.wetGain.gain.value = 0.0;
+
       src.connect(this.analyser);
-      this.analyser.connect(this.panner);
+      this.analyser.connect(this.bassFilter);
+      this.bassFilter.connect(this.trebleFilter);
+      this.trebleFilter.connect(this.lowpass);
+      this.lowpass.connect(this.dryGain);
+      this.lowpass.connect(this.reverb);
+      this.reverb.connect(this.wetGain);
+      this.dryGain.connect(this.panner);
+      this.wetGain.connect(this.panner);
       this.panner.connect(this.gain);
       this.gain.connect(this.ctx.destination);
 
@@ -100,6 +132,55 @@ export class AudioReactive {
     }
   }
 
+  /**
+   * Apply settings from the Sound Console UI \u2014 batched, fast, smoothed.
+   * Settings: volume, bass(dB), treble(dB), reverb, lowpass + lowpassHz, speed, pulseSync.
+   */
+  applyConsole(settings: {
+    volume?: number; bass?: number; treble?: number;
+    reverb?: boolean; lowpass?: boolean; lowpassHz?: number;
+    speed?: number; pulseSync?: boolean;
+  }): void {
+    if (typeof settings.volume === 'number') this.setVolume(settings.volume);
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tau = 0.05;
+    if (typeof settings.bass === 'number' && this.bassFilter) {
+      this.bassFilter.gain.setTargetAtTime(settings.bass, ctx.currentTime, tau);
+    }
+    if (typeof settings.treble === 'number' && this.trebleFilter) {
+      this.trebleFilter.gain.setTargetAtTime(settings.treble, ctx.currentTime, tau);
+    }
+    if (typeof settings.lowpass === 'boolean' && this.lowpass) {
+      const hz = settings.lowpass ? (settings.lowpassHz ?? 1800) : 18000;
+      this.lowpass.frequency.setTargetAtTime(hz, ctx.currentTime, tau);
+    } else if (typeof settings.lowpassHz === 'number' && this.lowpass && settings.lowpass !== false) {
+      this.lowpass.frequency.setTargetAtTime(settings.lowpassHz, ctx.currentTime, tau);
+    }
+    if (typeof settings.reverb === 'boolean' && this.wetGain && this.dryGain) {
+      this.wetGain.gain.setTargetAtTime(settings.reverb ? 0.45 : 0, ctx.currentTime, tau);
+      this.dryGain.gain.setTargetAtTime(settings.reverb ? 0.7 : 1.0, ctx.currentTime, tau);
+    }
+    if (typeof settings.speed === 'number' && this.audio) {
+      try { this.audio.playbackRate = Math.max(0.5, Math.min(1.6, settings.speed)); } catch {}
+    }
+    if (typeof settings.pulseSync === 'boolean') this.pulseSync = settings.pulseSync;
+  }
+
+  /** Synthesize a soft cosmic-cathedral impulse response for the convolver. */
+  private synthImpulseResponse(ctx: AudioContext, duration: number, decay: number): AudioBuffer {
+    const sr = ctx.sampleRate;
+    const len = Math.floor(sr * duration);
+    const buf = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+    }
+    return buf;
+  }
+
   // ---------- Envelope API ----------
 
   /** Schedule a smooth tween to `level` over `duration` seconds. */
@@ -146,7 +227,10 @@ export class AudioReactive {
 
   private applyGain(): void {
     if (!this.gain || !this.ctx) return;
-    const target = this.muted ? 0 : (this.currentGain + this.energy * 0.18) * this.volume;
+    // Pulse-sync option amplifies the bass-driven gain modulation by ~2.4\u00d7
+    // \u2014 makes the track "react" hard to bass spikes.
+    const reactiveMul = this.pulseSync ? 0.42 : 0.18;
+    const target = this.muted ? 0 : (this.currentGain + this.energy * reactiveMul) * this.volume;
     this.gain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.04);
   }
 
