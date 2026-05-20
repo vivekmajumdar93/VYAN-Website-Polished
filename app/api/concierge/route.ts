@@ -25,6 +25,20 @@ export async function POST(req: NextRequest) {
   const style: string = (body?.style ?? '').toString().slice(0, 280);
   if (!prompt) return NextResponse.json({ error: 'EMPTY_PROMPT' }, { status: 400 });
 
+  // ---- Kill switch & usage tracking (read by /api/netra) ----
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const usage: any = (globalThis as any).__VYAN_USAGE__ || ((globalThis as any).__VYAN_USAGE__ = {
+    gemini_calls: 0, pollinations_calls: 0, vercel_api_calls: 0, bootedAt: Date.now(),
+  });
+  const killBudget = parseFloat(process.env.NETRA_KILL_SWITCH_USD || '1');
+  const estimatedSpend = usage.gemini_calls * 0.0002;
+  if (estimatedSpend >= killBudget) {
+    return NextResponse.json(
+      { error: 'KILL_SWITCH', message: 'Daily budget exceeded. Console disarmed via VYAN Netra.' },
+      { status: 503 },
+    );
+  }
+
   const url = `${BASE}/${MODEL}:generateContent?key=${apiKey}`;
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -50,6 +64,7 @@ export async function POST(req: NextRequest) {
         { status: res.status === 429 ? 429 : 502 },
       );
     }
+    usage.gemini_calls += 1;
     const data = await res.json();
     const text =
       data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
