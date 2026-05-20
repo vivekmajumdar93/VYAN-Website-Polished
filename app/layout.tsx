@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import NetraConsole from './(cosmic)/NetraConsole';
 
 export const metadata: Metadata = {
   title: 'VYAN Shunya Mandala — Architecting the Liquid Infinite',
@@ -27,7 +28,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Preload the logo so the loader has it instantly */}
         <link rel="preload" as="image" href="/logo.png" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <NetraConsole />
+      </body>
     </html>
   );
 }
