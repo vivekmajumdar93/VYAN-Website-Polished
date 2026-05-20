@@ -66,8 +66,13 @@ export class GatewayRealm {
   update(_: number, t: number, progress: number, audio: any) {
     if (!this.deps) return;
 
-    // Vyōma always sits at the click zone — caption + click are always live.
-    const approach = 1;
+    // ORIGINAL gateway behaviour (restored verbatim from the canonical zip):
+    // Vyōma sits distant (z=280) until the user SCROLLS to approach it.
+    // `approach` (0..1) drives:
+    //   • CameraRig.updateGateway() — lerp z from 280 → 26
+    //   • Overlay.setGatewayCaption() — caption opacity / "Initiate Displacement"
+    //   • Click gating — only triggers burst once approach > 0.34
+    const approach = THREE.MathUtils.clamp(progress, 0, 1);
     const energy = audio.energy ?? 0;
 
     this.core.setVisible(true);

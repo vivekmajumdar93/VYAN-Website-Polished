@@ -92,7 +92,63 @@ frontend:
 
   - agent: main
     message: |
-      Phase 4 (Vist\u0101ra Product sub-void) + Phase 5 (Medh\u0101 chat HUD) shipped.
+      Major batch: Gateway-from-zip restored + bug pass + Concierge + Sound Console + Medh\u0101 fix.
+
+      GATEWAY (restored from user's canonical zip)
+      - GatewayRealm.update: approach = clamp(scroll.progress, 0, 1) (not hardcoded 1)
+      - CameraRig.updateGateway: z = lerp(280, 26, approach); FOV expands with approach
+      - RealmManager.update: activeApproach = clamp(progress, 0, 1) in gateway mode
+      - ScrollJourney: dual-mode \u2014 continuous (snapSlots=0, gateway) / discrete (void)
+      - User can now SCROLL to bring Vy\u014dma closer; click only fires when approach > 0.34
+
+      VOID NAVIGATION
+      - Discrete: 3 wheel ticks OR 2 touch swipes per orb (auto-snap to slot)
+      - Scroll re-enabled on void entry (was frozen post-burst)
+      - Vist\u0101ra orbs: flat ring layout (RING_RADIUS 140), identical click-zone distance
+      - Silver/grey palette across all 7 product orbs (per user request)
+      - Travel nebula (4200 soft volumetric particles) replaces obsolete spiral dust
+
+      BRANDING (CRITICAL \u2014 user emphasized trademark accuracy)
+      - VistaraPath restored to proper UTF-8 diacritics: VYAN \u1e5atam, Ojas, Mudr\u0101,
+        Netra, \u0100k\u1e5bti, S\u016btra, Placeholder
+      - ConciergeOrb nav panel uses same proper diacritics
+
+      MEDH\u0100 FIX (was showing blank black screen)
+      - Bug: setMode('shunya') was a no-op when transitioning /shunya \u2192 /medha (already
+        in shunya), so fadeFromBlack was never called by the realm \u2192 black overlay persisted
+      - Fix: MedhaHUD.tsx clears [data-vyan-fade="1"] overlays and dims .vyan-ui on mount;
+        restores both on unmount
+
+      NEURAL RAIL
+      - Brightened progressive fill (was too dark): rgba(212,168,255,1.0)
+      - Added vertical-shimmer keyframe animation (rail-shimmer 1.9s loop)
+      - World.jumpToOrb was a no-op stub \u2014 now delegates to RealmManager.jumpToOrb
+      - LY counter rendered ON the rail (unchanged from previous job)
+
+      CONCIERGE ORB (NEW \u2014 #3)
+      - Always-present 56px top-right orb, persistent across all routes EXCEPT /medha
+      - Click \u2192 glass quick-traverse panel listing all orbs/voids (Vy\u014dma, all 5 Shunya
+        orbs, all 7 Vist\u0101ra products, Medh\u0101)
+      - LIVE Gemini integration via /api/concierge \u2192 gemini-2.0-flash
+        (key in .env GOOGLE_GEMINI_API_KEY)
+      - Curated rotation fallback (50+ "Did You Know" AI-evolution facts, time-of-day greetings)
+        \u2014 used when Gemini rate-limits
+      - 30s rotation: random fact / nudge cycle
+      - 60s stuck-on-one-orb \u2192 contextual nudge
+      - Signal-orb cinematic: mini particles fly in from edges, exchange light with concierge
+        during "Did You Know" facts
+      - READ-ONLY: no chat input, only informational. Guides users to Medh\u0101 for typing.
+
+      SOUND CONSOLE (NEW \u2014 #10, all 7 features built)
+      - Volume / Bass / Treble / Playback Speed sliders
+      - Cosmic Reverb toggle (Web Audio convolver, synth IR)
+      - Submerge (Low-Pass) toggle + cutoff slider (300-18000 Hz)
+      - Pulse-Sync toggle (bass-reactive gain modulation 2.4\u00d7)
+      - 3 presets: VOID / GATEWAY / MEDH\u0100 + RESET
+      - All settings apply in real-time via AudioReactive.applyConsole()
+      - Audio processing chain: src \u2192 analyser \u2192 bass \u2192 treble \u2192 lowpass \u2192 (dry + wet reverb) \u2192 panner \u2192 gain
+
+      ADMIN CONSOLE (#3 / Vyan Netra link) \u2014 CONSENT REQUESTED, NOT YET BUILT
 
       PHASE 4 \u2014 VIST\u0100RA
       - 7 product orbs in golden-angle spiral path: V\u0303YAN \u1e6cTAM, OJAS, MUDR\u0100,
