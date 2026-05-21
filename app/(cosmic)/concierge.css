@@ -380,3 +380,13 @@
   .concierge-root { width: 64px; height: 64px; }
   .concierge-orb__shell { width: 52px; height: 52px; }
 }
+
+/* Mobile: place orb smaller and avoid overlap with glass-panel close button */
+@media (max-width: 767px) {
+  .concierge-root { top: 14px; right: 12px; width: 52px; height: 52px; }
+  .concierge-orb__shell { width: 44px; height: 44px; }
+  .concierge-bubble { right: 60px; max-width: 200px; font-size: 11px; padding: 8px 10px; }
+  .concierge-nav { top: 64px; width: min(280px, calc(100vw - 24px)); }
+  /* When a glass-panel is open, move the orb down to clear its close button. */
+  body:has(.glass-panel.open) .concierge-root { top: 64px; }
+}

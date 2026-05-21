@@ -80,10 +80,11 @@ const y = (e.clientY - rect.top) / rect.height;
 const idx = Math.max(0, Math.min(6, Math.floor(y * 7)));
 this.callbacks?.onJumpToOrb(idx);
 });
-    this.gatewayHint.className = 'gateway-hint';
+this.gatewayHint.className = 'gateway-hint';
     this.gatewayHint.innerHTML = `
       <div class="gateway-line-1">VYŌMA</div>
       <div class="gateway-line-2">The Primordial Core of VYAN</div>
+      <div class="gateway-line-3">Engage to enter the Void of VYAN</div>
     `;
     this.gatewayHint.style.opacity = '0';
     this.cursorHint.className = 'cursor-hint';
@@ -323,10 +324,10 @@ this.updateHintVisibility();
     const blurPx = 12 * (1 - gatewayOpacity);
     this.gatewayHint.style.opacity = String(gatewayOpacity);
     this.gatewayHint.style.filter = `blur(${blurPx}px)`;
-    // Move VYŌMA UPWARD into the centre of the viewport as the orb arrives.
-    // bottom: 180px → ~50vh as approach → 1.
-    const liftPx = this.currentApproach * 220;
-    const scaleVal = 1 + this.currentApproach * 0.18;
+    // Caption stays anchored at the bottom of the viewport. Subtle scale-up
+    // and slight lift as the orb arrives — but NO traversal to the centre.
+    const scaleVal = 1 + this.currentApproach * 0.08;
+    const liftPx = this.currentApproach * 30;
     this.gatewayHint.style.transform = `translateX(-50%) translateY(${-liftPx}px) scale(${scaleVal})`;
 
     // ---- INITIATE hint (shown first, pulses, fades as user starts scrolling) ----

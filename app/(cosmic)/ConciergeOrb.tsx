@@ -20,6 +20,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Udbhava — The Emergence', path: '/shunya/udbhava' },
       { label: 'Sandhi — The Communiqué', path: '/shunya/sandhi' },
       { label: 'Vyūha — The Design Seam', path: '/shunya/vyuha' },
+      { label: 'Saṅkalpa — The Intention', path: '/shunya/sankalpa' },
       { label: 'Vistāra — The Unfurling', path: '/shunya/vistara' },
       { label: 'Medhā — The Consciousness', path: '/shunya/medha' },
     ],

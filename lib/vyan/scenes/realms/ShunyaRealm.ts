@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { NanoOrb } from '../../objects/NanoOrb';
 import { PathCurve, SHUNYA_ORBS, ShunyaOrbDef, ShunyaOrbKey } from '../PathCurve';
-import { SLAB_UDBHAVA_HTML, SLAB_SANDHI_HTML } from '../../ui/slabContent';
+import { SLAB_UDBHAVA_HTML, SLAB_SANDHI_HTML, SLAB_SANKALPA_HTML } from '../../ui/slabContent';
 import { randomArrivalOffset } from '../../app/Spring';
 
 type BindDeps = {
@@ -203,6 +203,7 @@ export class ShunyaRealm {
       vistara: '<p class="vy-p">Vist\u0101ra is the unfurling \u2014 the lattice of products that radiate outward from the core. <em>Sub-void content arrives in Phase 4.</em></p>',
       vyuha:   '<p class="vy-p">Vy\u016bha is the design discipline \u2014 the lattice of intent, the geometry of decision. Every product passes through this seam.</p>',
       medha:   '<p class="vy-p">Medh\u0101 is the cognition that understands. Multiple minds, one resonance. <em>Sub-void content arrives in Phase 5.</em></p>',
+      sankalpa: SLAB_SANKALPA_HTML,
     };
     return placeholders[key] ?? '';
   }

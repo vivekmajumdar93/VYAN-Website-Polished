@@ -171,3 +171,70 @@ export const SLAB_SANDHI_HTML = /* html */ `
   </div>
 </div>
 `;
+
+// Saṅkalpa — the Intention orb. Where users place orders / engage to onboard onto
+// a VYAN product. The slab is a clean, conversion-oriented panel — request demo,
+// reserve access, learn more about each Vistāra product.
+export const SLAB_SANKALPA_HTML = /* html */ `
+<div class="vy-slab vy-slab--sankalpa">
+  <header class="vy-slab__hero vy-slab__hero--center">
+    <div class="vy-slab__brand">SAṄKALPA</div>
+    <div class="vy-slab__tag">Where Cognition Becomes Commerce</div>
+  </header>
+
+  <p class="vy-p">
+    Saṅkalpa is the seam between <em>intention</em> and <em>arrival</em>. When a Vistāra
+    product calls to you, this is where you cross the threshold — reserve access,
+    request a private demo, or begin onboarding into the VYAN cognitive lattice.
+  </p>
+
+  <h3 class="vy-h3">Place Your Intention</h3>
+  <p class="vy-p">Three pathways. Pick the one that matches your readiness.</p>
+
+  <div class="vy-card-grid vy-card-grid--sankalpa">
+    <article class="vy-card vy-card--hue-1">
+      <div class="vy-card__name">Pratyaya · Reserve Access</div>
+      <div class="vy-card__role">Early Cohort · Private Beta</div>
+      <p class="vy-p" style="font-size:13px; opacity:0.78; margin-bottom:14px;">
+        For organizations ready to onboard a Vistāra product into live operations.
+        Limited concurrent installations.
+      </p>
+      <a class="vy-card__mail" href="mailto:reserve@vyanlabs.com?subject=Sa%E1%B9%85kalpa%20%E2%80%94%20Reserve%20Access">reserve@vyanlabs.com</a>
+    </article>
+
+    <article class="vy-card vy-card--hue-2">
+      <div class="vy-card__name">Darśana · Request Demo</div>
+      <div class="vy-card__role">Live Walkthrough · 45 min</div>
+      <p class="vy-p" style="font-size:13px; opacity:0.78; margin-bottom:14px;">
+        A curated private session — VYAN's lead cognition architect walks you
+        through any of the seven Vistāra orbs in your own context.
+      </p>
+      <a class="vy-card__mail" href="mailto:darshana@vyanlabs.com?subject=Sa%E1%B9%85kalpa%20%E2%80%94%20Request%20Demo">darshana@vyanlabs.com</a>
+    </article>
+
+    <article class="vy-card vy-card--hue-3">
+      <div class="vy-card__name">Anuvāda · Custom Cognition</div>
+      <div class="vy-card__role">Bespoke Build · By Application</div>
+      <p class="vy-p" style="font-size:13px; opacity:0.78; margin-bottom:14px;">
+        For ambitions not yet represented in the Vistāra constellation —
+        a private cognitive system architected solely around your domain.
+      </p>
+      <a class="vy-card__mail" href="mailto:anuvada@vyanlabs.com?subject=Sa%E1%B9%85kalpa%20%E2%80%94%20Custom%20Cognition">anuvada@vyanlabs.com</a>
+    </article>
+
+    <article class="vy-card vy-card--hue-4 vy-card--brand">
+      <img class="vy-card__logo" src="/logo.png" alt="VYAN" />
+      <div class="vy-card__brandname">VYAN Labs</div>
+      <div class="vy-card__brandtag">Architecting the Liquid Infinite</div>
+      <p class="vy-p" style="font-size:12px; opacity:0.7; margin: 14px 0;">
+        Every Saṅkalpa transmission is read by a human — usually within one
+        Earth-rotation. No marketing funnels. Just real responses.
+      </p>
+      <div class="vy-card__pill vy-card__pill--bottom">
+        <span class="vy-card__dot"></span>
+        <span class="vy-card__pill-label">Cognition Online</span>
+      </div>
+    </article>
+  </div>
+</div>
+`;

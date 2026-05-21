@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-// 5 orbs of the Shunya Mandala (Layer 2). Order matters — it defines the path.
-export type ShunyaOrbKey = 'udbhava' | 'vistara' | 'vyuha' | 'medha' | 'sandhi';
+// 6 orbs of the Shunya Mandala (Layer 2). Order matters — it defines the path.
+export type ShunyaOrbKey = 'udbhava' | 'vistara' | 'vyuha' | 'sankalpa' | 'medha' | 'sandhi';
 
 export type ShunyaOrbDef = {
   key: ShunyaOrbKey;
@@ -36,6 +36,14 @@ export const SHUNYA_ORBS: ShunyaOrbDef[] = [
     colorA: '#9a55ff',
     colorB: '#ff3a3a',
     position: new THREE.Vector3(160, -30, -240),
+  },
+  {
+    key: 'sankalpa',
+    name: 'SAṄKALPA',
+    tagline: 'The Intention — Where Cognition Becomes Commerce',
+    colorA: '#ffb84d',
+    colorB: '#ff5a3a',
+    position: new THREE.Vector3(110, 10, -310),
   },
   {
     key: 'medha',

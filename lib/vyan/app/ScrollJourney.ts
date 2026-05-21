@@ -99,8 +99,10 @@ export class ScrollJourney {
 
     // CONTINUOUS mode (snapSlots = 0) \u2014 gateway fly-in. Each wheel tick adds
     // proportional progress so the user can scroll Vy\u014dma closer organically.
+    // Direction inverted per UX feedback: scrolling UP (negative deltaY) draws
+    // the orb closer; scrolling DOWN pushes it away.
     if (this.snapSlots === 0) {
-      this.target += e.deltaY * 0.00045;
+      this.target += -e.deltaY * 0.00045;
       this.lastInputAt = now;
       this.snapped = false;
       return;
@@ -138,9 +140,9 @@ export class ScrollJourney {
     this.touchPrevY = y;
     this.lastInputAt = performance.now();
 
-    // CONTINUOUS gateway mode \u2014 directly accumulate.
+    // CONTINUOUS gateway mode \u2014 directly accumulate (inverted per UX feedback).
     if (this.snapSlots === 0) {
-      this.target += dy * 0.006;
+      this.target += -dy * 0.006;
       this.snapped = false;
       return;
     }
