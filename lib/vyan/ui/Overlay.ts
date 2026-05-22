@@ -212,7 +212,9 @@ this.element.appendChild(this.distanceLabel);
 this.element.appendChild(this.shunyaCaption);
 this.element.appendChild(this.gatewayInfo);
 this.element.appendChild(this.gatewayInfoPanel);
-this.element.appendChild(this.depthLy);
+// LY counter is a CHILD of the rail so it's positioned relative to the rail
+// (riding alongside the active node), not the viewport.
+this.rail.appendChild(this.depthLy);
 this.element.appendChild(this.panel);
 }
 bind(callbacks: OverlayCallbacks) {
@@ -560,7 +562,7 @@ setShunyaCaption(name: string, tagline: string, focus: number) {
   this.shunyaCaption.style.filter = `blur(${(1 - f) * 6}px)`;
 }
 
-setShunyaRail(activeIndex: number, focus: number, total: number, names: string[] = []) {
+  setShunyaRail(activeIndex: number, focus: number, total: number, names: string[] = []) {
   if (!this.voidMode) return;
   this.railNodes.forEach((node, i) => {
     const inRange = i < total;
@@ -572,15 +574,49 @@ setShunyaRail(activeIndex: number, focus: number, total: number, names: string[]
       if (tip && names[i] && tip.textContent !== names[i]) tip.textContent = names[i];
     }
   });
-  const pct = ((activeIndex + focus) / total) * 100;
-  this.railFill.style.height = `${Math.max(2, Math.min(100, pct))}%`;
-  // LY counter — top-LEFT corner (detached from rail).
+  // Progress fill grows from TOP downward — anchor to active node's actual
+  // offsetTop so it lines up with the visible dot positions (which are
+  // flex-centered, not evenly distributed across 0-100%).
+  const railH = this.rail.clientHeight || 1;
+  const activeNode = this.railNodes[activeIndex];
+  const nextNodeForFill = this.railNodes[Math.min(activeIndex + 1, total - 1)];
+  let fillPct = 6; // baseline so the rail never looks empty
+  if (activeNode) {
+    const ay = activeNode.offsetTop + activeNode.offsetHeight / 2;
+    const by = (nextNodeForFill && nextNodeForFill !== activeNode)
+      ? nextNodeForFill.offsetTop + nextNodeForFill.offsetHeight / 2
+      : ay;
+    const slide = 1 - focus;
+    const y = ay + (by - ay) * slide;
+    fillPct = (y / railH) * 100;
+  }
+  const clampedPct = Math.max(2, Math.min(100, fillPct));
+  this.railFill.style.height = `${clampedPct}%`;
+  // LY counter — RIDES the rail at the active node's actual position
+  // (computed from the live DOM offsetTop of the active node, since the
+  // nodes are flex-centered with gaps, not evenly distributed 0-100%).
   if (this.depthLy) {
     const ly = Math.max(0, Math.round((1 - focus) * 420));
     const name = names[activeIndex] ?? '';
+    const nextName = names[(activeIndex + 1) % total] ?? '';
     this.depthLy.textContent = ly === 0
       ? `ARRIVED · ${name}`
-      : `${ly.toLocaleString()} LY → ${name}`;
+      : `${ly.toLocaleString()} LY → ${nextName}`;
+    const railH = this.rail.clientHeight || 1;
+    const activeNode = this.railNodes[activeIndex];
+    const nextNode = this.railNodes[Math.min(activeIndex + 1, total - 1)];
+    if (activeNode) {
+      // Lerp between current active node and the next one by `focus`.
+      // (focus=1 means we're parked on this orb; focus<1 means we're drifting
+      // toward the next one, so the badge slides ahead.)
+      const ay = activeNode.offsetTop + activeNode.offsetHeight / 2;
+      const by = (nextNode && nextNode !== activeNode)
+        ? nextNode.offsetTop + nextNode.offsetHeight / 2
+        : ay;
+      const slide = 1 - focus; // 0 at lock, growing as we drift toward next
+      const y = ay + (by - ay) * slide;
+      this.depthLy.style.top = `${(y / railH) * 100}%`;
+    }
     this.depthLy.style.opacity = this.voidMode ? '1' : '0';
   }
 }

@@ -11,6 +11,36 @@ const VERCEL_TOKEN = process.env.VERCEL_API_TOKEN || '';
 const VERCEL_PROJECT_ID = process.env.VERCEL_PROJECT_ID || '';
 const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID || '';
 
+// ---- SMTP runtime store (in-memory, ephemeral until restart) ----
+// Falls back to env vars on cold-start. /api/sankalpa reads this same module
+// via the exported getter so admin edits in Netra take effect immediately.
+type SmtpConfig = {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  fromEmail: string;
+  secure: boolean;
+  updatedAt?: number;
+  persisted: boolean; // false = in-memory only (not in .env)
+};
+const _smtp: SmtpConfig = {
+  host: process.env.SMTP_HOST || '',
+  port: parseInt(process.env.SMTP_PORT || '587', 10) || 587,
+  user: process.env.SMTP_USER || '',
+  pass: process.env.SMTP_PASS || '',
+  fromEmail: process.env.SMTP_FROM || '',
+  secure: (process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+  persisted: false,
+};
+// Expose via globalThis so /api/sankalpa can read without circular imports.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).__VYAN_SMTP__ = _smtp;
+export function getSmtpConfig(): SmtpConfig {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((globalThis as any).__VYAN_SMTP__ as SmtpConfig) ?? _smtp;
+}
+
 // ---- In-memory caches (zero infra cost) -------------------
 type CacheEntry<T> = { value: T; expires: number };
 const cache = new Map<string, CacheEntry<unknown>>();
@@ -132,11 +162,49 @@ async function fetchVercelHealth() {
 // ---- POST: heartbeat / visitor ping (no auth needed) -----
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json().catch(() => ({}))) as { fingerprint?: string; event?: string };
+    const body = (await req.json().catch(() => ({}))) as {
+      fingerprint?: string;
+      event?: string;
+      code?: string;
+      host?: string;
+      port?: number;
+      user?: string;
+      pass?: string;
+      fromEmail?: string;
+      secure?: boolean;
+    };
     if (body.fingerprint && body.event === 'ping') {
       visitors.set(body.fingerprint, Date.now());
       pruneVisitors();
       return NextResponse.json({ ok: true });
+    }
+    // SMTP update — secured by admin code (header or body).
+    if (body.event === 'smtp_update') {
+      const c = req.headers.get('x-netra-code') || body.code || '';
+      if (!NETRA_CODE) return NextResponse.json({ ok: false, error: 'netra not configured' }, { status: 503 });
+      if (c !== NETRA_CODE) return unauthorized();
+      const smtp = getSmtpConfig();
+      if (typeof body.host === 'string') smtp.host = body.host.trim();
+      if (typeof body.port === 'number' && body.port > 0) smtp.port = body.port;
+      if (typeof body.user === 'string') smtp.user = body.user.trim();
+      if (typeof body.pass === 'string' && body.pass.length > 0) smtp.pass = body.pass;
+      if (typeof body.fromEmail === 'string') smtp.fromEmail = body.fromEmail.trim();
+      if (typeof body.secure === 'boolean') smtp.secure = body.secure;
+      smtp.updatedAt = Date.now();
+      smtp.persisted = false;
+      return NextResponse.json({
+        ok: true,
+        persisted: smtp.persisted,
+        smtp: {
+          host: smtp.host,
+          port: smtp.port,
+          user: smtp.user,
+          fromEmail: smtp.fromEmail,
+          secure: smtp.secure,
+          hasPassword: !!smtp.pass,
+          updatedAt: smtp.updatedAt,
+        },
+      });
     }
     return NextResponse.json({ ok: false, error: 'bad request' }, { status: 400 });
   } catch {
@@ -160,6 +228,7 @@ export async function GET(req: NextRequest) {
   const [vercel, pp] = await Promise.all([fetchVercelHealth(), pingPollinations()]);
 
   const uptimeMs = Date.now() - usage.bootedAt;
+  const smtp = getSmtpConfig();
   return NextResponse.json({
     ok: true,
     timestamp: Date.now(),
@@ -179,6 +248,16 @@ export async function GET(req: NextRequest) {
     visitors: {
       active: visitors.size,
       windowMinutes: 5,
+    },
+    smtp: {
+      host: smtp.host,
+      port: smtp.port,
+      user: smtp.user,
+      fromEmail: smtp.fromEmail,
+      secure: smtp.secure,
+      hasPassword: !!smtp.pass,
+      persisted: smtp.persisted,
+      updatedAt: smtp.updatedAt,
     },
   });
 }

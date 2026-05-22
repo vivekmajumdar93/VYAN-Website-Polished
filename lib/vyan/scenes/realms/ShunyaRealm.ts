@@ -81,11 +81,12 @@ export class ShunyaRealm {
       o.reset();
       (o as any).magnifyFactor = 1.0;
     }
-    // Cinematic non-linear arrivals — each orb floats in from a random off-axis
-    // direction and springs back to its home position with the "arrogant" curve.
-    // Magnitude kept small (~10 units) so the orb never leaves the frame.
+    // EQUALIZATION (item 2): arrival offset reduced from 10 → 3 units so
+    // the focused orb stays visually centered + consistently sized during
+    // the entry settle. Larger drifts caused Sandhi / Medhā to look smaller
+    // and off-center during the first ~1.5s after deep-link entry.
     for (const orb of this.orbs) {
-      orb.setArrivalOffset(randomArrivalOffset(10), 1.5);
+      orb.setArrivalOffset(randomArrivalOffset(3), 0.9);
     }
     if (this.deps?.cameraRig) {
       this.deps.cameraRig.locked = false;
@@ -121,6 +122,19 @@ export class ShunyaRealm {
       } else {
         const cycle = Math.floor(this.deps.scroll.target);
         this.deps.scroll.target = cycle + idx / total;
+      }
+    }
+    // On deep-link entry, also snap the camera dead-on to this orb so the user
+    // doesn't watch a 200+ unit spring traversal across the void. Also pin the
+    // focused orb to its home (no arrival drift) so its on-screen size is
+    // identical to every other focused orb.
+    if (immediate && this.deps?.cameraRig?.snapToShunyaOrb) {
+      this.deps.cameraRig.snapToShunyaOrb(idx);
+      this.activeIndex = idx;
+      this.activeFocus = 1;
+      const focused = this.orbs[idx];
+      if (focused) {
+        focused.setArrivalOffset(new THREE.Vector3(0, 0, 0), 0);
       }
     }
   }

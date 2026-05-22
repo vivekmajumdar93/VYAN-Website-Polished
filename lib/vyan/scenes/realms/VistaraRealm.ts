@@ -119,6 +119,19 @@ export class VistaraRealm {
         this.deps.scroll.target = cycle + idx / total;
       }
     }
+    // Deep-link snap (mirrors ShunyaRealm.focusOrb for consistent sizing).
+    if (immediate && this.deps?.cameraRig?.snapToVistaraProduct) {
+      this.deps.cameraRig.snapToVistaraProduct(idx);
+      this.activeIndex = idx;
+      this.activeFocus = 1;
+      const focused = this.orbs[idx];
+      if (focused) {
+        try {
+          // VistaraRealm uses a different arrival API; reset to zero.
+          (focused as any).setArrivalOffset?.(new THREE.Vector3(0, 0, 0), 0);
+        } catch {}
+      }
+    }
   }
 
   activateFocused() {

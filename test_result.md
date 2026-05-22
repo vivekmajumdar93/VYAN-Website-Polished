@@ -92,6 +92,77 @@ frontend:
 
   - agent: main
     message: |
+      P0 BATCH — item 4, 5, 2 fixes + device-restricted admin gear + SMTP panel.
+
+      ITEM 4 — LY COUNTER LIVE TRACKING
+      - LY badge ("ARRIVED · X" / "NN LY → next") now rides the rail at the
+        actual offsetTop of the active node (and lerps toward the next during
+        traversal), so it visually tracks navigation top-to-bottom in real time.
+      - Reparented depthLy as a child of the rail so absolute positioning works
+        relative to the rail (was incorrectly anchored to viewport).
+      - Removed stale CSS overrides that pinned the badge top-center fixed.
+
+      ITEM 5 — NEURAL RAIL COLOR SEQUENCE
+      - Rail background line now uses a 6-stop gradient matching the orb
+        colour sequence top→bottom: Udbhava violet → Vistāra azure → Vyūha
+        purple → Saṅkalpa gold → Medhā teal → Sandhi ember.
+      - Fill grows from TOP down (was bottom-up), matching travel direction.
+      - Active-node colour: white scale 1.45× (more universal than red, works
+        with any orb hue).
+
+      ITEM 2 — ORB SIZE EQUALIZATION
+      - CameraRig: camera is ALWAYS look-target + (0,3,26). No catmullrom
+        position blend. Every orb appears at identical on-screen size.
+      - World.setMode now syncs cameraRig.setMode in the same tick (was
+        deferred to next start-loop iteration, which re-reset currentLookAt
+        to Udbhava after our snap, sending the camera off-orb on deep-links).
+      - CameraRig.snapToShunyaOrb / snapToVistaraProduct: instant camera +
+        look-target placement on deep-link entry (no 200+ unit spring traversal).
+      - ShunyaRealm.focusOrb + VistaraRealm.focusProduct snap to destination
+        + clear arrival drift on focused orb when immediate=true.
+      - ShunyaRealm.onEnter: arrival magnitude 10 → 3 units (settle 1.5s → 0.9s)
+        so all orbs stay visually centered + same size during entry settle.
+      - NanoOrb scale: floor 0.8 → 0.92, focus boost 0.38 → 0.40, active boost
+        1.08 → 1.10 — focused orbs feel substantial without dramatic shrinking
+        during traversal.
+
+      DEVICE-RESTRICTED ADMIN GEAR (new)
+      - NetraConsole renders a small floating ◈ orbit-gear bottom-right ONLY
+        on devices that have authenticated once with the access code.
+      - Tap → opens console (skips konami + auth).
+      - Right-click / long-press → confirm dialog → revokes trust on this device.
+      - Auth trust marker stored in localStorage.vyan.netra.device_auth.
+      - Effective device isolation: user can authenticate on iPhone 14 Pro
+        and the gear stays visible there; any other device shows nothing.
+
+      SMTP CREDENTIALS PANEL (new)
+      - Full-width "smtp · saṅkalpa transmissions" panel inside Netra console.
+      - Fields: host, port, user, password, fromEmail, secure (TLS).
+      - POST /api/netra { event: 'smtp_update' } updates an in-memory SmtpConfig
+        used by future /api/sankalpa wiring. Exposed via globalThis.__VYAN_SMTP__.
+      - Currently MOCKED — drop SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS /
+        SMTP_FROM / SMTP_SECURE into /app/.env to make the values persisted.
+      - Password field never echoed back to client — only `hasPassword: bool`.
+
+      Files modified:
+      - /app/lib/vyan/app/CameraRig.ts (snap methods + constant-offset anchor)
+      - /app/lib/vyan/app/World.ts (sync cameraRig.setMode)
+      - /app/lib/vyan/scenes/realms/ShunyaRealm.ts (deep-link snap, arrival reduce)
+      - /app/lib/vyan/scenes/realms/VistaraRealm.ts (deep-link snap)
+      - /app/lib/vyan/objects/NanoOrb.ts (scale equalization)
+      - /app/lib/vyan/ui/Overlay.ts (LY ride-rail + fill from active node)
+      - /app/lib/vyan/ui/styles.css (rail colour sequence, LY positioning override)
+      - /app/app/(cosmic)/CosmicCanvas.tsx (setMode before focus on deep-link)
+      - /app/app/(cosmic)/NetraConsole.tsx (gear icon + SMTP panel)
+      - /app/app/(cosmic)/netraconsole.css (gear + form styles)
+      - /app/app/api/netra/route.ts (SMTP runtime store + POST smtp_update)
+
+      Visual sanity verified via Playwright for: /vyoma, /shunya, /shunya/sandhi,
+      /shunya/medha — every orb now sits dead-centered at identical size with
+      the LY badge correctly riding alongside the active rail node.
+
+  - agent: main
+    message: |
       Major batch: Gateway-from-zip restored + bug pass + Concierge + Sound Console + Medh\u0101 fix.
 
       GATEWAY (restored from user's canonical zip)

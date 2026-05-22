@@ -68,10 +68,15 @@ export default function CosmicCanvas() {
       (window as any).__vyan.audio = appInstance.audioEngine;
 
       // Apply initial focus immediately (snap) if route is deep-linked.
+      // CRITICAL: setMode must run FIRST so ShunyaRealm.onEnter() (which
+      // resets scroll to 0) doesn't clobber our focus snap. We force the
+      // mode transition synchronously, then snap.
       if (initialMode === 'shunya') {
+        if (appInstance.getMode?.() !== 'shunya') appInstance.setMode('shunya');
         const seg = pathname?.split('/')[2];
         if (seg) appInstance.focusShunyaOrb?.(seg, true);
       } else if (initialMode === 'vistara') {
+        if (appInstance.getMode?.() !== 'vistara') appInstance.setMode('vistara');
         const seg = pathname?.split('/')[2];
         if (seg) appInstance.focusVistaraProduct?.(seg, true);
       }

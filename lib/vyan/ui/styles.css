@@ -65,21 +65,27 @@ bottom: 6%;
 left: 50%;
 width: 2px;
 transform: translateX(-50%);
+/* RAIL COLOR SEQUENCE — matches the 6 Shunya orb hues top→bottom:
+   Udbhava (violet) → Vistāra (azure) → Vyūha (purple) → Saṅkalpa (gold)
+   → Medhā (teal) → Sandhi (ember). Travel direction = top to bottom. */
 background: linear-gradient(
   to bottom,
-  rgba(180, 140, 255, 0.22),
-  rgba(190, 150, 255, 0.55),
-  rgba(180, 140, 255, 0.22)
+  rgba(122, 92, 255, 0.55)   0%,
+  rgba(58, 144, 255, 0.55)  20%,
+  rgba(154, 85, 255, 0.55)  40%,
+  rgba(255, 184, 77, 0.55)  60%,
+  rgba(34, 224, 212, 0.55)  80%,
+  rgba(255, 138, 58, 0.55) 100%
 );
 box-shadow: 0 0 10px rgba(180, 140, 255, 0.18);
 }
 .neural-depth-fill {
 position: absolute;
 left: 50%;
-bottom: 6%;
+top: 6%;
 width: 3px;
 transform: translateX(-50%);
-background: linear-gradient(to top,
+background: linear-gradient(to bottom,
   rgba(176, 112, 255, 0.45),
   rgba(212, 168, 255, 1.0));
 box-shadow:
@@ -95,19 +101,18 @@ overflow: visible;
   left: 50%;
   width: 9px;
   height: 22px;
+  bottom: -2px;
   transform: translateX(-50%);
   border-radius: 4px;
   background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0.9), rgba(255,255,255,0));
   filter: blur(2px);
-  animation: rail-shimmer 1.9s ease-in-out infinite;
+  animation: rail-comet 1.9s ease-in-out infinite;
   pointer-events: none;
   opacity: 0.85;
 }
-@keyframes rail-shimmer {
-  0%   { top: 100%; opacity: 0; }
-  10%  { opacity: 0.9; }
-  90%  { opacity: 0.9; }
-  100% { top: -6%; opacity: 0; }
+@keyframes rail-comet {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 1;   transform: translateX(-50%) scale(1.4); }
 }
 .depth-node {
 width: 12px;
@@ -626,12 +631,28 @@ color: rgba(255, 255, 255, 1);
 }
 .neural-depth.visible .depth-ly-rail { opacity: 0.9; }
 .neural-depth-fill {
-  background: linear-gradient(180deg, #ff2a4a 0%, #b03cff 50%, #3a90ff 100%) !important;
-  box-shadow: 0 0 18px rgba(255, 60, 92, 0.55), 0 0 36px rgba(120, 60, 255, 0.35);
+  /* Solid bright comet that grows top→bottom in the orb-sequence colors */
+  background: linear-gradient(
+    to bottom,
+    #7a5cff 0%,
+    #3a90ff 20%,
+    #9a55ff 40%,
+    #ffb84d 60%,
+    #22e0d4 80%,
+    #ff8a3a 100%
+  ) !important;
+  box-shadow:
+    0 0 22px rgba(212, 168, 255, 0.85),
+    0 0 44px rgba(176, 112, 255, 0.45) !important;
+  background-attachment: fixed !important;
+  background-size: 100% 100vh !important;
+  background-position: center center !important;
 }
 .depth-node.active {
-  background: #ff2a4a;
-  box-shadow: 0 0 18px rgba(255, 60, 92, 0.75), 0 0 38px rgba(255, 60, 92, 0.45);
+  background: #fff;
+  box-shadow:
+    0 0 18px rgba(255, 255, 255, 0.85),
+    0 0 38px rgba(212, 168, 255, 0.55);
   transform: scale(1.45);
 }
 /* Hide the central distance label \u2014 we now show LY on the rail */
@@ -1145,26 +1166,8 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
 .glass-panel { pointer-events: auto; }
 .glass-panel.open .glass-close { z-index: 60; }
 
-/* 8) NEURAL DEPTH — distance counter MUST be screamingly visible. */
-.neural-depth .depth-ly-rail {
-  position: absolute !important;
-  top: 22px !important;
-  right: 50px !important;
-  font-size: 14px !important;
-  letter-spacing: 0.44em !important;
-  font-weight: 600 !important;
-  color: #fff !important;
-  background: linear-gradient(90deg, rgba(8, 6, 18, 0.95), rgba(40, 18, 30, 0.85));
-  padding: 7px 16px !important;
-  border-radius: 999px !important;
-  border: 1px solid rgba(255, 100, 130, 0.45) !important;
-  text-shadow:
-    0 0 16px rgba(255, 100, 140, 0.95),
-    0 0 32px rgba(255, 80, 120, 0.55),
-    0 0 2px rgba(0,0,0, 0.95) !important;
-  backdrop-filter: blur(8px) !important;
-  box-shadow: 0 0 24px rgba(255, 80, 120, 0.18), inset 0 0 12px rgba(255, 80, 120, 0.08) !important;
-}
+/* 8) NEURAL DEPTH — legacy override; superseded by the rail-riding LY at end of file. */
+.neural-depth .depth-ly-rail { /* see end-of-file rule for layout */ }
 .neural-depth.visible .depth-ly-rail { opacity: 1 !important; }
 /* And a thicker, more visible progress fill */
 .neural-depth .depth-fill-rail {
@@ -1226,47 +1229,48 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
 }
 
 /* ============================================================
-   LY counter — pinned top-LEFT, ALWAYS prominent (item 8)
+   LY counter — RIDES the rail at current progress (item 4 fix)
+   Vertical top updated live every frame via JS (style.top).
+   Selector intentionally matches `.neural-depth .depth-ly-rail`
+   to override the earlier prominent-top-center version (higher specificity).
    ============================================================ */
+.neural-depth .depth-ly-rail,
 .depth-ly-rail {
-  position: fixed !important;
-  top: 24px !important;
-  left: 50% !important;
+  position: absolute !important;
   right: auto !important;
+  left: -16px !important;
   bottom: auto !important;
-  transform: translateX(-50%) !important;
-  font: 600 12.5px/1 'Inter', system-ui, sans-serif !important;
-  letter-spacing: 0.42em !important;
+  transform: translate(-100%, -50%) !important;
+  font: 600 11px/1 'Inter', system-ui, sans-serif !important;
+  letter-spacing: 0.36em !important;
   text-transform: uppercase !important;
   color: #fff !important;
-  background: linear-gradient(90deg, rgba(8, 6, 18, 0.92), rgba(40, 18, 30, 0.86)) !important;
-  padding: 9px 22px !important;
+  background: linear-gradient(90deg, rgba(8, 6, 18, 0.92), rgba(28, 16, 40, 0.88)) !important;
+  padding: 7px 14px !important;
   border-radius: 999px !important;
-  border: 1px solid rgba(255, 100, 130, 0.45) !important;
+  border: 1px solid rgba(212, 168, 255, 0.45) !important;
   text-shadow:
-    0 0 18px rgba(255, 110, 150, 0.95),
-    0 0 36px rgba(255, 80, 120, 0.55) !important;
-  backdrop-filter: blur(12px) !important;
+    0 0 14px rgba(212, 168, 255, 0.85),
+    0 0 28px rgba(176, 112, 255, 0.45) !important;
+  backdrop-filter: blur(10px) !important;
   box-shadow:
-    0 0 28px rgba(255, 80, 120, 0.22),
-    inset 0 0 14px rgba(255, 80, 120, 0.08) !important;
-  z-index: 60 !important;
+    0 0 22px rgba(176, 112, 255, 0.28),
+    inset 0 0 12px rgba(176, 112, 255, 0.08) !important;
+  z-index: 12 !important;
   pointer-events: none !important;
   white-space: nowrap !important;
-  transition: opacity 0.42s ease !important;
-  animation: ly-breath 3s ease-in-out infinite !important;
+  transition: top 0.45s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.42s ease !important;
+  animation: none !important;
 }
-@keyframes ly-breath {
-  0%, 100% { box-shadow: 0 0 28px rgba(255, 80, 120, 0.22), inset 0 0 14px rgba(255, 80, 120, 0.08); }
-  50%      { box-shadow: 0 0 42px rgba(255, 110, 140, 0.42), inset 0 0 18px rgba(255, 100, 130, 0.15); }
-}
+.neural-depth.visible .depth-ly-rail { opacity: 1 !important; }
 
 @media (max-width: 767px) {
+  .neural-depth .depth-ly-rail,
   .depth-ly-rail {
-    top: 14px !important;
-    font-size: 10px !important;
-    letter-spacing: 0.32em !important;
-    padding: 6px 14px !important;
+    left: -12px !important;
+    font-size: 9.5px !important;
+    letter-spacing: 0.28em !important;
+    padding: 5px 11px !important;
   }
 }
 

@@ -63,6 +63,38 @@ export class CameraRig {
   getMode() { return this.mode; }
 
   /**
+   * Snap the camera + look-target instantly to a specific Shunya orb.
+   * Called on deep-link entry so the user doesn't watch the camera
+   * spring 200+ units across the void — they arrive parked on the orb.
+   */
+  snapToShunyaOrb(idx: number) {
+    const total = SHUNYA_ORBS.length;
+    const safe = ((idx % total) + total) % total;
+    const orb = SHUNYA_ORBS[safe];
+    if (!orb) return;
+    const target = orb.position.clone();
+    this.currentLookAt.copy(target);
+    this.currentCamPos.copy(target).add(new THREE.Vector3(0, 3, 26));
+    this.camera.position.copy(this.currentCamPos);
+    this.camera.lookAt(this.currentLookAt);
+    this.posSpring.reset();
+    this.lookSpring.reset();
+  }
+  snapToVistaraProduct(idx: number) {
+    const total = VISTARA_PRODUCTS.length;
+    const safe = ((idx % total) + total) % total;
+    const p = VISTARA_PRODUCTS[safe];
+    if (!p) return;
+    const target = p.position.clone();
+    this.currentLookAt.copy(target);
+    this.currentCamPos.copy(target).add(new THREE.Vector3(0, 3, 26));
+    this.camera.position.copy(this.currentCamPos);
+    this.camera.lookAt(this.currentLookAt);
+    this.posSpring.reset();
+    this.lookSpring.reset();
+  }
+
+  /**
    * Cinematic arrival — camera springs in from an off-axis offset.
    * Called by ShunyaRealm.onEnter to give the camera an "arrogant" entrance.
    */
@@ -124,11 +156,6 @@ export class CameraRig {
     const px = this.deps.interaction.pointer.x;
     const py = this.deps.interaction.pointer.y;
 
-    // Camera position springs toward the path target \u2014 user-specified
-    // arrogant feel (stiffness 6 / damping 3.5 = confident slight overshoot).
-    const targetPos = path.cameraAt(progress);
-    this.posSpring.step(this.currentCamPos, targetPos, dt, 6.0, 3.5);
-
     // Look-at follows focused orb's live world position (drift included).
     let lookTarget: THREE.Vector3;
     if (realm && realm.getFocusedWorldPosition) {
@@ -140,6 +167,15 @@ export class CameraRig {
       lookTarget = path.lookAt(progress);
     }
     this.lookSpring.step(this.currentLookAt, lookTarget, dt, 9.0, 4.5);
+
+    // EQUALIZATION FIX (item 2): camera is ALWAYS look-target + (0,3,26).
+    // No catmullrom blend — guarantees identical on-screen size for every
+    // orb regardless of where it sits in world space (Medhā at z=-360,
+    // Udbhava at z=0, Sandhi at z=-220, etc.). The look-target itself is
+    // spring-lerped between adjacent orbs, so motion stays cinematic; the
+    // camera just rides 26 units behind it dead-on every frame.
+    const targetPos = this.currentLookAt.clone().add(new THREE.Vector3(0, 3, 26));
+    this.posSpring.step(this.currentCamPos, targetPos, dt, 6.0, 3.5);
 
     // Decay the arrival offset (if active).
     if (this.arrivalActive) {

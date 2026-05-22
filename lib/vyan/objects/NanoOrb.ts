@@ -415,7 +415,11 @@ export class NanoOrb {
     }
 
     const pulse = 1 + Math.sin(t * 1.5 + this.seed) * 0.045 + energy * 0.06;
-    const targetScale = ((active ? 1.08 : 0.98) * pulse) * (0.8 + presence * 0.38);
+    // EQUALIZATION (item 2): keep all orbs visually substantial even when
+    // partially out-of-focus, and let the focused orb confidently fill the
+    // frame. Floor 0.92x, focus boost up to ~1.32x — uniform across all 6
+    // Shunya orbs so Medhā / Sandhi never feel small or distant.
+    const targetScale = ((active ? 1.10 : 1.0) * pulse) * (0.92 + presence * 0.40);
 
     if (this.scale < 10) {
         this.scale += (targetScale - this.scale) * 0.08;

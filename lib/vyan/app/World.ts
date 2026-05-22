@@ -86,7 +86,13 @@ export class World {
     }, callbacks);
   }
 
-  setMode(mode: any) { this.realms.setMode(mode); }
+  setMode(mode: any) {
+    this.realms.setMode(mode);
+    // Sync cameraRig in the SAME tick so the start-loop auto-sync
+    // doesn't subsequently reset currentLookAt and clobber any
+    // snapToShunyaOrb that runs immediately after this call.
+    if (this.cameraRig.getMode() !== mode) this.cameraRig.setMode(mode);
+  }
   focusShunyaOrb(key: any, immediate = false) { this.realms.focusShunyaOrb(key, immediate); }
   focusVistaraProduct(key: any, immediate = false) { this.realms.focusVistaraProduct(key, immediate); }
   triggerVistaraExit(cb: () => void) { this.realms.triggerVistaraExit(cb); }
