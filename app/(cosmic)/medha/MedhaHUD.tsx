@@ -76,10 +76,14 @@ export default function MedhaHUD() {
   const [regErr, setRegErr] = useState('');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  // NEW: consent gate. UI is blurred / locked until granted.
-  const [consentGranted, setConsentGranted] = useState<boolean>(() =>
-    typeof window === 'undefined' ? false : hasLocalConsent()
-  );
+  // NEW: consent gate. Always start `false` on SSR + first client render to
+  // avoid hydration mismatch — then upgrade to localStorage value in effect.
+  const [consentGranted, setConsentGranted] = useState<boolean>(false);
+  const [consentReady, setConsentReady] = useState<boolean>(false);
+  useEffect(() => {
+    setConsentGranted(hasLocalConsent());
+    setConsentReady(true);
+  }, []);
   // NEW: electric link animation trigger. Counter increments each time the
   // user picks a Mode in the settings panel — the SVG link redraws.
   const [linkPulse, setLinkPulse] = useState(0);
@@ -296,11 +300,33 @@ export default function MedhaHUD() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
-  const switchMode = (k: CognitiveModeKey) => {
+  // Trigger the "thunderbolt impact" on Medhā when mode switches.
+  useEffect(() => {
+    if (linkPulse === 0) return;
+    const w = document.querySelector('.mlv-orb-float-wrap');
+    if (!w) return;
+    w.classList.remove('is-struck');
+    // Force reflow so the animation restarts every pulse.
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    (w as HTMLElement).offsetWidth;
+    w.classList.add('is-struck');
+    const t = window.setTimeout(() => w.classList.remove('is-struck'), 1100);
+    return () => window.clearTimeout(t);
+  }, [linkPulse]);
+
+  const switchMode = (k: CognitiveModeKey, ev?: React.MouseEvent<HTMLButtonElement>) => {
     if (k === mode) return;
     setMode(k);
     setShock(s => s + 1);
-    // Trigger the electrifying link visual from settings panel → Medhā.
+    // Capture the pill's center position so the electrifying bolt strikes
+    // FROM that specific pill TO Medhā's center — like a focused thunderbolt.
+    if (ev?.currentTarget) {
+      const r = ev.currentTarget.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      document.documentElement.style.setProperty('--mlv-zap-x', `${cx}px`);
+      document.documentElement.style.setProperty('--mlv-zap-y', `${cy}px`);
+    }
     setLinkPulse(p => p + 1);
   };
 
@@ -344,7 +370,9 @@ export default function MedhaHUD() {
     setChatId(c.id);
     setCurrentChatId(c.id);
     setMessages(c.messages);
-    setShowHistory(false);
+    // Per user spec: opening a specific chat must KEEP the history panel open
+    // so the user can navigate between chats without re-opening. Panel closes
+    // only via the close button (✕), backdrop click, or ESC.
     setStickyDot(null);
   };
 
@@ -490,6 +518,7 @@ export default function MedhaHUD() {
             {messages.map((m, i) => m.role !== 'user' ? null : (
               <button key={m.id} type="button"
                       className={`mlv-dot mlv-dot--user ${(stickyDot === i || hoverDot === i) ? 'is-glow' : ''}`}
+                      data-msg={m.content.slice(0, 200)}
                       onMouseEnter={() => setHoverDot(i)}
                       onMouseLeave={() => setHoverDot(null)}
                       onClick={() => setStickyDot(stickyDot === i ? null : i)}
@@ -524,6 +553,23 @@ export default function MedhaHUD() {
               <span className={`mlv-composer__count ${composerText.length > 900 ? 'is-warn' : ''}`}>
                 {composerText.length}/1000
               </span>
+              <button type="button" className="mlv-composer__attach"
+                      onClick={() => { (document.getElementById('mlv-file-input') as HTMLInputElement | null)?.click(); }}
+                      title="Attach image or file">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                </svg>
+              </button>
+              <input id="mlv-file-input" type="file" accept="image/*,.pdf,.txt,.md,.json,.csv"
+                     style={{ display: 'none' }}
+                     onChange={(e) => {
+                       const f = e.target.files?.[0];
+                       if (!f) return;
+                       // Append a marker to the prompt so the backend knows an
+                       // attachment exists. Wire to /api/upload later when ready.
+                       setComposerText((cur) => `${cur}\n\n[attached: ${f.name} · ${(f.size/1024).toFixed(1)}KB]`);
+                       setIsTyping(true);
+                     }} />
               <button type="button" className={`mlv-composer__mic ${listening ? 'is-on' : ''}`}
                       onClick={toggleListening}
                       disabled={!sttRef.current?.isSupported()}>◉</button>
@@ -618,8 +664,8 @@ export default function MedhaHUD() {
       )}
 
       {showSettings && (
-        <div className="mlv-modal" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false); }}>
-          <div className="mlv-modal__inner">
+        <div className="mlv-modal mlv-modal--side" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false); }}>
+          <div className="mlv-modal__inner mlv-modal__inner--side">
             <header className="mlv-modal__head">
               <h2>Cognitive Settings</h2>
               <button type="button" className="mlv-modal__x" onClick={() => setShowSettings(false)}>✕</button>
@@ -635,7 +681,7 @@ export default function MedhaHUD() {
                       key={m.key}
                       type="button"
                       className={`mlv-mind ${mode === m.key ? 'is-active' : ''}`}
-                      onClick={() => switchMode(m.key)}
+                      onClick={(ev) => switchMode(m.key, ev)}
                       title={`${m.name} — ${m.englishName}`}
                       style={{ ['--mind-a' as any]: m.colorA, ['--mind-b' as any]: m.colorB }}
                     >
@@ -647,6 +693,24 @@ export default function MedhaHUD() {
                 <p className="mlv-settings__hint">
                   Active: <strong>{modeDef.name}</strong> · {modeDef.englishName}
                 </p>
+              </div>
+              <div className="mlv-settings__section">
+                <div className="mlv-settings__lbl">Response Tone</div>
+                <div className="mlv-settings__pills">
+                  {(['Sūtra','Poetic','Direct','Mythic'] as const).map((t) => (
+                    <button key={t} type="button" className={`mlv-pill ${(typeof window !== 'undefined' && localStorage.getItem('vyan.medha.tone') === t) ? 'is-active' : ''}`}
+                            onClick={() => { try { localStorage.setItem('vyan.medha.tone', t); } catch {} setShock(s => s + 1); }}>{t}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="mlv-settings__section">
+                <div className="mlv-settings__lbl">Response Length</div>
+                <div className="mlv-settings__pills">
+                  {(['Tight','Standard','Expansive'] as const).map((t) => (
+                    <button key={t} type="button" className={`mlv-pill ${(typeof window !== 'undefined' && localStorage.getItem('vyan.medha.length') === t) ? 'is-active' : ''}`}
+                            onClick={() => { try { localStorage.setItem('vyan.medha.length', t); } catch {} setShock(s => s + 1); }}>{t}</button>
+                  ))}
+                </div>
               </div>
               <div className="mlv-set-row">
                 <span className="mlv-set-row__k">Voice reply (TTS)</span>

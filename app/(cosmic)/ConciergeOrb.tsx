@@ -95,7 +95,7 @@ export default function ConciergeOrb() {
   const onOrbSinceRef = useRef(Date.now());
 
   // Hide concierge entirely on the Medhā HUD route (where the user is typing).
-  const visible = !pathname?.startsWith('/medha');
+  const visible = true; // Nāvika is now visible on every page including /medha (per user spec)
 
   // Reset stuck timer whenever pathname changes.
   useEffect(() => {

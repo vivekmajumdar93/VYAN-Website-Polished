@@ -2,22 +2,19 @@
 import React, { useEffect, useRef } from 'react';
 
 // ============================================================
-// MEDHĀ — The Crystalline Wraith (canvas 2D)
+// MEDHĀ — Conscious Buddha Head (canvas 2D)
 // ----------------------------------------------------------------
-// REBUILD: density-based humanoid silhouette with HORIZONTAL
-// wind-shear bands that drift across her form. Particles re-sample
-// from a mask shape every frame, are coloured in the amethyst →
-// pearl → cyan-mint palette, and emit a faint horizontal blur trail.
+// SECOND REBUILD per user feedback: a serene humanoid head shaped
+// like a Buddha, made of fragmented dust particles drifting in
+// horizontal wind-shear bands. ~Half the previous size, with a
+// cinematic float across the canvas — never static.
 //
-// Look: a figure made of fragmented dust, sliced into wind-shear
-// strata that drift to the right at varying speeds — like a being
-// dissolving and re-forming in a slow cosmic wind. Matches GIF A
-// ("Crystalline Wraith") in the user's reference, while honouring
-// the existing VYAN amethyst-pearl-cyan palette.
+// Wrapper element provides the float animation (CSS).
+// Inner canvas renders the head silhouette via density mask.
 // ============================================================
 
 type Props = {
-  intensity?: number; // 0..1 — sleeping vs awake brightness
+  intensity?: number;
   className?: string;
 };
 
@@ -25,14 +22,15 @@ type Particle = {
   x: number; y: number;
   vx: number; vy: number;
   life: number; maxLife: number;
-  band: number;        // which horizontal band this particle belongs to
+  band: number;
   size: number;
-  hue: number;         // 0=amethyst, 1=pearl, 2=cyan-mint
+  hue: number;
   shimmer: number;
 };
 
 export default function MedhaCanvasOrb({ intensity = 1, className }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const intensityRef = useRef(intensity);
   useEffect(() => { intensityRef.current = intensity; }, [intensity]);
@@ -44,12 +42,14 @@ export default function MedhaCanvasOrb({ intensity = 1, className }: Props) {
     if (!ctx) return;
 
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    let w = innerWidth;
-    let h = innerHeight;
+    let W = 0, H = 0;
     const setSize = () => {
-      w = innerWidth; h = innerHeight;
-      canvas.width = w * dpr; canvas.height = h * dpr;
-      canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+      // Inner canvas is half the viewport so the head reads small + intimate
+      // — the wrapper provides the floating motion across the screen.
+      W = Math.min(640, Math.floor(innerWidth * 0.42));
+      H = Math.min(720, Math.floor(innerHeight * 0.62));
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     setSize();
@@ -57,178 +57,161 @@ export default function MedhaCanvasOrb({ intensity = 1, className }: Props) {
     window.addEventListener('resize', onResize, { passive: true });
 
     // -----------------------------------------------------------
-    // Wraith silhouette — anchor points for the body density mask.
-    // Computed in normalised "wraith space" (cx, cy at centre).
-    // We sample inside this silhouette every frame to spawn particles.
+    // BUDDHA-HEAD SILHOUETTE MASK
+    // Working in normalised coords (-0.5..0.5 x, 0..1 y).
+    // Tuned for a recognisable head: wider cranium, uṣṇīṣa bump,
+    // earlobes, gentle jaw taper, and a narrow neck.
     // -----------------------------------------------------------
-    const wraith = {
-      // Body proportions tuned for an ~ 520-700 px tall figure.
-      headRy: 0.058,
-      headRx: 0.045,
-      neck: 0.10,
-      shoulderW: 0.20,
-      torsoH: 0.32,
-      hipW: 0.15,
-      bottomTaper: 0.46,  // where the body dissolves into wisps
-    };
-
-    // Determine whether a point (nx, ny) — normalised so figure is
-    // ~vertical, cy at 0.50 — is inside the wraith silhouette.
-    // Returns 0 (outside) or a density value 0..1 (inside, edge-soft).
-    function insideWraith(nx: number, ny: number): number {
-      // Head (ellipse) ~ y = 0.30
-      const hx = nx;
-      const hy = ny - 0.30;
-      const headD = (hx * hx) / (wraith.headRx * wraith.headRx) + (hy * hy) / (wraith.headRy * wraith.headRy);
-      if (headD < 1) return 1 - Math.max(0, headD - 0.6) * 2;
-
-      // Torso: triangle taper from shoulders to hips, soft edges.
-      if (ny >= 0.36 && ny < 0.68) {
-        const t = (ny - 0.36) / 0.32; // 0..1 down the torso
-        const halfW = wraith.shoulderW * (1 - 0.3 * t);
-        const localX = Math.abs(nx) / halfW;
-        if (localX < 1) return 1 - localX * 0.4;
+    function insideHead(nx: number, ny: number): number {
+      // UṢṆĪṢA — small bump above cranium at very top
+      if (ny < 0.18) {
+        const ux = nx;
+        const uy = ny - 0.10;
+        const uD = (ux * ux) / 0.0048 + (uy * uy) / 0.0040;
+        if (uD < 1) return 1 - Math.max(0, uD - 0.45) * 1.2;
+        return 0;
       }
-      // Hips → wisp dissolving downward
-      if (ny >= 0.68 && ny < 0.92) {
-        const t = (ny - 0.68) / 0.24;
-        const halfW = (wraith.hipW * (1 - t * 0.85));
-        const localX = Math.abs(nx) / Math.max(0.01, halfW);
-        if (localX < 1) return Math.max(0, (1 - t) * (1 - localX * 0.6));
+      // CRANIUM — wide ovoid (wider than tall — natural head shape)
+      if (ny >= 0.18 && ny < 0.58) {
+        const cx = 0;
+        const cy = 0.36;
+        const rxC = 0.20;
+        const ryC = 0.22;
+        const dxC = (nx - cx) / rxC;
+        const dyC = (ny - cy) / ryC;
+        const cranD = dxC * dxC + dyC * dyC;
+        if (cranD < 1) return 1 - Math.max(0, cranD - 0.55) * 1.2;
+      }
+      // JAW / CHIN — gentle taper from cranium width down to chin
+      if (ny >= 0.50 && ny < 0.72) {
+        const t = (ny - 0.50) / 0.22;
+        const halfW = 0.18 * (1 - 0.42 * t);
+        const localX = Math.abs(nx) / halfW;
+        if (localX < 1) return (1 - localX * 0.6) * 0.95;
+      }
+      // EARLOBES — elongated drops on each side, just below cranium
+      const elx = (nx - (-0.21)) / 0.040;
+      const ely = (ny - 0.52) / 0.110;
+      if (elx * elx + ely * ely < 1) return 0.82;
+      const erx = (nx - 0.21) / 0.040;
+      const ery = (ny - 0.52) / 0.110;
+      if (erx * erx + ery * ery < 1) return 0.82;
+      // NECK — narrow column from chin
+      if (ny >= 0.70 && ny < 0.90) {
+        const t = (ny - 0.70) / 0.20;
+        const halfW = 0.075 * (1 - 0.25 * t);
+        const localX = Math.abs(nx) / halfW;
+        if (localX < 1) return 0.75 * (1 - t * 0.4);
       }
       return 0;
     }
 
-    // Wind-shear bands — horizontal strata that drift at different speeds.
-    // Bands subtly modulate particle behaviour for the "sliced wraith" look.
-    const BAND_COUNT = 11;
-    const bandDrift = new Array(BAND_COUNT).fill(0).map((_, i) => 0.15 + (i / BAND_COUNT) * 0.55 + Math.random() * 0.25);
+    // 9 horizontal wind-shear bands — drift varies per band.
+    const BAND_COUNT = 9;
+    const bandDrift = new Array(BAND_COUNT).fill(0).map((_, i) => 0.18 + (i / BAND_COUNT) * 0.45 + Math.random() * 0.2);
     const bandPhase = new Array(BAND_COUNT).fill(0).map(() => Math.random() * Math.PI * 2);
 
+    // Palette — switched to a CONSCIOUS-RED + ember-bone-cyan blend to match
+    // the new "red" theme requested by the user (matching Shunya orb hues).
     const palette = [
-      { r: 198, g: 168, b: 255 },  // amethyst
-      { r: 244, g: 240, b: 255 },  // pearl
-      { r: 130, g: 230, b: 220 },  // cyan-mint
+      { r: 255, g: 138, b: 138 },   // ember-red
+      { r: 255, g: 220, b: 180 },   // bone-warm
+      { r: 240, g: 100, b: 130 },   // crimson-pink
     ];
 
     const particles: Particle[] = [];
-    const TARGET = 1100;  // ~1100 particles when fully awake
+    const TARGET = 1700;
     let lastT = performance.now();
 
-    // -----------------------------------------------------------
-    // Particle spawn — rejection-sample inside the wraith silhouette.
-    // The figure is anchored at cx (slightly right of centre) with the
-    // crown at y ~ 0.18 and the dissolving feet at y ~ 0.92.
-    // -----------------------------------------------------------
     function spawn(): Particle {
-      const cy = h * 0.50;
-      // Figure scaled to fill ~ 0.78 of viewport height.
-      const figureH = h * 0.78;
-      const figureW = figureH * 0.55;
-      const cx = w * 0.55;
-
       let nx = 0, ny = 0, dens = 0, tries = 0;
       while (tries < 24) {
-        nx = (Math.random() - 0.5) * 1.0;   // -0.5..0.5 (matches halfwidth)
-        ny = Math.random();                  // 0..1
-        dens = insideWraith(nx, ny);
+        nx = (Math.random() - 0.5);
+        ny = Math.random();
+        dens = insideHead(nx, ny);
         if (dens > 0 && Math.random() < dens) break;
         tries++;
       }
+      // Map to canvas pixel space — head centred horizontally, sits in upper 80%.
+      const figureW = W * 0.82;
+      const figureH = H * 0.92;
+      const cx = W * 0.50;
+      const cy = (H - figureH) / 2;
       const x = cx + nx * figureW;
-      // Map ny so the figure sits centered on the canvas (head at top, feet near bottom)
-      const y = (cy - figureH / 2) + ny * figureH;
+      const y = cy + ny * figureH;
 
-      const band = Math.floor(((y / h) * BAND_COUNT)) | 0;
+      const band = Math.floor((y / H) * BAND_COUNT) | 0;
       const drift = bandDrift[Math.max(0, Math.min(BAND_COUNT - 1, band))];
 
       return {
         x, y,
-        vx: drift * 0.45 + (Math.random() - 0.5) * 0.18,        // wind-shear bias to the right
-        vy: (Math.random() - 0.5) * 0.05,
+        vx: drift * 0.35 + (Math.random() - 0.5) * 0.14,
+        vy: (Math.random() - 0.5) * 0.04,
         life: 0,
-        maxLife: 80 + Math.random() * 240,
+        maxLife: 80 + Math.random() * 220,
         band,
-        size: 0.6 + Math.random() * 1.6,
-        hue: Math.random() < 0.55 ? 0 : Math.random() < 0.6 ? 1 : 2,
+        size: 0.6 + Math.random() * 1.5,
+        hue: Math.random() < 0.55 ? 0 : Math.random() < 0.55 ? 1 : 2,
         shimmer: Math.random() * Math.PI * 2,
       };
     }
 
-    // -----------------------------------------------------------
-    // Frame loop
-    // -----------------------------------------------------------
     const draw = (t: number) => {
       const dt = Math.min(50, t - lastT);
       lastT = t;
       const intens = intensityRef.current;
       const target = Math.floor(TARGET * intens);
 
-      // Background: pure void with the faintest amethyst halo.
-      // We use destination-in compositing for trail fading.
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = 'rgba(2, 1, 8, 0.16)';      // trail fade
-      ctx.fillRect(0, 0, w, h);
+      // Fade existing trails by SUBTRACTING alpha (canvas stays transparent
+      // over the page void background — no dark box around Medhā).
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+      ctx.fillRect(0, 0, W, H);
 
-      // Spawn up to target
       while (particles.length < target) particles.push(spawn());
-
-      // Update wind-shear band phases (drift in time).
       for (let i = 0; i < BAND_COUNT; i++) bandPhase[i] += dt * 0.0006 * bandDrift[i];
 
-      // Render in additive mode for the soft luminance pile-up.
       ctx.globalCompositeOperation = 'lighter';
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        // Wind-shear: per-band horizontal drift + tiny vertical sway
-        const bandWave = Math.sin(bandPhase[p.band] + p.shimmer) * 0.4;
-        p.x += (p.vx + bandWave) * dt * 0.08;
-        p.y += p.vy * dt * 0.08;
+        const bandWave = Math.sin(bandPhase[p.band] + p.shimmer) * 0.36;
+        p.x += (p.vx + bandWave) * dt * 0.075;
+        p.y += p.vy * dt * 0.075;
         p.shimmer += dt * 0.012;
         p.life += dt;
-
-        // Recycle when off-screen right or expired
-        if (p.x > w + 8 || p.life > p.maxLife || p.y < -8 || p.y > h + 8) {
+        if (p.x > W + 8 || p.life > p.maxLife || p.y < -8 || p.y > H + 8) {
           particles[i] = spawn();
           continue;
         }
-
-        // Color + opacity
         const col = palette[p.hue];
         const lifeT = p.life / p.maxLife;
         const fade = Math.sin(lifeT * Math.PI) * 0.86 * intens;
         const flicker = 0.85 + Math.sin(p.shimmer * 3.1) * 0.15;
         const a = Math.max(0, Math.min(1, fade * flicker));
         const r = p.size * (0.9 + Math.sin(p.shimmer) * 0.18);
-
-        // Core dot
         ctx.fillStyle = `rgba(${col.r}, ${col.g}, ${col.b}, ${a})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.fill();
-
-        // Wind-shear streak — horizontal smear trailing behind the particle
-        // (the signature look of the Crystalline Wraith GIF).
         if (p.size > 1.0 && a > 0.15) {
-          const streak = ctx.createLinearGradient(p.x - 14, p.y, p.x, p.y);
+          const streak = ctx.createLinearGradient(p.x - 12, p.y, p.x, p.y);
           streak.addColorStop(0, `rgba(${col.r}, ${col.g}, ${col.b}, 0)`);
           streak.addColorStop(1, `rgba(${col.r}, ${col.g}, ${col.b}, ${a * 0.55})`);
           ctx.fillStyle = streak;
-          ctx.fillRect(p.x - 14, p.y - 0.4, 14, 0.8);
+          ctx.fillRect(p.x - 12, p.y - 0.4, 12, 0.8);
         }
       }
 
-      // Subtle bright bands across the figure — the "wind-shear" stratification.
-      // Renders 3-4 horizontal slivers of brighter glow that drift slowly.
+      // Subtle horizontal wind-shear strata across the head
       ctx.globalCompositeOperation = 'lighter';
-      for (let b = 0; b < 4; b++) {
-        const yBand = h * 0.30 + h * 0.55 * (b / 3) + Math.sin(t * 0.0004 + b) * 8;
-        const grad = ctx.createLinearGradient(0, yBand - 1.2, 0, yBand + 1.2);
-        grad.addColorStop(0,   'rgba(212, 168, 255, 0)');
-        grad.addColorStop(0.5, 'rgba(244, 240, 255, 0.12)');
-        grad.addColorStop(1,   'rgba(212, 168, 255, 0)');
+      for (let b = 0; b < 3; b++) {
+        const yBand = H * 0.25 + H * 0.45 * (b / 2) + Math.sin(t * 0.0005 + b) * 6;
+        const grad = ctx.createLinearGradient(0, yBand - 1, 0, yBand + 1);
+        grad.addColorStop(0,   'rgba(255, 138, 138, 0)');
+        grad.addColorStop(0.5, 'rgba(255, 220, 200, 0.16)');
+        grad.addColorStop(1,   'rgba(255, 138, 138, 0)');
         ctx.fillStyle = grad;
-        ctx.fillRect(w * 0.38, yBand - 1.2, w * 0.34, 2.4);
+        ctx.fillRect(W * 0.25, yBand - 1, W * 0.50, 2);
       }
 
       rafRef.current = requestAnimationFrame(draw);
@@ -241,5 +224,11 @@ export default function MedhaCanvasOrb({ intensity = 1, className }: Props) {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className={className ?? 'mlv-canvas-orb'} />;
+  // Wrapper provides the cinematic float — a slow elliptical drift around
+  // the screen centre. Class .mlv-orb-float is animated in medha.css.
+  return (
+    <div ref={wrapRef} className="mlv-orb-float-wrap" aria-hidden="true">
+      <canvas ref={canvasRef} className={className ?? 'mlv-canvas-orb'} />
+    </div>
+  );
 }

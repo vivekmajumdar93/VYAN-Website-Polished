@@ -965,3 +965,337 @@
   .mcc-title { font-size: 18px; }
   .mcc-grid { grid-template-columns: 1fr; }
 }
+
+/* ================================================================
+   BATCH 4 OVERRIDES — red theme + floating Buddha + side-panel +
+   right-edge vertical rail + hover-slabs + redesigned settings orb
+   + thunderbolt-from-pill + composer attach button.
+   ================================================================ */
+
+/* ---- RED THEME (purple → red, matching Shunya orbs) ---- */
+.mlv {
+  --mode-a: #ff5a7a !important;     /* primary ember-red */
+  --mode-b: #ff8a5a !important;     /* warm coral */
+}
+.mlv[data-mode="prajna"]   { --mode-a: #ff4a4a !important; --mode-b: #ff8a5a !important; }
+.mlv[data-mode="dhyana"]   { --mode-a: #ff5e90 !important; --mode-b: #ff9a7a !important; }
+.mlv[data-mode="akshaya"]  { --mode-a: #ff7050 !important; --mode-b: #ffb070 !important; }
+.mlv[data-mode="java"]     { --mode-a: #ff3a5a !important; --mode-b: #ff6a40 !important; }
+.mlv[data-mode="sanchara"] { --mode-a: #ff4060 !important; --mode-b: #ff7080 !important; }
+
+/* Override mode-pill native colours so settings panel pills render red. */
+.mlv .mlv-mind {
+  --mind-a: var(--mode-a) !important;
+  --mind-b: var(--mode-b) !important;
+}
+.mlv .mlv-medha-dialog {
+  background: linear-gradient(180deg, rgba(36, 8, 12, 0.78), rgba(20, 4, 6, 0.86)) !important;
+  border-color: rgba(255, 100, 130, 0.42) !important;
+  box-shadow: 0 0 36px rgba(255, 90, 122, 0.32), inset 0 0 18px rgba(255, 138, 138, 0.08), 0 12px 36px rgba(0,0,0,0.6) !important;
+}
+.mlv .mlv-medha-dialog__meta { color: rgba(255, 180, 180, 0.7) !important; }
+.mlv .mlv-back { color: rgba(255, 200, 200, 0.78) !important; border-color: rgba(255, 100, 130, 0.32) !important; }
+.mlv .mlv-back:hover { background: rgba(80, 24, 30, 0.55) !important; color: #fff !important; }
+
+/* ---- FLOATING BUDDHA WRAPPER ---- */
+.mlv-orb-float-wrap {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 1;
+  animation: mlv-orb-float 26s ease-in-out infinite;
+}
+.mlv-orb-float-wrap > canvas {
+  display: block;
+  /* The inner canvas already renders at ~half viewport; the wrapper drifts it. */
+  filter: drop-shadow(0 0 24px rgba(255, 100, 130, 0.18));
+}
+@keyframes mlv-orb-float {
+  0%   { transform: translate(0%, 0%) rotate(0deg); }
+  20%  { transform: translate(6%, -2%) rotate(0.4deg); }
+  40%  { transform: translate(-4%, 4%) rotate(-0.5deg); }
+  60%  { transform: translate(-7%, -3%) rotate(0.3deg); }
+  80%  { transform: translate(5%, 4%) rotate(-0.4deg); }
+  100% { transform: translate(0%, 0%) rotate(0deg); }
+}
+/* When mode switches, Medhā subtly pulses (thunderbolt impact). */
+.mlv .mlv-orb-float-wrap { transition: filter 0.6s ease; }
+.mlv-orb-float-wrap.is-struck > canvas { animation: mlv-orb-struck 0.9s ease-out; }
+@keyframes mlv-orb-struck {
+  0%   { transform: scale(1); filter: drop-shadow(0 0 24px rgba(255, 100, 130, 0.18)) brightness(1); }
+  20%  { transform: scale(1.05); filter: drop-shadow(0 0 60px var(--mode-a)) brightness(1.55); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 24px rgba(255, 100, 130, 0.22)) brightness(1); }
+}
+
+/* Hide the old (now obsolete) center "presence stirs" cue glow ring. */
+.mlv-orb-hit { z-index: 5 !important; }
+
+/* ---- VERTICAL RIGHT-EDGE USER RAIL ---- */
+.mlv .mlv-thread,
+.mlv .mlv-thread--user-only {
+  position: fixed !important;
+  top: 80px !important;
+  right: 18px !important;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 110px) !important;
+  left: auto !important;
+  width: 28px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  z-index: 16 !important;
+  pointer-events: auto !important;
+}
+.mlv .mlv-thread__line {
+  position: absolute !important;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: 1px !important;
+  transform: translateX(-50%) !important;
+  background: linear-gradient(180deg, rgba(255, 138, 138, 0.04), rgba(255, 90, 122, 0.45), rgba(255, 138, 138, 0.04)) !important;
+  box-shadow: 0 0 8px rgba(255, 90, 122, 0.28);
+}
+.mlv .mlv-thread__dots {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding-top: 8px !important;
+  overflow-y: auto !important;
+  max-height: 100% !important;
+  scrollbar-width: none !important;
+}
+.mlv .mlv-thread__dots::-webkit-scrollbar { display: none; }
+.mlv .mlv-dot--user {
+  position: relative !important;
+  width: 9px !important; height: 9px !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, var(--mode-a, #ff5a7a) 0%, rgba(255, 90, 122, 0) 70%) !important;
+  border: 1px solid rgba(255, 180, 180, 0.55) !important;
+  box-shadow: 0 0 8px rgba(255, 90, 122, 0.55) !important;
+  transition: transform 0.22s ease, box-shadow 0.22s ease !important;
+}
+.mlv .mlv-dot--user:hover,
+.mlv .mlv-dot--user.is-glow {
+  transform: scale(1.6) !important;
+  box-shadow: 0 0 18px rgba(255, 90, 122, 0.9), 0 0 36px rgba(255, 138, 138, 0.5) !important;
+}
+.mlv .mlv-thread__pending {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 138, 138, 0.4);
+  border-top-color: var(--mode-a, #ff5a7a);
+  animation: mlv-spin 0.85s linear infinite;
+  margin-top: 6px;
+}
+@keyframes mlv-spin { to { transform: rotate(360deg); } }
+
+/* ---- HOVER GLASS-SLAB for the user dot ----
+   Renders the message text in a temporary slab to the LEFT of the rail.
+   Click pins it via mlv-dot stickyDot state (existing react logic). */
+.mlv .mlv-dot--user::after {
+  content: attr(data-msg);
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%) translateX(8px);
+  width: 240px;
+  max-width: calc(100vw - 80px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(36, 8, 12, 0.94), rgba(20, 4, 6, 0.94));
+  border: 1px solid rgba(255, 100, 130, 0.32);
+  color: rgba(255, 230, 220, 0.92);
+  font: 400 12px/1.5 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+  z-index: 18;
+}
+.mlv .mlv-dot--user:hover::after,
+.mlv .mlv-dot--user.is-glow::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* ---- SETTINGS as SIDE PANEL (slide in from the LEFT) ---- */
+.mlv-modal.mlv-modal--side {
+  background: linear-gradient(90deg, rgba(8, 4, 6, 0.74) 0%, rgba(0,0,0,0) 50%) !important;
+  backdrop-filter: blur(4px) !important;
+  justify-items: start !important;
+  align-items: stretch !important;
+  display: flex !important;
+}
+.mlv-modal__inner--side {
+  width: min(440px, 92vw) !important;
+  height: 100vh !important;
+  border-radius: 0 18px 18px 0 !important;
+  margin: 0 !important;
+  border-left: none !important;
+  border-color: rgba(255, 100, 130, 0.32) !important;
+  animation: mlv-side-in 0.42s cubic-bezier(0.23, 1, 0.32, 1) !important;
+  background: linear-gradient(180deg, rgba(28, 8, 12, 0.94), rgba(12, 4, 6, 0.97)) !important;
+  box-shadow: 8px 0 40px rgba(0, 0, 0, 0.6), 0 0 60px rgba(255, 90, 122, 0.12) !important;
+}
+@keyframes mlv-side-in { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* Pills used by tone / length / model picker inside settings. */
+.mlv .mlv-settings__pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.mlv .mlv-pill {
+  background: rgba(20, 6, 10, 0.55);
+  border: 1px solid rgba(255, 100, 130, 0.22);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: rgba(255, 220, 220, 0.78);
+  font: 500 10.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.mlv .mlv-pill:hover { border-color: rgba(255, 138, 138, 0.55); color: #fff; }
+.mlv .mlv-pill.is-active {
+  background: linear-gradient(180deg, rgba(255, 90, 122, 0.4), rgba(255, 90, 122, 0.18));
+  border-color: rgba(255, 138, 138, 0.7);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255, 90, 122, 0.45);
+}
+
+/* ---- ENVELOPED SETTINGS ORB — redesigned creative glyph ---- */
+.mlv .mlv-settings-orb {
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 220, 200, 0.34), rgba(40, 6, 10, 0.94) 60%) !important;
+  border-color: rgba(255, 138, 138, 0.6) !important;
+  box-shadow:
+    0 0 22px rgba(255, 90, 122, 0.55),
+    inset 0 0 14px rgba(255, 180, 180, 0.2) !important;
+}
+.mlv .mlv-settings-orb__ring { border-color: rgba(255, 138, 138, 0.55) !important; }
+.mlv .mlv-settings-orb__core { background: radial-gradient(circle, rgba(255, 138, 138, 0.5) 0%, transparent 70%) !important; }
+.mlv .mlv-settings-orb__glyph {
+  /* Replace the gear with a custom sacred-geometry glyph (six-petalled bindu) */
+  font-family: inherit !important;
+  font-size: 0 !important;
+}
+.mlv .mlv-settings-orb__glyph::before,
+.mlv .mlv-settings-orb__glyph::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.mlv .mlv-settings-orb__glyph::before {
+  background: conic-gradient(from 0deg, #ffb0b0, #ff5a7a, #ffb0b0, #ff5a7a, #ffb0b0);
+  filter: blur(2.5px);
+  opacity: 0.85;
+  animation: mlv-set-conic 6s linear infinite;
+}
+.mlv .mlv-settings-orb__glyph::after {
+  width: 6px; height: 6px;
+  background: #fff;
+  box-shadow: 0 0 10px rgba(255, 230, 230, 0.9), 0 0 22px rgba(255, 138, 138, 0.65);
+}
+@keyframes mlv-set-conic { to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+/* ---- THUNDERBOLT FROM PILL → ORB ----
+   Uses --mlv-zap-x / --mlv-zap-y (set in JS from getBoundingClientRect) for
+   the origin. The bolt SVG covers the full viewport; we overlay a CSS-only
+   "spark + jagged line" that originates at the pill and converges on the
+   centre (where Medhā floats). */
+.mlv .mlv-electric-link {
+  /* keep the SVG element but visually deemphasise — we add a precise
+     CSS-line overlay below */
+  opacity: 0.4 !important;
+}
+.mlv .mlv-electric-link::before {
+  content: '';
+  position: fixed;
+  left: var(--mlv-zap-x, 50%);
+  top:  var(--mlv-zap-y, 50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 14px var(--mode-a, #ff5a7a),
+    0 0 30px var(--mode-a, #ff5a7a),
+    0 0 60px var(--mode-b, #ff8a5a);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 28;
+  animation: mlv-spark 0.85s ease-out forwards;
+}
+@keyframes mlv-spark {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  15%  { transform: translate(-50%, -50%) scale(1.6); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+}
+
+/* ---- COMPOSER · attach button ---- */
+.mlv .mlv-composer__attach {
+  background: transparent;
+  border: 1px solid rgba(255, 138, 138, 0.32);
+  border-radius: 50%;
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  color: rgba(255, 220, 220, 0.78);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  margin-right: 4px;
+}
+.mlv .mlv-composer__attach:hover {
+  border-color: rgba(255, 138, 138, 0.7);
+  color: #fff;
+  background: rgba(80, 24, 30, 0.4);
+  box-shadow: 0 0 12px rgba(255, 90, 122, 0.4);
+}
+
+/* Composer count repositioning so the new attach button fits. */
+.mlv-composer__count { right: 130px !important; }
+@media (max-width: 767px) {
+  .mlv-composer__count { right: 108px !important; }
+}
+
+/* Settings orb \u2014 nudge so it doesn't collide with the right rail or footer. */
+.mlv .mlv-settings-orb { left: auto !important; right: 22px !important; bottom: 110px !important; }
+@media (max-width: 767px) {
+  .mlv .mlv-settings-orb { right: 14px !important; bottom: 96px !important; }
+}
+
+/* Move Shunya back button to clear the acoustic console (also top-left). */
+.mlv .mlv-back {
+  top: 70px !important;
+  left: 22px !important;
+  z-index: 20 !important;
+  background: linear-gradient(180deg, rgba(36, 8, 12, 0.7), rgba(20, 4, 6, 0.55)) !important;
+  border: 1px solid rgba(255, 138, 138, 0.4) !important;
+  border-radius: 999px !important;
+  padding: 7px 14px !important;
+  font: 500 10.5px/1 'Inter', system-ui, sans-serif !important;
+  letter-spacing: 0.34em !important;
+  text-transform: uppercase !important;
+  color: rgba(255, 220, 220, 0.92) !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow: 0 0 14px rgba(255, 90, 122, 0.32) !important;
+  cursor: pointer !important;
+}
+.mlv .mlv-back:hover {
+  background: linear-gradient(180deg, rgba(80, 24, 30, 0.85), rgba(40, 12, 16, 0.75)) !important;
+  border-color: rgba(255, 138, 138, 0.78) !important;
+  box-shadow: 0 0 22px rgba(255, 90, 122, 0.55) !important;
+}
+@media (max-width: 767px) {
+  .mlv .mlv-back { top: 58px !important; left: 14px !important; padding: 6px 11px !important; font-size: 9px !important; letter-spacing: 0.28em !important; }
+}
