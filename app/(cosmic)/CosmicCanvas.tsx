@@ -94,19 +94,46 @@ export default function CosmicCanvas() {
   }, []);
 
   // Sync mode + focus whenever pathname changes (without remounting).
+  // CINEMATIC DEEP ROUTING: when the user makes a long mode-jump (e.g. from
+  // /vyoma → /vistara/netra), we don't hard-cut. We chain through the
+  // intermediate stages — Shunya focused on the Vistāra portal orb — so the
+  // camera physically traverses the void before landing on the destination.
+  // For Vyōma → Medhā we similarly stop at Shunya focused on the Medhā orb.
   useEffect(() => {
     if (!appInstance) return;
+    const app = appInstance;
     const targetMode = modeFromPath(pathname);
-    if (appInstance.getMode?.() !== targetMode) {
-      appInstance.setMode(targetMode);
+    const currentMode = app.getMode?.();
+    const seg = pathname?.split('/')[2];
+
+    // Helpers — pure mode/focus application (no traversal).
+    const applyFinal = () => {
+      if (app.getMode?.() !== targetMode) app.setMode(targetMode);
+      if (targetMode === 'shunya' && seg) app.focusShunyaOrb?.(seg);
+      else if (targetMode === 'vistara' && seg) app.focusVistaraProduct?.(seg);
+    };
+
+    // Cinematic chain detection:
+    //   gateway → vistara/X   ⇒  shunya:vistara  (1.4s)  →  vistara/X
+    //   gateway → medha       ⇒  shunya:medha    (1.4s)  →  medha
+    //   shunya  → vistara/X   ⇒  shunya:vistara  (0.9s)  →  vistara/X (if not already there)
+    const needsChain =
+      (currentMode === 'gateway' && (targetMode === 'vistara' || targetMode === 'medha')) ||
+      (currentMode === 'shunya'  && targetMode === 'vistara' && seg);
+    const chainStop =
+      targetMode === 'vistara' ? 'vistara' :
+      targetMode === 'medha'   ? 'medha'   :
+      null;
+    if (needsChain && chainStop) {
+      // Step 1: go to Shunya and focus on the portal orb of the destination.
+      if (app.getMode?.() !== 'shunya') app.setMode('shunya');
+      app.focusShunyaOrb?.(chainStop);
+      const dwell = currentMode === 'gateway' ? 1400 : 900;
+      const t = window.setTimeout(applyFinal, dwell);
+      return () => window.clearTimeout(t);
     }
-    if (targetMode === 'shunya') {
-      const seg = pathname?.split('/')[2];
-      if (seg) appInstance.focusShunyaOrb?.(seg);
-    } else if (targetMode === 'vistara') {
-      const seg = pathname?.split('/')[2];
-      if (seg) appInstance.focusVistaraProduct?.(seg);
-    }
+
+    applyFinal();
   }, [pathname]);
 
   return <div id="vyan-root" ref={ref} />;

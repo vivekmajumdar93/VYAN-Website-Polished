@@ -2,206 +2,244 @@
 import React, { useEffect, useRef } from 'react';
 
 // ============================================================
-// MEDHĀ — Living Ghost Orb (canvas 2D)
-// Ported from the user-supplied HTML code. Renders full-screen
-// with humanoid body, flowing ribbons, hair, and a quiet face.
+// MEDHĀ — The Crystalline Wraith (canvas 2D)
+// ----------------------------------------------------------------
+// REBUILD: density-based humanoid silhouette with HORIZONTAL
+// wind-shear bands that drift across her form. Particles re-sample
+// from a mask shape every frame, are coloured in the amethyst →
+// pearl → cyan-mint palette, and emit a faint horizontal blur trail.
+//
+// Look: a figure made of fragmented dust, sliced into wind-shear
+// strata that drift to the right at varying speeds — like a being
+// dissolving and re-forming in a slow cosmic wind. Matches GIF A
+// ("Crystalline Wraith") in the user's reference, while honouring
+// the existing VYAN amethyst-pearl-cyan palette.
 // ============================================================
 
 type Props = {
-  hue?: { rComp: number; gComp: number; bComp: number }; // base body colour
   intensity?: number; // 0..1 — sleeping vs awake brightness
   className?: string;
 };
 
-export default function MedhaCanvasOrb({ hue, intensity = 1, className }: Props) {
+type Particle = {
+  x: number; y: number;
+  vx: number; vy: number;
+  life: number; maxLife: number;
+  band: number;        // which horizontal band this particle belongs to
+  size: number;
+  hue: number;         // 0=amethyst, 1=pearl, 2=cyan-mint
+  shimmer: number;
+};
+
+export default function MedhaCanvasOrb({ intensity = 1, className }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
+  const intensityRef = useRef(intensity);
+  useEffect(() => { intensityRef.current = intensity; }, [intensity]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: false });
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
-    let w = canvas.width = innerWidth;
-    let h = canvas.height = innerHeight;
-    canvas.style.width = innerWidth + 'px';
-    canvas.style.height = innerHeight + 'px';
-
-    const onResize = () => {
-      w = canvas.width = innerWidth;
-      h = canvas.height = innerHeight;
-      canvas.style.width = innerWidth + 'px';
-      canvas.style.height = innerHeight + 'px';
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    let w = innerWidth;
+    let h = innerHeight;
+    const setSize = () => {
+      w = innerWidth; h = innerHeight;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
+    setSize();
+    const onResize = () => setSize();
     window.addEventListener('resize', onResize, { passive: true });
 
-    // PREMIUM PALETTE — Amethyst → Pearl → Cyan-Mint.
-    // A trinity wisp of consciousness, not blood.
-    // Values: [R, G, B, peakR, peakG, peakB] picked for ethereal cosmic feel.
-    const palette = {
-      ribbonR: 198, ribbonG: 178, ribbonB: 255,  // amethyst pearl
-      ribbonPeakR: 230, ribbonPeakG: 220, ribbonPeakB: 255,
-      ribbonSecR: 140, ribbonSecG: 220, ribbonSecB: 215, // mint accent
-      bodyR: 200, bodyG: 180, bodyB: 255,
-      hairR: 220, hairG: 200, hairB: 255,
-      faceR: 230, faceG: 220, faceB: 255,
-      eyeR: 200, eyeG: 240, eyeB: 255,
+    // -----------------------------------------------------------
+    // Wraith silhouette — anchor points for the body density mask.
+    // Computed in normalised "wraith space" (cx, cy at centre).
+    // We sample inside this silhouette every frame to spawn particles.
+    // -----------------------------------------------------------
+    const wraith = {
+      // Body proportions tuned for an ~ 520-700 px tall figure.
+      headRy: 0.058,
+      headRx: 0.045,
+      neck: 0.10,
+      shoulderW: 0.20,
+      torsoH: 0.32,
+      hipW: 0.15,
+      bottomTaper: 0.46,  // where the body dissolves into wisps
     };
 
-    // 35% smaller than before per user feedback (#10).
-    let baseScale = Math.max(w, h) * 0.30 / 520 * 0.65;
+    // Determine whether a point (nx, ny) — normalised so figure is
+    // ~vertical, cy at 0.50 — is inside the wraith silhouette.
+    // Returns 0 (outside) or a density value 0..1 (inside, edge-soft).
+    function insideWraith(nx: number, ny: number): number {
+      // Head (ellipse) ~ y = 0.30
+      const hx = nx;
+      const hy = ny - 0.30;
+      const headD = (hx * hx) / (wraith.headRx * wraith.headRx) + (hy * hy) / (wraith.headRy * wraith.headRy);
+      if (headD < 1) return 1 - Math.max(0, headD - 0.6) * 2;
 
-    const smoothNoise = (t: number, seed: number, frequency = 0.001, amplitude = 1) =>
-      Math.sin(t * frequency + seed) * amplitude;
-
-    const noiseSeed1 = Math.random() * 10000;
-    const noiseSeed2 = Math.random() * 10000;
-    const noiseSeed3 = Math.random() * 10000;
-
-    const ribbons: Array<{ seed: number; speed: number; width: number; alpha: number; phase: number; radius: number; rComp: number }> = [];
-    for (let i = 0; i < 8; i++) {
-      ribbons.push({
-        seed: Math.random() * 1000,
-        speed: 0.00015 + Math.random() * 0.0004,
-        width: 1.2 + Math.random() * 2.4,
-        alpha: 0.12 + Math.random() * 0.18,
-        phase: Math.random() * Math.PI * 2,
-        radius: 60 + Math.random() * 240,
-        rComp: 200 + Math.floor(Math.random() * 55),
-      });
+      // Torso: triangle taper from shoulders to hips, soft edges.
+      if (ny >= 0.36 && ny < 0.68) {
+        const t = (ny - 0.36) / 0.32; // 0..1 down the torso
+        const halfW = wraith.shoulderW * (1 - 0.3 * t);
+        const localX = Math.abs(nx) / halfW;
+        if (localX < 1) return 1 - localX * 0.4;
+      }
+      // Hips → wisp dissolving downward
+      if (ny >= 0.68 && ny < 0.92) {
+        const t = (ny - 0.68) / 0.24;
+        const halfW = (wraith.hipW * (1 - t * 0.85));
+        const localX = Math.abs(nx) / Math.max(0.01, halfW);
+        if (localX < 1) return Math.max(0, (1 - t) * (1 - localX * 0.6));
+      }
+      return 0;
     }
 
-    const hairs: Array<{ phase: number; length: number; alpha: number; side: number }> = [];
-    for (let i = 0; i < 80; i++) {
-      hairs.push({
-        phase: Math.random() * Math.PI * 2,
-        length: 120 + Math.random() * 220,
-        alpha: 0.03 + Math.random() * 0.07,
-        side: i % 2 === 0 ? -1 : 1,
-      });
+    // Wind-shear bands — horizontal strata that drift at different speeds.
+    // Bands subtly modulate particle behaviour for the "sliced wraith" look.
+    const BAND_COUNT = 11;
+    const bandDrift = new Array(BAND_COUNT).fill(0).map((_, i) => 0.15 + (i / BAND_COUNT) * 0.55 + Math.random() * 0.25);
+    const bandPhase = new Array(BAND_COUNT).fill(0).map(() => Math.random() * Math.PI * 2);
+
+    const palette = [
+      { r: 198, g: 168, b: 255 },  // amethyst
+      { r: 244, g: 240, b: 255 },  // pearl
+      { r: 130, g: 230, b: 220 },  // cyan-mint
+    ];
+
+    const particles: Particle[] = [];
+    const TARGET = 1100;  // ~1100 particles when fully awake
+    let lastT = performance.now();
+
+    // -----------------------------------------------------------
+    // Particle spawn — rejection-sample inside the wraith silhouette.
+    // The figure is anchored at cx (slightly right of centre) with the
+    // crown at y ~ 0.18 and the dissolving feet at y ~ 0.92.
+    // -----------------------------------------------------------
+    function spawn(): Particle {
+      const cy = h * 0.50;
+      // Figure scaled to fill ~ 0.78 of viewport height.
+      const figureH = h * 0.78;
+      const figureW = figureH * 0.55;
+      const cx = w * 0.55;
+
+      let nx = 0, ny = 0, dens = 0, tries = 0;
+      while (tries < 24) {
+        nx = (Math.random() - 0.5) * 1.0;   // -0.5..0.5 (matches halfwidth)
+        ny = Math.random();                  // 0..1
+        dens = insideWraith(nx, ny);
+        if (dens > 0 && Math.random() < dens) break;
+        tries++;
+      }
+      const x = cx + nx * figureW;
+      // Map ny so the figure sits centered on the canvas (head at top, feet near bottom)
+      const y = (cy - figureH / 2) + ny * figureH;
+
+      const band = Math.floor(((y / h) * BAND_COUNT)) | 0;
+      const drift = bandDrift[Math.max(0, Math.min(BAND_COUNT - 1, band))];
+
+      return {
+        x, y,
+        vx: drift * 0.45 + (Math.random() - 0.5) * 0.18,        // wind-shear bias to the right
+        vy: (Math.random() - 0.5) * 0.05,
+        life: 0,
+        maxLife: 80 + Math.random() * 240,
+        band,
+        size: 0.6 + Math.random() * 1.6,
+        hue: Math.random() < 0.55 ? 0 : Math.random() < 0.6 ? 1 : 2,
+        shimmer: Math.random() * Math.PI * 2,
+      };
     }
 
+    // -----------------------------------------------------------
+    // Frame loop
+    // -----------------------------------------------------------
     const draw = (t: number) => {
-      // Refresh scale and dimensions if window changed
-      baseScale = Math.max(w, h) * 0.30 / 520;
+      const dt = Math.min(50, t - lastT);
+      lastT = t;
+      const intens = intensityRef.current;
+      const target = Math.floor(TARGET * intens);
 
-      ctx.fillStyle = 'rgba(2,0,1,0.06)';
+      // Background: pure void with the faintest amethyst halo.
+      // We use destination-in compositing for trail fading.
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(2, 1, 8, 0.16)';      // trail fade
       ctx.fillRect(0, 0, w, h);
 
-      const drift1X = smoothNoise(t, noiseSeed1, 0.0003, w * 0.25);
-      const drift2X = smoothNoise(t, noiseSeed2, 0.0001, w * 0.15);
-      const drift3X = smoothNoise(t, noiseSeed3, 0.00005, w * 0.1);
-      const drift1Y = smoothNoise(t, noiseSeed1 + 1000, 0.00025, h * 0.25);
-      const drift2Y = smoothNoise(t, noiseSeed2 + 1000, 0.00012, h * 0.15);
-      const drift3Y = smoothNoise(t, noiseSeed3 + 1000, 0.00006, h * 0.1);
+      // Spawn up to target
+      while (particles.length < target) particles.push(spawn());
 
-      const orbX = w * 0.5 + drift1X + drift2X + drift3X;
-      const orbY = h * 0.5 + drift1Y + drift2Y + drift3Y;
-      const floatPulse = Math.sin(t * 0.0008) * 20;
+      // Update wind-shear band phases (drift in time).
+      for (let i = 0; i < BAND_COUNT; i++) bandPhase[i] += dt * 0.0006 * bandDrift[i];
 
-      ctx.save();
-      ctx.translate(orbX, orbY + floatPulse);
-      ctx.scale(baseScale, baseScale);
-
-      // NO aura — removed per user request (#10). The ethereal manifestation
-      // stands clean against the void; only the ribbons + body + hair speak.
-      // (was: an elliptical red radial gradient drawn here.)
-      void intensity;
-
-      // Ribbons — amethyst pearl with mint highlights
-      ctx.globalCompositeOperation = 'screen';
-      ctx.shadowBlur = 0;
-      for (const r of ribbons) {
-        ctx.beginPath();
-        for (let i = 0; i < 260; i++) {
-          const p = i / 260;
-          const a = p * Math.PI * 2.4 + t * r.speed + r.phase;
-          const vert = (p - 0.5) * 620;
-          const col = 1 - Math.pow(Math.abs(p - 0.5) * 2, 1.6);
-          const dis = Math.sin(a * 2.2 + r.seed) * r.radius * 0.18;
-          const x = Math.cos(a) * (r.radius * col) + dis * 0.2;
-          const y = vert + Math.sin(a * 1.4) * 40;
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.lineWidth = r.width;
-        // Subtle hue shift per ribbon — some amethyst-pearl, some mint
-        const useAccent = (r.rComp % 3 === 0);
-        const rr = useAccent ? palette.ribbonSecR : palette.ribbonR;
-        const gg = useAccent ? palette.ribbonSecG : palette.ribbonG;
-        const bb = useAccent ? palette.ribbonSecB : palette.ribbonB;
-        ctx.strokeStyle = `rgba(${rr},${gg},${bb},${r.alpha * intensity})`;
-        ctx.stroke();
-      }
-
-      // Body — amethyst gradient (no aura behind, just the form)
-      const body = ctx.createLinearGradient(0, -260, 0, 320);
-      body.addColorStop(0, `rgba(${palette.bodyR},${palette.bodyG},${palette.bodyB},${0.07 * intensity})`);
-      body.addColorStop(0.4, `rgba(${palette.bodyR},${palette.bodyG},${palette.bodyB},${0.14 * intensity})`);
-      body.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = body;
-      ctx.beginPath();
-      ctx.moveTo(0, -270);
-      ctx.quadraticCurveTo(-110, -230, -100, -80);
-      ctx.quadraticCurveTo(-92, -10, -68, 70);
-      ctx.quadraticCurveTo(-55, 170, -45, 250);
-      ctx.quadraticCurveTo(-120, 430, 0, 560);
-      ctx.quadraticCurveTo(120, 430, 45, 250);
-      ctx.quadraticCurveTo(55, 170, 68, 70);
-      ctx.quadraticCurveTo(92, -10, 100, -80);
-      ctx.quadraticCurveTo(110, -230, 0, -270);
-      ctx.closePath();
-      ctx.fill();
-
-      // Hair — amethyst pearl strands
+      // Render in additive mode for the soft luminance pile-up.
       ctx.globalCompositeOperation = 'lighter';
-      for (const h2 of hairs) {
-        ctx.beginPath();
-        for (let i = 0; i < 36; i++) {
-          const p = i / 36;
-          const x = h2.side * 26 + Math.sin(p * 4 + t * 0.001 + h2.phase) * 20 + h2.side * p * 55;
-          const y = -220 + p * h2.length;
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        // Wind-shear: per-band horizontal drift + tiny vertical sway
+        const bandWave = Math.sin(bandPhase[p.band] + p.shimmer) * 0.4;
+        p.x += (p.vx + bandWave) * dt * 0.08;
+        p.y += p.vy * dt * 0.08;
+        p.shimmer += dt * 0.012;
+        p.life += dt;
+
+        // Recycle when off-screen right or expired
+        if (p.x > w + 8 || p.life > p.maxLife || p.y < -8 || p.y > h + 8) {
+          particles[i] = spawn();
+          continue;
         }
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = `rgba(${palette.hairR},${palette.hairG},${palette.hairB},${h2.alpha * intensity})`;
-        ctx.stroke();
+
+        // Color + opacity
+        const col = palette[p.hue];
+        const lifeT = p.life / p.maxLife;
+        const fade = Math.sin(lifeT * Math.PI) * 0.86 * intens;
+        const flicker = 0.85 + Math.sin(p.shimmer * 3.1) * 0.15;
+        const a = Math.max(0, Math.min(1, fade * flicker));
+        const r = p.size * (0.9 + Math.sin(p.shimmer) * 0.18);
+
+        // Core dot
+        ctx.fillStyle = `rgba(${col.r}, ${col.g}, ${col.b}, ${a})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Wind-shear streak — horizontal smear trailing behind the particle
+        // (the signature look of the Crystalline Wraith GIF).
+        if (p.size > 1.0 && a > 0.15) {
+          const streak = ctx.createLinearGradient(p.x - 14, p.y, p.x, p.y);
+          streak.addColorStop(0, `rgba(${col.r}, ${col.g}, ${col.b}, 0)`);
+          streak.addColorStop(1, `rgba(${col.r}, ${col.g}, ${col.b}, ${a * 0.55})`);
+          ctx.fillStyle = streak;
+          ctx.fillRect(p.x - 14, p.y - 0.4, 14, 0.8);
+        }
       }
 
-      // Face — soft pearl glow (no harsh red shadow)
-      ctx.globalCompositeOperation = 'source-over';
-      const face = ctx.createRadialGradient(0, -185, 2, 0, -185, 42);
-      face.addColorStop(0, `rgba(${palette.faceR},${palette.faceG},${palette.faceB},${0.22 * intensity})`);
-      face.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = face;
-      ctx.beginPath();
-      ctx.ellipse(0, -185, 32, 46, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Eyes — cyan-pearl
-      ctx.fillStyle = `rgba(${palette.eyeR},${palette.eyeG},${palette.eyeB},${0.55 * intensity})`;
-      ctx.beginPath();
-      ctx.ellipse(-10, -188, 2, 1, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(10, -188, 2, 1, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
+      // Subtle bright bands across the figure — the "wind-shear" stratification.
+      // Renders 3-4 horizontal slivers of brighter glow that drift slowly.
+      ctx.globalCompositeOperation = 'lighter';
+      for (let b = 0; b < 4; b++) {
+        const yBand = h * 0.30 + h * 0.55 * (b / 3) + Math.sin(t * 0.0004 + b) * 8;
+        const grad = ctx.createLinearGradient(0, yBand - 1.2, 0, yBand + 1.2);
+        grad.addColorStop(0,   'rgba(212, 168, 255, 0)');
+        grad.addColorStop(0.5, 'rgba(244, 240, 255, 0.12)');
+        grad.addColorStop(1,   'rgba(212, 168, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(w * 0.38, yBand - 1.2, w * 0.34, 2.4);
+      }
 
       rafRef.current = requestAnimationFrame(draw);
     };
-
-    ctx.fillStyle = '#020001';
-    ctx.fillRect(0, 0, w, h);
     rafRef.current = requestAnimationFrame(draw);
 
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       window.removeEventListener('resize', onResize);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [intensity]);
+  }, []);
 
   return <canvas ref={canvasRef} className={className ?? 'mlv-canvas-orb'} />;
 }

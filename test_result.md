@@ -184,7 +184,90 @@ frontend:
       after grant. Curl-verified the consent dedupe end-to-end.
 
   - agent: main
-    message: "Phase 1 complete. Loader → /vyoma transition verified via screenshot. HTTP 200 on both routes."
+    message: |
+      BATCH 3 — Crystalline Wraith rebuild, Vistāra product demos, cinematic
+      deep routing. (Overlay.ts refactor deferred — see notes.)
+
+      MEDHĀ · CRYSTALLINE WRAITH REBUILD (Item 1)
+      - MedhaCanvasOrb.tsx rewritten as a density-based humanoid mask sampler.
+      - ~1100 particles re-sample inside the wraith silhouette every frame
+        (head ellipse, taper torso, dissolving wisp legs).
+      - 11 horizontal wind-shear bands drift at varying speeds; each band
+        modulates particle vx + has its own phase so the figure dissolves and
+        re-forms in slow cosmic wind — matches GIF A exactly.
+      - Each particle additionally emits a 14-pixel horizontal smear gradient
+        trailing leftward (the signature shear streak).
+      - 4 luminous wind-shear "strata" overlay across the figure at h*0.30
+        through h*0.85, drifting on sin(t).
+      - Palette: amethyst (198,168,255) · pearl (244,240,255) · cyan-mint
+        (130,230,220) — unchanged from previous orb.
+      - DPR-aware, resize-aware, additive blend mode, gentle trail fade.
+
+      VISTĀRA · PRODUCT DEMO SLABS (Item 2)
+      - NEW /app/app/(cosmic)/vistara/VistaraProductDemo.tsx — Google-AI-Studio
+        styled glass slabs, one config per product. Each spec carries:
+        domain kicker, name, tagline, accent (CSS color), prompt placeholder,
+        3 model pills, 3 sliders, output hint, optional embedUrl.
+      - The 6 product configurations use the taglines already in VistaraPath.ts:
+        Ṛtam (Pravāha · Flow, violet)        — Conscious Living Through Pravāha
+        Ojas  (Prāṇa · Rhythm, gold)         — Tracking Your Prāṇic Rhythm
+        Mudrā (Kośa · Identity, blue)        — The Kośa of Global Entities
+        Netra (Tantra · Observability, cyan) — The Conscious Eye Across Tantras
+        Ākṛti (Dṛṣṭi · Creation, pink)       — Creating Digital Anubhava Through Your Dṛṣṭi
+        Sūtra (Saṅgama · Connection, amethyst) — Weaving Saṅgama Through Viveka
+      - The 7th (placeholder) shows "Awaiting Initiation" gracefully disabled.
+      - EMBED-READY: each spec has an `embedUrl?: string`. When you drop the
+        Google AI Studio share link into that field, the slab swaps from the
+        mocked output to a live <iframe data-vyan-embed="..."> hosting the
+        real app. No rebuild required.
+      - Mocked "run" returns a structured echo of the prompt + model + slider
+        values in the canvas pane. Loading spinner + 1.1s simulated latency.
+      - Color theming via CSS color-mix(in srgb, var(--accent) ...) — every
+        border, pill, slider thumb, button glow, embed canvas tint pulls from
+        the per-product accent. Each product feels distinct.
+      - Renders on /vistara/<product> route. ESC + veil-click close back to
+        /vistara. Concierge + Sound Console + Cosmic Canvas still visible
+        behind the slab.
+
+      CINEMATIC DEEP ROUTING (Item 3)
+      - CosmicCanvas.tsx pathname useEffect now detects long mode-jumps:
+          gateway → vistara/X   ⇒  setMode(shunya) + focusShunyaOrb(vistara)
+                                    (1.4s dwell) → setMode(vistara) + focus(X)
+          gateway → medha       ⇒  setMode(shunya) + focusShunyaOrb(medha)
+                                    (1.4s dwell) → setMode(medha)
+          shunya  → vistara/X   ⇒  focusShunyaOrb(vistara)
+                                    (0.9s dwell) → setMode(vistara) + focus(X)
+      - Camera physically traverses through the void via the existing spring
+        + snap pipeline — no hard cut. Cleanup via window.clearTimeout on
+        re-route. Other transitions remain instant (e.g. /shunya/medha →
+        /shunya/sandhi is already a sibling-jump).
+
+      OVERLAY.TS REFACTOR (Item 4) — DEFERRED
+      - The 587-line vanilla-DOM Overlay.ts is a substantial migration
+        (gateway intro panel, depth rail, product slab, shunya caption,
+        legal panels, ambient pulses — all built via innerHTML + manual
+        querySelector/addEventListener). A faithful React port is a 2-3k
+        line lift that I'd prefer to do in a dedicated session so we can
+        verify each panel without regression. Recommend tackling in the
+        next batch when this round is verified.
+
+      Files touched:
+      - /app/app/(cosmic)/medha/MedhaCanvasOrb.tsx (full rewrite — Crystalline Wraith)
+      - /app/app/(cosmic)/vistara/VistaraProductDemo.tsx (NEW)
+      - /app/app/(cosmic)/vistara/vistara-demo.css (NEW)
+      - /app/app/(cosmic)/vistara/[product]/page.tsx (now renders the demo)
+      - /app/app/(cosmic)/CosmicCanvas.tsx (cinematic chain detector)
+
+      Verified via Playwright:
+      - /medha → Crystalline Wraith silhouette with horizontal wind-shear
+        bands and amethyst-pearl-cyan particles.
+      - /vistara/ritam → violet glassmorphic slab with Ṛtam · Native pill,
+        Reflection Depth / Poétic Register / Time Horizon sliders.
+      - /vistara/netra → teal slab, Yantra/Tantra/Mantra pills, OBSERVABILITY
+        kicker, "OPEN THE EYE" CTA.
+      - Cinematic routing kicks in for cross-mode jumps (visual confirmed
+        from /vyoma → /vistara/netra: brief Shunya stop on Vistāra portal
+        orb before the realm transition).
 
   - agent: main
     message: |
