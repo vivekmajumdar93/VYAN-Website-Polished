@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { GREETINGS, FACTS, NUDGES, STUCK_PROMPTS, getTimeBucket, pickRandom } from '@/lib/concierge/facts';
+import ConciergePlexusCanvas from './ConciergePlexusCanvas';
 import './concierge.css';
 
 type Bubble = { id: string; text: string; kind: 'greet' | 'fact' | 'nudge' | 'stuck'; ttl: number };
@@ -249,13 +250,9 @@ export default function ConciergeOrb() {
       >
         <span className="concierge-orb__halo" />
         <span className="concierge-orb__shell">
-          <span className="concierge-orb__ring concierge-orb__ring--outer" />
-          <span className="concierge-orb__ring concierge-orb__ring--inner" />
-          <span className="concierge-orb__plexus"><PlexusPattern /></span>
-          <span className="concierge-orb__plexus concierge-orb__plexus--counter"><PlexusPattern /></span>
-          <span className="concierge-orb__core" />
-          <span className="concierge-orb__satellite concierge-orb__satellite--a" />
-          <span className="concierge-orb__satellite concierge-orb__satellite--b" />
+          <span className="concierge-orb__neural-canvas">
+            <ConciergePlexusCanvas size={160} />
+          </span>
         </span>
       </button>
 

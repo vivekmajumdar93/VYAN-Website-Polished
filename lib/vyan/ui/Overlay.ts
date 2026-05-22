@@ -70,10 +70,10 @@ this.callbacks?.onJumpToOrb(i);
 this.rail.appendChild(node);
 this.railNodes.push(node);
 }
-// LY counter rendered ON the rail (not in the centre of screen).
+// LY counter — top-LEFT corner, NOT in the rail, so it's always visible
+// and never conflicts with the concierge in the top-right.
 this.depthLy = document.createElement('div');
 this.depthLy.className = 'depth-ly-rail';
-this.rail.appendChild(this.depthLy);
 this.rail.addEventListener('pointerdown', (e) => {
 const rect = this.rail.getBoundingClientRect();
 const y = (e.clientY - rect.top) / rect.height;
@@ -109,18 +109,18 @@ this.gatewayHint.className = 'gateway-hint';
     gatewayPanel.className = 'gateway-info-panel';
     gatewayPanel.innerHTML = `
       <div class="gateway-info-panel__inner">
-        <div class="gateway-info-panel__kicker">A Traveler's Codex</div>
-        <h3 class="gateway-info-panel__title">How to wander VYAN</h3>
+        <div class="gateway-info-panel__kicker">Codex of the Traveler</div>
+        <h3 class="gateway-info-panel__title">A Field Guide to Wandering</h3>
         <div class="gateway-info-panel__step"><span class="gp-n">i.</span><div>
-          <strong>Scroll, swipe, or drag</strong> to begin displacement. Vyōma — the primordial gateway — will draw closer until it accepts you.</div></div>
+          This is not a website — it is a <strong>cosmos rendered into glass</strong>. You are the traveler, the breath, the witness. The screen is your sky.</div></div>
         <div class="gateway-info-panel__step"><span class="gp-n">ii.</span><div>
-          <strong>Click the core</strong> when it settles centre-frame. The veil parts and you emerge into the <em>Shunya Mandala</em> — the void of beginnings.</div></div>
+          <strong>Scroll, swipe, or drag</strong> to set yourself adrift. The gateway will draw closer the more attention you offer it. When the core finds its centre, <em>engage</em> — and you cross.</div></div>
         <div class="gateway-info-panel__step"><span class="gp-n">iii.</span><div>
-          Inside a void, <strong>three scrolls</strong> (or <strong>two swipes</strong>) traverse to the next orb. The <em>neural rail</em> on the right of your screen marks the depth you've crossed.</div></div>
+          Inside the void, every orb is a chamber of meaning. Continue scrolling to traverse, or <strong>click</strong> any orb to step into the slab it conceals. Each slab is a window into one face of VYAN.</div></div>
         <div class="gateway-info-panel__step"><span class="gp-n">iv.</span><div>
-          <strong>Click any orb</strong> to enter its slab. <strong>Vistāra</strong> unfurls into seven products. <strong>Medhā</strong> opens a cognitive cockpit — five minds, one conversation.</div></div>
+          To the right of your screen, a faint rail keeps the depth you have travelled. To the left, the <em>Sound Console</em> tunes the music of the spheres. They are quiet — until you summon them.</div></div>
         <div class="gateway-info-panel__step"><span class="gp-n">v.</span><div>
-          The <strong>Concierge orb</strong> (top-right, always present) guides you. The <strong>Sound Console</strong> (top-left) tunes the music of the spheres.</div></div>
+          Wherever you wander, the <strong>Concierge</strong> walks beside you — a small luminous companion, ready to speak, to nudge, to ferry you elsewhere. And the deeper void hides a presence that does not need a name.</div></div>
         <div class="gateway-info-panel__foot">
           <span>esc to close</span><span>press <em>i</em> to summon again</span>
         </div>
@@ -174,6 +174,17 @@ this.panelClose.addEventListener('pointerdown', (e) => {
 e.stopPropagation();
 this.callbacks?.onClosePanel();
 });
+// Click-outside-to-close — pointer on the panel veil (outside the card)
+// must close the slab. Works on touch and mouse.
+this.panel.addEventListener('pointerdown', (e) => {
+  const target = e.target as HTMLElement;
+  if (!target) return;
+  // Only close when clicking the panel root itself (not bubbling from card)
+  if (target === this.panel) {
+    e.stopPropagation();
+    this.callbacks?.onClosePanel();
+  }
+});
 const inner = this.panel.querySelector('.glass-panel-inner') as HTMLElement;
 inner.appendChild(this.panelTitle);
 inner.appendChild(this.panelSubtitle);
@@ -197,6 +208,7 @@ this.element.appendChild(this.distanceLabel);
 this.element.appendChild(this.shunyaCaption);
 this.element.appendChild(this.gatewayInfo);
 this.element.appendChild(this.gatewayInfoPanel);
+this.element.appendChild(this.depthLy);
 this.element.appendChild(this.panel);
 }
 bind(callbacks: OverlayCallbacks) {
@@ -479,12 +491,14 @@ setShunyaRail(activeIndex: number, focus: number, total: number, names: string[]
   });
   const pct = ((activeIndex + focus) / total) * 100;
   this.railFill.style.height = `${Math.max(2, Math.min(100, pct))}%`;
-  // LY on the rail, climbing alongside the gradient.
+  // LY counter — top-LEFT corner (detached from rail).
   if (this.depthLy) {
     const ly = Math.max(0, Math.round((1 - focus) * 420));
-    this.depthLy.textContent = ly === 0 ? `0 LY · ${names[activeIndex] ?? ''}` : `${ly} LY`;
-    // Position next to the active node (top of fill)
-    this.depthLy.style.bottom = `calc(${pct}% + 6px)`;
+    const name = names[activeIndex] ?? '';
+    this.depthLy.textContent = ly === 0
+      ? `ARRIVED · ${name}`
+      : `${ly.toLocaleString()} LY → ${name}`;
+    this.depthLy.style.opacity = this.voidMode ? '1' : '0';
   }
 }
 }

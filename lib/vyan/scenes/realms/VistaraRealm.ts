@@ -177,16 +177,15 @@ export class VistaraRealm {
     const status = isPlaceholder
       ? '<span class="vy-card__pill vy-card__pill--bottom"><span class="vy-card__dot"></span><span class="vy-card__pill-label">Awaiting Manifestation</span></span>'
       : '<span class="vy-card__pill vy-card__pill--bottom"><span class="vy-card__dot"></span><span class="vy-card__pill-label">In Cognition</span></span>';
+    // NOTE: the name + tagline are already shown in dramatic red BEHIND the
+    // slab by the in-canvas caption. We deliberately omit the white hero
+    // header here to avoid duplicating it. (User feedback #10.)
     return `
       <div class="vy-slab vy-slab--product">
-        <header class="vy-slab__hero vy-slab__hero--center">
-          <div class="vy-slab__brand">${def.name}</div>
-          <div class="vy-slab__tag">${def.tagline}</div>
-        </header>
         <p class="vy-p">
           ${isPlaceholder
-            ? 'A future cognition orbits in dark wait. Its purpose has not yet crystallized into the manifest layer of VYAN. Return after the next emergence.'
-            : 'A bespoke cognitive product engineered by VYAN Labs. The full manifestation arrives in the next phase — specifications, demos and access tier will fold in as the void unfurls.'
+            ? 'A future cognition orbits in dark wait. This branch of the <em>Vist\u0101ra Mandala</em> has not yet crystallised into the manifest layer of VYAN. <strong>Your application could live here.</strong> Tell us what you are building \u2014 the next orb in this constellation may very well be yours.'
+            : 'A bespoke cognitive product engineered by VYAN Labs, born from the unfurling of the <em>Vist\u0101ra Mandala</em>. The full manifestation arrives in the next phase \u2014 specifications, live demos and access tiers will fold in as this branch matures.'
           }
         </p>
         <div style="text-align:center; margin-top: 24px;">${status}</div>

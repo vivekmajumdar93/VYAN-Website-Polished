@@ -390,3 +390,61 @@
   /* When a glass-panel is open, move the orb down to clear its close button. */
   body:has(.glass-panel.open) .concierge-root { top: 64px; }
 }
+
+/* ---------- New canvas-based plexus (replaces SVG/CSS rings) ---------- */
+.concierge-orb__neural-canvas {
+  position: absolute;
+  inset: -50%;
+  display: grid; place-items: center;
+  pointer-events: none;
+  filter: drop-shadow(0 0 14px rgba(80, 200, 255, 0.55));
+}
+.concierge-plexus-canvas {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  transform: translate(-50%, -50%);
+  top: 50%; left: 50%;
+  pointer-events: none;
+}
+/* Halo tint shifts to match the new cyan-blue field */
+.concierge-root .concierge-orb__halo {
+  background: radial-gradient(circle, rgba(80, 180, 255, 0.42) 0%, rgba(80, 180, 255, 0) 70%) !important;
+}
+
+/* ---------- Distinguished signal orb (item 12) ---------- */
+.concierge-signal {
+  background: radial-gradient(circle, #ffffff 0%, rgba(140, 240, 255, 0.95) 35%, rgba(80, 200, 255, 0.7) 70%, rgba(80, 200, 255, 0) 100%) !important;
+  box-shadow:
+    0 0 18px rgba(140, 240, 255, 0.95),
+    0 0 38px rgba(80, 200, 255, 0.7),
+    0 0 60px rgba(80, 200, 255, 0.35) !important;
+  width: 10px !important;
+  height: 10px !important;
+}
+
+/* Bolt — drawn as a CSS-only tapered streak from concierge to signal */
+.concierge-signal::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 220px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(140, 240, 255, 0.95) 0%, rgba(80, 200, 255, 0.55) 50%, rgba(80, 200, 255, 0) 100%);
+  transform: translate(0, -50%) rotate(180deg);
+  transform-origin: 0 50%;
+  filter: blur(0.7px);
+  opacity: 0.85;
+  pointer-events: none;
+  animation: signal-bolt 1.2s ease-out forwards;
+}
+@keyframes signal-bolt {
+  0%   { width: 0px; opacity: 0; }
+  35%  { width: 180px; opacity: 1; }
+  60%  { width: 240px; opacity: 0.9; filter: blur(0.4px) brightness(1.4); }
+  100% { width: 320px; opacity: 0; }
+}
+
+/* When NOT hovered, the orb is static. Drift animation only on hover. */
+.concierge-root { animation: none !important; }
+.concierge-root.is-hovered { animation: concierge-drift 14s ease-in-out infinite; }

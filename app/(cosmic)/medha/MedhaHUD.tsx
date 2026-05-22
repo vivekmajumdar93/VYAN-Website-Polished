@@ -10,6 +10,7 @@ import {
   type StoredChat, type StoredMsg,
 } from '@/lib/medha/storage';
 import { STT, TTS } from '@/lib/medha/voice';
+import MedhaCanvasOrb from './MedhaCanvasOrb';
 import './medha.css';
 
 // ============================================================
@@ -298,25 +299,16 @@ export default function MedhaHUD() {
         <div className="mlv-stars mlv-stars--slow" />
       </div>
 
+      {/* Living Ghost Orb — full-screen canvas. Intensity dims while sleeping. */}
+      <MedhaCanvasOrb intensity={phase === 'sleeping' ? 0.55 : 1} />
+
+      {/* Orb-click hit area for opening conversation history. */}
       <div
-        className={`mlv-orb-wrap ${speaking ? 'is-speaking' : ''} ${busy ? 'is-listening' : ''}`}
+        className={`mlv-orb-hit ${speaking ? 'is-speaking' : ''} ${busy ? 'is-listening' : ''}`}
         onClick={() => phase === 'awake' && setShowHistory(v => !v)}
         role="button"
         aria-label="Open conversation history"
       >
-        <div className="mlv-orb">
-          <div className="mlv-orb__corona" />
-          <div className="mlv-orb__ring mlv-orb__ring--a" />
-          <div className="mlv-orb__ring mlv-orb__ring--b" />
-          <div className="mlv-orb__ring mlv-orb__ring--c" />
-          <div className="mlv-orb__core"><div className="mlv-orb__core-inner" /></div>
-          <div className="mlv-orb__particles">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <span key={i} className="mlv-orb__particle" style={{ ['--p-i' as any]: i }} />
-            ))}
-          </div>
-          <div className="mlv-orb__shockwave" key={shock} />
-        </div>
         {phase === 'sleeping' && (
           <div className="mlv-orb-cue">a presence stirs · move, touch, or speak</div>
         )}

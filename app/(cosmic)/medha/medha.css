@@ -590,3 +590,38 @@
   .mlv-back { padding: 6px 10px; font-size: 9px; letter-spacing: 0.24em; }
   .mlv-modal__inner { max-height: 86vh; }
 }
+
+/* Canvas orb fills the whole viewport behind UI */
+.mlv-canvas-orb {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+/* Hit area for opening history (overlaps canvas center) */
+.mlv-orb-hit {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 28vw; height: 60vh;
+  min-width: 200px; min-height: 280px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 4;
+}
+.mlv-orb-hit .mlv-orb-cue {
+  position: absolute;
+  bottom: -10%; left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: rgba(255, 130, 140, 0.65);
+  white-space: nowrap;
+  animation: mlv-cue-breath 3.4s ease-in-out infinite;
+}
+/* Bring UI above canvas */
+.mlv-rail, .mlv-back, .mlv-slab, .mlv-thread, .mlv-composer, .mlv-modal { z-index: 10; }
+.mlv-slab { z-index: 8; }

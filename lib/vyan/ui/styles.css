@@ -1095,3 +1095,177 @@ color: rgba(255, 255, 255, 1);
 /* Saṅkalpa card grid — single column on mobile */
 .vy-card-grid--sankalpa { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 640px) { .vy-card-grid--sankalpa { grid-template-columns: 1fr; } }
+
+/* ============================================================
+   USER FEEDBACK BATCH — items 1, 5, 7, 8, 10, 12
+   ============================================================ */
+
+/* 1) VYŌMA caption pushed to ~85-90% from top so it never overlaps the orb. */
+.gateway-hint {
+  bottom: 7vh !important;
+  top: auto !important;
+}
+.gateway-hint .gateway-line-1 { font-size: clamp(28px, 5.2vw, 56px); margin-bottom: 16px; }
+.gateway-hint .gateway-line-2 { font-size: clamp(12px, 1.6vw, 16px); margin-bottom: 12px; }
+.gateway-hint .gateway-line-3 {
+  font-size: clamp(10px, 1.2vw, 13px);
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: rgba(206, 173, 255, 0.6);
+  margin-top: 6px;
+  animation: gateway-line3-breath 2.6s ease-in-out infinite;
+}
+@keyframes gateway-line3-breath {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; text-shadow: 0 0 18px rgba(180, 130, 255, 0.55); }
+}
+
+/* 5) When a glass panel is OPEN, hard-disable the background controls
+   (sound console, concierge, codex icon, neural rail) so they don't
+   clutter mobile UX or compete with the close button. */
+body:has(.glass-panel.open) .concierge-root,
+body:has(.glass-panel.open) .sound-console,
+body:has(.glass-panel.open) .gateway-info,
+body:has(.glass-panel.open) .neural-depth,
+body:has(.glass-panel.open) .concierge-bubble,
+body:has(.glass-panel.open) .concierge-signal,
+body:has(.glass-panel.open) .concierge-nav {
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.22s ease;
+}
+/* The sound console panel itself stays visible when its OWN class is open */
+body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visibility: visible !important; }
+
+/* 7) Glass panel close-on-outside-click — handled in JS, but we add a
+   click-veil layer behind the panel that swallows clicks and triggers close.
+   Existing veil class .glass-panel::before already covers this; ensure it
+   actually receives pointer events. */
+.glass-panel { pointer-events: auto; }
+.glass-panel.open .glass-close { z-index: 60; }
+
+/* 8) NEURAL DEPTH — distance counter MUST be screamingly visible. */
+.neural-depth .depth-ly-rail {
+  position: absolute !important;
+  top: 22px !important;
+  right: 50px !important;
+  font-size: 14px !important;
+  letter-spacing: 0.44em !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+  background: linear-gradient(90deg, rgba(8, 6, 18, 0.95), rgba(40, 18, 30, 0.85));
+  padding: 7px 16px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 100, 130, 0.45) !important;
+  text-shadow:
+    0 0 16px rgba(255, 100, 140, 0.95),
+    0 0 32px rgba(255, 80, 120, 0.55),
+    0 0 2px rgba(0,0,0, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow: 0 0 24px rgba(255, 80, 120, 0.18), inset 0 0 12px rgba(255, 80, 120, 0.08) !important;
+}
+.neural-depth.visible .depth-ly-rail { opacity: 1 !important; }
+/* And a thicker, more visible progress fill */
+.neural-depth .depth-fill-rail {
+  background: linear-gradient(180deg, #ff80a0 0%, #ff3a6a 60%, #b02050 100%) !important;
+  box-shadow: 0 0 12px rgba(255, 90, 120, 0.55), 0 0 28px rgba(255, 90, 120, 0.32) !important;
+  width: 3px !important;
+}
+
+/* 14) Subtle nav animation overlay (used by EdgeSwipeNav and snap nav). */
+.nav-pulse {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9991;
+  opacity: 0;
+  animation: nav-pulse-anim 0.75s ease-out forwards;
+}
+.nav-pulse--next { background: linear-gradient(270deg, rgba(180, 130, 255, 0.32), transparent 60%); }
+.nav-pulse--prev { background: linear-gradient(90deg,  rgba(180, 130, 255, 0.32), transparent 60%); }
+@keyframes nav-pulse-anim {
+  0%   { opacity: 0; transform: scale(1.02); }
+  50%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* ============================================================
+   MOBILE-FIRST OVERHAUL (item 6)
+   ============================================================ */
+@media (max-width: 767px) {
+  /* Push gateway caption further up so orb is unobstructed */
+  .gateway-hint { bottom: 10vh !important; }
+  .gateway-hint .gateway-line-1 { font-size: clamp(22px, 7vw, 32px); margin-bottom: 12px; }
+  .gateway-hint .gateway-line-2 { font-size: 11px; margin-bottom: 10px; }
+  .gateway-hint .gateway-line-3 { font-size: 9.5px; letter-spacing: 0.28em; }
+
+  /* LY counter scales down but stays prominent */
+  .neural-depth .depth-ly-rail {
+    top: 14px !important;
+    right: 14px !important;
+    font-size: 10.5px !important;
+    padding: 5px 11px !important;
+    letter-spacing: 0.36em !important;
+  }
+  /* Hide the dot rail on mobile and just show the LY badge */
+  .neural-depth .depth-track-rail { display: none !important; }
+  .neural-depth .depth-nodes-rail { display: none !important; }
+  .neural-depth .depth-fill-rail { display: none !important; }
+
+  /* When glass panel open on mobile, force everything else off-screen */
+  body:has(.glass-panel.open) {
+    overflow: hidden;
+  }
+  /* Glass panel takes full viewport on mobile for easy reading */
+  .glass-panel.open .glass-card {
+    width: calc(100vw - 24px) !important;
+    max-width: none !important;
+    max-height: 92vh !important;
+  }
+}
+
+/* ============================================================
+   LY counter — pinned top-LEFT, ALWAYS prominent (item 8)
+   ============================================================ */
+.depth-ly-rail {
+  position: fixed !important;
+  top: 24px !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+  font: 600 12.5px/1 'Inter', system-ui, sans-serif !important;
+  letter-spacing: 0.42em !important;
+  text-transform: uppercase !important;
+  color: #fff !important;
+  background: linear-gradient(90deg, rgba(8, 6, 18, 0.92), rgba(40, 18, 30, 0.86)) !important;
+  padding: 9px 22px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 100, 130, 0.45) !important;
+  text-shadow:
+    0 0 18px rgba(255, 110, 150, 0.95),
+    0 0 36px rgba(255, 80, 120, 0.55) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow:
+    0 0 28px rgba(255, 80, 120, 0.22),
+    inset 0 0 14px rgba(255, 80, 120, 0.08) !important;
+  z-index: 60 !important;
+  pointer-events: none !important;
+  white-space: nowrap !important;
+  transition: opacity 0.42s ease !important;
+  animation: ly-breath 3s ease-in-out infinite !important;
+}
+@keyframes ly-breath {
+  0%, 100% { box-shadow: 0 0 28px rgba(255, 80, 120, 0.22), inset 0 0 14px rgba(255, 80, 120, 0.08); }
+  50%      { box-shadow: 0 0 42px rgba(255, 110, 140, 0.42), inset 0 0 18px rgba(255, 100, 130, 0.15); }
+}
+
+@media (max-width: 767px) {
+  .depth-ly-rail {
+    top: 14px !important;
+    font-size: 10px !important;
+    letter-spacing: 0.32em !important;
+    padding: 6px 14px !important;
+  }
+}
