@@ -43,8 +43,9 @@ export default function ConciergePlexusCanvas({ size = 160 }: Props) {
         density: 1.5 + Math.random() * 3.2,
         speed: 0.00028 + Math.random() * 0.00055,
         phase: Math.random() * Math.PI * 2,
-        alpha: 0.04 + Math.random() * 0.04,
-        thickness: (0.45 + Math.random() * 0.9) * Math.max(0.5, SCALE),
+        // Boosted alpha so Nāvika reads clearly against any backdrop.
+        alpha: 0.08 + Math.random() * 0.08,
+        thickness: (0.65 + Math.random() * 1.1) * Math.max(0.6, SCALE),
         twist: 0.8 + Math.random() * 1.6,
       });
     }
@@ -57,9 +58,14 @@ export default function ConciergePlexusCanvas({ size = 160 }: Props) {
       if (dt > 32) dt = 32;
       last = now;
 
-      // Clean fade
-      ctx.fillStyle = 'rgba(1,2,8,0.10)';
+      // TRANSPARENT canvas — use destination-out to fade the alpha channel
+      // (instead of painting a dark plate over the canvas). This keeps the
+      // background visible behind Nāvika.
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'rgba(0,0,0,0.14)';
       ctx.fillRect(0, 0, w, h);
+      ctx.restore();
 
       ctx.save();
       const driftX = Math.sin(now * 0.00008) * 6 + Math.cos(now * 0.00012) * 4;

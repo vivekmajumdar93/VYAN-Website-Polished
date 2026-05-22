@@ -80,7 +80,7 @@ export default function LoaderClient() {
           draggable={false}
         />
         <div ref={tagRef} className="vyan-loader__tag">
-          <div className="vyan-loader__brand">VYAN Labs</div>
+          <div className="vyan-loader__brand">VYAN</div>
           <div className="vyan-loader__sub">A Boutique Studio for Cognitive Solutions</div>
         </div>
       </div>

@@ -1269,3 +1269,130 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
     padding: 6px 14px !important;
   }
 }
+
+/* ================================================================
+   Saṅkalpa form styles (in-slab functional product-request form)
+   ================================================================ */
+.vy-cta-link {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 184, 77, 0.45);
+  background: linear-gradient(180deg, rgba(255, 184, 77, 0.16), rgba(255, 90, 58, 0.10));
+  color: #ffd49a;
+  font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+  text-decoration: none;
+  transition: all 0.22s ease;
+}
+.vy-cta-link:hover { background: rgba(255, 184, 77, 0.32); color: #fff; border-color: #ffd49a; }
+
+.sk-form { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; color: rgba(232, 232, 240, 0.92); }
+.sk-row--toggle { display: inline-flex; gap: 6px; padding: 4px; background: rgba(20, 12, 38, 0.45); border: 1px solid rgba(255, 184, 77, 0.22); border-radius: 999px; align-self: flex-start; }
+.sk-toggle { position: relative; cursor: pointer; }
+.sk-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.sk-toggle span { display: block; padding: 8px 18px; border-radius: 999px; font: 600 11px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255, 220, 200, 0.62); transition: all 0.22s ease; }
+.sk-toggle input:checked + span { background: linear-gradient(180deg, rgba(255, 184, 77, 0.32), rgba(255, 90, 58, 0.18)); color: #fff; box-shadow: 0 0 18px rgba(255, 184, 77, 0.32); }
+
+.sk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.sk-field { display: flex; flex-direction: column; gap: 6px; }
+.sk-field--enterprise { display: none; }
+.sk-form.is-enterprise .sk-field--enterprise { display: flex; }
+.sk-k { font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase; color: rgba(255, 220, 200, 0.68); }
+.sk-k em { color: #ff6680; font-style: normal; margin-left: 4px; }
+.sk-help { font-size: 11px; letter-spacing: 0.04em; opacity: 0.6; margin-top: 4px; font-style: italic; }
+
+.sk-form input[type=text], .sk-form input[type=email], .sk-form input[type=tel], .sk-form textarea {
+  width: 100%;
+  background: rgba(20, 12, 38, 0.45);
+  border: 1px solid rgba(255, 184, 77, 0.20);
+  border-radius: 10px;
+  padding: 11px 14px;
+  color: #fff;
+  font: 14px 'Inter', system-ui, sans-serif;
+  outline: none;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.sk-form input:focus, .sk-form textarea:focus { border-color: rgba(255, 184, 77, 0.62); background: rgba(28, 18, 50, 0.6); box-shadow: 0 0 0 3px rgba(255, 184, 77, 0.12); }
+.sk-form textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
+
+.sk-fieldset { border: 1px dashed rgba(255, 184, 77, 0.2); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.sk-fieldset legend { padding: 0 8px; }
+.sk-radio { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 8px 10px; border-radius: 10px; transition: background 0.18s ease; }
+.sk-radio:hover { background: rgba(255, 184, 77, 0.08); }
+.sk-radio input { margin-top: 4px; accent-color: #ffb84d; }
+.sk-radio span { font-size: 13px; line-height: 1.55; }
+.sk-radio strong { color: #ffd49a; font-weight: 600; }
+
+.sk-products { padding: 12px 14px; border: 1px dashed rgba(255, 184, 77, 0.2); border-radius: 14px; display: flex; flex-direction: column; gap: 10px; }
+.sk-checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sk-checks label { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12.5px; }
+.sk-checks label:hover { background: rgba(255, 184, 77, 0.08); }
+.sk-checks input { accent-color: #ffb84d; }
+
+.sk-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
+.sk-submit {
+  position: relative;
+  padding: 12px 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 184, 77, 0.55);
+  background: linear-gradient(180deg, rgba(255, 184, 77, 0.32), rgba(255, 90, 58, 0.22));
+  color: #fff;
+  font: 600 11.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.22s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.sk-submit:hover { background: linear-gradient(180deg, rgba(255, 184, 77, 0.5), rgba(255, 90, 58, 0.32)); box-shadow: 0 0 28px rgba(255, 184, 77, 0.32); }
+.sk-submit:disabled { opacity: 0.6; cursor: wait; }
+.sk-submit__spinner { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; opacity: 0; animation: sk-spin 0.7s linear infinite; }
+.sk-submit.is-loading .sk-submit__spinner { opacity: 1; }
+@keyframes sk-spin { to { transform: rotate(360deg); } }
+
+.sk-result { margin-top: 6px; padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.5; display: none; }
+.sk-result.is-success { display: block; background: rgba(110, 255, 166, 0.10); border: 1px solid rgba(110, 255, 166, 0.32); color: #c6ffd9; }
+.sk-result.is-error   { display: block; background: rgba(255, 100, 130, 0.12); border: 1px solid rgba(255, 100, 130, 0.32); color: #ffc6c6; }
+.sk-result__id { display: block; margin-top: 4px; font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.7; }
+
+@media (max-width: 640px) {
+  .sk-grid, .sk-checks { grid-template-columns: 1fr; }
+}
+
+/* ================================================================
+   Medhā quota lock modal (item 11)
+   ================================================================ */
+.medha-quota-lock {
+  position: fixed; inset: 0;
+  z-index: 220;
+  background: radial-gradient(ellipse at center, rgba(15, 10, 30, 0.92), rgba(0,0,0,0.96));
+  backdrop-filter: blur(14px);
+  display: grid; place-items: center;
+  padding: 24px;
+  animation: mql-fade 0.32s ease;
+}
+@keyframes mql-fade { from { opacity: 0; } to { opacity: 1; } }
+.medha-quota-lock__card {
+  width: min(520px, 100%);
+  padding: 30px 32px 28px;
+  background: linear-gradient(180deg, rgba(15, 10, 30, 0.96), rgba(8, 6, 18, 0.96));
+  border: 1px solid rgba(180, 130, 255, 0.32);
+  border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(80, 40, 180, 0.35);
+  color: rgba(232, 232, 240, 0.92);
+}
+.medha-quota-lock__kicker { font-size: 10px; letter-spacing: 0.42em; text-transform: uppercase; color: rgba(180, 130, 255, 0.7); margin-bottom: 8px; }
+.medha-quota-lock__title { font-size: 22px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 500; color: #fff; margin: 0 0 14px; }
+.medha-quota-lock__p { font-size: 14px; line-height: 1.65; margin: 0 0 16px; }
+.medha-quota-lock__form { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.medha-quota-lock__form input { background: rgba(20, 12, 38, 0.55); border: 1px solid rgba(180, 130, 255, 0.22); border-radius: 10px; padding: 11px 14px; color: #fff; font-size: 14px; outline: none; }
+.medha-quota-lock__form input:focus { border-color: rgba(180, 130, 255, 0.6); box-shadow: 0 0 0 3px rgba(180, 130, 255, 0.12); }
+.medha-quota-lock__cta { padding: 12px 22px; border-radius: 999px; border: 1px solid rgba(180, 130, 255, 0.55); background: linear-gradient(180deg, rgba(180, 130, 255, 0.32), rgba(80, 40, 180, 0.22)); color: #fff; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; cursor: pointer; transition: all 0.22s ease; }
+.medha-quota-lock__cta:hover { box-shadow: 0 0 28px rgba(180, 130, 255, 0.42); }
+.medha-quota-lock__cta:disabled { opacity: 0.5; cursor: wait; }
+.medha-quota-lock__err { color: #ff8a8a; font-size: 12px; }
+.medha-quota-lock__ok { color: #6effa6; font-size: 13px; }
+.medha-quota-lock__foot { margin-top: 16px; font-size: 11px; opacity: 0.6; line-height: 1.5; }

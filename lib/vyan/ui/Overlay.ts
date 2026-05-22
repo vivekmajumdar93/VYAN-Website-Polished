@@ -51,6 +51,10 @@ this.element.className = 'vyan-ui';
 this.soundConsole.className = 'sound-console';
 this.soundConsole.type = 'button';
 this.soundConsole.textContent = 'SOUND OFF';
+// Hide the legacy in-canvas SOUND OFF button — the unified Acoustic
+// Console (React component) on the top-left now owns this UI. We keep
+// the element to preserve the muted-state hooks below but make it invisible.
+this.soundConsole.style.display = 'none';
 this.rail.className = 'neural-depth';
 this.railFill.className = 'neural-depth-fill';
 this.rail.appendChild(this.railFill);
@@ -454,10 +458,89 @@ this.panelTitle.textContent = info.title;
 this.panelSubtitle.textContent = info.subtitle;
 if (info.html) {
   this.panelBody.innerHTML = info.html;
+  // Wire any forms inside the slab to /api endpoints. Idempotent — runs on every panel open.
+  this.wireSlabForms();
 } else {
   this.panelBody.textContent = info.description;
 }
 this.panel.classList.add('open');
+}
+
+// Wires any [data-vyan-form] forms inside the slab body to the matching API.
+private wireSlabForms() {
+  const form = this.panelBody.querySelector('form[data-vyan-form="sankalpa"]') as HTMLFormElement | null;
+  if (!form) return;
+  if ((form as any).__wired) return;
+  (form as any).__wired = true;
+
+  // Dynamic field visibility (Individual vs Enterprise, product intent)
+  const reflect = () => {
+    const type = (form.elements.namedItem('type') as RadioNodeList).value;
+    const intent = (form.elements.namedItem('productIntent') as RadioNodeList).value;
+    form.classList.toggle('is-enterprise', type === 'enterprise');
+    const products = form.querySelector('.sk-products[data-show-on]') as HTMLElement | null;
+    if (products) products.style.display = intent === 'modify_combination' ? '' : 'none';
+    const companyField = form.querySelector('.sk-field--enterprise') as HTMLElement | null;
+    if (companyField) companyField.style.display = type === 'enterprise' ? '' : 'none';
+  };
+  form.addEventListener('change', reflect);
+  reflect();
+
+  const result = form.querySelector('.sk-result') as HTMLElement | null;
+  const submitBtn = form.querySelector('.sk-submit') as HTMLButtonElement | null;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!submitBtn) return;
+    submitBtn.disabled = true;
+    submitBtn.classList.add('is-loading');
+    if (result) { result.className = 'sk-result'; result.textContent = ''; }
+    const fd = new FormData(form);
+    const products: string[] = [];
+    fd.getAll('productsOfInterest').forEach(v => products.push(String(v)));
+    const payload = {
+      type: String(fd.get('type') || 'individual'),
+      name: String(fd.get('name') || ''),
+      email: String(fd.get('email') || ''),
+      company: String(fd.get('company') || ''),
+      role: String(fd.get('role') || ''),
+      phone: String(fd.get('phone') || ''),
+      productIntent: String(fd.get('productIntent') || ''),
+      productsOfInterest: products,
+      usageRequirements: String(fd.get('usageRequirements') || ''),
+      desiredTimeline: String(fd.get('desiredTimeline') || ''),
+      hearAboutUs: String(fd.get('hearAboutUs') || ''),
+    };
+    try {
+      const res = await fetch('/api/sankalpa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        if (result) {
+          result.className = 'sk-result is-error';
+          result.textContent = data?.error || 'Transmission failed. Try again.';
+        }
+        return;
+      }
+      if (result) {
+        result.className = 'sk-result is-success';
+        result.innerHTML = `<strong>Sa\u1e45kalpa received.</strong> ${data.message || ''}<br/><span class="sk-result__id">reference: ${data.id || '\u2014'}</span>`;
+      }
+      form.reset();
+      reflect();
+    } catch {
+      if (result) {
+        result.className = 'sk-result is-error';
+        result.textContent = 'Network unavailable. Try again in a moment.';
+      }
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('is-loading');
+    }
+  });
 }
 closePanel() {
 this.panel.classList.remove('open');

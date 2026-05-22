@@ -92,8 +92,12 @@ export class ScrollJourney {
     this.snapped = false;
   }
 
+  private isPaused(): boolean {
+    return typeof document !== 'undefined' && document.body.classList.contains('vyan-paused');
+  }
+
   private onWheel = (e: WheelEvent) => {
-    if (!this.enabled) return;
+    if (!this.enabled || this.isPaused()) return;
     e.preventDefault();
     const now = performance.now();
 
@@ -125,7 +129,7 @@ export class ScrollJourney {
   };
 
   private onTouchStart = (e: TouchEvent) => {
-    if (!this.enabled) return;
+    if (!this.enabled || this.isPaused()) return;
     this.touchStartY = e.touches[0]?.clientY ?? 0;
     this.touchPrevY = this.touchStartY;
     this.touchAccum = 0;
@@ -133,7 +137,7 @@ export class ScrollJourney {
   };
 
   private onTouchMove = (e: TouchEvent) => {
-    if (!this.enabled) return;
+    if (!this.enabled || this.isPaused()) return;
     e.preventDefault();
     const y = e.touches[0]?.clientY ?? 0;
     const dy = this.touchPrevY - y;

@@ -1,195 +1,140 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import React, { useEffect, useRef, useState } from 'react';
 import './soundconsole.css';
 
-type Preset = 'void' | 'gateway' | 'medha';
-type Settings = {
-  volume: number;       // 0..1
-  bass: number;         // -8..+8 dB
-  treble: number;       // -8..+8 dB
-  reverb: boolean;
-  lowpass: boolean;
-  lowpassHz: number;    // 200..18000
-  speed: number;        // 0.85..1.15
-  pulseSync: boolean;
-};
+// ============================================================
+// VYAN — Acoustic Console (unified, modern, futuristic).
+// One single console contains: power toggle, master amplitude,
+// atmospheric resonance, transmission active indicator. Replaces
+// the old "SOUND OFF" + Acoustic Logic panel duplication.
+// ============================================================
 
-const DEFAULT_SETTINGS: Settings = {
-  volume: 0.85,
-  bass: 0,
-  treble: 0,
-  reverb: false,
-  lowpass: false,
-  lowpassHz: 1800,
-  speed: 1.0,
-  pulseSync: false,
-};
-
-const PRESETS: Record<Preset, Partial<Settings>> = {
-  void:    { bass: 3,  treble: -2, reverb: true,  lowpass: false, speed: 0.95, pulseSync: false },
-  gateway: { bass: 5,  treble: 2,  reverb: false, lowpass: false, speed: 1.0,  pulseSync: true  },
-  medha:   { bass: 1,  treble: -1, reverb: true,  lowpass: true,  lowpassHz: 2400, speed: 0.9, pulseSync: false },
-};
+const KEY_ON = 'vyan.sound.on';
+const KEY_VOL = 'vyan.sound.vol';
+const KEY_RES = 'vyan.sound.res';
 
 export default function SoundConsole() {
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [s, setS] = useState<Settings>(DEFAULT_SETTINGS);
-  const [activePreset, setActivePreset] = useState<Preset | null>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [on, setOn] = useState(false);
+  const [vol, setVol] = useState(0.5);
+  const [resonance, setResonance] = useState(0.35);
+  const [tx, setTx] = useState(false);
+  const consoleRef = useRef<HTMLDivElement | null>(null);
 
-  // Hide on /medha (the cockpit already controls audio mood).
-  const visible = !pathname?.startsWith('/medha');
-
-  const applyToAudioEngine = useCallback((settings: Settings) => {
-    const w: any = typeof window !== 'undefined' ? (window as any) : null;
-    const audio = w?.__vyan?.audio;
-    if (!audio) return;
+  useEffect(() => {
     try {
-      audio.applyConsole?.(settings);
+      const o = localStorage.getItem(KEY_ON);
+      const v = localStorage.getItem(KEY_VOL);
+      const r = localStorage.getItem(KEY_RES);
+      if (o) setOn(o === '1');
+      if (v) setVol(Math.max(0, Math.min(1, parseFloat(v))));
+      if (r) setResonance(Math.max(0, Math.min(1, parseFloat(r))));
     } catch {}
   }, []);
+  useEffect(() => { try { localStorage.setItem(KEY_ON, on ? '1' : '0'); window.dispatchEvent(new CustomEvent('vyan:sound', { detail: { on, vol, resonance } })); } catch {} }, [on, vol, resonance]);
+  useEffect(() => { try { localStorage.setItem(KEY_VOL, String(vol)); } catch {} }, [vol]);
+  useEffect(() => { try { localStorage.setItem(KEY_RES, String(resonance)); } catch {} }, [resonance]);
 
-  // Push changes whenever settings change.
+  // Simulated transmission indicator (flickers when on + vol)
   useEffect(() => {
-    applyToAudioEngine(s);
-  }, [s, applyToAudioEngine]);
+    if (!on) { setTx(false); return; }
+    const id = setInterval(() => setTx(Math.random() > 0.4), 1100);
+    return () => clearInterval(id);
+  }, [on]);
 
-  const update = (patch: Partial<Settings>) => setS((prev) => ({ ...prev, ...patch }));
-  const applyPreset = (p: Preset) => {
-    setActivePreset(p);
-    setS((prev) => ({ ...prev, ...PRESETS[p] }));
-  };
-  const reset = () => {
-    setActivePreset(null);
-    setS(DEFAULT_SETTINGS);
-  };
-
-  if (!mounted || !visible) return null;
+  // Click-outside-close
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: PointerEvent) => {
+      if (!consoleRef.current) return;
+      if (!consoleRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDoc, { capture: true });
+    return () => document.removeEventListener('pointerdown', onDoc, { capture: true } as any);
+  }, [open]);
 
   return (
-    <div className="sc-root">
-      <button
-        type="button"
-        className={`sc-trigger ${open ? 'is-open' : ''}`}
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Sound Console"
-        title="Sound Console"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 10v4" />
-          <path d="M7 6v12" />
-          <path d="M11 9v6" />
-          <path d="M15 4v16" />
-          <path d="M19 8v8" />
-        </svg>
+    <div className={`vac-root ${open ? 'is-open' : ''} ${on ? 'is-on' : ''}`} ref={consoleRef}>
+      {/* Trigger badge (top-left, always visible). Replaces the old SOUND OFF button. */}
+      <button type="button" className="vac-trigger" onClick={() => setOpen(v => !v)} aria-label="Acoustic Console">
+        <span className="vac-trigger__wave">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <span key={i} className="vac-trigger__bar" style={{ ['--i' as any]: i }} />
+          ))}
+        </span>
+        <span className="vac-trigger__label">acoustic</span>
+        <span className={`vac-trigger__dot ${on ? 'is-on' : ''}`} />
       </button>
 
-      {open && (
-        <div className="sc-panel" role="dialog">
-          <header className="sc-panel__head">
-            <div className="sc-panel__title">SOUND CONSOLE</div>
-            <button type="button" className="sc-panel__close" onClick={() => setOpen(false)}>×</button>
-          </header>
-
-          <div className="sc-presets">
-            {(['void','gateway','medha'] as Preset[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                className={`sc-preset ${activePreset === p ? 'is-active' : ''}`}
-                onClick={() => applyPreset(p)}
-              >
-                {p.toUpperCase()}
-              </button>
-            ))}
-            <button type="button" className="sc-preset sc-preset--reset" onClick={reset}>RESET</button>
+      {/* The console panel */}
+      <div className="vac-panel" role="dialog" aria-label="Acoustic Console">
+        <header className="vac-panel__head">
+          <div className="vac-panel__title">
+            <span className="vac-panel__glyph">✵</span>
+            <span>Acoustic Console</span>
           </div>
+          <button className="vac-panel__close" onClick={() => setOpen(false)} aria-label="close">✕</button>
+        </header>
 
-          <Slider
-            label="Volume" hint={`${Math.round(s.volume * 100)}%`}
-            min={0} max={1} step={0.01} value={s.volume}
-            onChange={(v) => update({ volume: v })}
-          />
-          <Slider
-            label="Bass" hint={`${s.bass.toFixed(1)} dB`}
-            min={-8} max={8} step={0.5} value={s.bass}
-            onChange={(v) => update({ bass: v })}
-          />
-          <Slider
-            label="Treble" hint={`${s.treble.toFixed(1)} dB`}
-            min={-8} max={8} step={0.5} value={s.treble}
-            onChange={(v) => update({ treble: v })}
-          />
-          <Slider
-            label="Playback Speed" hint={`${s.speed.toFixed(2)}×`}
-            min={0.85} max={1.15} step={0.01} value={s.speed}
-            onChange={(v) => update({ speed: v })}
-          />
+        {/* Power */}
+        <section className="vac-row vac-row--power">
+          <div className="vac-row__label">
+            <span className="vac-row__k">Resonant Field</span>
+            <span className="vac-row__sub">{on ? 'engaged' : 'dormant'}</span>
+          </div>
+          <button type="button" className={`vac-power ${on ? 'is-on' : ''}`} onClick={() => setOn(v => !v)} aria-pressed={on}>
+            <span className="vac-power__core" />
+            <span className="vac-power__ring" />
+            <span className="vac-power__lbl">{on ? 'On' : 'Off'}</span>
+          </button>
+        </section>
 
-          <Toggle
-            label="Cosmic Reverb"
-            checked={s.reverb}
-            onChange={(v) => update({ reverb: v })}
-          />
-          <Toggle
-            label="Submerge (Low-Pass)"
-            checked={s.lowpass}
-            onChange={(v) => update({ lowpass: v })}
-          />
-          {s.lowpass && (
-            <Slider
-              label="Cutoff" hint={`${Math.round(s.lowpassHz)} Hz`}
-              min={300} max={18000} step={100} value={s.lowpassHz}
-              onChange={(v) => update({ lowpassHz: v })}
-            />
-          )}
-          <Toggle
-            label="Pulse-Sync (bass reactive)"
-            checked={s.pulseSync}
-            onChange={(v) => update({ pulseSync: v })}
-          />
+        {/* Master amplitude */}
+        <section className="vac-row">
+          <div className="vac-row__label">
+            <span className="vac-row__k">Master Amplitude</span>
+            <span className="vac-row__v">{Math.round(vol * 100)}</span>
+          </div>
+          <div className="vac-slider">
+            <input type="range" min={0} max={1} step={0.01} value={vol}
+                   onChange={(e) => setVol(parseFloat(e.target.value))}
+                   disabled={!on} aria-label="Master amplitude" />
+            <div className="vac-slider__fill" style={{ width: `${vol * 100}%` }} />
+          </div>
+        </section>
 
-          <footer className="sc-panel__foot">VYAN · Audio Layer</footer>
-        </div>
-      )}
+        {/* Atmospheric resonance */}
+        <section className="vac-row">
+          <div className="vac-row__label">
+            <span className="vac-row__k">Atmospheric Resonance</span>
+            <span className="vac-row__v">{Math.round(resonance * 100)}</span>
+          </div>
+          <div className="vac-slider">
+            <input type="range" min={0} max={1} step={0.01} value={resonance}
+                   onChange={(e) => setResonance(parseFloat(e.target.value))}
+                   disabled={!on} aria-label="Atmospheric resonance" />
+            <div className="vac-slider__fill" style={{ width: `${resonance * 100}%` }} />
+          </div>
+        </section>
+
+        {/* Transmission */}
+        <section className="vac-row vac-row--tx">
+          <div className="vac-row__label">
+            <span className="vac-row__k">Transmission</span>
+            <span className="vac-row__sub">{on ? (tx ? 'streaming' : 'idle') : 'silent'}</span>
+          </div>
+          <div className="vac-tx-vis">
+            {Array.from({ length: 18 }).map((_, i) => (
+              <span key={i} className={`vac-tx-bar ${tx ? 'is-pulse' : ''}`} style={{ ['--i' as any]: i, ['--amp' as any]: on ? vol : 0 }} />
+            ))}
+          </div>
+        </section>
+
+        <footer className="vac-panel__foot">
+          <span>Web Audio API · zero external streams</span>
+        </footer>
+      </div>
     </div>
-  );
-}
-
-function Slider({
-  label, hint, min, max, step, value, onChange,
-}: { label: string; hint: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void }) {
-  return (
-    <label className="sc-row">
-      <span className="sc-row__label">{label}<em>{hint}</em></span>
-      <input
-        type="range"
-        min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="sc-slider"
-      />
-    </label>
-  );
-}
-
-function Toggle({
-  label, checked, onChange,
-}: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="sc-row sc-row--toggle">
-      <span className="sc-row__label">{label}</span>
-      <button
-        type="button"
-        className={`sc-toggle ${checked ? 'is-on' : ''}`}
-        onClick={() => onChange(!checked)}
-        aria-pressed={checked}
-      >
-        <span className="sc-toggle__thumb" />
-      </button>
-    </label>
   );
 }

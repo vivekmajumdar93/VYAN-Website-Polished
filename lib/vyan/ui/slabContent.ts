@@ -7,12 +7,12 @@
 export const SLAB_UDBHAVA_HTML = /* html */ `
 <div class="vy-slab">
   <header class="vy-slab__hero">
-    <div class="vy-slab__brand">VYAN Labs</div>
+    <div class="vy-slab__brand">VYAN</div>
     <div class="vy-slab__tag">A Boutique Studio for Cognitive Solutions</div>
   </header>
 
   <p class="vy-p">
-    VYAN Labs exists at the intersection of human behavior, operational intelligence,
+    VYAN exists at the intersection of human behavior, operational intelligence,
     and adaptive technology. We build bespoke cognitive systems designed to integrate
     seamlessly into the lives, workflows, and ambitions of modern individuals and
     organizations.
@@ -31,7 +31,7 @@ export const SLAB_UDBHAVA_HTML = /* html */ `
 
   <p class="vy-p">
     Most digital platforms force humans to adapt to predefined structures.
-    VYAN Labs operates on the opposite philosophy:
+    VYAN operates on the opposite philosophy:
   </p>
 
   <blockquote class="vy-quote">
@@ -47,7 +47,7 @@ export const SLAB_UDBHAVA_HTML = /* html */ `
   </p>
 
   <h3 class="vy-h3">What We Build</h3>
-  <p class="vy-p">VYAN Labs develops highly customized cognitive ecosystems including:</p>
+  <p class="vy-p">VYAN develops highly customized cognitive ecosystems including:</p>
   <ul class="vy-list">
     <li>Adaptive AI-powered operational systems</li>
     <li>Intelligent dashboards and analytics environments</li>
@@ -78,7 +78,7 @@ export const SLAB_UDBHAVA_HTML = /* html */ `
   </p>
 
   <h3 class="vy-h3">The VYAN Approach</h3>
-  <p class="vy-p">VYAN Labs combines:</p>
+  <p class="vy-p">VYAN combines:</p>
   <ul class="vy-list">
     <li>Strategic business thinking</li>
     <li>Behavioral analysis</li>
@@ -105,7 +105,7 @@ export const SLAB_UDBHAVA_HTML = /* html */ `
   </blockquote>
 
   <footer class="vy-slab__foot">
-    <div class="vy-slab__sig">VYAN Labs™</div>
+    <div class="vy-slab__sig">VYAN™</div>
     <div class="vy-slab__sigsub">Engineered for Cognitive Intelligence.</div>
   </footer>
 </div>
@@ -131,7 +131,7 @@ export const SLAB_SANDHI_HTML = /* html */ `
         </div>
       </div>
       <div class="vy-card__role">General Queries</div>
-      <a class="vy-card__mail" href="mailto:reachus@vyanlabs.com">reachus@vyanlabs.com</a>
+      <a class="vy-card__mail" href="mailto:reachus@vyan.dev">reachus@vyan.dev</a>
     </article>
 
     <article class="vy-card vy-card--hue-2" data-status="active">
@@ -143,7 +143,7 @@ export const SLAB_SANDHI_HTML = /* html */ `
         </div>
       </div>
       <div class="vy-card__role">Technical Support</div>
-      <a class="vy-card__mail" href="mailto:need-support@vyanlabs.com">need-support@vyanlabs.com</a>
+      <a class="vy-card__mail" href="mailto:need-support@vyan.dev">need-support@vyan.dev</a>
     </article>
 
     <article class="vy-card vy-card--hue-3" data-status="active">
@@ -155,14 +155,14 @@ export const SLAB_SANDHI_HTML = /* html */ `
         </div>
       </div>
       <div class="vy-card__role">Administrative Governance</div>
-      <a class="vy-card__mail" href="mailto:admin@vyanlabs.com">admin@vyanlabs.com</a>
+      <a class="vy-card__mail" href="mailto:admin@vyan.dev">admin@vyan.dev</a>
     </article>
 
     <article class="vy-card vy-card--hue-4 vy-card--brand" data-status="active" data-auto-status="true">
       <img class="vy-card__logo" src="/logo.png" alt="VYAN" />
-      <div class="vy-card__brandname">VYAN Labs</div>
+      <div class="vy-card__brandname">VYAN</div>
       <div class="vy-card__brandtag">Architecting the Liquid Infinite</div>
-      <a class="vy-card__site" href="https://vyanlabs.com" target="_blank" rel="noopener">vyanlabs.com</a>
+      <a class="vy-card__site" href="https://vyan.dev" target="_blank" rel="noopener">vyan.dev</a>
       <div class="vy-card__pill vy-card__pill--bottom">
         <span class="vy-card__dot"></span>
         <span class="vy-card__pill-label">System Online</span>
@@ -172,69 +172,88 @@ export const SLAB_SANDHI_HTML = /* html */ `
 </div>
 `;
 
-// Saṅkalpa — the Intention orb. Where users place orders / engage to onboard onto
-// a VYAN product. The slab is a clean, conversion-oriented panel — request demo,
-// reserve access, learn more about each Vistāra product.
+// Saṅkalpa — Intention orb. A REAL functional product-request form
+// wired to /api/sankalpa (Mongo + SMTP linking-ready).
 export const SLAB_SANKALPA_HTML = /* html */ `
 <div class="vy-slab vy-slab--sankalpa">
-  <header class="vy-slab__hero vy-slab__hero--center">
-    <div class="vy-slab__brand">SAṄKALPA</div>
-    <div class="vy-slab__tag">Where Cognition Becomes Commerce</div>
-  </header>
-
   <p class="vy-p">
-    Saṅkalpa is the seam between <em>intention</em> and <em>arrival</em>. When a Vistāra
-    product calls to you, this is where you cross the threshold — reserve access,
-    request a private demo, or begin onboarding into the VYAN cognitive lattice.
+    Saṅkalpa is the seam between <em>intention</em> and <em>arrival</em>. Cross it deliberately —
+    tell VYAN what you are building, in what shape, by when. We will respond with whether
+    the cognition you require can be delivered within your window.
   </p>
 
-  <h3 class="vy-h3">Place Your Intention</h3>
-  <p class="vy-p">Three pathways. Pick the one that matches your readiness.</p>
+  <form id="sankalpa-form" class="sk-form" novalidate autocomplete="on" data-vyan-form="sankalpa">
+    <div class="sk-row sk-row--toggle">
+      <label class="sk-toggle"><input type="radio" name="type" value="individual" checked /> <span>Individual</span></label>
+      <label class="sk-toggle"><input type="radio" name="type" value="enterprise" /> <span>Enterprise</span></label>
+    </div>
 
-  <div class="vy-card-grid vy-card-grid--sankalpa">
-    <article class="vy-card vy-card--hue-1">
-      <div class="vy-card__name">Pratyaya · Reserve Access</div>
-      <div class="vy-card__role">Early Cohort · Private Beta</div>
-      <p class="vy-p" style="font-size:13px; opacity:0.78; margin-bottom:14px;">
-        For organizations ready to onboard a Vistāra product into live operations.
-        Limited concurrent installations.
-      </p>
-      <a class="vy-card__mail" href="mailto:reserve@vyanlabs.com?subject=Sa%E1%B9%85kalpa%20%E2%80%94%20Reserve%20Access">reserve@vyanlabs.com</a>
-    </article>
+    <div class="sk-grid">
+      <label class="sk-field">
+        <span class="sk-k">Your Name <em>*</em></span>
+        <input type="text" name="name" required maxlength="120" placeholder="e.g. Ananya Rao" />
+      </label>
+      <label class="sk-field">
+        <span class="sk-k">Email <em>*</em></span>
+        <input type="email" name="email" required maxlength="240" placeholder="you@domain.com" />
+      </label>
+      <label class="sk-field sk-field--enterprise">
+        <span class="sk-k">Company <em data-only="enterprise">*</em></span>
+        <input type="text" name="company" maxlength="200" placeholder="Organization name" />
+      </label>
+      <label class="sk-field">
+        <span class="sk-k">Role / Title</span>
+        <input type="text" name="role" maxlength="120" placeholder="Founder, CTO, etc." />
+      </label>
+      <label class="sk-field">
+        <span class="sk-k">Phone (optional)</span>
+        <input type="tel" name="phone" maxlength="40" placeholder="optional" />
+      </label>
+    </div>
 
-    <article class="vy-card vy-card--hue-2">
-      <div class="vy-card__name">Darśana · Request Demo</div>
-      <div class="vy-card__role">Live Walkthrough · 45 min</div>
-      <p class="vy-p" style="font-size:13px; opacity:0.78; margin-bottom:14px;">
-        A curated private session — VYAN's lead cognition architect walks you
-        through any of the seven Vistāra orbs in your own context.
-      </p>
-      <a class="vy-card__mail" href="mailto:darshana@vyanlabs.com?subject=Sa%E1%B9%85kalpa%20%E2%80%94%20Request%20Demo">darshana@vyanlabs.com</a>
-    </article>
+    <fieldset class="sk-fieldset">
+      <legend class="sk-k">Your Intent <em>*</em></legend>
+      <label class="sk-radio"><input type="radio" name="productIntent" value="existing_as_is" checked /> <span><strong>Adopt an existing VYAN product as-is.</strong> I want what is already manifest.</span></label>
+      <label class="sk-radio"><input type="radio" name="productIntent" value="modify_combination" /> <span><strong>Modify a single product, or combine several.</strong> I need a tailored stack.</span></label>
+      <label class="sk-radio"><input type="radio" name="productIntent" value="fresh_other" /> <span><strong>Build something altogether new (Fresh / Other).</strong> My idea is not yet in your constellation.</span></label>
+    </fieldset>
 
-    <article class="vy-card vy-card--hue-3">
-      <div class="vy-card__name">Anuvāda · Custom Cognition</div>
-      <div class="vy-card__role">Bespoke Build · By Application</div>
-      <p class="vy-p" style="font-size:13px; opacity:0.78; margin-bottom:14px;">
-        For ambitions not yet represented in the Vistāra constellation —
-        a private cognitive system architected solely around your domain.
-      </p>
-      <a class="vy-card__mail" href="mailto:anuvada@vyanlabs.com?subject=Sa%E1%B9%85kalpa%20%E2%80%94%20Custom%20Cognition">anuvada@vyanlabs.com</a>
-    </article>
-
-    <article class="vy-card vy-card--hue-4 vy-card--brand">
-      <img class="vy-card__logo" src="/logo.png" alt="VYAN" />
-      <div class="vy-card__brandname">VYAN Labs</div>
-      <div class="vy-card__brandtag">Architecting the Liquid Infinite</div>
-      <p class="vy-p" style="font-size:12px; opacity:0.7; margin: 14px 0;">
-        Every Saṅkalpa transmission is read by a human — usually within one
-        Earth-rotation. No marketing funnels. Just real responses.
-      </p>
-      <div class="vy-card__pill vy-card__pill--bottom">
-        <span class="vy-card__dot"></span>
-        <span class="vy-card__pill-label">Cognition Online</span>
+    <div class="sk-products" data-show-on="modify_combination">
+      <span class="sk-k">Which products interest you?</span>
+      <div class="sk-checks">
+        <label><input type="checkbox" name="productsOfInterest" value="ritam" /> <span>VYAN Ṛtam</span></label>
+        <label><input type="checkbox" name="productsOfInterest" value="ojas" /> <span>VYAN Ojas</span></label>
+        <label><input type="checkbox" name="productsOfInterest" value="mudra" /> <span>VYAN Mudrā</span></label>
+        <label><input type="checkbox" name="productsOfInterest" value="netra" /> <span>VYAN Netra</span></label>
+        <label><input type="checkbox" name="productsOfInterest" value="akriti" /> <span>VYAN Ākṛti</span></label>
+        <label><input type="checkbox" name="productsOfInterest" value="sutra" /> <span>VYAN Sūtra</span></label>
       </div>
-    </article>
-  </div>
+    </div>
+
+    <label class="sk-field">
+      <span class="sk-k">Usage Requirements <em>*</em></span>
+      <textarea name="usageRequirements" rows="4" required minlength="12" maxlength="4000"
+        placeholder="Describe how you intend to use the product(s) — the problem you are solving, the users you are serving, the outcome you want."></textarea>
+    </label>
+
+    <label class="sk-field">
+      <span class="sk-k">Requested Timeline <em>*</em></span>
+      <input type="text" name="desiredTimeline" required maxlength="200" placeholder="e.g. by Q4 2026, within 6 weeks, etc." />
+      <span class="sk-help">VYAN will review and respond with whether delivery is feasible within your window.</span>
+    </label>
+
+    <label class="sk-field">
+      <span class="sk-k">How did you find VYAN?</span>
+      <input type="text" name="hearAboutUs" maxlength="200" placeholder="optional" />
+    </label>
+
+    <div class="sk-actions">
+      <button type="submit" class="sk-submit">
+        <span class="sk-submit__lbl">Transmit Saṅkalpa</span>
+        <span class="sk-submit__spinner" aria-hidden="true"></span>
+      </button>
+    </div>
+    <div class="sk-result" role="status" aria-live="polite"></div>
+  </form>
 </div>
 `;

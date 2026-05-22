@@ -36,7 +36,21 @@ export default function MedhaCanvasOrb({ hue, intensity = 1, className }: Props)
     };
     window.addEventListener('resize', onResize, { passive: true });
 
-    let baseScale = Math.max(w, h) * 0.30 / 520;
+    // PREMIUM PALETTE — Amethyst → Pearl → Cyan-Mint.
+    // A trinity wisp of consciousness, not blood.
+    // Values: [R, G, B, peakR, peakG, peakB] picked for ethereal cosmic feel.
+    const palette = {
+      ribbonR: 198, ribbonG: 178, ribbonB: 255,  // amethyst pearl
+      ribbonPeakR: 230, ribbonPeakG: 220, ribbonPeakB: 255,
+      ribbonSecR: 140, ribbonSecG: 220, ribbonSecB: 215, // mint accent
+      bodyR: 200, bodyG: 180, bodyB: 255,
+      hairR: 220, hairG: 200, hairB: 255,
+      faceR: 230, faceG: 220, faceB: 255,
+      eyeR: 200, eyeG: 240, eyeB: 255,
+    };
+
+    // 35% smaller than before per user feedback (#10).
+    let baseScale = Math.max(w, h) * 0.30 / 520 * 0.65;
 
     const smoothNoise = (t: number, seed: number, frequency = 0.001, amplitude = 1) =>
       Math.sin(t * frequency + seed) * amplitude;
@@ -90,17 +104,12 @@ export default function MedhaCanvasOrb({ hue, intensity = 1, className }: Props)
       ctx.translate(orbX, orbY + floatPulse);
       ctx.scale(baseScale, baseScale);
 
-      // Aura glow
-      const aura = ctx.createRadialGradient(0, 0, 20, 0, 0, 260);
-      aura.addColorStop(0, `rgba(220,40,40,${0.25 * intensity})`);
-      aura.addColorStop(0.4, `rgba(180,20,20,${0.15 * intensity})`);
-      aura.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = aura;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 180, 260, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // NO aura — removed per user request (#10). The ethereal manifestation
+      // stands clean against the void; only the ribbons + body + hair speak.
+      // (was: an elliptical red radial gradient drawn here.)
+      void intensity;
 
-      // Ribbons
+      // Ribbons — amethyst pearl with mint highlights
       ctx.globalCompositeOperation = 'screen';
       ctx.shadowBlur = 0;
       for (const r of ribbons) {
@@ -116,14 +125,19 @@ export default function MedhaCanvasOrb({ hue, intensity = 1, className }: Props)
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.lineWidth = r.width;
-        ctx.strokeStyle = `rgba(${r.rComp},20,20,${r.alpha * intensity})`;
+        // Subtle hue shift per ribbon — some amethyst-pearl, some mint
+        const useAccent = (r.rComp % 3 === 0);
+        const rr = useAccent ? palette.ribbonSecR : palette.ribbonR;
+        const gg = useAccent ? palette.ribbonSecG : palette.ribbonG;
+        const bb = useAccent ? palette.ribbonSecB : palette.ribbonB;
+        ctx.strokeStyle = `rgba(${rr},${gg},${bb},${r.alpha * intensity})`;
         ctx.stroke();
       }
 
-      // Body
+      // Body — amethyst gradient (no aura behind, just the form)
       const body = ctx.createLinearGradient(0, -260, 0, 320);
-      body.addColorStop(0, `rgba(180,50,50,${0.08 * intensity})`);
-      body.addColorStop(0.4, `rgba(200,60,60,${0.15 * intensity})`);
+      body.addColorStop(0, `rgba(${palette.bodyR},${palette.bodyG},${palette.bodyB},${0.07 * intensity})`);
+      body.addColorStop(0.4, `rgba(${palette.bodyR},${palette.bodyG},${palette.bodyB},${0.14 * intensity})`);
       body.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = body;
@@ -140,7 +154,7 @@ export default function MedhaCanvasOrb({ hue, intensity = 1, className }: Props)
       ctx.closePath();
       ctx.fill();
 
-      // Hair
+      // Hair — amethyst pearl strands
       ctx.globalCompositeOperation = 'lighter';
       for (const h2 of hairs) {
         ctx.beginPath();
@@ -151,22 +165,22 @@ export default function MedhaCanvasOrb({ hue, intensity = 1, className }: Props)
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.lineWidth = 1.2;
-        ctx.strokeStyle = `rgba(230,80,80,${h2.alpha * intensity})`;
+        ctx.strokeStyle = `rgba(${palette.hairR},${palette.hairG},${palette.hairB},${h2.alpha * intensity})`;
         ctx.stroke();
       }
 
-      // Face
+      // Face — soft pearl glow (no harsh red shadow)
       ctx.globalCompositeOperation = 'source-over';
       const face = ctx.createRadialGradient(0, -185, 2, 0, -185, 42);
-      face.addColorStop(0, `rgba(150,50,50,${0.25 * intensity})`);
+      face.addColorStop(0, `rgba(${palette.faceR},${palette.faceG},${palette.faceB},${0.22 * intensity})`);
       face.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = face;
       ctx.beginPath();
       ctx.ellipse(0, -185, 32, 46, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Eyes
-      ctx.fillStyle = `rgba(255,80,80,${0.35 * intensity})`;
+      // Eyes — cyan-pearl
+      ctx.fillStyle = `rgba(${palette.eyeR},${palette.eyeG},${palette.eyeB},${0.55 * intensity})`;
       ctx.beginPath();
       ctx.ellipse(-10, -188, 2, 1, 0, 0, Math.PI * 2);
       ctx.fill();

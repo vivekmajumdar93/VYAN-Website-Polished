@@ -126,7 +126,7 @@ export function isForbiddenQuery(prompt: string): boolean {
 export const SANDHI_REDIRECT_MARKDOWN =
   'That question lives **beyond Medhā’s cognitive surface** — it touches the inner architecture of VYAN.\n\n' +
   'Walk to the **Sandhi** orb (the Communiqué of VYAN) and reach out directly. Real humans, real answers.\n\n' +
-  '- **General queries** — reachus@vyanlabs.com\n' +
-  '- **Technical support** — need-support@vyanlabs.com\n' +
-  '- **Administrative governance** — admin@vyanlabs.com\n\n' +
+  '- **General queries** — reachus@vyan.dev\n' +
+  '- **Technical support** — need-support@vyan.dev\n' +
+  '- **Administrative governance** — admin@vyan.dev\n\n' +
   '_I will gladly resume conversations on cognition, ideas, philosophy, life, science, language — anything that does not require lifting the veil of VYAN’s internals._';

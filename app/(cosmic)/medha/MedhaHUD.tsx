@@ -10,6 +10,7 @@ import {
   type StoredChat, type StoredMsg,
 } from '@/lib/medha/storage';
 import { STT, TTS } from '@/lib/medha/voice';
+import { incrementQuota, quotaRemaining, getUser, setUser, quotaLimit, type LocalUser } from '@/lib/quota/quota';
 import MedhaCanvasOrb from './MedhaCanvasOrb';
 import './medha.css';
 
@@ -60,6 +61,12 @@ export default function MedhaHUD() {
   const [speaking, setSpeaking] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [chats, setChats] = useState<StoredChat[]>([]);
+  const [quotaUser, setQuotaUser] = useState<LocalUser | null>(null);
+  const [showQuotaLock, setShowQuotaLock] = useState(false);
+  const [regBusy, setRegBusy] = useState(false);
+  const [regErr, setRegErr] = useState('');
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const sttRef = useRef<STT | null>(null);
@@ -71,6 +78,7 @@ export default function MedhaHUD() {
   const modeDef = useMemo(() => getMode(mode), [mode]);
 
   // ---- Bootstrap ---------------------------------------------
+  useEffect(() => { setQuotaUser(getUser()); }, []);
   useEffect(() => {
     sttRef.current = new STT();
     ttsRef.current = new TTS();
@@ -98,7 +106,7 @@ export default function MedhaHUD() {
         createdAt: Date.now(), lastInteractionAt: Date.now(), topic: prev?.topic,
       });
     }
-    // Clear leftover fade overlay from portal transition
+    // Clear leftover fade overlay from portal transition + PAUSE the world
     try {
       document.querySelectorAll('[data-vyan-fade="1"]').forEach((el) => {
         (el as HTMLElement).style.transition = 'opacity 0.7s ease-out';
@@ -107,10 +115,22 @@ export default function MedhaHUD() {
       });
       const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
       if (ui) { ui.style.opacity = '0'; ui.style.pointerEvents = 'none'; }
+      const canvas = document.querySelector('canvas[data-vyan-canvas]') as HTMLElement | null;
+      if (canvas) canvas.style.opacity = '0';
+      // Freeze the cosmic world's scroll/swipe handlers — these are window-level
+      // listeners that would otherwise eat the user's scroll while in /medha
+      // and leave the camera in a broken state when they navigate back.
+      document.body.classList.add('vyan-paused');
     } catch {}
     return () => {
       const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
       if (ui) { ui.style.opacity = '1'; ui.style.pointerEvents = 'auto'; }
+      const canvas = document.querySelector('canvas[data-vyan-canvas]') as HTMLElement | null;
+      if (canvas) canvas.style.opacity = '1';
+      document.body.classList.remove('vyan-paused');
+      // Force a one-time scroll reset event so the World re-syncs to the
+      // current activeIndex (prevents the "stuck at Medhā" bug when returning).
+      window.dispatchEvent(new CustomEvent('vyan:resume'));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -173,6 +193,23 @@ export default function MedhaHUD() {
   const send = useCallback(async () => {
     const text = composerText.trim();
     if (!text || busy) return;
+
+    // ---- QUOTA GATE (item 11) ---------------------------------
+    // Anonymous visitors get 15 conversations with Medhā. After that they
+    // must register with VYAN to unlock full cognition.
+    if (!quotaUser && !getUser()) {
+      const remaining = quotaRemaining('medha');
+      if (remaining <= 0) {
+        setShowQuotaLock(true);
+        return;
+      }
+      const inc = incrementQuota('medha');
+      if (!inc.ok) {
+        setShowQuotaLock(true);
+        return;
+      }
+    }
+
     setComposerText('');
     const userMsg: StoredMsg = { id: uid(), role: 'user', content: text, mode, ts: Date.now() };
     setMessages(prev => [...prev, userMsg]);
@@ -212,7 +249,31 @@ export default function MedhaHUD() {
     } finally {
       setBusy(false);
     }
-  }, [composerText, busy, mode, modeDef, ttsEnabled]);
+  }, [composerText, busy, mode, modeDef, ttsEnabled, quotaUser]);
+
+  // Register with VYAN — unlock full Medhā access.
+  const submitRegistration = useCallback(async () => {
+    if (!regEmail.trim() || regBusy) return;
+    setRegBusy(true);
+    setRegErr('');
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: regName, email: regEmail, intent: 'medha-unlock' }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { setRegErr(data?.error || 'Registration failed.'); return; }
+      const u: LocalUser = data.user || { email: regEmail, name: regName, registeredAt: Date.now(), verified: false };
+      setUser(u);
+      setQuotaUser(u);
+      setShowQuotaLock(false);
+      setRegName(''); setRegEmail('');
+    } catch {
+      setRegErr('Network unavailable.');
+    } finally {
+      setRegBusy(false);
+    }
+  }, [regName, regEmail, regBusy]);
 
   const onComposerKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
@@ -501,6 +562,36 @@ export default function MedhaHUD() {
           </div>
         </div>
       )}
+      {showQuotaLock && (
+        <div className="medha-quota-lock" role="dialog" aria-modal="true">
+          <div className="medha-quota-lock__card">
+            <div className="medha-quota-lock__kicker">Cognition Threshold</div>
+            <h2 className="medha-quota-lock__title">You have reached the visitor limit.</h2>
+            <p className="medha-quota-lock__p">
+              Medhā grants every wanderer <strong>{quotaLimit('medha')} conversations</strong> as a first taste.
+              You have arrived at the edge of that gift.
+            </p>
+            <p className="medha-quota-lock__p">
+              Register with VYAN to unlock the <strong>full cognitive lattice</strong> — unlimited
+              conversations, voice continuity, mind-switching, and access to the Vistāra products
+              waiting beyond this veil.
+            </p>
+            <div className="medha-quota-lock__form">
+              <input type="text" placeholder="Your name" value={regName} onChange={(e) => setRegName(e.target.value)} />
+              <input type="email" placeholder="you@domain.com" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} />
+              {regErr && <div className="medha-quota-lock__err">{regErr}</div>}
+              <button type="button" className="medha-quota-lock__cta" onClick={submitRegistration} disabled={regBusy || !regEmail.trim()}>
+                {regBusy ? 'Transmitting…' : 'Register with VYAN'}
+              </button>
+            </div>
+            <p className="medha-quota-lock__foot">
+              VYAN will send a verification to your address. Your conversations remain on your device.
+              No tracking — only continuity.
+            </p>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

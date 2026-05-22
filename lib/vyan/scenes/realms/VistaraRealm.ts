@@ -184,8 +184,8 @@ export class VistaraRealm {
       <div class="vy-slab vy-slab--product">
         <p class="vy-p">
           ${isPlaceholder
-            ? 'A future cognition orbits in dark wait. This branch of the <em>Vist\u0101ra Mandala</em> has not yet crystallised into the manifest layer of VYAN. <strong>Your application could live here.</strong> Tell us what you are building \u2014 the next orb in this constellation may very well be yours.'
-            : 'A bespoke cognitive product engineered by VYAN Labs, born from the unfurling of the <em>Vist\u0101ra Mandala</em>. The full manifestation arrives in the next phase \u2014 specifications, live demos and access tiers will fold in as this branch matures.'
+            ? 'A future cognition orbits in dark wait. This branch of the <em>Vist\u0101ra Mandala</em> has not yet crystallised into the manifest layer of VYAN. <strong>Your application could live here.</strong> Tell us what you are building \u2014 the next orb in this constellation may very well be yours. <a href="/shunya/sankalpa" class="vy-cta-link">\u279d Manifest your intention at Sa\u1e45kalpa</a>'
+            : 'A bespoke cognitive product engineered by VYAN, born from the unfurling of the <em>Vist\u0101ra Mandala</em>. The full manifestation arrives in the next phase \u2014 specifications, live demos and access tiers will fold in as this branch matures. <a href="/shunya/sankalpa" class="vy-cta-link">\u279d Place a Sa\u1e45kalpa request</a>'
           }
         </p>
         <div style="text-align:center; margin-top: 24px;">${status}</div>
