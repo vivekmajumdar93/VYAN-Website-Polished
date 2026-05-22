@@ -88,7 +88,103 @@ frontend:
 ## Agent Communications
 
   - agent: main
-    message: "Phase 1 complete. Loader → /vyoma transition verified via screenshot. HTTP 200 on both routes. Awaiting user approval to proceed to Phase 2 (Shunya void)."
+    message: |
+      MEGA-BATCH — Medhā 7-component interface, consent gate (MongoDB-deduped),
+      Nebula Footer, liquid copyright pill, strict scope-lock on Medhā prompts.
+
+      MEDHĀ CONSENT GATE (Item 4)
+      - New /api/consent (MongoDB-backed) with GET (?email=) and POST endpoints.
+      - Server-side dedupe: same email → existing id returned, marked deduped:true.
+      - Local localStorage flag (vyan.medha.consent) prevents re-asking on same device.
+      - Slab: name + email + phone (optional) + purpose + agree checkbox.
+      - Verified via curl: 1st POST creates, 2nd POST with same email dedupes, GET
+        confirms exists:true. Falls back to mock-success if MONGO_URL is empty.
+
+      STRICT 7-COMPONENT MEDHĀ HUD (Items 1, 2, 5)
+      - A: vertical right rail — now USER messages only (assistant dots removed).
+        Dot color uses the active mode hue (--mode-a) so user history glows in
+        the current cognition's palette.
+      - B: Sound console (global cosmic layout).
+      - C: Nāvika orb (global cosmic layout).
+      - D: NEW floating Settings orb (cosmic glyph + dashed orbit ring) bottom-left.
+        Opens a glass panel with the full Cognitive Mode picker (5 minds), TTS/STT
+        toggles, persistence info, conversations count, erase-all danger button.
+        Selecting a mode triggers the electrifying link visual to Medhā.
+      - E: Slim glass composer at bottom — 1000-char limit, live counter, auto-grows
+        to 3× height past 220 chars with internal scroll. "is-warn" coloring near
+        the limit.
+      - F: Shunya back button (preserved).
+      - G: Medhā living orb canvas (existing ribbon-wraith — see Item 6 note).
+      - Legacy left action rail HIDDEN via .mlv-rail--hidden — all actions
+        consolidated into the Settings orb so the screen stays clutter-free for
+        Medhā's movements (per spec).
+
+      MEDHĀ DIALOG = MOVABLE GLASS BOX (Item 1)
+      - Replaced the static center slab with .mlv-medha-dialog — a floating glass
+        box positioned at 58% viewport, floats with a 9s breathing animation, and
+        vanishes the instant the user begins typing (isTyping state hook).
+      - User messages never appear in this dialog — they're shown only when the
+        user hovers/clicks the corresponding rail dot.
+
+      ELECTRIFYING MODE-LINK VISUAL (Item 4 clarification)
+      - On every cognitive-mode switch, an SVG bolt zaps from the settings panel
+        across the screen to Medhā's center along a curved path. The bolt uses
+        the new mode's gradient. A jittery dashed "crackle" line runs alongside.
+        ~0.85s animation, re-keyed each pulse so it always restarts cleanly.
+      - Medhā's existing aura tint follows the --mode-a / --mode-b CSS variables
+        so her hue subtly shifts with the chosen mind.
+
+      MEDHĀ SCOPE LOCK (Item 5 last paragraph) — NON-NEGOTIABLE
+      - Added VYAN_SCOPE_RESTRICTION constant appended to all 5 mode prompts.
+      - Forbidden: code, file paths, frameworks, libraries, prompts, model ids,
+        DB schemas, infrastructure, deployment details, internal APIs, creds, API
+        keys, security mechanisms, Netra, business strategies, roadmap, financials,
+        partner names, employee details, competitors, AI provider technicals, etc.
+      - Allowed: VYAN brand, public ecosystem (Vyōma/Shunya/Vistāra/Medhā/Sandhi),
+        Vistāra product names (Vyan Ṛtam, Ojas, Mudrā, Netra, Ākṛti, Sūtra) at the
+        public-tagline level only, contacts (sandhi@vyan.dev, sankalpa@vyan.dev),
+        Saṅkalpa form, published legal pages.
+      - On refusal: warm one-sentence steer toward sandhi@vyan.dev. Never breaks
+        character, never acknowledges the lock exists, never paraphrases it.
+
+      NEBULA FOOTER + LIQUID COPYRIGHT PILL (Items 7, 8)
+      - New NebulaFooter component (fixed bottom 10vh, hidden on /medha).
+      - Diamond-dust speckled nebula background with hover-summon hover sensor
+        extending 60px above the band for forgiving activation.
+      - 7 dormant placeholder slabs: Privacy · Terms · Refund · Contact · Press
+        · Careers · Imprint. Hover-state crisps them up (opacity 0.25→1, blur 0,
+        rise 8px). Click opens a 65–70% glass panel with "Content awaits
+        manifestation" — ready for your content drops later.
+      - Liquid-glass copyright pill BELOW the slab row:
+          [© VYAN 2026]   ← pill with animated radial-gradient liquid motion
+                              (9s loop, three colored blobs drift + rotate +
+                              scale, mix-blend-mode: screen, backdrop-filter
+                              blur+saturate for true glassmorphism)
+          ALL RIGHTS RESERVED  ← plain caps text below.
+      - Mobile: pill shrinks to 100px wide, slabs become tap-friendly.
+
+      MEDHĀ ORB STYLE A — DOABILITY (Item 6)
+      - Current MedhaCanvasOrb renders a humanoid ribbon-wraith in amethyst /
+        pearl / cyan-mint — which already approximates the Crystalline Wraith
+        gif. Awaiting your verdict: KEEP this rendition, or do a focused rebuild
+        to add the horizontal wind-shear bands seen in the GIF.
+
+      Files touched:
+      - /app/app/(cosmic)/medha/MedhaHUD.tsx (consent gate, isTyping, electric link,
+        char counter, user-only dots, settings orb, settings panel mode picker)
+      - /app/app/(cosmic)/medha/MedhaConsentSlab.tsx (NEW)
+      - /app/app/(cosmic)/medha/medha.css (appended ~12kB of new selectors)
+      - /app/app/api/consent/route.ts (NEW — MongoDB dedupe)
+      - /app/app/(cosmic)/NebulaFooter.tsx (NEW)
+      - /app/app/(cosmic)/NebulaFooter.css (NEW)
+      - /app/app/(cosmic)/layout.tsx (mount NebulaFooter)
+      - /app/lib/medha/cognitive.ts (VYAN_SCOPE_RESTRICTION on all 5 modes)
+
+      Verified via Playwright: consent gate renders, fills correctly, opens Medhā
+      after grant. Curl-verified the consent dedupe end-to-end.
+
+  - agent: main
+    message: "Phase 1 complete. Loader → /vyoma transition verified via screenshot. HTTP 200 on both routes."
 
   - agent: main
     message: |

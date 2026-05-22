@@ -12,11 +12,20 @@ import {
 import { STT, TTS } from '@/lib/medha/voice';
 import { incrementQuota, quotaRemaining, getUser, setUser, quotaLimit, type LocalUser } from '@/lib/quota/quota';
 import MedhaCanvasOrb from './MedhaCanvasOrb';
+import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './MedhaConsentSlab';
 import './medha.css';
 
 // ============================================================
-// MEDHĀ — The Living Orb. A single breathing presence at the
-// centre of a dark void. You don't "use" Medhā — you visit her.
+// MEDHĀ — The Living Orb. Strict 7-component interface:
+//   A = vertical user-query rail (right edge, dots accumulate)
+//   B = Sound Console (rendered globally by cosmic layout)
+//   C = Nāvika orb       (rendered globally by cosmic layout)
+//   D = Settings orb     (cosmic glyph, opens settings panel)
+//   E = Slim glass composer (bottom, 1000-char limit, scrolls)
+//   F = Shunya back button (top-left)
+//   G = Medhā living orb (canvas)
+// Medhā's reply renders as a FLOATING DIALOG glass-box near her;
+// it vanishes the instant the user begins typing.
 // ============================================================
 
 type Phase = 'sleeping' | 'awake';
@@ -67,6 +76,14 @@ export default function MedhaHUD() {
   const [regErr, setRegErr] = useState('');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  // NEW: consent gate. UI is blurred / locked until granted.
+  const [consentGranted, setConsentGranted] = useState<boolean>(() =>
+    typeof window === 'undefined' ? false : hasLocalConsent()
+  );
+  // NEW: electric link animation trigger. Counter increments each time the
+  // user picks a Mode in the settings panel — the SVG link redraws.
+  const [linkPulse, setLinkPulse] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const sttRef = useRef<STT | null>(null);
@@ -283,6 +300,8 @@ export default function MedhaHUD() {
     if (k === mode) return;
     setMode(k);
     setShock(s => s + 1);
+    // Trigger the electrifying link visual from settings panel → Medhā.
+    setLinkPulse(p => p + 1);
   };
 
   const toggleListening = () => {
@@ -348,13 +367,20 @@ export default function MedhaHUD() {
 
   return (
     <div
-      className={`mlv mlv-phase-${phase}`}
+      className={`mlv mlv-phase-${phase} ${consentGranted ? '' : 'mlv-consent-locked'}`}
       data-mode={mode}
       style={{
         ['--mode-a' as any]: modeDef.colorA,
         ['--mode-b' as any]: modeDef.colorB,
       }}
     >
+      {/* CONSENT GATE — shown ONCE per user (deduped by email server-side). */}
+      {!consentGranted && (
+        <MedhaConsentSlab onGranted={(snap: ConsentSnapshot) => {
+          setConsentGranted(true);
+        }} />
+      )}
+
       <div className="mlv-bg" aria-hidden="true">
         <div className="mlv-stars" />
         <div className="mlv-stars mlv-stars--slow" />
@@ -383,7 +409,9 @@ export default function MedhaHUD() {
         <span>Shunya</span>
       </button>
 
-      <aside className="mlv-rail" aria-label="Medhā controls">
+      <aside className="mlv-rail mlv-rail--hidden" aria-hidden="true">
+        {/* Legacy left rail intentionally hidden — strict 7-component spec.
+            All actions consolidated into the floating Settings orb (D). */}
         <button type="button" className="mlv-rail__btn" onClick={startNewChat} title="New conversation">
           <span className="mlv-rail__glyph">＋</span>
           <span className="mlv-rail__lbl">new</span>
@@ -424,19 +452,27 @@ export default function MedhaHUD() {
         </div>
       </aside>
 
-      {showMsg && phase === 'awake' && (
-        <div className={`mlv-slab mlv-slab--${showMsg.role} ${stickyDot !== null ? 'is-sticky' : ''} ${previewMsg ? 'is-preview' : ''}`}>
-          <div className="mlv-slab__meta">
-            <span className="mlv-slab__who">{showMsg.role === 'user' ? 'you' : (getMode(showMsg.mode as CognitiveModeKey).name)}</span>
-            <span className="mlv-slab__ts">{new Date(showMsg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+      {/* Medhā's reply — FLOATING DIALOG GLASS BOX that drifts beside her.
+          Vanishes the instant the user begins typing (per the strict spec).
+          User messages NEVER appear here — they're only shown when the
+          corresponding rail-dot is hovered/clicked. */}
+      {showMsg && phase === 'awake' && !isTyping && !composerOpen && (
+        <div className={`mlv-medha-dialog mlv-medha-dialog--${showMsg.role} ${stickyDot !== null ? 'is-sticky' : ''}`}>
+          <div className="mlv-medha-dialog__meta">
+            <span className="mlv-medha-dialog__who">
+              {showMsg.role === 'user' ? 'you' : (getMode(showMsg.mode as CognitiveModeKey).name)}
+            </span>
+            <span className="mlv-medha-dialog__ts">
+              {new Date(showMsg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
           </div>
           {showMsg.role === 'assistant' ? (
-            <div className="mlv-slab__body medha-md"
+            <div className="mlv-medha-dialog__body medha-md"
                  dangerouslySetInnerHTML={{ __html: renderMarkdown(showMsg.content) }} />
           ) : (
-            <div className="mlv-slab__body mlv-slab__body--user">{showMsg.content}</div>
+            <div className="mlv-medha-dialog__body mlv-medha-dialog__body--user">{showMsg.content}</div>
           )}
-          <div className="mlv-slab__actions">
+          <div className="mlv-medha-dialog__actions">
             <button type="button" onClick={() => copyMsg(showMsg)}>⧉ copy</button>
             {stickyDot !== null && (
               <button type="button" onClick={() => setStickyDot(null)}>⟲ release</button>
@@ -446,16 +482,18 @@ export default function MedhaHUD() {
       )}
 
       {phase === 'awake' && (
-        <div className="mlv-thread">
+        <div className="mlv-thread mlv-thread--user-only">
           <div className="mlv-thread__line" />
           <div className="mlv-thread__dots">
-            {messages.map((m, i) => (
+            {/* RAIL DOTS — strictly USER messages only (per item 2 of spec).
+                Medhā's responses live in the floating dialog box, not here. */}
+            {messages.map((m, i) => m.role !== 'user' ? null : (
               <button key={m.id} type="button"
-                      className={`mlv-dot mlv-dot--${m.role} ${(stickyDot === i || hoverDot === i) ? 'is-glow' : ''}`}
+                      className={`mlv-dot mlv-dot--user ${(stickyDot === i || hoverDot === i) ? 'is-glow' : ''}`}
                       onMouseEnter={() => setHoverDot(i)}
                       onMouseLeave={() => setHoverDot(null)}
                       onClick={() => setStickyDot(stickyDot === i ? null : i)}
-                      aria-label={`${m.role} message`} />
+                      aria-label={`Your message ${i + 1}`} />
             ))}
             {busy && <span className="mlv-thread__pending" />}
           </div>
@@ -463,9 +501,9 @@ export default function MedhaHUD() {
       )}
 
       {phase === 'awake' && (
-        <div className={`mlv-composer ${composerOpen ? 'is-open' : ''}`}>
+        <div className={`mlv-composer ${composerOpen ? 'is-open' : ''} ${composerText.length > 220 ? 'is-tall' : ''}`}>
           {!composerOpen && (
-            <button type="button" className="mlv-composer__pill" onClick={() => { setComposerOpen(true); setTimeout(() => composerRef.current?.focus(), 50); }}>
+            <button type="button" className="mlv-composer__pill" onClick={() => { setComposerOpen(true); setIsTyping(true); setTimeout(() => composerRef.current?.focus(), 50); }}>
               <span className="mlv-composer__dot" />
               <span>speak to {modeDef.name}</span>
             </button>
@@ -475,8 +513,17 @@ export default function MedhaHUD() {
               <span className="mlv-composer__bind">{modeDef.glyph} {modeDef.name}</span>
               <textarea ref={composerRef} value={composerText}
                         placeholder={listening ? '(listening…)' : `Speak to ${modeDef.name}…`}
-                        onChange={(e) => setComposerText(e.target.value)}
-                        onKeyDown={onComposerKey} rows={1} disabled={busy} />
+                        maxLength={1000}
+                        onChange={(e) => {
+                          setComposerText(e.target.value);
+                          setIsTyping(e.target.value.length > 0);
+                        }}
+                        onFocus={() => setIsTyping(true)}
+                        onBlur={() => { if (!composerText.trim()) setIsTyping(false); }}
+                        onKeyDown={onComposerKey} rows={composerText.length > 220 ? 3 : 1} disabled={busy} />
+              <span className={`mlv-composer__count ${composerText.length > 900 ? 'is-warn' : ''}`}>
+                {composerText.length}/1000
+              </span>
               <button type="button" className={`mlv-composer__mic ${listening ? 'is-on' : ''}`}
                       onClick={toggleListening}
                       disabled={!sttRef.current?.isSupported()}>◉</button>
@@ -486,6 +533,57 @@ export default function MedhaHUD() {
             </div>
           )}
         </div>
+      )}
+
+      {/* SETTINGS ORB (D) — tiny floating glyph, opens the settings glass panel. */}
+      {phase === 'awake' && (
+        <button
+          type="button"
+          className="mlv-settings-orb"
+          onClick={() => setShowSettings(true)}
+          aria-label="Open Medhā settings"
+          title="Medhā settings"
+        >
+          <span className="mlv-settings-orb__ring" />
+          <span className="mlv-settings-orb__core" />
+          <span className="mlv-settings-orb__glyph">⚙</span>
+        </button>
+      )}
+
+      {/* ELECTRIFYING LINK — animated SVG zaps from the settings panel position
+          to Medhā when the user switches cognitive modes. Re-keyed on each
+          mode change so the animation restarts cleanly. */}
+      {linkPulse > 0 && (
+        <svg
+          key={linkPulse}
+          className="mlv-electric-link"
+          viewBox="0 0 1000 600"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id={`mlv-elec-grad-${linkPulse}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"  stopColor={modeDef.colorA} stopOpacity="0.0" />
+              <stop offset="40%" stopColor={modeDef.colorA} stopOpacity="1" />
+              <stop offset="100%" stopColor={modeDef.colorB} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 750 320 Q 600 260 500 300 Q 400 340 300 280"
+            stroke={`url(#mlv-elec-grad-${linkPulse})`}
+            strokeWidth="2"
+            fill="none"
+            className="mlv-electric-link__bolt"
+          />
+          <path
+            d="M 750 320 Q 600 260 500 300 Q 400 340 300 280"
+            stroke={modeDef.colorA}
+            strokeWidth="0.8"
+            fill="none"
+            opacity="0.7"
+            className="mlv-electric-link__crackle"
+          />
+        </svg>
       )}
 
       {showHistory && (
@@ -527,6 +625,29 @@ export default function MedhaHUD() {
               <button type="button" className="mlv-modal__x" onClick={() => setShowSettings(false)}>✕</button>
             </header>
             <div className="mlv-modal__body mlv-settings">
+              {/* Cognitive Mode picker — selecting one fires the electrifying
+                  link from the settings panel to Medhā and tints her aura. */}
+              <div className="mlv-settings__section">
+                <div className="mlv-settings__lbl">Cognitive Mode</div>
+                <div className="mlv-settings__modes">
+                  {COGNITIVE_MODES.map((m) => (
+                    <button
+                      key={m.key}
+                      type="button"
+                      className={`mlv-mind ${mode === m.key ? 'is-active' : ''}`}
+                      onClick={() => switchMode(m.key)}
+                      title={`${m.name} — ${m.englishName}`}
+                      style={{ ['--mind-a' as any]: m.colorA, ['--mind-b' as any]: m.colorB }}
+                    >
+                      <span className="mlv-mind__glyph">{m.glyph}</span>
+                      <span className="mlv-mind__name">{m.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mlv-settings__hint">
+                  Active: <strong>{modeDef.name}</strong> · {modeDef.englishName}
+                </p>
+              </div>
               <div className="mlv-set-row">
                 <span className="mlv-set-row__k">Voice reply (TTS)</span>
                 <button type="button" className={`mlv-toggle ${ttsEnabled ? 'is-on' : ''}`} onClick={toggleTts}>
@@ -534,16 +655,20 @@ export default function MedhaHUD() {
                 </button>
               </div>
               <div className="mlv-set-row">
-                <span className="mlv-set-row__k">Active mind</span>
-                <span className="mlv-set-row__v">{modeDef.name} · {modeDef.englishName}</span>
-              </div>
-              <div className="mlv-set-row">
-                <span className="mlv-set-row__k">Persistence</span>
-                <span className="mlv-set-row__v">30 days from last interaction · local device</span>
+                <span className="mlv-set-row__k">Voice input (STT)</span>
+                <button type="button" className={`mlv-toggle ${listening ? 'is-on' : ''}`}
+                        onClick={toggleListening}
+                        disabled={!sttRef.current?.isSupported()}>
+                  {listening ? 'on' : 'off'}
+                </button>
               </div>
               <div className="mlv-set-row">
                 <span className="mlv-set-row__k">Conversations stored</span>
                 <span className="mlv-set-row__v">{chats.length}</span>
+              </div>
+              <div className="mlv-set-row">
+                <span className="mlv-set-row__k">Local persistence</span>
+                <span className="mlv-set-row__v">30 days · device + VYAN cloud</span>
               </div>
               <div className="mlv-set-row">
                 <button type="button" className="mlv-modal__danger" onClick={() => {
@@ -556,7 +681,7 @@ export default function MedhaHUD() {
                 </button>
               </div>
               <p className="mlv-settings__note">
-                Character tone, voice persona, and per-mode tuning will appear here in the next emergence.
+                Tone, response length and voice persona will manifest here in the next emergence.
               </p>
             </div>
           </div>
