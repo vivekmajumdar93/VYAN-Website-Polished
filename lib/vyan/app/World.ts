@@ -94,8 +94,6 @@ export class World {
     if (this.cameraRig.getMode() !== mode) this.cameraRig.setMode(mode);
   }
   focusShunyaOrb(key: any, immediate = false) { this.realms.focusShunyaOrb(key, immediate); }
-  focusVistaraProduct(key: any, immediate = false) { this.realms.focusVistaraProduct(key, immediate); }
-  triggerVistaraExit(cb: () => void) { this.realms.triggerVistaraExit(cb); }
   getMode() { return this.realms.mode; }
 
   start() {

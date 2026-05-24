@@ -623,30 +623,30 @@ export default function MedhaHUD() {
 
       {showHistory && (
         <div className="mlv-modal" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setShowHistory(false); }}>
-          <div className="mlv-modal__inner">
+          <div className="mlv-modal__inner" onClick={(e) => e.stopPropagation()}>
             <header className="mlv-modal__head">
               <h2>Conversation Threads</h2>
-              <button type="button" className="mlv-modal__x" onClick={() => setShowHistory(false)}>✕</button>
+              <button type="button" className="mlv-modal__x" onClick={(e) => { e.stopPropagation(); setShowHistory(false); }}>✕</button>
             </header>
             <div className="mlv-modal__body">
               {chats.length === 0 && <p className="mlv-modal__empty">No conversations yet. This is the first.</p>}
               {chats.map((c) => (
                 <div key={c.id} className={`mlv-chat-row ${c.id === chatId ? 'is-current' : ''}`}>
-                  <button type="button" className="mlv-chat-row__open" onClick={() => openChatId(c.id)}>
+                  <button type="button" className="mlv-chat-row__open" onClick={(e) => { e.stopPropagation(); openChatId(c.id); }}>
                     <div className="mlv-chat-row__title">{c.title || 'Untitled'}</div>
                     <div className="mlv-chat-row__meta">
                       {new Date(c.lastInteractionAt).toLocaleString()} · {c.messages.length} messages
                     </div>
                   </button>
                   <button type="button" className="mlv-chat-row__del"
-                          onClick={() => { deleteChat(c.id); setChats(listChats()); if (c.id === chatId) startNewChat(); }}>
+                          onClick={(e) => { e.stopPropagation(); deleteChat(c.id); setChats(listChats()); if (c.id === chatId) startNewChat(); }}>
                     ✕
                   </button>
                 </div>
               ))}
             </div>
             <footer className="mlv-modal__foot">
-              <button type="button" className="mlv-modal__cta" onClick={startNewChat}>+ Start new conversation</button>
+              <button type="button" className="mlv-modal__cta" onClick={(e) => { e.stopPropagation(); startNewChat(); }}>+ Start new conversation</button>
             </footer>
           </div>
         </div>
@@ -654,7 +654,7 @@ export default function MedhaHUD() {
 
       {showSettings && (
         <div className="mlv-modal mlv-modal--side" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false); }}>
-          <div className="mlv-modal__inner mlv-modal__inner--side">
+          <div className="mlv-modal__inner mlv-modal__inner--side" onClick={(e) => e.stopPropagation()}>
             <header className="mlv-modal__head">
               <h2>Cognitive Settings</h2>
               <button type="button" className="mlv-modal__x" onClick={() => setShowSettings(false)}>✕</button>
