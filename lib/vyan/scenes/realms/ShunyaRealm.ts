@@ -79,8 +79,16 @@ export class ShunyaRealm {
     for (const o of this.orbs) {
       o.setVisible(true);
       o.reset();
+      // CRITICAL FIX: when re-entering Shunya (e.g. user exits Medhā back to
+      // /shunya/medha) we must force-reset every orb's magnification so the
+      // previously-magnified orb (Medhā / Vistāra) shrinks back to its click
+      // zone. Otherwise the camera stays locked on a giant frozen orb and
+      // the user can't navigate.
       (o as any).magnifyFactor = 1.0;
+      try { (o as any).magnify?.(1.0, 0.4); } catch {}
     }
+    // Force-clear any lingering magnify state from the previous session.
+    this.magnifiedIdx = null;
     // EQUALIZATION (item 2): arrival offset reduced from 10 → 3 units so
     // the focused orb stays visually centered + consistently sized during
     // the entry settle. Larger drifts caused Sandhi / Medhā to look smaller

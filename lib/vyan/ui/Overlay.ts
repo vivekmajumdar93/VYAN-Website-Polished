@@ -189,6 +189,13 @@ this.panel.addEventListener('pointerdown', (e) => {
     this.callbacks?.onClosePanel();
   }
 });
+// ESC key — close any open glass panel.
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && this.panel.classList.contains('is-open')) {
+    e.stopPropagation();
+    this.callbacks?.onClosePanel();
+  }
+});
 const inner = this.panel.querySelector('.glass-panel-inner') as HTMLElement;
 inner.appendChild(this.panelTitle);
 inner.appendChild(this.panelSubtitle);

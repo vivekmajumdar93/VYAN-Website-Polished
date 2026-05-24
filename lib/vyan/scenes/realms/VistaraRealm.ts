@@ -78,6 +78,9 @@ export class VistaraRealm {
       o.setVisible(true);
       o.reset();
       (o as any).magnifyFactor = 1.0;
+      // Force any previously-magnified orb to collapse back to default size
+      // so re-entering the realm doesn't show a frozen expanded orb.
+      try { (o as any).magnify?.(1.0, 0.4); } catch {}
     }
     // CINEMATIC RANDOM ARRIVAL — each orb arrives from a truly random off-axis
     // direction (mirroring Shunya). No biased X/Z weighting.

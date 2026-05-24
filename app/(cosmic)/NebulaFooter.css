@@ -14,7 +14,11 @@
   align-items: center;
   gap: 6px;
   padding-bottom: 8px;
+  /* Fully invisible at rest — only awakens on hover/touch. */
+  opacity: 0;
+  transition: opacity 0.42s ease;
 }
+.nf-root.is-hovered { opacity: 1; }
 .nf-root::before {
   /* invisible hover "sensor" extending above so users can summon the
      footer without precisely touching its base. */

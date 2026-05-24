@@ -131,7 +131,7 @@ export const SLAB_SANDHI_HTML = /* html */ `
         </div>
       </div>
       <div class="vy-card__role">General Queries</div>
-      <a class="vy-card__mail" href="mailto:reachus@vyan.dev">reachus@vyan.dev</a>
+      <a class="vy-card__mail" href="mailto:reachus@vyanlabs.com">reachus@vyanlabs.com</a>
     </article>
 
     <article class="vy-card vy-card--hue-2" data-status="active">
@@ -143,7 +143,7 @@ export const SLAB_SANDHI_HTML = /* html */ `
         </div>
       </div>
       <div class="vy-card__role">Technical Support</div>
-      <a class="vy-card__mail" href="mailto:need-support@vyan.dev">need-support@vyan.dev</a>
+      <a class="vy-card__mail" href="mailto:need-support@vyanlabs.com">need-support@vyanlabs.com</a>
     </article>
 
     <article class="vy-card vy-card--hue-3" data-status="active">
@@ -155,14 +155,14 @@ export const SLAB_SANDHI_HTML = /* html */ `
         </div>
       </div>
       <div class="vy-card__role">Administrative Governance</div>
-      <a class="vy-card__mail" href="mailto:admin@vyan.dev">admin@vyan.dev</a>
+      <a class="vy-card__mail" href="mailto:admin@vyanlabs.com">admin@vyanlabs.com</a>
     </article>
 
     <article class="vy-card vy-card--hue-4 vy-card--brand" data-status="active" data-auto-status="true">
       <img class="vy-card__logo" src="/logo.png" alt="VYAN" />
       <div class="vy-card__brandname">VYAN</div>
       <div class="vy-card__brandtag">Architecting the Liquid Infinite</div>
-      <a class="vy-card__site" href="https://vyan.dev" target="_blank" rel="noopener">vyan.dev</a>
+      <a class="vy-card__site" href="https://vyanlabs.com" target="_blank" rel="noopener">vyanlabs.com</a>
       <div class="vy-card__pill vy-card__pill--bottom">
         <span class="vy-card__dot"></span>
         <span class="vy-card__pill-label">System Online</span>

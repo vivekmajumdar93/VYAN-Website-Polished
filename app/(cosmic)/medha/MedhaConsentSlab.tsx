@@ -133,7 +133,7 @@ export default function MedhaConsentSlab({ onGranted }: { onGranted: (snap: Cons
           {busy ? 'transmitting…' : 'Enter Medhā'}
         </button>
         <p className="mcc-foot">
-          Your local browser keeps a copy of every conversation. The cloud copy may be deleted at any time by emailing <em>sandhi@vyan.dev</em>.
+          Your local browser keeps a copy of every conversation. The cloud copy may be deleted at any time by emailing <em>sandhi@vyanlabs.com</em>.
         </p>
       </div>
     </div>

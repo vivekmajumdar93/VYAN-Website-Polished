@@ -49,7 +49,7 @@ function newId(): string { return `sk_${Date.now().toString(36)}_${Math.random()
 async function sendNotificationEmail(_sub: SankalpaSubmission): Promise<void> {
   // Example wiring (pseudo):
   // await resend.emails.send({
-  //   from: 'sankalpa@vyan.dev',
+  //   from: 'sankalpa@vyanlabs.com',
   //   to: [process.env.ADMIN_EMAIL!, _sub.email],
   //   subject: `Saṅkalpa received — ${_sub.name}`,
   //   html: renderSankalpaEmail(_sub),
