@@ -11,7 +11,6 @@ import {
 } from '@/lib/medha/storage';
 import { STT, TTS } from '@/lib/medha/voice';
 import { incrementQuota, quotaRemaining, getUser, setUser, quotaLimit, type LocalUser } from '@/lib/quota/quota';
-import MedhaCanvasOrb from './MedhaCanvasOrb';
 import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './MedhaConsentSlab';
 import './medha.css';
 
@@ -127,7 +126,9 @@ export default function MedhaHUD() {
         createdAt: Date.now(), lastInteractionAt: Date.now(), topic: prev?.topic,
       });
     }
-    // Clear leftover fade overlay from portal transition + PAUSE the world
+    // PHASE 2 in-place: don't hide the cosmic canvas — the unfolded Medhā
+    // orb lives behind this HUD now. We only dim the void-mode UI chrome
+    // (depth rail, caption) so the chat stays the focus.
     try {
       document.querySelectorAll('[data-vyan-fade="1"]').forEach((el) => {
         (el as HTMLElement).style.transition = 'opacity 0.7s ease-out';
@@ -136,21 +137,11 @@ export default function MedhaHUD() {
       });
       const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
       if (ui) { ui.style.opacity = '0'; ui.style.pointerEvents = 'none'; }
-      const canvas = document.querySelector('canvas[data-vyan-canvas]') as HTMLElement | null;
-      if (canvas) canvas.style.opacity = '0';
-      // Freeze the cosmic world's scroll/swipe handlers — these are window-level
-      // listeners that would otherwise eat the user's scroll while in /medha
-      // and leave the camera in a broken state when they navigate back.
-      document.body.classList.add('vyan-paused');
+      // DO NOT hide the canvas — leave it visible for the in-place orb.
     } catch {}
     return () => {
       const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
       if (ui) { ui.style.opacity = '1'; ui.style.pointerEvents = 'auto'; }
-      const canvas = document.querySelector('canvas[data-vyan-canvas]') as HTMLElement | null;
-      if (canvas) canvas.style.opacity = '1';
-      document.body.classList.remove('vyan-paused');
-      // Force a one-time scroll reset event so the World re-syncs to the
-      // current activeIndex (prevents the "stuck at Medhā" bug when returning).
       window.dispatchEvent(new CustomEvent('vyan:resume'));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -409,15 +400,13 @@ export default function MedhaHUD() {
         }} />
       )}
 
-      <div className="mlv-bg" aria-hidden="true">
-        <div className="mlv-stars" />
-        <div className="mlv-stars mlv-stars--slow" />
-      </div>
+      {/* PHASE 2 in-place architecture: the Medhā orb lives in the cosmic
+          canvas (Shunya scene) behind this HUD — we no longer render a
+          separate fullscreen MedhaCanvasOrb. The chat UI floats above the
+          unfolded cosmic orb. */}
 
-      {/* Living Ghost Orb — full-screen canvas. Intensity dims while sleeping. */}
-      <MedhaCanvasOrb intensity={phase === 'sleeping' ? 0.55 : 1} />
-
-      {/* Orb-click hit area for opening conversation history. */}
+      {/* Orb-click hit area for opening conversation history. Anchored to
+          the cosmic Medhā orb's projected screen centre via __vyanAnchor. */}
       <div
         className={`mlv-orb-hit ${speaking ? 'is-speaking' : ''} ${busy ? 'is-listening' : ''}`}
         onClick={() => phase === 'awake' && setShowHistory(v => !v)}

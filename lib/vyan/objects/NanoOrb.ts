@@ -50,6 +50,7 @@ export class NanoOrb {
   private haze: THREE.Points;
   private dust: THREE.Points;
   private satellites: THREE.Group;
+  private socketGroup!: THREE.Group;
 
   constructor(data: NanoOrbData, radius: number = 1.65, _networkSize: number = 4200) {
     this.data = data;
@@ -58,10 +59,10 @@ export class NanoOrb {
     const nodePos = [];
     const nodeCols = [];
     const nodes = [];
-    // PHASE 1: expansion state stubs. Mutated by setExpansionProgress / setSignal.
-    // Phase 2 will wire these to a shader uniform that scales node positions
-    // outward and brightens the plexus along the branches.
+    // PHASE 1-2: expansion state. Mutated by setExpansionProgress / setSignal.
+    // Drives in-place unfolding: scale, brightness, web density, signal flow.
     (this as any).expansionT = 0;     // 0=dormant, 1=fully unfolded
+    (this as any).visualDim = 1;      // 1=normal, <1=dim (when sibling orb is expanded)
     (this as any).signal = 'idle';
     (this as any).spectrumLo = new THREE.Color(this.data.colorA);
     (this as any).spectrumHi = new THREE.Color(this.data.colorB);
@@ -295,6 +296,73 @@ export class NanoOrb {
     );
     this.group.add(this.hitMesh);
 
+    // PHASE 3 — visible UNFOLD-SOCKETS. 6 glowing nodes that fade in around
+    // the orb when expansionT > 0. Each is a small sphere + filament back
+    // to the orb centre. Used by Vistāra to anchor product slabs.
+    this.socketGroup = new THREE.Group();
+    this.socketGroup.visible = false;
+    this.group.add(this.socketGroup);
+    const socketColor = new THREE.Color(this.data.colorB || '#ff5a7a');
+    for (let i = 0; i < 6; i++) {
+      const node = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 16, 16),
+        new THREE.MeshBasicMaterial({
+          color: socketColor,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      // Halo ring
+      const halo = new THREE.Mesh(
+        new THREE.RingGeometry(0.55, 0.95, 32),
+        new THREE.MeshBasicMaterial({
+          color: socketColor,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      halo.userData.isHalo = true;
+      // Outer glow disc
+      const glow = new THREE.Mesh(
+        new THREE.CircleGeometry(1.4, 32),
+        new THREE.MeshBasicMaterial({
+          color: socketColor,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      glow.userData.isGlow = true;
+      // Filament line to centre
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, 0),
+      ]);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: socketColor,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+      });
+      const line = new THREE.Line(lineGeo, lineMat);
+      line.userData.isFilament = true;
+
+      const wrap = new THREE.Group();
+      wrap.add(glow);
+      wrap.add(halo);
+      wrap.add(node);
+      wrap.add(line);
+      wrap.userData.socketIdx = i;
+      this.socketGroup.add(wrap);
+    }
+
     this.trail = new OrbDustTrail('#a066ff');
     this.trailGroup.add(this.trail.group);
 
@@ -426,7 +494,14 @@ export class NanoOrb {
     // partially out-of-focus, and let the focused orb confidently fill the
     // frame. Floor 0.92x, focus boost up to ~1.32x — uniform across all 6
     // Shunya orbs so Medhā / Sandhi never feel small or distant.
-    const targetScale = ((active ? 1.10 : 1.0) * pulse) * (0.92 + presence * 0.40);
+    const baseScale = ((active ? 1.10 : 1.0) * pulse) * (0.92 + presence * 0.40);
+    // PHASE 2: in-place unfold. expansionT 0..1 multiplies size up to ~1.7x.
+    // We keep the orb comfortably in-frame so the user can read the slabs
+    // anchored to its sockets.
+    const expT = (this as any).expansionT ?? 0;
+    const unfoldEase = expT < 0.5 ? 2 * expT * expT : 1 - Math.pow(-2 * expT + 2, 2) / 2;
+    const expandScale = 1 + unfoldEase * 0.7;
+    const targetScale = baseScale * expandScale;
 
     if (this.scale < 10) {
         this.scale += (targetScale - this.scale) * 0.08;
@@ -449,16 +524,33 @@ export class NanoOrb {
     }
     posAttr.needsUpdate = true;
 
-    // NETWORK SHIMMER
-    this.web.material.opacity = 0.3 + Math.sin(t * 2.4) * 0.1;
-    this.nodeMat.opacity = 0.82 + Math.sin(t * 1.7) * 0.08;
+    // NETWORK SHIMMER — signal-state-driven brightness and pulse.
+    const expT2 = (this as any).expansionT ?? 0;
+    const signal = (this as any).signal as string;
+    const dim = (this as any).visualDim ?? 1;
+    let signalBoost = 0;
+    let signalPulse = 0;
+    if (signal === 'hover')        { signalBoost = 0.15; signalPulse = 0.05; }
+    else if (signal === 'listening'){ signalBoost = 0.20; signalPulse = 0.10; }
+    else if (signal === 'processing'){ signalBoost = 0.25; signalPulse = 0.18; }
+    else if (signal === 'response') { signalBoost = 0.32; signalPulse = 0.25; }
+    else if (signal === 'interaction'){ signalBoost = 0.22; signalPulse = 0.08; }
+    else if (signal === 'decay')    { signalBoost = 0.05; signalPulse = 0.0; }
+    const pulseFreq = signal === 'processing' ? 3.8 : signal === 'response' ? 5.2 : 2.4;
+    const webBase = 0.30 + expT2 * 0.35 + signalBoost;
+    this.web.material.opacity = (webBase + Math.sin(t * pulseFreq) * (0.10 + signalPulse)) * dim;
+    this.nodeMat.opacity = (0.82 + expT2 * 0.18 + Math.sin(t * 1.7) * 0.08 + signalBoost) * dim;
 
     // CORE TURBULENCE
     this.coreDust.rotation.y += 0.08 * motion * 0.016;
     this.coreDust.rotation.x -= 0.03 * motion * 0.016;
     this.haze.rotation.y -= 0.015 * motion * 0.016;
     this.haze.rotation.z += 0.01 * motion * 0.016;
-    (this.coreDust.material as THREE.Material).opacity = 0.82 + Math.sin(t * 2.5) * 0.08;
+
+    // Apply visual dim to other materials.
+    (this.haze.material as THREE.PointsMaterial).opacity = 0.12 * dim;
+    (this.coreDust.material as THREE.Material).opacity = (0.82 + Math.sin(t * 2.5) * 0.08) * dim;
+    (this.dust.material as THREE.PointsMaterial).opacity = 0.22 * dim;
 
     // SATELLITES
     this.satellites.children.forEach((c, i) => {
@@ -470,6 +562,59 @@ export class NanoOrb {
     // DUST
     this.dust.rotation.y += 0.003 * motion * 0.016;
     this.dust.rotation.x += 0.001 * motion * 0.016;
+
+    // PHASE 3 — unfold sockets. Position each socket on a ring around the
+    // orb. Their radius and opacity scale with expansionT, and they receive
+    // the spectrum colour so the right product slabs can anchor to them.
+    if (this.socketGroup) {
+      const expForSockets = (this as any).expansionT ?? 0;
+      this.socketGroup.visible = expForSockets > 0.01;
+      const spectrumHi: THREE.Color | undefined = (this as any).spectrumHi;
+      const total = this.socketGroup.children.length;
+      // Sockets sit on a ring larger than the orb body (orb radius ~5.2).
+      const baseRadius = 6.4 + expForSockets * 3.2;
+      const wave = Math.sin(t * 1.6) * 0.18;
+      // Compensate parent group scale so sockets stay at fixed world-distance.
+      const groupScale = this.group.scale.x || 1;
+      const inv = 1 / groupScale;
+      for (let i = 0; i < total; i++) {
+        const wrap = this.socketGroup.children[i] as THREE.Group;
+        const idx = (wrap.userData.socketIdx as number) ?? i;
+        const angle = (idx / total) * Math.PI * 2 - Math.PI / 2 + t * 0.05;
+        const r = (baseRadius + Math.sin(t * 1.2 + idx) * 0.25) * inv;
+        const yJ = (Math.sin(idx * 1.7) * 0.4 + wave * (idx % 2 === 0 ? 1 : -1)) * inv;
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r * 0.62 + yJ;
+        wrap.position.set(x, y, 0);
+        // Stagger fade-in (each socket lights up at 0.2 + idx*0.07).
+        const fadeStart = 0.20 + idx * 0.07;
+        const localT = Math.max(0, Math.min(1, (expForSockets - fadeStart) / Math.max(0.001, 1 - fadeStart)));
+        const op = localT;
+        for (const child of wrap.children) {
+          const m = (child as any).material as THREE.Material | undefined;
+          if (!m) continue;
+          let perOp = op;
+          if ((child as any).userData?.isHalo)     perOp = op * 0.55;
+          else if ((child as any).userData?.isFilament) perOp = op * 0.45;
+          else if ((child as any).userData?.isGlow) perOp = op * 0.28;
+          else                                       perOp = op * 0.95; // node sphere
+          (m as any).opacity = perOp;
+          if ('color' in m && spectrumHi) (m as any).color = spectrumHi;
+        }
+        // Update filament line endpoints (centre → wrap origin in local space).
+        const line = wrap.children.find(c => c.userData.isFilament) as THREE.Line | undefined;
+        if (line) {
+          const pos = (line.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
+          pos.setXYZ(0, -x, -y, 0);
+          pos.setXYZ(1, 0, 0, 0);
+          pos.needsUpdate = true;
+        }
+        // Halo gentle rotation.
+        const halo = wrap.children.find(c => c.userData.isHalo) as THREE.Mesh | undefined;
+        if (halo) halo.rotation.z = t * 0.6 + idx;
+        // Always face camera-ish (billboard-light) — set rotation.x=0 keeps in xy plane.
+      }
+    }
 
     this.trail.update(this.group.position, 1, 1, t);
   }
@@ -494,5 +639,37 @@ export class NanoOrb {
     } catch {}
   }
   getExpansionProgress(): number { return (this as any).expansionT ?? 0; }
+
+  /** Sibling-orb dim factor (0..1). When another orb is unfolded, set this <1 to fade. */
+  setVisualDim(v: number) {
+    (this as any).visualDim = Math.max(0, Math.min(1, v));
+  }
+
+  /**
+   * Compute the world position of one of 6 unfold-sockets surrounding this orb.
+   * Anchors React product slabs in screen-space for Vistāra.
+   * The sockets sit on a ring of radius proportional to expansionT so they
+   * smoothly fly out from the orb's center as it unfolds.
+   */
+  getSocketWorld(socketIdx: number, totalSockets: number = 6): THREE.Vector3 {
+    const expT = (this as any).expansionT ?? 0;
+    const baseRadius = 3.4 + expT * 2.8;   // world units from orb center
+    const angle = (socketIdx / totalSockets) * Math.PI * 2 - Math.PI / 2;
+    // Tilt the ring slightly so we don't get perfect symmetry.
+    const yJitter = Math.sin(socketIdx * 1.7) * 0.4;
+    const local = new THREE.Vector3(
+      Math.cos(angle) * baseRadius,
+      Math.sin(angle) * baseRadius * 0.55 + yJitter,
+      0
+    );
+    // Transform local → world via group matrix.
+    return local.applyMatrix4(this.group.matrixWorld);
+  }
+
+  /** Project the orb's centre to NDC (-1..1) using a camera. */
+  getScreenNDC(camera: THREE.Camera): { x: number; y: number; visible: boolean } {
+    const p = this.group.position.clone().project(camera);
+    return { x: p.x, y: p.y, visible: p.z > -1 && p.z < 1 };
+  }
 }
 

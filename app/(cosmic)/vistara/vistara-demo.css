@@ -1,22 +1,30 @@
 /* ================================================================
    VISTĀRA · Product Demo Slab (Google-AI-Studio styled)
    ================================================================ */
+/* PHASE 2 in-place architecture: veil is now fully transparent so the
+   cosmic Vistāra orb (with its 6 unfolded sockets) stays visible behind
+   the slab. The slab itself docks to one side and remains glassmorphic. */
 .vpd-veil {
   position: fixed; inset: 0;
   z-index: 50;
-  background: radial-gradient(ellipse at center, rgba(8, 6, 18, 0.62), rgba(0, 0, 0, 0.88));
-  backdrop-filter: blur(14px);
+  background: transparent;
+  pointer-events: none; /* clicks pass through to canvas except on slab */
   display: grid; place-items: center;
   padding: 24px;
   animation: vpd-veil-in 0.34s ease;
 }
+.vpd-veil > * { pointer-events: auto; }
 @keyframes vpd-veil-in { from { opacity: 0; } to { opacity: 1; } }
 
 .vpd-slab {
-  width: min(1080px, 96vw);
-  height: min(720px, 92vh);
+  width: min(560px, 46vw);
+  max-height: min(720px, 88vh);
+  margin-right: 4vw;
+  margin-left: auto;   /* dock right so cosmic orb stays visible on the left */
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(15, 10, 30, 0.92), rgba(8, 6, 18, 0.94));
+  background: linear-gradient(180deg, rgba(15, 10, 30, 0.78), rgba(8, 6, 18, 0.82));
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
   border: 1px solid color-mix(in srgb, var(--accent, #d4a8ff) 38%, transparent);
   box-shadow:
     0 30px 80px rgba(0, 0, 0, 0.6),

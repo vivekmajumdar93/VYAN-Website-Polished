@@ -5,15 +5,19 @@
 .mlv {
   position: fixed;
   inset: 0;
-  background: #000;
+  background: transparent;
   color: rgba(232, 232, 240, 0.92);
   font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
   isolation: isolate;
   z-index: 30;
+  pointer-events: none; /* let cosmic canvas receive events except where we re-enable */
   --mode-a: #7a5cff;
   --mode-b: #ff2a4a;
 }
+/* Re-enable interaction for actual UI children (everything inside re-receives events). */
+.mlv * { pointer-events: auto; }
+.mlv-bg, .mlv-stars, .mlv-stars--slow { pointer-events: none !important; }
 
 /* Starfield backdrop */
 .mlv-bg { position: absolute; inset: 0; pointer-events: none; }

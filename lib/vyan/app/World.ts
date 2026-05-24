@@ -129,6 +129,26 @@ export class World {
       this.deps.overlay.setDistance(this.realms.activeApproach);
       this.deps.overlay.updateVisualizer(this.deps.audio.energy);
 
+      // PHASE 3: per-frame screen anchors for the in-place HUDs / product slabs.
+      try {
+        const sh: any = this.realms.shunya;
+        if (sh && sh.getOrbScreenNDC) {
+          const ex = (window as any).__vyanExpansion;
+          const tgt = ex?.target;
+          if (tgt) {
+            const centre = sh.getOrbScreenNDC(tgt, this.camera);
+            const sockets: Array<{ x: number; y: number }> = [];
+            for (let i = 0; i < 6; i++) {
+              const s = sh.getOrbSocketNDC(tgt, i, 6, this.camera);
+              if (s) sockets.push(s);
+            }
+            (window as any).__vyanAnchor = { target: tgt, centre, sockets, w: window.innerWidth, h: window.innerHeight };
+          } else {
+            (window as any).__vyanAnchor = null;
+          }
+        }
+      } catch {}
+
       this.updateAudioSpatial();
       this.composerBundle.composer.render();
 

@@ -191,7 +191,15 @@ export class CameraRig {
     const sway = new THREE.Vector3(px * 0.8, py * 0.5, 0);
     this.camera.position.copy(this.currentCamPos).add(sway).add(this.arrivalOffset);
     this.camera.lookAt(this.currentLookAt);
-    this.camera.fov = 38;
+    // PHASE 2: subtle FOV focus-pull when an orb unfolds in-place. FOV
+    // tightens from 38 \u2192 32 as expansion progresses, giving a cinematic
+    // dolly-in without losing the orb out of frame.
+    let exp = 0;
+    try {
+      const ex = (window as any).__vyanExpansion;
+      if (ex && ex.target) exp = Math.max(0, Math.min(1, ex.progress ?? 0));
+    } catch {}
+    this.camera.fov = 38 - exp * 6;
     this.camera.updateProjectionMatrix();
   }
 

@@ -67,22 +67,35 @@ export class ShunyaRealm {
 
   bind(deps: BindDeps) {
     this.deps = deps;
-    // PHASE 1: subscribe to InteractionState and forward expansion progress
-    // + signal + spectrum to the matching orb. Phase 2 will read these on
-    // the NanoOrb itself to drive the visual unfolding + signal flow.
+    // PHASE 1-4: subscribe to InteractionState and forward expansion progress
+    // + signal + spectrum to the matching orb. Also dim all sibling orbs to
+    // 0.18 when ANY orb is unfolded (in-place focus pull).
     try {
       const store = getInteractionStore();
       store.subscribe((s) => {
         const targetKey = s.target; // 'medha' | 'vistara' | null
         for (const orb of this.orbs) {
-          const isTarget = !!targetKey && orb.data.key === targetKey;
+          const isTarget = !!targetKey && orb.data.id === targetKey;
           orb.setExpansionProgress(isTarget ? s.progress : 0);
           orb.setSignal(isTarget ? s.signal : 'idle');
           if (isTarget) {
             const sp = SPECTRUM_HEX[s.spectrum];
             if (sp) orb.setSpectrumHex(sp.lo, sp.hi);
           }
+          // Sibling fade — others fade down as the expansion unfolds.
+          if (targetKey) {
+            const dim = isTarget ? 1.0 : (1.0 - s.progress * 0.82);
+            orb.setVisualDim(dim);
+          } else {
+            orb.setVisualDim(1.0);
+          }
         }
+        // Expose current expansion to consumers (CameraRig FOV pull).
+        (window as any).__vyanExpansion = {
+          target: targetKey,
+          progress: s.progress,
+          phase: s.phase,
+        };
       });
     } catch {}
   }
@@ -91,6 +104,26 @@ export class ShunyaRealm {
   getFocusedWorldPosition(): THREE.Vector3 {
     const idx = this.activeIndex;
     return this.orbs[idx]?.group.position.clone() ?? new THREE.Vector3();
+  }
+
+  // PHASE 3: external React overlays need the orb's screen-projected centre
+  // so they can anchor themselves over it.
+  getOrbByKey(key: string): NanoOrb | null {
+    for (const o of this.orbs) if (o.data.id === key) return o;
+    return null;
+  }
+  getOrbScreenNDC(key: string, camera: THREE.Camera): { x: number; y: number } | null {
+    const o = this.getOrbByKey(key);
+    if (!o) return null;
+    const p = o.group.position.clone().project(camera);
+    return { x: p.x, y: p.y };
+  }
+  getOrbSocketNDC(key: string, socketIdx: number, totalSockets: number, camera: THREE.Camera): { x: number; y: number } | null {
+    const o = this.getOrbByKey(key);
+    if (!o) return null;
+    const world = o.getSocketWorld(socketIdx, totalSockets);
+    const p = world.project(camera);
+    return { x: p.x, y: p.y };
   }
 
   onEnter() {
@@ -173,35 +206,24 @@ export class ShunyaRealm {
     const orb = this.orbs[idx];
     const def = this.defs[idx];
 
-    // Special case \u2014 Vist\u0101ra is a sub-void portal. Burst + fade \u2192 enter Vist\u0101ra.
+    // PHASE 2 in-place architecture: Vist\u0101ra and Medh\u0101 no longer fade to
+    // black or burst-teleport. They route to their URL (which sets
+    // InteractionState.expand) and the orb unfolds in-place. The camera
+    // stays in the Shunya field throughout — no scene teleport.
     if (def.key === 'vistara') {
       this.magnifiedIdx = idx;
-      this.deps?.scroll?.freeze?.();
-      orb.magnify(4.2, 0.55);
-      this.deps?.audio?.swell?.(1.15, 0.4);
-      setTimeout(() => {
-        this.deps?.audio?.duck?.(0.05, 1.8);
-        this.deps?.overlay?.fadeToBlack?.(1.8);
-      }, 480);
-      setTimeout(() => {
-        try { this.deps?.onEnterVistara?.(); } catch {}
-      }, 2350);
+      this.deps?.audio?.swell?.(1.05, 0.4);
+      // Tiny pre-anchor magnify so the click feels tactile but no warp.
+      orb.magnify(1.25, 0.35);
+      setTimeout(() => { try { this.deps?.onEnterVistara?.(); } catch {} }, 60);
       return;
     }
 
-    // Special case \u2014 Medh\u0101 is the cognitive cockpit portal. Burst + fade \u2192 enter HUD.
     if (def.key === 'medha') {
       this.magnifiedIdx = idx;
-      this.deps?.scroll?.freeze?.();
-      orb.magnify(3.6, 0.55);
-      this.deps?.audio?.swell?.(1.1, 0.4);
-      setTimeout(() => {
-        this.deps?.audio?.duck?.(0.05, 1.6);
-        this.deps?.overlay?.fadeToBlack?.(1.6);
-      }, 480);
-      setTimeout(() => {
-        try { this.deps?.onEnterMedha?.(); } catch {}
-      }, 2100);
+      this.deps?.audio?.swell?.(1.05, 0.4);
+      orb.magnify(1.25, 0.35);
+      setTimeout(() => { try { this.deps?.onEnterMedha?.(); } catch {} }, 60);
       return;
     }
 
