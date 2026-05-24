@@ -8,13 +8,13 @@ import '../../lib/vyan/ui/styles.css';
 let appInstance: any = null;
 let rootEl: HTMLDivElement | null = null;
 
-function modeFromPath(pathname: string | null): 'gateway' | 'shunya' | 'vistara' {
+function modeFromPath(pathname: string | null): 'gateway' | 'shunya' {
   if (!pathname) return 'gateway';
-  if (pathname.startsWith('/vistara')) return 'vistara';
-  // /medha keeps the canvas in Shunya mode (background field) while the HUD overlays.
-  if (pathname.startsWith('/medha')) return 'shunya';
-  if (pathname.startsWith('/shunya')) return 'shunya';
-  return 'gateway';
+  // PHASE 1 in-place architecture: every route except /vyoma renders the
+  // Shunya field. /vistara/* and /medha are now URL aliases that focus a
+  // Shunya orb + expand it in-place (driven via InteractionState).
+  if (pathname === '/vyoma' || pathname === '/') return 'gateway';
+  return 'shunya';
 }
 
 export default function CosmicCanvas() {
@@ -47,7 +47,12 @@ export default function CosmicCanvas() {
           router.push('/shunya');
         },
         onOrbActivate: (key: string) => {
-          router.push(`/shunya/${key}`);
+          // PHASE 1: Medhā + Vistāra orbs get their own distinct URLs and
+          // open in-place via InteractionState. Other Shunya orbs (Sandhi,
+          // Saṅkalpa, Udbhava, Vyūha) route to their /shunya/<key> page.
+          if (key === 'medha') router.push('/medha');
+          else if (key === 'vistara') router.push('/vistara');
+          else router.push(`/shunya/${key}`);
         },
         onEnterVistara: () => {
           router.push('/vistara');
@@ -67,18 +72,19 @@ export default function CosmicCanvas() {
       // Expose audio engine separately so the Sound Console can find it.
       (window as any).__vyan.audio = appInstance.audioEngine;
 
-      // Apply initial focus immediately (snap) if route is deep-linked.
-      // CRITICAL: setMode must run FIRST so ShunyaRealm.onEnter() (which
-      // resets scroll to 0) doesn't clobber our focus snap. We force the
-      // mode transition synchronously, then snap.
+      // PHASE 1: every non-gateway URL stays in Shunya mode and focuses a
+      // Shunya orb. /vistara/<product> and /medha become aliases that focus
+      // their respective Shunya orb (the in-place expansion is wired via
+      // InteractionState in the pathname effect below).
       if (initialMode === 'shunya') {
         if (appInstance.getMode?.() !== 'shunya') appInstance.setMode('shunya');
-        const seg = pathname?.split('/')[2];
-        if (seg) appInstance.focusShunyaOrb?.(seg, true);
-      } else if (initialMode === 'vistara') {
-        if (appInstance.getMode?.() !== 'vistara') appInstance.setMode('vistara');
-        const seg = pathname?.split('/')[2];
-        if (seg) appInstance.focusVistaraProduct?.(seg, true);
+        const pn = pathname ?? '';
+        const isVistara = pn.startsWith('/vistara');
+        const isMedha   = pn.startsWith('/medha');
+        const focusKey = isMedha ? 'medha'
+                       : isVistara ? 'vistara'
+                       : pathname?.split('/')[2];
+        if (focusKey) appInstance.focusShunyaOrb?.(focusKey, true);
       }
     })();
 
@@ -93,48 +99,45 @@ export default function CosmicCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync mode + focus whenever pathname changes (without remounting).
-  // CINEMATIC DEEP ROUTING: when the user makes a long mode-jump (e.g. from
-  // /vyoma → /vistara/netra), we don't hard-cut. We chain through the
-  // intermediate stages — Shunya focused on the Vistāra portal orb — so the
-  // camera physically traverses the void before landing on the destination.
-  // For Vyōma → Medhā we similarly stop at Shunya focused on the Medhā orb.
+  // PHASE 1 routing — in-place orb expansion:
+  //   /medha              → stay in Shunya, focus Medhā orb, EXPAND it
+  //   /vistara/<product>  → stay in Shunya, focus Vistāra orb, EXPAND + select node
+  //   anything else       → fold any currently-expanded orb back to dormant
   useEffect(() => {
     if (!appInstance) return;
     const app = appInstance;
-    const targetMode = modeFromPath(pathname);
-    const currentMode = app.getMode?.();
     const seg = pathname?.split('/')[2];
+    const ix = (window as any).__vyanIX as undefined | { expand: (t: 'medha'|'vistara', node?: string|null, spectrum?: any) => void; fold: () => void };
 
-    // Helpers — pure mode/focus application (no traversal).
-    const applyFinal = () => {
-      if (app.getMode?.() !== targetMode) app.setMode(targetMode);
-      if (targetMode === 'shunya' && seg) app.focusShunyaOrb?.(seg);
-      else if (targetMode === 'vistara' && seg) app.focusVistaraProduct?.(seg);
-    };
+    const isMedha   = pathname === '/medha' || pathname?.startsWith('/medha/');
+    const isVistara = pathname === '/vistara' || pathname?.startsWith('/vistara/');
+    const targetOrb: 'medha' | 'vistara' | null = isMedha ? 'medha' : isVistara ? 'vistara' : null;
 
-    // Cinematic chain detection:
-    //   gateway → vistara/X   ⇒  shunya:vistara  (1.4s)  →  vistara/X
-    //   gateway → medha       ⇒  shunya:medha    (1.4s)  →  medha
-    //   shunya  → vistara/X   ⇒  shunya:vistara  (0.9s)  →  vistara/X (if not already there)
-    const needsChain =
-      (currentMode === 'gateway' && (targetMode === 'vistara' || targetMode === 'medha')) ||
-      (currentMode === 'shunya'  && targetMode === 'vistara' && seg);
-    const chainStop =
-      targetMode === 'vistara' ? 'vistara' :
-      targetMode === 'medha'   ? 'medha'   :
-      null;
-    if (needsChain && chainStop) {
-      // Step 1: go to Shunya and focus on the portal orb of the destination.
-      if (app.getMode?.() !== 'shunya') app.setMode('shunya');
-      app.focusShunyaOrb?.(chainStop);
-      const dwell = currentMode === 'gateway' ? 1400 : 900;
-      const t = window.setTimeout(applyFinal, dwell);
-      return () => window.clearTimeout(t);
+    // In-place model: every legacy mode collapses to 'shunya'. Gateway stays
+    // only at /vyoma.
+    const targetMode = (pathname === '/vyoma' || pathname === '/' || !pathname) ? 'gateway' : 'shunya';
+    if (app.getMode?.() !== targetMode) app.setMode(targetMode);
+
+    if (targetMode === 'shunya') {
+      // Focus the right Shunya orb so the camera lands on it.
+      if (targetOrb === 'medha') app.focusShunyaOrb?.('medha');
+      else if (targetOrb === 'vistara') app.focusShunyaOrb?.('vistara');
+      else if (seg) app.focusShunyaOrb?.(seg);
     }
 
-    applyFinal();
-  }, [pathname]);
+    // Drive the InteractionState (in-place expansion).
+    if (targetOrb && ix) {
+      // Lazy import the spectrum mapping to avoid circular import.
+      import('../../lib/vyan/state/InteractionState').then(m => {
+        const spectrum = targetOrb === 'vistara' && seg && seg !== 'placeholder'
+          ? m.VISTARA_SPECTRUM[seg]
+          : 'crimson';
+        ix.expand(targetOrb, targetOrb === 'vistara' ? (seg ?? null) : null, spectrum as any);
+      });
+    } else if (!targetOrb && ix) {
+      ix.fold();
+    }
+  }, [pathname, appInstance]);
 
   return <div id="vyan-root" ref={ref} />;
 }

@@ -58,6 +58,13 @@ export class NanoOrb {
     const nodePos = [];
     const nodeCols = [];
     const nodes = [];
+    // PHASE 1: expansion state stubs. Mutated by setExpansionProgress / setSignal.
+    // Phase 2 will wire these to a shader uniform that scales node positions
+    // outward and brightens the plexus along the branches.
+    (this as any).expansionT = 0;     // 0=dormant, 1=fully unfolded
+    (this as any).signal = 'idle';
+    (this as any).spectrumLo = new THREE.Color(this.data.colorA);
+    (this as any).spectrumHi = new THREE.Color(this.data.colorB);
 
     for (let i = 0; i < this.NODE_COUNT; i++) {
         const r = Math.pow(Math.random(), 0.68) * 5.2;
@@ -466,5 +473,26 @@ export class NanoOrb {
 
     this.trail.update(this.group.position, 1, 1, t);
   }
+
+  // ============================================================
+  // PHASE 1 — InteractionState driver API.
+  // Called by ShunyaRealm when the InteractionState target matches this orb.
+  // Phase 2 will use these to drive the actual visual unfolding (shader
+  // uniforms, branch growth, signal flow). For now they're tracked as plain
+  // members so the wiring is testable.
+  // ============================================================
+  setExpansionProgress(t: number) {
+    (this as any).expansionT = Math.max(0, Math.min(1, t));
+  }
+  setSignal(s: string) {
+    (this as any).signal = s;
+  }
+  setSpectrumHex(loHex: string, hiHex: string) {
+    try {
+      (this as any).spectrumLo = new THREE.Color(loHex);
+      (this as any).spectrumHi = new THREE.Color(hiHex);
+    } catch {}
+  }
+  getExpansionProgress(): number { return (this as any).expansionT ?? 0; }
 }
 

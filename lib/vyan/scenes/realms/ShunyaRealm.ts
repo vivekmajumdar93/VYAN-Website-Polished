@@ -3,6 +3,7 @@ import { NanoOrb } from '../../objects/NanoOrb';
 import { PathCurve, SHUNYA_ORBS, ShunyaOrbDef, ShunyaOrbKey } from '../PathCurve';
 import { SLAB_UDBHAVA_HTML, SLAB_SANDHI_HTML, SLAB_SANKALPA_HTML } from '../../ui/slabContent';
 import { randomArrivalOffset } from '../../app/Spring';
+import { getInteractionStore, SPECTRUM_HEX } from '../../state/InteractionState';
 
 type BindDeps = {
   interaction: any;
@@ -66,6 +67,24 @@ export class ShunyaRealm {
 
   bind(deps: BindDeps) {
     this.deps = deps;
+    // PHASE 1: subscribe to InteractionState and forward expansion progress
+    // + signal + spectrum to the matching orb. Phase 2 will read these on
+    // the NanoOrb itself to drive the visual unfolding + signal flow.
+    try {
+      const store = getInteractionStore();
+      store.subscribe((s) => {
+        const targetKey = s.target; // 'medha' | 'vistara' | null
+        for (const orb of this.orbs) {
+          const isTarget = !!targetKey && orb.data.key === targetKey;
+          orb.setExpansionProgress(isTarget ? s.progress : 0);
+          orb.setSignal(isTarget ? s.signal : 'idle');
+          if (isTarget) {
+            const sp = SPECTRUM_HEX[s.spectrum];
+            if (sp) orb.setSpectrumHex(sp.lo, sp.hi);
+          }
+        }
+      });
+    } catch {}
   }
 
   // Expose focused orb live world position so CameraRig can lock onto it.
