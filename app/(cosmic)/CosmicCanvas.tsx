@@ -95,6 +95,8 @@ export default function CosmicCanvas() {
       appInstance.start();
       (window as any).__vyan = appInstance;
       (window as any).__vyan.audio = appInstance.audioEngine;
+      // Expose router for in-canvas socket clicks (Vistāra product nodes).
+      (window as any).__vyanRouter = router;
 
       // Apply the current route state — fires the in-place expansion if the
       // URL already points at /medha or /vistara/<product>.

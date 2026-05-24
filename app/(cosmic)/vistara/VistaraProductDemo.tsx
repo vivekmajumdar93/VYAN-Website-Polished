@@ -179,60 +179,59 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
 
   const hasEmbed = !!spec.embedUrl;
 
-  // PHASE 3: anchor the slab to its specific Vist\u0101ra socket.
-  // Each product maps to a socket index 0..5 (the 7th is the placeholder).
-  const SOCKET_MAP: Record<string, number> = {
-    ritam: 0, ojas: 1, mudra: 2, netra: 3, akriti: 4, sutra: 5, placeholder: 0,
-  };
-  const socketIdx = SOCKET_MAP[productKey] ?? 0;
+  // PHASE 3 v2: anchor the slab to its specific Vistāra product node by KEY
+  // (the tiny dot scattered on the orb's plexus). The dot exposes its world
+  // position via NanoOrb.socketGroup children with userData.productKey.
   const slabRef = React.useRef<HTMLDivElement | null>(null);
   React.useEffect(() => {
     let raf = 0;
     const SLAB_WIDTH = 480;
     const SLAB_HEIGHT = 580;
+    const tmpV = (() => {
+      try { const THREE = require('three'); return new THREE.Vector3(); } catch { return null; }
+    })();
+
     const tick = () => {
       const el = slabRef.current;
       if (!el) { raf = requestAnimationFrame(tick); return; }
-      // Pull the live anchor data either from the per-frame window broadcast
-      // OR — as a robust fallback — directly from the cosmic world (which
-      // always has the camera + shunya realm references).
-      let anchor: any = (window as any).__vyanAnchor;
-      if (!anchor) {
-        try {
-          const vyan: any = (window as any).__vyan;
-          const w = vyan?.worldRef;
-          if (w?.realms?.shunya?.getOrbSocketNDC && w?.camera) {
-            const ix = (window as any).__vyanIX?.get?.();
-            const tgt = ix?.target;
-            if (tgt) {
-              const sockets: Array<{ x: number; y: number }> = [];
-              for (let i = 0; i < 6; i++) {
-                const s = w.realms.shunya.getOrbSocketNDC(tgt, i, 6, w.camera);
-                if (s) sockets.push(s);
-              }
-              const centre = w.realms.shunya.getOrbScreenNDC(tgt, w.camera);
-              anchor = { target: tgt, centre, sockets, w: window.innerWidth, h: window.innerHeight };
+      let anchorScreen: { x: number; y: number } | null = null;
+      try {
+        const vyan: any = (window as any).__vyan;
+        const w = vyan?.worldRef;
+        if (w?.realms?.shunya?.getOrbByKey && w?.camera && tmpV) {
+          const orb = w.realms.shunya.getOrbByKey('vistara');
+          if (orb?.socketGroup?.children?.length) {
+            // Find the hit-sphere for this productKey (it has the world pos).
+            const child = orb.socketGroup.children.find((c: any) =>
+              c.userData?.isProductSocket && c.userData?.productKey === productKey && c.geometry,
+            );
+            if (child) {
+              child.getWorldPosition(tmpV);
+              tmpV.project(w.camera);
+              anchorScreen = {
+                x: (tmpV.x * 0.5 + 0.5) * window.innerWidth,
+                y: (-tmpV.y * 0.5 + 0.5) * window.innerHeight,
+              };
             }
           }
-        } catch {}
-      }
-      if (anchor && anchor.sockets && anchor.sockets[socketIdx]) {
-        const sock = anchor.sockets[socketIdx];
-        const cx = (sock.x * 0.5 + 0.5) * anchor.w;
-        const cy = (-sock.y * 0.5 + 0.5) * anchor.h;
-        const onRight = cx >= anchor.w * 0.5;
-        const offsetX = onRight ? 60 : -(SLAB_WIDTH + 60);
+        }
+      } catch {}
+
+      if (anchorScreen) {
+        const cx = anchorScreen.x;
+        const cy = anchorScreen.y;
+        const W = window.innerWidth, H = window.innerHeight;
+        const onRight = cx >= W * 0.5;
+        const offsetX = onRight ? 50 : -(SLAB_WIDTH + 50);
         let left = cx + offsetX;
-        // Centre the slab vertically on the socket BUT clamp to viewport.
         let top  = cy - SLAB_HEIGHT * 0.5;
-        const MIN_MARGIN = 24;
-        left = Math.max(MIN_MARGIN, Math.min(anchor.w - SLAB_WIDTH - MIN_MARGIN, left));
-        top  = Math.max(MIN_MARGIN, Math.min(anchor.h - SLAB_HEIGHT - MIN_MARGIN, top));
-        // Smooth lerp toward target to avoid per-frame jitter.
+        const MIN = 20;
+        left = Math.max(MIN, Math.min(W - SLAB_WIDTH - MIN, left));
+        top  = Math.max(MIN, Math.min(H - SLAB_HEIGHT - MIN, top));
         const cur = el.getBoundingClientRect();
         const curLeft = cur.left || left;
         const curTop  = cur.top  || top;
-        const lerp = 0.18;
+        const lerp = 0.20;
         const nextLeft = curLeft + (left - curLeft) * lerp;
         const nextTop  = curTop  + (top  - curTop)  * lerp;
         el.style.left = nextLeft + 'px';
@@ -242,6 +241,7 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
         el.style.transform = 'none';
         el.style.position = 'fixed';
         el.style.opacity = '1';
+        // Draw faint filament from slab edge → node.
         const filament = el.querySelector('.vpd-anchor-filament') as SVGElement | null;
         if (filament) {
           const sx = onRight ? 0 : SLAB_WIDTH;
@@ -256,8 +256,7 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
           }
         }
       } else {
-        // No anchor yet — dock to right as graceful fallback so the slab
-        // is at least visible while the world boots.
+        // Fallback: dock to right.
         el.style.right = '4vw';
         el.style.left = 'auto';
         el.style.top = '50%';
@@ -269,7 +268,7 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [socketIdx]);
+  }, [productKey]);
 
   return (
     <div className="vpd-veil" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) router.push('/vistara'); }}>

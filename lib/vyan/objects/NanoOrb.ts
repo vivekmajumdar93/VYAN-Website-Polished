@@ -51,6 +51,7 @@ export class NanoOrb {
   private dust: THREE.Points;
   private satellites: THREE.Group;
   private socketGroup!: THREE.Group;
+  private signalGroup!: THREE.Group;
 
   constructor(data: NanoOrbData, radius: number = 1.65, _networkSize: number = 4200) {
     this.data = data;
@@ -296,78 +297,128 @@ export class NanoOrb {
     );
     this.group.add(this.hitMesh);
 
-    // PHASE 3 — visible UNFOLD-SOCKETS. 6 glowing nodes that fade in around
-    // the orb when expansionT > 0. Each is a small sphere + filament back
-    // to the orb centre. Used by Vistāra to anchor product slabs.
+    // PHASE 3 v2 — clickable PRODUCT NODES (only enabled for Vistāra orb).
+    // Tiny additive dots placed at scattered "intersection-like" positions
+    // around the orb's plexus. Each carries a productKey for raycast click
+    // routing. They're invisible until expansionT > 0.1, then bloom in.
+    // Set via `enableProductSockets(keys)` from ShunyaRealm.
     this.socketGroup = new THREE.Group();
     this.socketGroup.visible = false;
     this.group.add(this.socketGroup);
-    const socketColor = new THREE.Color(this.data.colorB || '#ff5a7a');
-    for (let i = 0; i < 6; i++) {
-      const node = new THREE.Mesh(
-        new THREE.SphereGeometry(0.42, 16, 16),
-        new THREE.MeshBasicMaterial({
-          color: socketColor,
-          transparent: true,
-          opacity: 0,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
-      );
-      // Halo ring
-      const halo = new THREE.Mesh(
-        new THREE.RingGeometry(0.55, 0.95, 32),
-        new THREE.MeshBasicMaterial({
-          color: socketColor,
-          transparent: true,
-          opacity: 0,
-          side: THREE.DoubleSide,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
-      );
-      halo.userData.isHalo = true;
-      // Outer glow disc
-      const glow = new THREE.Mesh(
-        new THREE.CircleGeometry(1.4, 32),
-        new THREE.MeshBasicMaterial({
-          color: socketColor,
-          transparent: true,
-          opacity: 0,
-          side: THREE.DoubleSide,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
-      );
-      glow.userData.isGlow = true;
-      // Filament line to centre
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, 0),
-      ]);
-      const lineMat = new THREE.LineBasicMaterial({
-        color: socketColor,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-      });
-      const line = new THREE.Line(lineGeo, lineMat);
-      line.userData.isFilament = true;
 
-      const wrap = new THREE.Group();
-      wrap.add(glow);
-      wrap.add(halo);
-      wrap.add(node);
-      wrap.add(line);
-      wrap.userData.socketIdx = i;
-      this.socketGroup.add(wrap);
-    }
+    // PHASE 3 v2 — ELECTRIC SIGNAL PULSES. Travel from random branch
+    // origins toward each socket so the user can SEE which dots to click.
+    this.signalGroup = new THREE.Group();
+    this.signalGroup.visible = false;
+    this.group.add(this.signalGroup);
 
     this.trail = new OrbDustTrail('#a066ff');
     this.trailGroup.add(this.trail.group);
 
     this.group.visible = false;
     this.trailGroup.visible = false;
+  }
+
+  /**
+   * Enable clickable product sockets on this orb. Tiny dots at scattered
+   * intersection-like positions, each tagged with its productKey for
+   * raycast click → URL routing.
+   * Only Vistāra calls this.
+   */
+  enableProductSockets(productKeys: string[]) {
+    // Clear any existing sockets.
+    while (this.socketGroup.children.length) {
+      const c = this.socketGroup.children[0];
+      this.socketGroup.remove(c);
+      (c as any).geometry?.dispose?.();
+      (c as any).material?.dispose?.();
+    }
+    while (this.signalGroup.children.length) {
+      const c = this.signalGroup.children[0];
+      this.signalGroup.remove(c);
+      (c as any).geometry?.dispose?.();
+      (c as any).material?.dispose?.();
+    }
+
+    const socketColor = new THREE.Color(this.data.colorB || '#ff5a7a');
+    // Use a seeded RNG so positions are stable across mounts.
+    let seed = 1337;
+    const srand = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+
+    for (let i = 0; i < productKeys.length; i++) {
+      const key = productKeys[i];
+
+      // Place the dot at a scattered intersection-like point: random angle,
+      // radius near orb edge (1.7..2.4) with depth jitter. This puts the
+      // dot AMONG the web's outer intersections, not on a giant ring.
+      const angle = srand() * Math.PI * 2;
+      const elev  = (srand() - 0.5) * 1.1;
+      const r     = 1.7 + srand() * 0.7;
+      const lp = new THREE.Vector3(
+        Math.cos(angle) * Math.cos(elev) * r,
+        Math.sin(elev) * r,
+        Math.sin(angle) * Math.cos(elev) * r,
+      );
+
+      // The dot itself — a small additive billboard sprite for max
+      // visibility without the giant disc look.
+      const dotGeom = new THREE.SphereGeometry(0.06, 10, 10);
+      const dotMat = new THREE.MeshBasicMaterial({
+        color: socketColor,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const dot = new THREE.Mesh(dotGeom, dotMat);
+      dot.position.copy(lp);
+      dot.userData.isProductSocket = true;
+      dot.userData.productKey = key;
+      dot.userData.basePos = lp.clone();
+
+      // A slightly larger invisible hit-sphere on top so taps register.
+      const hit = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 8, 8),
+        new THREE.MeshBasicMaterial({ visible: false, depthWrite: false }),
+      );
+      hit.position.copy(lp);
+      hit.userData.isProductSocket = true;
+      hit.userData.productKey = key;
+      this.socketGroup.add(hit);
+      this.socketGroup.add(dot);
+
+      // PHASE 3 — electric SIGNAL PULSE travelling toward this dot.
+      // A small bright point + a fading trail line drawn each frame.
+      const pulseGeo = new THREE.SphereGeometry(0.05, 6, 6);
+      const pulseMat = new THREE.MeshBasicMaterial({
+        color: socketColor,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+      pulse.userData.isSignal = true;
+      pulse.userData.targetKey = key;
+      // Random starting offset along its 0..1 progress so all 6 are
+      // staggered (so users see ALL nodes signal sequentially).
+      pulse.userData.t = i / Math.max(1, productKeys.length);
+      pulse.userData.speed = 0.35 + srand() * 0.25;
+      // Random branch origin point (near the orb surface, opposite side).
+      const ogAngle = angle + Math.PI + (srand() - 0.5) * 0.8;
+      const ogElev  = (srand() - 0.5) * 1.4;
+      const ogR     = 2.0 + srand() * 0.6;
+      pulse.userData.origin = new THREE.Vector3(
+        Math.cos(ogAngle) * Math.cos(ogElev) * ogR,
+        Math.sin(ogElev) * ogR,
+        Math.sin(ogAngle) * Math.cos(ogElev) * ogR,
+      );
+      pulse.userData.target = lp.clone();
+      this.signalGroup.add(pulse);
+    }
   }
 
   setHomePosition(p: THREE.Vector3) {
@@ -525,21 +576,25 @@ export class NanoOrb {
     posAttr.needsUpdate = true;
 
     // NETWORK SHIMMER — signal-state-driven brightness and pulse.
+    // CRITICAL FIX: branches DIM as expansionT rises so the electric signals
+    // travelling toward each clickable product node are clearly visible.
     const expT2 = (this as any).expansionT ?? 0;
     const signal = (this as any).signal as string;
     const dim = (this as any).visualDim ?? 1;
     let signalBoost = 0;
     let signalPulse = 0;
-    if (signal === 'hover')        { signalBoost = 0.15; signalPulse = 0.05; }
-    else if (signal === 'listening'){ signalBoost = 0.20; signalPulse = 0.10; }
-    else if (signal === 'processing'){ signalBoost = 0.25; signalPulse = 0.18; }
-    else if (signal === 'response') { signalBoost = 0.32; signalPulse = 0.25; }
-    else if (signal === 'interaction'){ signalBoost = 0.22; signalPulse = 0.08; }
-    else if (signal === 'decay')    { signalBoost = 0.05; signalPulse = 0.0; }
+    if (signal === 'hover')        { signalBoost = 0.05; signalPulse = 0.04; }
+    else if (signal === 'listening'){ signalBoost = 0.08; signalPulse = 0.06; }
+    else if (signal === 'processing'){ signalBoost = 0.10; signalPulse = 0.10; }
+    else if (signal === 'response') { signalBoost = 0.14; signalPulse = 0.14; }
+    else if (signal === 'interaction'){ signalBoost = 0.06; signalPulse = 0.05; }
+    else if (signal === 'decay')    { signalBoost = 0.02; signalPulse = 0.0; }
     const pulseFreq = signal === 'processing' ? 3.8 : signal === 'response' ? 5.2 : 2.4;
-    const webBase = 0.30 + expT2 * 0.35 + signalBoost;
-    this.web.material.opacity = (webBase + Math.sin(t * pulseFreq) * (0.10 + signalPulse)) * dim;
-    this.nodeMat.opacity = (0.82 + expT2 * 0.18 + Math.sin(t * 1.7) * 0.08 + signalBoost) * dim;
+    // INVERT: web fades down as expansion grows, so signals show through.
+    const webBase = 0.30 * (1 - expT2 * 0.68) + signalBoost;
+    this.web.material.opacity = (webBase + Math.sin(t * pulseFreq) * (0.06 + signalPulse * 0.5)) * dim;
+    // Nodes (the orb's intrinsic web-junctions) also dim.
+    this.nodeMat.opacity = (0.82 * (1 - expT2 * 0.55) + Math.sin(t * 1.7) * 0.06 + signalBoost) * dim;
 
     // CORE TURBULENCE
     this.coreDust.rotation.y += 0.08 * motion * 0.016;
@@ -548,7 +603,7 @@ export class NanoOrb {
     this.haze.rotation.z += 0.01 * motion * 0.016;
 
     // Apply visual dim to other materials.
-    (this.haze.material as THREE.PointsMaterial).opacity = 0.12 * dim;
+    (this.haze.material as THREE.PointsMaterial).opacity = 0.12 * dim * (1 - expT2 * 0.5);
     (this.coreDust.material as THREE.Material).opacity = (0.82 + Math.sin(t * 2.5) * 0.08) * dim;
     (this.dust.material as THREE.PointsMaterial).opacity = 0.22 * dim;
 
@@ -563,56 +618,60 @@ export class NanoOrb {
     this.dust.rotation.y += 0.003 * motion * 0.016;
     this.dust.rotation.x += 0.001 * motion * 0.016;
 
-    // PHASE 3 — unfold sockets. Position each socket on a ring around the
-    // orb. Their radius and opacity scale with expansionT, and they receive
-    // the spectrum colour so the right product slabs can anchor to them.
-    if (this.socketGroup) {
+    // PHASE 3 v2 — clickable PRODUCT NODES + electrifying SIGNAL PULSES.
+    // Only render when sockets are enabled AND expansion > 0.
+    if (this.socketGroup && this.signalGroup) {
       const expForSockets = (this as any).expansionT ?? 0;
-      this.socketGroup.visible = expForSockets > 0.01;
-      const spectrumHi: THREE.Color | undefined = (this as any).spectrumHi;
-      const total = this.socketGroup.children.length;
-      // Sockets sit on a ring larger than the orb body (orb radius ~5.2).
-      const baseRadius = 6.4 + expForSockets * 3.2;
-      const wave = Math.sin(t * 1.6) * 0.18;
-      // Compensate parent group scale so sockets stay at fixed world-distance.
-      const groupScale = this.group.scale.x || 1;
-      const inv = 1 / groupScale;
-      for (let i = 0; i < total; i++) {
-        const wrap = this.socketGroup.children[i] as THREE.Group;
-        const idx = (wrap.userData.socketIdx as number) ?? i;
-        const angle = (idx / total) * Math.PI * 2 - Math.PI / 2 + t * 0.05;
-        const r = (baseRadius + Math.sin(t * 1.2 + idx) * 0.25) * inv;
-        const yJ = (Math.sin(idx * 1.7) * 0.4 + wave * (idx % 2 === 0 ? 1 : -1)) * inv;
-        const x = Math.cos(angle) * r;
-        const y = Math.sin(angle) * r * 0.62 + yJ;
-        wrap.position.set(x, y, 0);
-        // Stagger fade-in (each socket lights up at 0.2 + idx*0.07).
-        const fadeStart = 0.20 + idx * 0.07;
-        const localT = Math.max(0, Math.min(1, (expForSockets - fadeStart) / Math.max(0.001, 1 - fadeStart)));
-        const op = localT;
-        for (const child of wrap.children) {
-          const m = (child as any).material as THREE.Material | undefined;
+      const visible = expForSockets > 0.05 && this.socketGroup.children.length > 0;
+      this.socketGroup.visible = visible;
+      this.signalGroup.visible = visible;
+
+      if (visible) {
+        const spectrumHi: THREE.Color | undefined = (this as any).spectrumHi;
+        // -- DOTS: tiny pulsating intersection points. --
+        for (const c of this.socketGroup.children) {
+          const isHit = !(c as any).geometry || !(c as any).material || ((c as any).material as any).visible === false;
+          const m = (c as any).material as THREE.MeshBasicMaterial | undefined;
           if (!m) continue;
-          let perOp = op;
-          if ((child as any).userData?.isHalo)     perOp = op * 0.55;
-          else if ((child as any).userData?.isFilament) perOp = op * 0.45;
-          else if ((child as any).userData?.isGlow) perOp = op * 0.28;
-          else                                       perOp = op * 0.95; // node sphere
-          (m as any).opacity = perOp;
-          if ('color' in m && spectrumHi) (m as any).color = spectrumHi;
+          if (isHit) continue; // skip invisible hit-spheres
+          // Stagger fade-in.
+          const fadeIn = Math.min(1, Math.max(0, (expForSockets - 0.2) / 0.6));
+          // Soft glittering pulse so the dots feel ALIVE.
+          const idx = (c as any).id ?? 0;
+          const pulseAmt = 0.7 + Math.sin(t * 3.2 + idx) * 0.30;
+          m.opacity = fadeIn * pulseAmt;
+          if (spectrumHi && (m as any).color) (m as any).color = spectrumHi;
+          // Slight breathing in scale.
+          const s = 1 + Math.sin(t * 3.0 + idx) * 0.18;
+          c.scale.setScalar(s);
         }
-        // Update filament line endpoints (centre → wrap origin in local space).
-        const line = wrap.children.find(c => c.userData.isFilament) as THREE.Line | undefined;
-        if (line) {
-          const pos = (line.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
-          pos.setXYZ(0, -x, -y, 0);
-          pos.setXYZ(1, 0, 0, 0);
-          pos.needsUpdate = true;
+
+        // -- SIGNAL PULSES: travel from origin → target, draw fading trail. --
+        for (const pulse of this.signalGroup.children) {
+          const p: any = pulse;
+          p.userData.t += dt * (p.userData.speed ?? 0.4);
+          if (p.userData.t > 1.15) p.userData.t = -0.15;
+          const tt = Math.max(0, Math.min(1, p.userData.t));
+          const origin: THREE.Vector3 = p.userData.origin;
+          const target: THREE.Vector3 = p.userData.target;
+          // Bezier-ish curve via mid-point arc for visual richness.
+          const mid = origin.clone().add(target).multiplyScalar(0.5);
+          mid.y += 0.5; // arc upward
+          // Quadratic bezier: B(t) = (1-t)²P0 + 2(1-t)t·P1 + t²P2
+          const omt = 1 - tt;
+          const px = omt * omt * origin.x + 2 * omt * tt * mid.x + tt * tt * target.x;
+          const py = omt * omt * origin.y + 2 * omt * tt * mid.y + tt * tt * target.y;
+          const pz = omt * omt * origin.z + 2 * omt * tt * mid.z + tt * tt * target.z;
+          pulse.position.set(px, py, pz);
+          const mat = (pulse as any).material as THREE.MeshBasicMaterial;
+          // Bright in middle, fade at ends.
+          const env = Math.sin(tt * Math.PI);
+          mat.opacity = env * Math.min(1, expForSockets * 1.6);
+          if (spectrumHi) mat.color = spectrumHi;
+          // Slight glow scale near target so it feels like impact.
+          const burst = 1 + (tt > 0.85 ? (tt - 0.85) * 8 : 0);
+          pulse.scale.setScalar(burst);
         }
-        // Halo gentle rotation.
-        const halo = wrap.children.find(c => c.userData.isHalo) as THREE.Mesh | undefined;
-        if (halo) halo.rotation.z = t * 0.6 + idx;
-        // Always face camera-ish (billboard-light) — set rotation.x=0 keeps in xy plane.
       }
     }
 

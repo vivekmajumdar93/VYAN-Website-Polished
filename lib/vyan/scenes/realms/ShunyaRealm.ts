@@ -55,6 +55,15 @@ export class ShunyaRealm {
       this.group.add(orb.group);
       this.group.add(orb.trailGroup);
       this.orbs.push(orb);
+
+      // PHASE 3 v2 — ONLY Vistāra gets clickable product sockets (tiny dots
+      // at scattered intersection points, electric signal pulses converging
+      // on them). Medhā and other orbs have NO sockets.
+      if (def.key === 'vistara') {
+        orb.enableProductSockets([
+          'ritam', 'ojas', 'mudra', 'netra', 'akriti', 'sutra',
+        ]);
+      }
     }
 
     this.starfield = this.buildStarfield(7000, 600);
@@ -318,6 +327,34 @@ export class ShunyaRealm {
       this.ndc.set(this.deps.interaction.pointer.x, this.deps.interaction.pointer.y);
       this.raycaster.setFromCamera(this.ndc, this.deps.camera);
       const focused = this.orbs[this.activeIndex];
+
+      // PHASE 3 v2 — product-socket click (only on Vistāra). If the user
+      // taps one of the tiny dots, route directly to /vistara/<productKey>.
+      const isVistaraOrb = this.defs[this.activeIndex]?.key === 'vistara';
+      if (isVistaraOrb && (focused as any).socketGroup) {
+        const socketHits = this.raycaster.intersectObjects(
+          (focused as any).socketGroup.children, true
+        );
+        const productHit = socketHits.find((h: any) =>
+          h.object?.userData?.isProductSocket && h.object?.userData?.productKey,
+        );
+        if (productHit) {
+          const productKey = productHit.object.userData.productKey as string;
+          // Light click feedback then route — the in-place expansion stays.
+          this.deps?.audio?.swell?.(1.06, 0.25);
+          // Use the same route as the in-place architecture: /vistara/<key>
+          // which sets InteractionState.expand('vistara', key) automatically.
+          try {
+            const router = (window as any).__vyanRouter;
+            if (router?.push) router.push(`/vistara/${productKey}`);
+            else window.location.assign(`/vistara/${productKey}`);
+          } catch {
+            window.location.assign(`/vistara/${productKey}`);
+          }
+          return;
+        }
+      }
+
       const hit = this.raycaster.intersectObject(focused.hitMesh, true);
       const centered = Math.abs(this.ndc.x) < 0.34 && Math.abs(this.ndc.y) < 0.24;
       if (hit.length > 0 || centered) {
