@@ -81,16 +81,16 @@ export default function CosmicCanvas() {
         initialMode,
         onEnterVoid: () => { router.push('/shunya'); },
         onOrbActivate: (key: string) => {
-          // PHASE 2 in-place: Medhā + Vistāra get their own URLs and unfold
+          // PHASE 2+5 in-place: Medhā + Vistāra get their own URLs and unfold
           // in-place via InteractionState. Other Shunya orbs route to /shunya/<key>.
+          // Legacy onEnterVistara/onProductActivate callbacks removed — those
+          // code paths are obsolete under the in-place architecture.
           if (key === 'medha') router.push('/medha');
           else if (key === 'vistara') router.push('/vistara');
           else router.push(`/shunya/${key}`);
         },
         onEnterVistara: () => { router.push('/vistara'); },
-        onProductActivate: (key: string) => { router.push(`/vistara/${key}`); },
-        onExitVistara: () => { router.push('/shunya/vistara'); },
-        onEnterMedha: () => { router.push('/medha'); },
+        onEnterMedha:   () => { router.push('/medha');   },
       });
       appInstance.start();
       (window as any).__vyan = appInstance;

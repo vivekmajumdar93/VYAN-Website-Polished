@@ -17,10 +17,11 @@
 @keyframes vpd-veil-in { from { opacity: 0; } to { opacity: 1; } }
 
 .vpd-slab {
-  width: min(560px, 46vw);
-  max-height: min(720px, 88vh);
-  margin-right: 4vw;
-  margin-left: auto;   /* dock right so cosmic orb stays visible on the left */
+  /* PHASE 3: position is set per-frame by VistaraProductDemo based on the
+     socket index, so the slab anchors to its specific Vistāra socket. */
+  position: fixed;
+  width: 480px;
+  height: 580px;
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(15, 10, 30, 0.78), rgba(8, 6, 18, 0.82));
   backdrop-filter: blur(18px) saturate(140%);
@@ -33,8 +34,30 @@
   color: rgba(244, 235, 255, 0.92);
   display: flex; flex-direction: column;
   overflow: hidden;
+  opacity: 0; /* fade in once anchored on first frame */
+  transition: opacity 0.45s ease;
   animation: vpd-slab-in 0.52s cubic-bezier(0.23, 1, 0.32, 1);
 }
+
+/* Filament SVG that connects the slab to its socket. Drawn behind slab content. */
+.vpd-anchor-filament {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent, #d4a8ff) 60%, transparent));
+}
+.vpd-anchor-filament path {
+  animation: vpd-fil-pulse 2.6s ease-in-out infinite;
+}
+@keyframes vpd-fil-pulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.95; }
+}
+.vpd-slab > *:not(.vpd-anchor-filament) { position: relative; z-index: 1; }
 @keyframes vpd-slab-in { from { opacity: 0; transform: translateY(22px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 .vpd-head {

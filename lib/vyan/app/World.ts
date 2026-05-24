@@ -18,7 +18,7 @@ export class World {
 
   private clock = new THREE.Clock();
   private cameraRig: CameraRig;
-  private realms: SceneManager;
+  public realms: SceneManager;
   private deps!: Deps;
   private composerBundle!: ComposerBundle;
   private raf = 0;
@@ -133,9 +133,18 @@ export class World {
       try {
         const sh: any = this.realms.shunya;
         if (sh && sh.getOrbScreenNDC) {
-          const ex = (window as any).__vyanExpansion;
-          const tgt = ex?.target;
+          // Read directly from InteractionState (works even if ShunyaRealm
+          // subscribe is in a stale-closure due to React HMR re-mounts).
+          const ix = (window as any).__vyanIX;
+          const snap = ix?.get?.();
+          const tgt = snap?.target ?? null;
           if (tgt) {
+            // Mirror to __vyanExpansion for camera FOV pull.
+            (window as any).__vyanExpansion = {
+              target: tgt,
+              progress: snap.progress ?? 0,
+              phase: snap.phase ?? 'unfolding',
+            };
             const centre = sh.getOrbScreenNDC(tgt, this.camera);
             const sockets: Array<{ x: number; y: number }> = [];
             for (let i = 0; i < 6; i++) {
@@ -144,6 +153,7 @@ export class World {
             }
             (window as any).__vyanAnchor = { target: tgt, centre, sockets, w: window.innerWidth, h: window.innerHeight };
           } else {
+            (window as any).__vyanExpansion = { target: null, progress: 0, phase: 'dormant' };
             (window as any).__vyanAnchor = null;
           }
         }

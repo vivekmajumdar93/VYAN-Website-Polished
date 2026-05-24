@@ -585,8 +585,17 @@
   .mlv-mind__name { font-size: 7.5px; }
   .mlv-slab { width: calc(100vw - 24px); transform: translate(-50%, calc(-50% + 180px)); max-height: 30vh; padding: 12px 14px 10px; }
   .mlv-slab__body { font-size: 13px; }
-  .mlv-thread { left: 12px; right: 12px; bottom: 92px; }
-  .mlv-composer { left: 12px; right: 12px; bottom: 12px; }
+  /* Vertical rail stays on extreme right even on mobile per user spec.
+     Override the legacy horizontal mobile layout. */
+  .mlv-thread {
+    left: auto !important;
+    right: 0 !important;
+    top: 80px !important;
+    bottom: 92px !important;
+    width: 24px !important;
+    flex-direction: column !important;
+  }
+  .mlv-composer { left: 12px; right: 56px; bottom: 12px; }
   .mlv-composer__wrap { padding: 8px 10px; gap: 6px; }
   .mlv-composer__bind { display: none; }
   .mlv-composer__wrap textarea { font-size: 13px; }
@@ -1041,10 +1050,11 @@
 .mlv .mlv-thread--user-only {
   position: fixed !important;
   top: 80px !important;
-  right: 18px !important;
+  right: 0px !important;          /* EXTREME RIGHT EDGE per user spec */
   bottom: calc(env(safe-area-inset-bottom, 0px) + 110px) !important;
   left: auto !important;
   width: 28px !important;
+  padding-right: 6px !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;

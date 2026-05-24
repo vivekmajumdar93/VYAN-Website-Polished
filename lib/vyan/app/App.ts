@@ -98,6 +98,8 @@ export class App {
   // ----- Public API used by Next.js pages via window.__vyan -----
   /** Audio engine reference for SoundConsole / external controls. */
   public get audioEngine() { return this.audio; }
+  /** World reference for in-place HUD anchoring. */
+  public get worldRef() { return this.world; }
 
   setMode(mode: RealmMode) {
     this.world.setMode(mode);
