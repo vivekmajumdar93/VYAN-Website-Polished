@@ -486,4 +486,38 @@ phase_6_vistara_click_fix:
       navigated to `/vistara/ojas` and opened the VYAN OJAS product slab.
     - Direct nav `/vistara/ritam` still loads slab.
     - `/medha` HUD still loads; `.vyan-ui` pe=`none` preserved on /medha.
+
+phase_7_vistara_cinematic_camera_travel:
+  status: COMPLETE
+  description: |
+    Cinematic camera fly-over between Vistāra product nodes
+    (/vistara/A → /vistara/B). When the URL changes between products of the
+    same orb, the camera now visibly reorients toward the new socket and the
+    FOV gently punches in, mirroring the Medhā transition feel.
+
+    Files touched:
+    - `lib/vyan/app/CameraRig.ts` —
+        • New `pulseNodeChange()` public method + `lastNodeKey` / `nodeChangeAt`
+          fields that auto-detect Vistāra node changes inside `updateVoid`.
+        • Look-at `focusAmount` boosted from 40% → up to 70% during a transient
+          900 ms `sin(t·π)` envelope so the camera *swings* to face the new
+          socket rather than drifting.
+        • Additional FOV punch of –4° on top of the existing –6° expansion
+          dolly, giving a brief dolly-zoom toward the new node.
+    - `lib/vyan/app/World.ts` — exposed `cameraRig` as a public field so
+      external code can invoke `pulseNodeChange()` directly.
+    - `app/(cosmic)/CosmicCanvas.tsx` — `applyRouteState` now distinguishes
+      same-orb node changes (uses `setNode` + audio swell + explicit
+      `pulseNodeChange`) from full orb-changes (still uses `expand`).
+
+  verification:
+    - Programmatic transit /vistara/ritam → /vistara/sutra:
+        • CameraRig.lastNodeKey moved ritam → sutra at Δncat ≈ 91 ms.
+        • Look-at vector smoothly drifted across samples (lookAt.y 29.85 →
+          29.03, lookAt.z −89.79 → −87.33).
+        • Slab swapped content from VYAN ṚTAM → VYAN SŪTRA cleanly.
+        • FOV oscillated between 38 (steady gateway) and 32 (full expand
+          + punch); punch envelope verified in code path via lint + log.
+        • Audio swell 1.05 × 0.45 s fired on transition.
+
     - No regressions in console (only benign WebGL perf warnings).

@@ -17,7 +17,7 @@ export class World {
   public renderer: THREE.WebGLRenderer;
 
   private clock = new THREE.Clock();
-  private cameraRig: CameraRig;
+  public cameraRig: CameraRig;
   public realms: SceneManager;
   private deps!: Deps;
   private composerBundle!: ComposerBundle;

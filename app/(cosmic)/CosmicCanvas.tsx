@@ -48,7 +48,27 @@ async function applyRouteState(pathname: string | null, isInitial = false) {
     const spectrum = targetOrb === 'vistara' && seg && seg !== 'placeholder'
       ? (m.VISTARA_SPECTRUM[seg] ?? 'crimson')
       : 'crimson';
-    ix.expand(targetOrb, targetOrb === 'vistara' ? (seg ?? null) : null, spectrum);
+
+    // PHASE 6 — same-orb node-change cinematic. When the user navigates from
+    // /vistara/A → /vistara/B (same orb, different product socket), use
+    // setNode (instant) instead of expand (full tween) and fire an audio
+    // swell so the camera's FOV-punch + look-at swing feels synchronized.
+    const cur = ix.get();
+    if (cur.target === targetOrb && cur.phase !== 'dormant') {
+      const nextNode = targetOrb === 'vistara' ? (seg ?? null) : null;
+      if (cur.node !== nextNode) {
+        ix.setNode(nextNode, spectrum);
+        try { app.audioEngine?.swell?.(1.05, 0.45); } catch {}
+        // Also trigger the camera-rig FOV punch directly (belt + braces —
+        // the rig's auto-detect will also fire, but this guarantees the cue
+        // even if the IX node-change isn't observed in the same frame).
+        try { app.worldRef?.cameraRig?.pulseNodeChange?.(); } catch {}
+      } else if (spectrum && cur.spectrum !== spectrum) {
+        ix.setSpectrum(spectrum);
+      }
+    } else {
+      ix.expand(targetOrb, targetOrb === 'vistara' ? (seg ?? null) : null, spectrum);
+    }
   } else {
     ix.fold();
   }

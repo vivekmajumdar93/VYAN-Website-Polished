@@ -26,6 +26,19 @@ export class CameraRig {
   private arrivalSpring = new SpringV3();
   private arrivalActive = false;
 
+  // PHASE 6 — cinematic Vistāra node-change "fly-over".
+  // When the active socket key changes while target = 'vistara', we kick a
+  // transient FOV "punch" (38 → 30 → 38) over ~0.9s and momentarily boost the
+  // look-at lerp toward the new socket, so the camera *swings* to face it.
+  private lastNodeKey: string | null = null;
+  private nodeChangeAt: number = 0;
+  private nodeChangeDur: number = 900; // ms
+
+  /** Public: called when route changes to a new Vistāra product to trigger the cinematic. */
+  public pulseNodeChange() {
+    this.nodeChangeAt = performance.now();
+  }
+
   constructor(private camera: THREE.PerspectiveCamera) {}
 
   bind(deps: Deps) {
@@ -168,15 +181,27 @@ export class CameraRig {
     }
 
     // PHASE 4 — CINEMATIC NODE FOCUS. When a specific socket is selected
-    // (Vist\u0101ra product OR Medh\u0101 model), shift the look-target subtly toward
+    // (Vistāra product OR Medhā model), shift the look-target subtly toward
     // that socket's world position. Combined with the FOV pull below, this
     // gives a "camera cinematically turns to face the node" feel without
     // teleporting away from the orb.
+    //
+    // PHASE 6 — Vistāra node-change "fly-over". When the active socket key
+    // changes (e.g. /vistara/ritam → /vistara/sutra) we briefly amplify the
+    // look-at commitment (40% → 70%) and trigger an FOV punch via
+    // `pulseNodeChange()`. The transient eases out over `nodeChangeDur` ms.
+    let focusBoost = 0;
     try {
       const ix = (window as any).__vyanIX?.get?.();
       const tgtKey = ix?.target;
       const nodeKey = ix?.node;
       if (tgtKey && nodeKey && realm?.getOrbByKey) {
+        // Detect a node-key change → kick the cinematic.
+        if (nodeKey !== this.lastNodeKey && this.lastNodeKey !== null && tgtKey === 'vistara') {
+          this.pulseNodeChange();
+        }
+        this.lastNodeKey = nodeKey;
+
         const orb = realm.getOrbByKey(tgtKey);
         if (orb?.socketGroup?.children?.length) {
           // Find the hit-sphere with matching productKey.
@@ -186,11 +211,18 @@ export class CameraRig {
           if (sock) {
             const sockWorld = new THREE.Vector3();
             sock.getWorldPosition(sockWorld);
-            // Move ~40% toward the socket so the orb stays in frame.
-            const focusAmount = Math.max(0, Math.min(0.4, (ix.progress ?? 0) * 0.4));
+            // Base: 40% lerp during steady state. Burst: ramps up to +30% during
+            // the node-change pulse so the camera visibly swings to the new socket.
+            const t = (performance.now() - this.nodeChangeAt) / this.nodeChangeDur;
+            const pulseEnv = t < 0 || t > 1 ? 0 : Math.sin(t * Math.PI); // 0 → 1 → 0 over the duration
+            focusBoost = pulseEnv * 0.3;
+            const baseFocus = Math.max(0, Math.min(0.4, (ix.progress ?? 0) * 0.4));
+            const focusAmount = Math.min(0.85, baseFocus + focusBoost);
             lookTarget.lerp(sockWorld, focusAmount);
           }
         }
+      } else {
+        this.lastNodeKey = null;
       }
     } catch {}
 
@@ -220,14 +252,19 @@ export class CameraRig {
     this.camera.position.copy(this.currentCamPos).add(sway).add(this.arrivalOffset);
     this.camera.lookAt(this.currentLookAt);
     // PHASE 2: subtle FOV focus-pull when an orb unfolds in-place. FOV
-    // tightens from 38 \u2192 32 as expansion progresses, giving a cinematic
+    // tightens from 38 → 32 as expansion progresses, giving a cinematic
     // dolly-in without losing the orb out of frame.
+    //
+    // PHASE 6: ADD a transient FOV PUNCH (extra –4) on Vistāra node change
+    // so the cinematic feels like a "dolly-zoom" toward the new socket.
     let exp = 0;
     try {
       const ex = (window as any).__vyanExpansion;
       if (ex && ex.target) exp = Math.max(0, Math.min(1, ex.progress ?? 0));
     } catch {}
-    this.camera.fov = 38 - exp * 6;
+    const tPunch = (performance.now() - this.nodeChangeAt) / this.nodeChangeDur;
+    const punchEnv = tPunch < 0 || tPunch > 1 ? 0 : Math.sin(tPunch * Math.PI); // ease in-out
+    this.camera.fov = 38 - exp * 6 - punchEnv * 4;
     this.camera.updateProjectionMatrix();
   }
 
