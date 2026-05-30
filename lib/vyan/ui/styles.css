@@ -41,7 +41,9 @@ opacity: 0.72;
 }
 .neural-depth {
 position: absolute;
-top: 0;
+/* PHASE: keep the neural rail clear of the N\u0101vika orb at top-right
+   (orb sits at top:18, ~40px height \u2192 add safe gap). */
+top: 80px;
 right: 22px;
 bottom: 22px;
 width: 24px;
@@ -591,6 +593,45 @@ color: rgba(255, 255, 255, 1);
   font-weight: 300;
   color: rgba(230, 232, 238, 0.55);
   animation: gateway-breath 3.6s ease-in-out infinite;
+}
+/* PHASE: gateway click-cue — small pulsing cursor glyph that "taps" the orb. */
+.gateway-hint .gateway-click-hint {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+.gateway-hint .gw-cursor {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(176, 107, 255, 0.95) 0%, rgba(176, 107, 255, 0.35) 55%, transparent 75%);
+  box-shadow: 0 0 14px rgba(176, 107, 255, 0.6);
+  position: relative;
+  animation: gw-cursor-tap 2.0s ease-in-out infinite;
+}
+.gateway-hint .gw-cursor::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1.4px solid rgba(176, 107, 255, 0.55);
+  animation: gw-cursor-ring 2.0s ease-out infinite;
+}
+@keyframes gw-cursor-tap {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.95; }
+  35%      { transform: translate(0, -6px) scale(0.85); opacity: 0.65; }
+  55%      { transform: translate(0, 0) scale(1.25); opacity: 1; }
+}
+@keyframes gw-cursor-ring {
+  0%   { transform: scale(0.6); opacity: 0; }
+  35%  { opacity: 0.65; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+.gateway-line-2 em strong, .gateway-line-2 strong em {
+  font-style: italic;
+  font-weight: 700;
 }
 @keyframes gateway-breath {
   0%, 100% { opacity: 0.42; }

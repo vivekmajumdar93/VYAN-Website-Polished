@@ -166,6 +166,34 @@ export class CameraRig {
     } else {
       lookTarget = path.lookAt(progress);
     }
+
+    // PHASE 4 — CINEMATIC NODE FOCUS. When a specific socket is selected
+    // (Vist\u0101ra product OR Medh\u0101 model), shift the look-target subtly toward
+    // that socket's world position. Combined with the FOV pull below, this
+    // gives a "camera cinematically turns to face the node" feel without
+    // teleporting away from the orb.
+    try {
+      const ix = (window as any).__vyanIX?.get?.();
+      const tgtKey = ix?.target;
+      const nodeKey = ix?.node;
+      if (tgtKey && nodeKey && realm?.getOrbByKey) {
+        const orb = realm.getOrbByKey(tgtKey);
+        if (orb?.socketGroup?.children?.length) {
+          // Find the hit-sphere with matching productKey.
+          const sock = orb.socketGroup.children.find((c: any) =>
+            c.userData?.isProductSocket && c.userData?.productKey === nodeKey && c.geometry,
+          );
+          if (sock) {
+            const sockWorld = new THREE.Vector3();
+            sock.getWorldPosition(sockWorld);
+            // Move ~40% toward the socket so the orb stays in frame.
+            const focusAmount = Math.max(0, Math.min(0.4, (ix.progress ?? 0) * 0.4));
+            lookTarget.lerp(sockWorld, focusAmount);
+          }
+        }
+      }
+    } catch {}
+
     this.lookSpring.step(this.currentLookAt, lookTarget, dt, 9.0, 4.5);
 
     // EQUALIZATION FIX (item 2): camera is ALWAYS look-target + (0,3,26).

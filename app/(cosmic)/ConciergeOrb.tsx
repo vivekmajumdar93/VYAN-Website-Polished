@@ -246,7 +246,7 @@ export default function ConciergeOrb() {
         onClick={() => setOpen((v) => !v)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        aria-label="Concierge"
+        aria-label="N\u0101vika \u2014 The Navigator of VYAN"
       >
         <span className="concierge-orb__halo" />
         <span className="concierge-orb__shell">
@@ -262,8 +262,8 @@ export default function ConciergeOrb() {
           <header className="concierge-nav__head">
             <span className="concierge-nav__dot" />
             <div>
-              <div className="concierge-nav__title">Concierge</div>
-              <div className="concierge-nav__sub">Quick traverse</div>
+              <div className="concierge-nav__title">N\u0101vika</div>
+              <div className="concierge-nav__sub">The Navigator of VYAN</div>
             </div>
           </header>
           <div className="concierge-nav__list">

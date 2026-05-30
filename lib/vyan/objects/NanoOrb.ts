@@ -100,16 +100,22 @@ export class NanoOrb {
     const nodePoints = new THREE.Points(this.nodeGeo, this.nodeMat);
     this.group.add(nodePoints);
 
-    // CONNECTION NETWORK
+    // CONNECTION NETWORK — also store adjacency for signal-pulse routing.
     const linePoints = [];
+    const webAdj: Map<number, number[]> = new Map();
+    for (let i = 0; i < this.NODE_COUNT; i++) webAdj.set(i, []);
     for (let i = 0; i < this.NODE_COUNT; i++) {
         for (let j = i + 1; j < this.NODE_COUNT; j++) {
             const d = nodes[i].distanceTo(nodes[j]);
             if (d < 1.7 && Math.random() < 0.13) {
                 linePoints.push(nodes[i].clone(), nodes[j].clone());
+                webAdj.get(i)!.push(j);
+                webAdj.get(j)!.push(i);
             }
         }
     }
+    (this as any).webNodes = nodes;        // THREE.Vector3[]
+    (this as any).webAdj = webAdj;         // adjacency Map
 
     const lineGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
     const lineMat = new THREE.LineBasicMaterial({
@@ -320,104 +326,187 @@ export class NanoOrb {
   }
 
   /**
-   * Enable clickable product sockets on this orb. Tiny dots at scattered
-   * intersection-like positions, each tagged with its productKey for
-   * raycast click → URL routing.
-   * Only Vistāra calls this.
+   * Enable clickable interaction nodes on this orb. Each node:
+   *  - Snaps to an ACTUAL web intersection (one of the nodeBase points).
+   *  - Pulses like the bright core (tiny additive sphere + soft halo).
+   *  - Carries its own distinct spectrum colour for signal pulses.
+   *  - Has a precomputed PATH through the web (4-6 connected web nodes),
+   *    along which the electric signal pulse travels.
+   *
+   * Used for both Vistāra products (inward signals → node) and Medhā
+   * models (outward signals from core → node), controlled by `direction`.
    */
-  enableProductSockets(productKeys: string[]) {
-    // Clear any existing sockets.
-    while (this.socketGroup.children.length) {
-      const c = this.socketGroup.children[0];
-      this.socketGroup.remove(c);
-      (c as any).geometry?.dispose?.();
-      (c as any).material?.dispose?.();
-    }
-    while (this.signalGroup.children.length) {
-      const c = this.signalGroup.children[0];
-      this.signalGroup.remove(c);
-      (c as any).geometry?.dispose?.();
-      (c as any).material?.dispose?.();
-    }
+  enableProductSockets(
+    productKeys: string[],
+    options: { direction?: 'inward' | 'outward'; colors?: string[] } = {},
+  ) {
+    const direction = options.direction ?? 'inward';
+    // Default cyan/violet/green/amber/magenta/blue palette for 6 products
+    // (Medhā passes its own 5-model palette).
+    const DEFAULT_COLORS = [
+      '#3da9ff', // cosmic blue
+      '#b465ff', // violet
+      '#46ffae', // radium green
+      '#ffb84a', // amber
+      '#ff4ba0', // magenta
+      '#7ef0ff', // cyan
+    ];
+    const colors = options.colors ?? DEFAULT_COLORS;
 
-    const socketColor = new THREE.Color(this.data.colorB || '#ff5a7a');
-    // Use a seeded RNG so positions are stable across mounts.
-    let seed = 1337;
-    const srand = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
+    // Clear existing.
+    const clear = (g: THREE.Group) => {
+      while (g.children.length) {
+        const c = g.children[0];
+        g.remove(c);
+        (c as any).geometry?.dispose?.();
+        (c as any).material?.dispose?.();
+      }
+    };
+    clear(this.socketGroup);
+    clear(this.signalGroup);
+
+    const webNodes: THREE.Vector3[] = (this as any).webNodes ?? [];
+    const webAdj: Map<number, number[]> = (this as any).webAdj ?? new Map();
+
+    // Helper: find indices of "outer" nodes (radius > 3.4) for socket placement.
+    const outerNodeIdx: number[] = [];
+    for (let i = 0; i < webNodes.length; i++) {
+      if (webNodes[i].length() > 3.4 && (webAdj.get(i)?.length ?? 0) >= 1) {
+        outerNodeIdx.push(i);
+      }
+    }
+    // Helper: pick a random node index with at least 1 adjacency.
+    const pickRandomConnected = (exclude: Set<number>): number => {
+      for (let tries = 0; tries < 50; tries++) {
+        const idx = outerNodeIdx[Math.floor(Math.random() * outerNodeIdx.length)];
+        if (!exclude.has(idx) && (webAdj.get(idx)?.length ?? 0) > 0) return idx;
+      }
+      return outerNodeIdx[0] ?? 0;
+    };
+    // Helper: random walk through the web from start node, length steps.
+    const buildPath = (startIdx: number, length: number): number[] => {
+      const path: number[] = [startIdx];
+      let cur = startIdx;
+      let prev = -1;
+      for (let i = 0; i < length; i++) {
+        const adj = (webAdj.get(cur) ?? []).filter(n => n !== prev);
+        if (!adj.length) break;
+        const next = adj[Math.floor(Math.random() * adj.length)];
+        path.push(next);
+        prev = cur;
+        cur = next;
+      }
+      return path;
     };
 
+    const used = new Set<number>();
     for (let i = 0; i < productKeys.length; i++) {
       const key = productKeys[i];
+      const color = new THREE.Color(colors[i % colors.length]);
 
-      // Place the dot at a scattered intersection-like point: random angle,
-      // radius near orb edge (1.7..2.4) with depth jitter. This puts the
-      // dot AMONG the web's outer intersections, not on a giant ring.
-      const angle = srand() * Math.PI * 2;
-      const elev  = (srand() - 0.5) * 1.1;
-      const r     = 1.7 + srand() * 0.7;
-      const lp = new THREE.Vector3(
-        Math.cos(angle) * Math.cos(elev) * r,
-        Math.sin(elev) * r,
-        Math.sin(angle) * Math.cos(elev) * r,
-      );
+      // Snap socket to an outer web node.
+      const nodeIdx = pickRandomConnected(used);
+      used.add(nodeIdx);
+      const lp = webNodes[nodeIdx]?.clone() ?? new THREE.Vector3();
 
-      // The dot itself — a small additive billboard sprite for max
-      // visibility without the giant disc look.
-      const dotGeom = new THREE.SphereGeometry(0.06, 10, 10);
+      // -- DOT: tiny bright additive sphere + soft halo, behaves like core. --
+      const dotGeom = new THREE.SphereGeometry(0.05, 12, 12);
       const dotMat = new THREE.MeshBasicMaterial({
-        color: socketColor,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
+        color, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
       });
       const dot = new THREE.Mesh(dotGeom, dotMat);
       dot.position.copy(lp);
       dot.userData.isProductSocket = true;
       dot.userData.productKey = key;
+      dot.userData.color = color;
       dot.userData.basePos = lp.clone();
 
-      // A slightly larger invisible hit-sphere on top so taps register.
+      // Soft halo billboard for the "glowing core" feel.
+      const haloGeom = new THREE.SphereGeometry(0.14, 12, 12);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const halo = new THREE.Mesh(haloGeom, haloMat);
+      halo.position.copy(lp);
+      halo.userData.isHalo = true;
+      halo.userData.productKey = key;
+
+      // Invisible larger hit-sphere for raycast click.
       const hit = new THREE.Mesh(
-        new THREE.SphereGeometry(0.42, 8, 8),
+        new THREE.SphereGeometry(0.45, 8, 8),
         new THREE.MeshBasicMaterial({ visible: false, depthWrite: false }),
       );
       hit.position.copy(lp);
       hit.userData.isProductSocket = true;
       hit.userData.productKey = key;
+
       this.socketGroup.add(hit);
+      this.socketGroup.add(halo);
       this.socketGroup.add(dot);
 
-      // PHASE 3 — electric SIGNAL PULSE travelling toward this dot.
-      // A small bright point + a fading trail line drawn each frame.
-      const pulseGeo = new THREE.SphereGeometry(0.05, 6, 6);
+      // -- PATH for the signal pulse. --
+      // Inward: pulse travels FROM an outer node, THROUGH 4 web segments, TO the socket node.
+      // Outward: pulse starts at the SOCKET and walks OUTWARD through 4 segments.
+      let path: number[];
+      if (direction === 'inward') {
+        const walk = buildPath(nodeIdx, 4).reverse();
+        path = walk;
+      } else {
+        path = buildPath(nodeIdx, 4);
+      }
+      // Resolve to world positions.
+      const pathPositions = path.map(p => webNodes[p].clone());
+      if (pathPositions.length < 2) pathPositions.push(lp.clone());
+
+      // -- PULSE: small bright additive sphere that moves along the polyline. --
       const pulseMat = new THREE.MeshBasicMaterial({
-        color: socketColor,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
+        color, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
       });
-      const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+      const pulse = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), pulseMat);
       pulse.userData.isSignal = true;
-      pulse.userData.targetKey = key;
-      // Random starting offset along its 0..1 progress so all 6 are
-      // staggered (so users see ALL nodes signal sequentially).
-      pulse.userData.t = i / Math.max(1, productKeys.length);
-      pulse.userData.speed = 0.35 + srand() * 0.25;
-      // Random branch origin point (near the orb surface, opposite side).
-      const ogAngle = angle + Math.PI + (srand() - 0.5) * 0.8;
-      const ogElev  = (srand() - 0.5) * 1.4;
-      const ogR     = 2.0 + srand() * 0.6;
-      pulse.userData.origin = new THREE.Vector3(
-        Math.cos(ogAngle) * Math.cos(ogElev) * ogR,
-        Math.sin(ogElev) * ogR,
-        Math.sin(ogAngle) * Math.cos(ogElev) * ogR,
-      );
-      pulse.userData.target = lp.clone();
+      pulse.userData.productKey = key;
+      pulse.userData.color = color;
+      pulse.userData.path = pathPositions;
+      pulse.userData.t = i / Math.max(1, productKeys.length);  // stagger
+      pulse.userData.speed = 0.25 + Math.random() * 0.15;
+      pulse.userData.direction = direction;
       this.signalGroup.add(pulse);
+    }
+
+    (this as any).socketDirection = direction;
+  }
+
+  /**
+   * Change all socket+pulse colours dynamically (Medhā: per response /
+   * per model selection). Pass a single colour OR an array matching the
+   * number of sockets.
+   */
+  setSocketColors(colors: string | string[]) {
+    if (!this.socketGroup || !this.signalGroup) return;
+    const arr = Array.isArray(colors) ? colors : null;
+    const single = !arr ? new THREE.Color(colors) : null;
+    let i = 0;
+    for (const c of this.socketGroup.children) {
+      const m = (c as any).material as THREE.MeshBasicMaterial | undefined;
+      if (m && 'color' in m) {
+        const col = arr ? new THREE.Color(arr[i % arr.length]) : single!;
+        m.color = col;
+        (c as any).userData.color = col;
+      }
+      if ((c as any).userData?.isProductSocket && !(c as any).userData?.isHalo) i++;
+    }
+    let p = 0;
+    for (const pulse of this.signalGroup.children) {
+      const m = (pulse as any).material as THREE.MeshBasicMaterial | undefined;
+      if (m && 'color' in m) {
+        const col = arr ? new THREE.Color(arr[p % arr.length]) : single!;
+        m.color = col;
+        (pulse as any).userData.color = col;
+      }
+      p++;
     }
   }
 
@@ -618,8 +707,7 @@ export class NanoOrb {
     this.dust.rotation.y += 0.003 * motion * 0.016;
     this.dust.rotation.x += 0.001 * motion * 0.016;
 
-    // PHASE 3 v2 — clickable PRODUCT NODES + electrifying SIGNAL PULSES.
-    // Only render when sockets are enabled AND expansion > 0.
+    // PHASE 3 v3 — clickable PRODUCT/MODEL NODES + branch-travelling SIGNAL PULSES.
     if (this.socketGroup && this.signalGroup) {
       const expForSockets = (this as any).expansionT ?? 0;
       const visible = expForSockets > 0.05 && this.socketGroup.children.length > 0;
@@ -627,49 +715,58 @@ export class NanoOrb {
       this.signalGroup.visible = visible;
 
       if (visible) {
-        const spectrumHi: THREE.Color | undefined = (this as any).spectrumHi;
-        // -- DOTS: tiny pulsating intersection points. --
+        // Signal-state drives pulse SPEED + INTENSITY (per user spec).
+        let speedMul = 1.0;
+        let intensityMul = 1.0;
+        if (signal === 'idle')         { speedMul = 0.55; intensityMul = 0.65; }
+        else if (signal === 'hover')   { speedMul = 0.95; intensityMul = 1.0; }
+        else if (signal === 'listening'){ speedMul = 1.2; intensityMul = 1.1; }
+        else if (signal === 'processing'){ speedMul = 1.85; intensityMul = 1.3; }
+        else if (signal === 'response'){ speedMul = 2.30; intensityMul = 1.5; }
+        else if (signal === 'interaction'){ speedMul = 1.0; intensityMul = 0.95; }
+
+        // -- DOTS + HALOS: pulse like the bright core. --
+        let nodeIdx = 0;
         for (const c of this.socketGroup.children) {
-          const isHit = !(c as any).geometry || !(c as any).material || ((c as any).material as any).visible === false;
           const m = (c as any).material as THREE.MeshBasicMaterial | undefined;
-          if (!m) continue;
-          if (isHit) continue; // skip invisible hit-spheres
-          // Stagger fade-in.
-          const fadeIn = Math.min(1, Math.max(0, (expForSockets - 0.2) / 0.6));
-          // Soft glittering pulse so the dots feel ALIVE.
-          const idx = (c as any).id ?? 0;
-          const pulseAmt = 0.7 + Math.sin(t * 3.2 + idx) * 0.30;
-          m.opacity = fadeIn * pulseAmt;
-          if (spectrumHi && (m as any).color) (m as any).color = spectrumHi;
-          // Slight breathing in scale.
-          const s = 1 + Math.sin(t * 3.0 + idx) * 0.18;
-          c.scale.setScalar(s);
+          if (!m || (m as any).visible === false) continue;
+          const isHalo = (c as any).userData?.isHalo;
+          const fadeIn = Math.min(1, Math.max(0, (expForSockets - 0.15) / 0.5));
+          // Core-like rapid pulse + slow swell.
+          const fastPulse = 0.55 + Math.sin(t * 6.0 + nodeIdx * 0.9) * 0.20;
+          const slowSwell = 0.85 + Math.sin(t * 1.8 + nodeIdx) * 0.15;
+          const baseOp = isHalo ? 0.32 : 0.95;
+          m.opacity = fadeIn * baseOp * fastPulse * slowSwell * intensityMul;
+          // Subtle scale breathing.
+          const sScale = 1 + Math.sin(t * 3.0 + nodeIdx) * 0.18;
+          c.scale.setScalar(sScale);
+          if (!isHalo) nodeIdx++;
         }
 
-        // -- SIGNAL PULSES: travel from origin → target, draw fading trail. --
+        // -- PULSES travel ALONG THE WEB BRANCHES (not space arcs). --
         for (const pulse of this.signalGroup.children) {
           const p: any = pulse;
-          p.userData.t += dt * (p.userData.speed ?? 0.4);
-          if (p.userData.t > 1.15) p.userData.t = -0.15;
-          const tt = Math.max(0, Math.min(1, p.userData.t));
-          const origin: THREE.Vector3 = p.userData.origin;
-          const target: THREE.Vector3 = p.userData.target;
-          // Bezier-ish curve via mid-point arc for visual richness.
-          const mid = origin.clone().add(target).multiplyScalar(0.5);
-          mid.y += 0.5; // arc upward
-          // Quadratic bezier: B(t) = (1-t)²P0 + 2(1-t)t·P1 + t²P2
-          const omt = 1 - tt;
-          const px = omt * omt * origin.x + 2 * omt * tt * mid.x + tt * tt * target.x;
-          const py = omt * omt * origin.y + 2 * omt * tt * mid.y + tt * tt * target.y;
-          const pz = omt * omt * origin.z + 2 * omt * tt * mid.z + tt * tt * target.z;
-          pulse.position.set(px, py, pz);
+          const path: THREE.Vector3[] | undefined = p.userData.path;
+          if (!path || path.length < 2) continue;
+          p.userData.t += dt * (p.userData.speed ?? 0.3) * speedMul;
+          if (p.userData.t > 1.15) p.userData.t = -0.10;
+          const tt = Math.max(0, Math.min(0.999, p.userData.t));
+          // Map tt → segment index + segment-local progress.
+          const segCount = path.length - 1;
+          const segIdx = Math.min(segCount - 1, Math.floor(tt * segCount));
+          const segLocal = (tt * segCount) - segIdx;
+          const a = path[segIdx];
+          const b = path[segIdx + 1];
+          pulse.position.set(
+            a.x + (b.x - a.x) * segLocal,
+            a.y + (b.y - a.y) * segLocal,
+            a.z + (b.z - a.z) * segLocal,
+          );
           const mat = (pulse as any).material as THREE.MeshBasicMaterial;
-          // Bright in middle, fade at ends.
-          const env = Math.sin(tt * Math.PI);
-          mat.opacity = env * Math.min(1, expForSockets * 1.6);
-          if (spectrumHi) mat.color = spectrumHi;
-          // Slight glow scale near target so it feels like impact.
-          const burst = 1 + (tt > 0.85 ? (tt - 0.85) * 8 : 0);
+          const env = Math.sin(Math.max(0, Math.min(1, tt)) * Math.PI);
+          mat.opacity = env * Math.min(1, expForSockets * 1.6) * intensityMul;
+          // Brighter burst when reaching socket (last 20% of path).
+          const burst = 1 + (tt > 0.80 ? (tt - 0.80) * 6 : 0) * intensityMul;
           pulse.scale.setScalar(burst);
         }
       }

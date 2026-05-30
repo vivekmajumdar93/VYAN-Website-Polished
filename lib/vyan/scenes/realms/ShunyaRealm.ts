@@ -56,13 +56,36 @@ export class ShunyaRealm {
       this.group.add(orb.trailGroup);
       this.orbs.push(orb);
 
-      // PHASE 3 v2 — ONLY Vistāra gets clickable product sockets (tiny dots
-      // at scattered intersection points, electric signal pulses converging
-      // on them). Medhā and other orbs have NO sockets.
+      // PHASE 3 v3 — clickable nodes.
+      // VISTĀRA: 6 product sockets, each with its own brand colour. Signals
+      //          travel INWARD through the web → converge on each socket.
+      // MEDHĀ: 5 model nodes (one per cognitive mode). Signals travel
+      //        OUTWARD from the core through the web. Colours change on
+      //        each model selection via setSocketColors().
       if (def.key === 'vistara') {
-        orb.enableProductSockets([
-          'ritam', 'ojas', 'mudra', 'netra', 'akriti', 'sutra',
-        ]);
+        orb.enableProductSockets(
+          ['ritam', 'ojas', 'mudra', 'netra', 'akriti', 'sutra'],
+          {
+            direction: 'inward',
+            colors: [
+              '#3da9ff', // ritam   → cosmic blue
+              '#46ffae', // ojas    → radium green
+              '#ffb84a', // mudra   → amber
+              '#7ef0ff', // netra   → cyan
+              '#ff4ba0', // akriti  → magenta
+              '#b465ff', // sutra   → violet
+            ],
+          },
+        );
+      } else if (def.key === 'medha') {
+        orb.enableProductSockets(
+          ['prajna', 'mantra', 'darsana', 'smarana', 'kavi'],
+          {
+            direction: 'outward',
+            // Default red; cycles colour per selection from MedhaHUD.
+            colors: ['#ff3550', '#ff3550', '#ff3550', '#ff3550', '#ff3550'],
+          },
+        );
       }
     }
 

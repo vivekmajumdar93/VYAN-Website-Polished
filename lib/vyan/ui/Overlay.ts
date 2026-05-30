@@ -87,8 +87,11 @@ this.callbacks?.onJumpToOrb(idx);
 this.gatewayHint.className = 'gateway-hint';
     this.gatewayHint.innerHTML = `
       <div class="gateway-line-1">VYŌMA</div>
-      <div class="gateway-line-2">The Primordial Core of VYAN</div>
-      <div class="gateway-line-3">Engage to enter the Void of VYAN</div>
+      <div class="gateway-line-2"><em><strong>The Primordial Core of VYAN</strong></em></div>
+      <div class="gateway-line-3 gateway-click-hint">
+        <span class="gw-cursor" aria-hidden="true"></span>
+        <span>click the orb to enter</span>
+      </div>
     `;
     this.gatewayHint.style.opacity = '0';
     this.cursorHint.className = 'cursor-hint';
@@ -607,7 +610,7 @@ setShunyaCaption(name: string, tagline: string, focus: number) {
     const name = names[activeIndex] ?? '';
     const nextName = names[(activeIndex + 1) % total] ?? '';
     this.depthLy.textContent = ly === 0
-      ? `ARRIVED · ${name}`
+      ? `ENTERED · ${name}`
       : `${ly.toLocaleString()} LY → ${nextName}`;
     const railH = this.rail.clientHeight || 1;
     const activeNode = this.railNodes[activeIndex];

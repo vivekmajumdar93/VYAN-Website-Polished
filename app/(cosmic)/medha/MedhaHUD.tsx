@@ -309,8 +309,6 @@ export default function MedhaHUD() {
     if (k === mode) return;
     setMode(k);
     setShock(s => s + 1);
-    // Capture the pill's center position so the electrifying bolt strikes
-    // FROM that specific pill TO Medhā's center — like a focused thunderbolt.
     if (ev?.currentTarget) {
       const r = ev.currentTarget.getBoundingClientRect();
       const cx = r.left + r.width / 2;
@@ -319,6 +317,25 @@ export default function MedhaHUD() {
       document.documentElement.style.setProperty('--mlv-zap-y', `${cy}px`);
     }
     setLinkPulse(p => p + 1);
+    // PHASE 4 — Medh\u0101 socket color cycle on model selection. Each model
+    // tints the entire Medh\u0101 orb's signal pulses + node dots in a unique
+    // colour, so the user sees the cognition signature change.
+    try {
+      const MODEL_COLOR: Record<string, string> = {
+        prajna:  '#ff3550', // crimson  \u2014 default insight
+        mantra:  '#7a5cff', // violet   \u2014 chant
+        darsana: '#3da9ff', // azure    \u2014 vision
+        smarana: '#46ffae', // radium   \u2014 memory
+        kavi:    '#ffb84a', // amber    \u2014 poet
+      };
+      const color = MODEL_COLOR[k] ?? '#ff3550';
+      const vyan: any = (window as any).__vyan;
+      const orb = vyan?.worldRef?.realms?.shunya?.getOrbByKey?.('medha');
+      orb?.setSocketColors?.(color);
+      // Tell the interaction-state which node is active (drives camera focus).
+      const ix = (window as any).__vyanIX;
+      ix?.expand?.('medha', k, 'crimson');
+    } catch {}
   };
 
   const toggleListening = () => {

@@ -57,6 +57,26 @@ function isPollinationsError(text: string): boolean {
   return false;
 }
 
+async function fetchMedhaApi(
+  mode: CognitiveMode,
+  history: ChatMessage[],
+  signal?: AbortSignal,
+): Promise<string> {
+  // Call our /api/medha proxy (Emergent LLM \u2192 Pollinations fallback).
+  const res = await fetch('/api/medha', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({
+      system: trim(mode.systemPrompt, MAX_SYSTEM_CHARS),
+      history,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.text) throw new Error(data?.error || 'medha-api-error');
+  return String(data.text).trim();
+}
+
 async function fetchPollinations(
   mode: CognitiveMode,
   history: ChatMessage[],
@@ -80,19 +100,25 @@ async function fetchPollinations(
   return text.trim();
 }
 
-/** One-shot completion with single retry on transient failure. */
+/** One-shot completion with single retry on transient failure.
+ *  Primary: /api/medha (Emergent LLM). Fallback: direct Pollinations. */
 export async function chatComplete(
   mode: CognitiveMode,
   history: ChatMessage[],
   signal?: AbortSignal,
 ): Promise<string> {
+  // Primary path \u2014 our server proxy that uses Emergent universal LLM key.
   try {
-    return await fetchPollinations(mode, history, signal);
+    return await fetchMedhaApi(mode, history, signal);
   } catch (_) {
-    // Back off briefly and retry once.
-    await new Promise(r => setTimeout(r, 2400));
-    if (signal?.aborted) throw new Error('aborted');
-    return await fetchPollinations(mode, history, signal);
+    // Fallback to direct Pollinations (slow / occasionally errors).
+    try {
+      return await fetchPollinations(mode, history, signal);
+    } catch (__) {
+      await new Promise(r => setTimeout(r, 1800));
+      if (signal?.aborted) throw new Error('aborted');
+      return await fetchPollinations(mode, history, signal);
+    }
   }
 }
 

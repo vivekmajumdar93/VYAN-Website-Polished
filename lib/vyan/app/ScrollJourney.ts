@@ -201,9 +201,10 @@ export class ScrollJourney {
       return;
     }
 
-    // VOID (discrete): fast critically-damped approach to the slot target.
+    // VOID (discrete): slower critically-damped approach so the user can
+    // SEE the neural rail travel between orbs (was 0.0008 → too snappy).
     const diff = this.target - this.progress;
-    this.progress += diff * (1 - Math.pow(0.0008, dt));
+    this.progress += diff * (1 - Math.pow(0.04, dt));
     if (Math.abs(this.target - this.progress) < 0.0008) {
       this.progress = this.target;
       this.snapped = true;
