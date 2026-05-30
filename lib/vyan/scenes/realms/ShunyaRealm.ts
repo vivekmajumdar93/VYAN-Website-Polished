@@ -346,15 +346,16 @@ export class ShunyaRealm {
     this.deps.overlay?.setShunyaCaption?.(def.name, def.tagline, this.magnifiedIdx !== null ? 1 : this.activeFocus);
     this.deps.overlay?.setShunyaRail?.(this.activeIndex, this.magnifiedIdx !== null ? 1 : this.activeFocus, total, this.defs.map(d => d.name));
 
-    if (this.magnifiedIdx === null && this.deps.interaction.clicked && this.activeFocus > 0.55) {
+    // PHASE 3 v3 — product-socket clicks register even on low focus so
+    // users can hit the tiny dots reliably. We do an early socket-only
+    // raycast on every click that lands while a Vistāra orb is on-screen.
+    if (this.magnifiedIdx === null && this.deps.interaction.clicked) {
       this.ndc.set(this.deps.interaction.pointer.x, this.deps.interaction.pointer.y);
       this.raycaster.setFromCamera(this.ndc, this.deps.camera);
       const focused = this.orbs[this.activeIndex];
 
-      // PHASE 3 v2 — product-socket click (only on Vistāra). If the user
-      // taps one of the tiny dots, route directly to /vistara/<productKey>.
-      const isVistaraOrb = this.defs[this.activeIndex]?.key === 'vistara';
-      if (isVistaraOrb && (focused as any).socketGroup) {
+      // Try socket clicks first on Vistāra OR any orb that has sockets.
+      if ((focused as any).socketGroup && (focused as any).socketGroup.children.length) {
         const socketHits = this.raycaster.intersectObjects(
           (focused as any).socketGroup.children, true
         );
@@ -363,14 +364,13 @@ export class ShunyaRealm {
         );
         if (productHit) {
           const productKey = productHit.object.userData.productKey as string;
-          // Light click feedback then route — the in-place expansion stays.
+          const orbKey = this.defs[this.activeIndex]?.key;
           this.deps?.audio?.swell?.(1.06, 0.25);
-          // Use the same route as the in-place architecture: /vistara/<key>
-          // which sets InteractionState.expand('vistara', key) automatically.
           try {
             const router = (window as any).__vyanRouter;
-            if (router?.push) router.push(`/vistara/${productKey}`);
-            else window.location.assign(`/vistara/${productKey}`);
+            const target = orbKey === 'medha' ? `/medha?model=${productKey}` : `/vistara/${productKey}`;
+            if (router?.push) router.push(target);
+            else window.location.assign(target);
           } catch {
             window.location.assign(`/vistara/${productKey}`);
           }
@@ -378,10 +378,13 @@ export class ShunyaRealm {
         }
       }
 
-      const hit = this.raycaster.intersectObject(focused.hitMesh, true);
-      const centered = Math.abs(this.ndc.x) < 0.34 && Math.abs(this.ndc.y) < 0.24;
-      if (hit.length > 0 || centered) {
-        this.activateFocused();
+      // Fallback: regular orb-body click (only when focused).
+      if (this.activeFocus > 0.55) {
+        const hit = this.raycaster.intersectObject(focused.hitMesh, true);
+        const centered = Math.abs(this.ndc.x) < 0.34 && Math.abs(this.ndc.y) < 0.24;
+        if (hit.length > 0 || centered) {
+          this.activateFocused();
+        }
       }
     }
   }

@@ -37,7 +37,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'VYAN Sūtra', path: '/vistara/sutra' },
     ],
   },
-  { id: 'medha', label: 'Medhā — Speak to AI', tone: 'medha', path: '/medha' },
+  { id: 'medha', label: 'Medhā — Engage with VYAN Intelligence', tone: 'medha', path: '/medha' },
 ];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -246,7 +246,7 @@ export default function ConciergeOrb() {
         onClick={() => setOpen((v) => !v)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        aria-label="N\u0101vika \u2014 The Navigator of VYAN"
+        aria-label="Nāvika — The Navigator of VYAN"
       >
         <span className="concierge-orb__halo" />
         <span className="concierge-orb__shell">
@@ -258,14 +258,23 @@ export default function ConciergeOrb() {
 
       {/* Quick-nav glass panel — collapsible sections, short by default */}
       {open && (
-        <div className="concierge-nav" role="menu">
-          <header className="concierge-nav__head">
-            <span className="concierge-nav__dot" />
-            <div>
-              <div className="concierge-nav__title">N\u0101vika</div>
-              <div className="concierge-nav__sub">The Navigator of VYAN</div>
-            </div>
-          </header>
+        <>
+          {/* Backdrop closes panel on outside click */}
+          <div className="concierge-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className="concierge-nav" role="menu" onClick={(e) => e.stopPropagation()}>
+            <header className="concierge-nav__head">
+              <span className="concierge-nav__dot" />
+              <div>
+                <div className="concierge-nav__title">Nāvika</div>
+                <div className="concierge-nav__sub">The Navigator of VYAN</div>
+              </div>
+              <button
+                type="button"
+                className="concierge-nav__close"
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+              >✕</button>
+            </header>
           <div className="concierge-nav__list">
             {NAV_SECTIONS.map((sec) => {
               const hasChildren = !!sec.children?.length;
@@ -314,9 +323,10 @@ export default function ConciergeOrb() {
             })}
           </div>
           <footer className="concierge-nav__foot">
-            Concierge guides only. For conversation → Medhā.
+            Engage with the VYAN intelligence in Medhā.
           </footer>
         </div>
+        </>
       )}
     </div>
   );

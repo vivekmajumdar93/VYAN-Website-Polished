@@ -1,16 +1,21 @@
 /* ============================================================
-   VYAN · Sound Console — minimalist trigger + expandable panel
-   Theme: red glassmorphic, transparent base with bright reflective borders.
+   VYAN · Sound Console v2 — futuristic holo-glass console
+   Animated holographic borders · spectrum analyzer · waveform
+   ribbon · dual-ring energy core · ember-particle field.
    ============================================================ */
+
 .sc-root {
   position: fixed;
   top: 22px; left: 22px;
   z-index: 25;
   font-family: 'Inter', system-ui, sans-serif;
 }
+
+/* --------- Trigger pill (closed state) --------- */
 .sc-trigger {
+  position: relative;
   display: inline-flex; align-items: center; gap: 8px;
-  background: rgba(20, 6, 10, 0.5);
+  background: linear-gradient(135deg, rgba(28,8,12,0.62), rgba(8,2,4,0.78));
   border: 1px solid rgba(255, 138, 138, 0.5);
   border-radius: 999px;
   padding: 7px 14px;
@@ -19,109 +24,319 @@
   letter-spacing: 0.34em;
   text-transform: uppercase;
   cursor: pointer;
-  backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
   box-shadow:
-    0 0 16px rgba(255, 90, 122, 0.32),
-    inset 0 0 8px rgba(255, 138, 138, 0.08);
+    0 0 18px rgba(255, 90, 122, 0.30),
+    inset 0 0 10px rgba(255, 138, 138, 0.08);
   transition: all 0.22s ease;
+  overflow: hidden;
+}
+.sc-trigger::before {
+  /* Inner holographic shimmer — slow */
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(120deg,
+    transparent 35%,
+    rgba(255, 180, 180, 0.18) 50%,
+    transparent 65%);
+  background-size: 240% 100%;
+  animation: sc-shimmer 6s linear infinite;
+  pointer-events: none;
 }
 .sc-trigger:hover {
-  border-color: rgba(255, 180, 180, 0.85);
+  border-color: rgba(255, 200, 200, 0.92);
   box-shadow:
-    0 0 24px rgba(255, 90, 122, 0.6),
-    inset 0 0 12px rgba(255, 138, 138, 0.15);
+    0 0 28px rgba(255, 90, 122, 0.65),
+    inset 0 0 14px rgba(255, 138, 138, 0.18);
   color: #fff;
+  transform: translateY(-1px);
 }
+.sc-trigger:active { transform: translateY(0); }
 .sc-root.is-open .sc-trigger { display: none; }
 
+@keyframes sc-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* --------- Open panel (the console) --------- */
 .sc-panel {
   position: absolute; top: 0; left: 0;
-  width: 320px;
-  background: linear-gradient(180deg, rgba(28, 8, 12, 0.78), rgba(12, 4, 6, 0.86));
-  border: 1px solid rgba(255, 138, 138, 0.55);
-  border-radius: 16px;
-  backdrop-filter: blur(18px) saturate(150%);
+  width: 340px;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(255, 90, 122, 0.10), transparent 60%),
+    linear-gradient(180deg, rgba(28, 8, 12, 0.82), rgba(8, 3, 5, 0.92));
+  border: 1px solid rgba(255, 138, 138, 0.42);
+  border-radius: 18px;
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
   box-shadow:
-    0 0 32px rgba(255, 90, 122, 0.42),
-    0 16px 48px rgba(0,0,0,0.7),
-    inset 0 0 14px rgba(255, 138, 138, 0.08);
-  padding: 16px 18px;
+    0 0 40px rgba(255, 90, 122, 0.32),
+    0 24px 64px rgba(0,0,0,0.7),
+    inset 0 0 18px rgba(255, 138, 138, 0.08);
+  padding: 18px 18px 16px;
   color: rgba(255, 230, 230, 0.92);
-  animation: sc-in 0.34s cubic-bezier(0.23, 1, 0.32, 1);
+  animation: sc-in 0.42s cubic-bezier(0.23, 1, 0.32, 1);
+  overflow: hidden;
 }
-@keyframes sc-in { from { opacity: 0; transform: translateY(-6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes sc-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
 
-.sc-panel__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.sc-kicker { font: 500 9.5px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.34em; text-transform: uppercase; color: rgba(255, 180, 180, 0.7); }
-.sc-x { background: transparent; border: 1px solid rgba(255, 138, 138, 0.32); border-radius: 8px; width: 26px; height: 26px; color: rgba(255, 220, 220, 0.7); cursor: pointer; transition: all 0.18s ease; }
-.sc-x:hover { background: rgba(80, 24, 30, 0.55); color: #fff; border-color: rgba(255, 138, 138, 0.7); }
+/* Holographic scanning beam across panel border */
+.sc-panel::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 19px;
+  padding: 1px;
+  background: conic-gradient(from 0deg,
+    transparent 0%,
+    rgba(255, 138, 138, 0.0) 70%,
+    rgba(255, 200, 200, 0.95) 80%,
+    rgba(255, 80, 100, 0.7) 88%,
+    transparent 95%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: sc-scan 4.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes sc-scan {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 
-.sc-viz { display: block; width: 100%; height: 72px; margin-bottom: 12px; border-radius: 10px; background: rgba(0,0,0,0.32); border: 1px solid rgba(255, 138, 138, 0.18); }
+/* Subtle floating embers behind controls */
+.sc-panel::after {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 14% 22%, rgba(255, 220, 200, 0.55) 50%, transparent 52%),
+    radial-gradient(1px 1px at 78% 34%, rgba(255, 200, 200, 0.45) 50%, transparent 52%),
+    radial-gradient(1px 1px at 42% 76%, rgba(255, 180, 180, 0.50) 50%, transparent 52%),
+    radial-gradient(1px 1px at 86% 82%, rgba(255, 200, 180, 0.40) 50%, transparent 52%);
+  animation: sc-embers 9s ease-in-out infinite alternate;
+  pointer-events: none;
+  opacity: 0.55;
+}
+@keyframes sc-embers {
+  from { transform: translateY(0)  rotate(0); }
+  to   { transform: translateY(-6px) rotate(2deg); }
+}
 
-.sc-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.sc-slider { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-.sc-slider > span { font: 500 9px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.28em; text-transform: uppercase; color: rgba(255, 200, 200, 0.6); flex-shrink: 0; width: 50px; }
-.sc-slider > em { font: 500 9px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.04em; color: rgba(255, 230, 220, 0.92); font-style: normal; min-width: 44px; text-align: right; }
+.sc-panel > * { position: relative; z-index: 1; }
+
+.sc-panel__head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.sc-kicker {
+  font: 500 9.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(255, 180, 180, 0.78);
+  text-shadow: 0 0 8px rgba(255, 90, 122, 0.4);
+}
+.sc-x {
+  background: rgba(20, 6, 10, 0.55);
+  border: 1px solid rgba(255, 138, 138, 0.36);
+  border-radius: 8px; width: 26px; height: 26px;
+  color: rgba(255, 220, 220, 0.85);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-size: 11px;
+}
+.sc-x:hover {
+  background: rgba(80, 24, 30, 0.7);
+  color: #fff;
+  border-color: rgba(255, 200, 200, 0.85);
+  transform: rotate(90deg);
+}
+
+/* --------- Visualiser canvas --------- */
+.sc-viz {
+  display: block;
+  width: 100%;
+  height: 86px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background:
+    radial-gradient(60% 100% at 50% 100%, rgba(255, 80, 100, 0.10), transparent 70%),
+    linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.6));
+  border: 1px solid rgba(255, 138, 138, 0.24);
+  box-shadow:
+    inset 0 0 18px rgba(255, 90, 122, 0.08),
+    inset 0 0 2px rgba(255, 138, 138, 0.35);
+  position: relative;
+}
+
+/* --------- Rows + sliders --------- */
+.sc-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 9px;
+}
+.sc-slider {
+  display: flex; align-items: center; gap: 10px;
+  flex: 1; min-width: 0;
+  padding: 6px 10px;
+  background: rgba(255, 90, 122, 0.04);
+  border: 1px solid rgba(255, 138, 138, 0.12);
+  border-radius: 10px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.sc-slider:hover {
+  border-color: rgba(255, 138, 138, 0.32);
+  background: rgba(255, 90, 122, 0.07);
+}
+.sc-slider > span {
+  font: 500 9px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.32em; text-transform: uppercase;
+  color: rgba(255, 200, 200, 0.62);
+  flex-shrink: 0; width: 50px;
+}
+.sc-slider > em {
+  font: 500 9.5px/1 'JetBrains Mono', 'Courier New', monospace;
+  letter-spacing: 0.04em;
+  color: rgba(255, 235, 220, 0.95);
+  font-style: normal;
+  min-width: 44px; text-align: right;
+  text-shadow: 0 0 6px rgba(255, 138, 138, 0.5);
+}
 .sc-slider input[type="range"] {
   -webkit-appearance: none; appearance: none;
   flex: 1;
-  height: 3px;
-  background: linear-gradient(90deg, rgba(255, 90, 122, 0.5), rgba(255, 138, 90, 0.5));
+  height: 4px;
+  background: linear-gradient(90deg,
+    rgba(255, 90, 122, 0.42),
+    rgba(255, 140, 100, 0.42),
+    rgba(255, 200, 160, 0.42));
   border-radius: 999px;
   outline: none;
+  cursor: pointer;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.4);
 }
 .sc-slider input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 12px; height: 12px;
-  background: #fff; border-radius: 50%;
-  border: 2px solid rgba(255, 90, 122, 0.78);
-  box-shadow: 0 0 10px rgba(255, 90, 122, 0.65);
+  width: 14px; height: 14px;
+  background:
+    radial-gradient(circle at 35% 35%, #ffffff 0%, #ffe2e8 30%, #ff4060 80%);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 90, 122, 0.92);
+  box-shadow:
+    0 0 12px rgba(255, 90, 122, 0.85),
+    0 0 4px rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: transform 0.16s ease;
+}
+.sc-slider input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.18); }
+.sc-slider input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #ffe2e8 30%, #ff4060 80%);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 90, 122, 0.92);
+  box-shadow: 0 0 12px rgba(255, 90, 122, 0.85);
   cursor: pointer;
 }
-.sc-slider input[type="range"]::-moz-range-thumb {
-  width: 12px; height: 12px; background: #fff; border-radius: 50%;
-  border: 2px solid rgba(255, 90, 122, 0.78);
-  box-shadow: 0 0 10px rgba(255, 90, 122, 0.65); cursor: pointer;
-}
 
+/* --------- Buttons --------- */
 .sc-mute, .sc-toggle {
-  background: rgba(20, 6, 10, 0.6);
+  background: rgba(20, 6, 10, 0.62);
   border: 1px solid rgba(255, 138, 138, 0.45);
   border-radius: 999px;
-  padding: 5px 12px;
-  color: rgba(255, 230, 220, 0.85);
+  padding: 6px 14px;
+  color: rgba(255, 230, 220, 0.86);
   font: 500 9.5px/1 'Inter', system-ui, sans-serif;
   letter-spacing: 0.28em;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.18s ease;
+  position: relative;
+  overflow: hidden;
 }
-.sc-mute:hover, .sc-toggle:hover { border-color: rgba(255, 180, 180, 0.85); color: #fff; }
-.sc-mute.is-muted { background: linear-gradient(180deg, rgba(255, 100, 130, 0.45), rgba(180, 50, 80, 0.4)); color: #fff; border-color: rgba(255, 138, 138, 0.85); }
-.sc-toggle.is-on { background: linear-gradient(180deg, rgba(255, 100, 130, 0.32), rgba(180, 50, 80, 0.32)); color: #fff; border-color: rgba(255, 138, 138, 0.85); box-shadow: 0 0 12px rgba(255, 90, 122, 0.42); }
+.sc-mute::before, .sc-toggle::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(110deg,
+    transparent 30%,
+    rgba(255, 200, 200, 0.18) 50%,
+    transparent 70%);
+  background-size: 240% 100%;
+  animation: sc-shimmer 5s linear infinite;
+  pointer-events: none;
+}
+.sc-mute:hover, .sc-toggle:hover {
+  border-color: rgba(255, 200, 200, 0.9);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255, 90, 122, 0.5);
+}
+.sc-mute.is-muted {
+  background: linear-gradient(180deg, rgba(255, 100, 130, 0.50), rgba(180, 50, 80, 0.45));
+  color: #fff;
+  border-color: rgba(255, 200, 200, 0.92);
+  box-shadow: 0 0 16px rgba(255, 90, 122, 0.65);
+}
+.sc-toggle.is-on {
+  background: linear-gradient(180deg, rgba(255, 100, 130, 0.42), rgba(180, 50, 80, 0.38));
+  color: #fff;
+  border-color: rgba(255, 200, 200, 0.92);
+  box-shadow: 0 0 16px rgba(255, 90, 122, 0.62);
+}
 
-.sc-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 138, 138, 0.12); }
+/* --------- Presets row --------- */
+.sc-presets {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 138, 138, 0.16);
+}
 .sc-preset {
-  background: rgba(20, 6, 10, 0.5);
+  background: rgba(20, 6, 10, 0.52);
   border: 1px solid rgba(255, 138, 138, 0.22);
-  border-radius: 9px;
-  padding: 8px 4px;
+  border-radius: 10px;
+  padding: 9px 4px;
   color: rgba(255, 220, 220, 0.78);
   font: 500 9px/1 'Inter', system-ui, sans-serif;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  position: relative;
+  overflow: hidden;
 }
-.sc-preset:hover { border-color: rgba(255, 138, 138, 0.7); color: #fff; }
-.sc-preset.is-active {
-  background: linear-gradient(180deg, rgba(255, 100, 130, 0.4), rgba(180, 50, 80, 0.3));
-  border-color: rgba(255, 180, 180, 0.85);
+.sc-preset:hover {
+  border-color: rgba(255, 200, 200, 0.75);
   color: #fff;
-  box-shadow: 0 0 14px rgba(255, 90, 122, 0.5);
+  transform: translateY(-1px);
+}
+.sc-preset.is-active {
+  background: linear-gradient(180deg, rgba(255, 100, 130, 0.45), rgba(180, 50, 80, 0.32));
+  border-color: rgba(255, 200, 200, 0.95);
+  color: #fff;
+  box-shadow:
+    0 0 18px rgba(255, 90, 122, 0.6),
+    inset 0 0 6px rgba(255, 200, 200, 0.2);
+}
+.sc-preset.is-active::after {
+  content: '';
+  position: absolute;
+  left: 50%; bottom: 4px;
+  width: 4px; height: 4px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #fff;
+  transform: translateX(-50%);
+  animation: sc-dot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes sc-dot-pulse {
+  0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 0.45; transform: translateX(-50%) scale(1.3); }
 }
 
 @media (max-width: 767px) {
-  .sc-root { top: 14px; left: 14px; }
+  .sc-root  { top: 14px; left: 14px; }
   .sc-panel { width: calc(100vw - 28px); }
 }

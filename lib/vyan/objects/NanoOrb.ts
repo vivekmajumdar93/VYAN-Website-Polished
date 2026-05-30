@@ -410,7 +410,7 @@ export class NanoOrb {
       const lp = webNodes[nodeIdx]?.clone() ?? new THREE.Vector3();
 
       // -- DOT: tiny bright additive sphere + soft halo, behaves like core. --
-      const dotGeom = new THREE.SphereGeometry(0.05, 12, 12);
+      const dotGeom = new THREE.SphereGeometry(0.025, 10, 10);
       const dotMat = new THREE.MeshBasicMaterial({
         color, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -423,7 +423,7 @@ export class NanoOrb {
       dot.userData.basePos = lp.clone();
 
       // Soft halo billboard for the "glowing core" feel.
-      const haloGeom = new THREE.SphereGeometry(0.14, 12, 12);
+      const haloGeom = new THREE.SphereGeometry(0.07, 10, 10);
       const haloMat = new THREE.MeshBasicMaterial({
         color, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -433,9 +433,10 @@ export class NanoOrb {
       halo.userData.isHalo = true;
       halo.userData.productKey = key;
 
-      // Invisible larger hit-sphere for raycast click.
+      // Invisible larger hit-sphere for raycast click — stays generous so
+      // tiny dots remain easy to tap on touch screens.
       const hit = new THREE.Mesh(
-        new THREE.SphereGeometry(0.45, 8, 8),
+        new THREE.SphereGeometry(0.42, 8, 8),
         new THREE.MeshBasicMaterial({ visible: false, depthWrite: false }),
       );
       hit.position.copy(lp);
@@ -460,19 +461,29 @@ export class NanoOrb {
       const pathPositions = path.map(p => webNodes[p].clone());
       if (pathPositions.length < 2) pathPositions.push(lp.clone());
 
-      // -- PULSE: small bright additive sphere that moves along the polyline. --
-      const pulseMat = new THREE.MeshBasicMaterial({
+      // -- PULSE: an ELECTRIC LINE segment that travels along the web edges
+      //    (NOT a floating ball). We use a thin LineSegments geometry and
+      //    update its two endpoints per-frame so the line slides along the
+      //    polyline like a charge moving through wire.
+      const lineGeom = new THREE.BufferGeometry();
+      lineGeom.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(new Float32Array(6), 3),
+      );
+      const lineMat = new THREE.LineBasicMaterial({
         color, transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        linewidth: 2,
       });
-      const pulse = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), pulseMat);
+      const pulse: any = new THREE.LineSegments(lineGeom, lineMat);
       pulse.userData.isSignal = true;
       pulse.userData.productKey = key;
       pulse.userData.color = color;
       pulse.userData.path = pathPositions;
       pulse.userData.t = i / Math.max(1, productKeys.length);  // stagger
-      pulse.userData.speed = 0.25 + Math.random() * 0.15;
+      pulse.userData.speed = 0.30 + Math.random() * 0.18;
       pulse.userData.direction = direction;
+      pulse.userData.segLength = 0.12; // length of the moving "spark" along the path (0..1)
       this.signalGroup.add(pulse);
     }
 
@@ -743,31 +754,43 @@ export class NanoOrb {
           if (!isHalo) nodeIdx++;
         }
 
-        // -- PULSES travel ALONG THE WEB BRANCHES (not space arcs). --
+        // -- ELECTRIC LINE PULSES travel along the web edges (NOT space arcs).
+        // For each pulse, compute the head + tail positions along the polyline
+        // and write them into the LineSegments geometry. The result looks like
+        // a spark/charge moving WITHIN the existing web branches.
+        const sampleAlongPath = (path: THREE.Vector3[], u: number): THREE.Vector3 => {
+          const uu = Math.max(0, Math.min(0.9999, u));
+          const segCount = path.length - 1;
+          const segIdx = Math.min(segCount - 1, Math.floor(uu * segCount));
+          const segLocal = (uu * segCount) - segIdx;
+          const a = path[segIdx];
+          const b = path[segIdx + 1];
+          return new THREE.Vector3(
+            a.x + (b.x - a.x) * segLocal,
+            a.y + (b.y - a.y) * segLocal,
+            a.z + (b.z - a.z) * segLocal,
+          );
+        };
         for (const pulse of this.signalGroup.children) {
           const p: any = pulse;
           const path: THREE.Vector3[] | undefined = p.userData.path;
           if (!path || path.length < 2) continue;
           p.userData.t += dt * (p.userData.speed ?? 0.3) * speedMul;
           if (p.userData.t > 1.15) p.userData.t = -0.10;
-          const tt = Math.max(0, Math.min(0.999, p.userData.t));
-          // Map tt → segment index + segment-local progress.
-          const segCount = path.length - 1;
-          const segIdx = Math.min(segCount - 1, Math.floor(tt * segCount));
-          const segLocal = (tt * segCount) - segIdx;
-          const a = path[segIdx];
-          const b = path[segIdx + 1];
-          pulse.position.set(
-            a.x + (b.x - a.x) * segLocal,
-            a.y + (b.y - a.y) * segLocal,
-            a.z + (b.z - a.z) * segLocal,
-          );
-          const mat = (pulse as any).material as THREE.MeshBasicMaterial;
-          const env = Math.sin(Math.max(0, Math.min(1, tt)) * Math.PI);
+          const tt = Math.max(0, Math.min(1, p.userData.t));
+          const segLength: number = p.userData.segLength ?? 0.12;
+          // Spark head = current tt; tail = tt - segLength.
+          const head = sampleAlongPath(path, tt);
+          const tail = sampleAlongPath(path, Math.max(0, tt - segLength));
+          // Geometry: 2 points (head + tail) drawn as a LineSegment.
+          const pos = (pulse as any).geometry.attributes.position as THREE.BufferAttribute;
+          pos.setXYZ(0, tail.x, tail.y, tail.z);
+          pos.setXYZ(1, head.x, head.y, head.z);
+          pos.needsUpdate = true;
+          // Opacity: bright in middle, fade at endpoints — and tracks intensity.
+          const env = Math.sin(tt * Math.PI);
+          const mat = (pulse as any).material as THREE.LineBasicMaterial;
           mat.opacity = env * Math.min(1, expForSockets * 1.6) * intensityMul;
-          // Brighter burst when reaching socket (last 20% of path).
-          const burst = 1 + (tt > 0.80 ? (tt - 0.80) * 6 : 0) * intensityMul;
-          pulse.scale.setScalar(burst);
         }
       }
     }

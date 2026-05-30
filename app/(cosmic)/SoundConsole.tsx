@@ -86,41 +86,139 @@ export default function SoundConsole() {
       const r = canvas.getBoundingClientRect();
       const W = r.width, H = r.height;
       ctx.clearRect(0, 0, W, H);
-      // Background subtle red gradient strip
-      const bg = ctx.createLinearGradient(0, 0, W, 0);
-      bg.addColorStop(0, 'rgba(255, 90, 122, 0.05)');
-      bg.addColorStop(1, 'rgba(255, 138, 90, 0.05)');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-      // 3-band bars (bass, mid, treble) — left half
-      const bars = [
-        { v: e?.bass   ?? Math.abs(Math.sin(Date.now() / 700)) * 0.4, col: '#ff5a7a' },
-        { v: e?.mid    ?? Math.abs(Math.sin(Date.now() / 500)) * 0.5, col: '#ff8a5a' },
-        { v: e?.treble ?? Math.abs(Math.sin(Date.now() / 380)) * 0.45, col: '#ffd0a0' },
+
+      // Time-driven decay buffers (smoother bars).
+      const now = Date.now();
+      const tSec = now / 1000;
+
+      // ===== BACKGROUND GRID — subtle holographic crosshatch ===========
+      ctx.save();
+      ctx.globalAlpha = 0.10;
+      ctx.strokeStyle = '#ff8c8c';
+      ctx.lineWidth = 0.5;
+      for (let i = 1; i < 8; i++) {
+        const x = (W * i) / 8;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let j = 1; j < 4; j++) {
+        const y = (H * j) / 4;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+      ctx.restore();
+
+      // ===== SPECTRUM BARS (12 bars across left 62%) ===================
+      const bandsLive = [
+        e?.bass ?? 0,
+        e?.mid ?? 0,
+        e?.treble ?? 0,
       ];
-      const bw = (W * 0.45) / bars.length;
-      bars.forEach((b, i) => {
-        const v = Math.min(1, b.v);
-        const bh = Math.max(2, v * (H * 0.78));
-        ctx.fillStyle = b.col;
-        ctx.fillRect(8 + i * bw + bw * 0.18, H - bh - 6, bw * 0.6, bh);
-      });
-      // Energy ring — right half
-      const cx = W * 0.74, cy = H / 2;
-      const energy = e?.energy ?? (Math.abs(Math.sin(Date.now() / 600)) * 0.45);
-      const ringR = H * 0.36 + energy * 8;
+      const barCount = 12;
+      const barAreaW = W * 0.62;
+      const barW = (barAreaW - 16) / barCount - 1.5;
+      for (let i = 0; i < barCount; i++) {
+        // Distribute frequencies across the 3 bands with sine modulation.
+        const bandIdx = i < 4 ? 0 : i < 8 ? 1 : 2;
+        const base = bandsLive[bandIdx];
+        const v = Math.min(1,
+          Math.max(0,
+            base * (0.7 + Math.abs(Math.sin(tSec * 6 + i * 0.55)) * 0.55)
+            + (e ? 0 : Math.abs(Math.sin(tSec * (3 + i * 0.4))) * 0.35)
+          )
+        );
+        const bh = Math.max(2, v * (H - 14));
+        const x = 8 + i * (barW + 1.5);
+        const y = H - bh - 6;
+
+        // Bar fill — vertical gradient red → amber tip
+        const grd = ctx.createLinearGradient(0, y + bh, 0, y);
+        grd.addColorStop(0,   `rgba(255, 60, 90, ${0.85})`);
+        grd.addColorStop(0.6, `rgba(255, 120, 90, ${0.92})`);
+        grd.addColorStop(1,   `rgba(255, 220, 200, ${0.95})`);
+        ctx.fillStyle = grd;
+        ctx.shadowColor = 'rgba(255, 90, 122, 0.7)';
+        ctx.shadowBlur = 6;
+        ctx.fillRect(x, y, barW, bh);
+        // Bright cap line at top of each bar
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 4;
+        ctx.fillRect(x, y, barW, 1.5);
+        ctx.shadowBlur = 0;
+      }
+
+      // ===== WAVEFORM RIBBON across bottom-middle ======================
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 200, 180, 0.6)';
+      ctx.lineWidth = 1.3;
+      ctx.shadowColor = 'rgba(255, 120, 100, 0.6)';
+      ctx.shadowBlur = 6;
       ctx.beginPath();
-      ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 138, 138, ${0.45 + energy * 0.4})`;
-      ctx.lineWidth = 1.4;
+      const wfY = H * 0.85;
+      const energyForWave = e?.energy ?? 0.3;
+      for (let x = 0; x <= barAreaW; x += 2) {
+        const ph = (x / 40) + tSec * 4;
+        const amp = (3 + energyForWave * 12);
+        const y = wfY + Math.sin(ph) * amp * Math.sin(x / 22);
+        if (x === 0) ctx.moveTo(x + 8, y);
+        else         ctx.lineTo(x + 8, y);
+      }
       ctx.stroke();
-      // Inner pulse dot
+      ctx.restore();
+
+      // ===== DUAL ENERGY RING — right side core ========================
+      const ringCx = W * 0.83, ringCy = H / 2;
+      const energy = e?.energy ?? (Math.abs(Math.sin(tSec * 1.2)) * 0.45);
+      const ringR  = H * 0.30 + energy * 8;
+
+      // Outer ring — full circle, soft fill
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, 2 + energy * 3, 0, Math.PI * 2);
+      ctx.arc(ringCx, ringCy, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 180, 180, ${0.42 + energy * 0.4})`;
+      ctx.lineWidth = 1.4;
+      ctx.shadowColor = 'rgba(255, 90, 122, 0.7)';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.restore();
+
+      // Inner ring — rotating arc segment for "scan" feel
+      ctx.save();
+      ctx.translate(ringCx, ringCy);
+      ctx.rotate(tSec * 1.8);
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR - 6, 0, Math.PI * 1.2);
+      ctx.strokeStyle = `rgba(255, 220, 200, ${0.65 + energy * 0.3})`;
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = '#ffb0a0';
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.restore();
+
+      // Core pulse dot
+      ctx.beginPath();
+      ctx.arc(ringCx, ringCy, 2.6 + energy * 4, 0, Math.PI * 2);
       ctx.fillStyle = '#fff';
       ctx.shadowColor = '#ff5a7a';
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 14;
       ctx.fill();
       ctx.shadowBlur = 0;
+
+      // Tick marks around the ring (every 30°)
+      ctx.save();
+      ctx.translate(ringCx, ringCy);
+      ctx.strokeStyle = 'rgba(255, 180, 180, 0.42)';
+      ctx.lineWidth = 1;
+      for (let a = 0; a < 12; a++) {
+        const ang = (a / 12) * Math.PI * 2;
+        const r1 = ringR + 3;
+        const r2 = ringR + 6;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(ang) * r1, Math.sin(ang) * r1);
+        ctx.lineTo(Math.cos(ang) * r2, Math.sin(ang) * r2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
       rafRef.current = requestAnimationFrame(draw);
     };
     rafRef.current = requestAnimationFrame(draw);
