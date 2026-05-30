@@ -120,9 +120,13 @@ export default function SoundConsole() {
         const bandIdx = i < 4 ? 0 : i < 8 ? 1 : 2;
         const base = bandsLive[bandIdx];
         const v = Math.min(1,
-          Math.max(0,
-            base * (0.7 + Math.abs(Math.sin(tSec * 6 + i * 0.55)) * 0.55)
-            + (e ? 0 : Math.abs(Math.sin(tSec * (3 + i * 0.4))) * 0.35)
+          Math.max(0.04,
+            // 70% live spectrum (muted → 0) + 30% ambient cosmic flow
+            // (always present so the visualizer never goes flat). When
+            // there is no engine yet we boost ambient further so the
+            // panel still feels alive on first open.
+            base * 0.7 * (0.7 + Math.abs(Math.sin(tSec * 6 + i * 0.55)) * 0.55)
+            + Math.abs(Math.sin(tSec * (3 + i * 0.4) + bandIdx)) * (e ? 0.18 : 0.42)
           )
         );
         const bh = Math.max(2, v * (H - 14));
@@ -226,7 +230,12 @@ export default function SoundConsole() {
       window.removeEventListener('resize', onResize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, []);
+    // PHASE 8 (#5 Sound Console "breaking" — visualizer was flat because
+    // canvas mounts only when `open` and the viz useEffect had [] deps,
+    // so vizRef was null when it ran. Adding `open` to deps makes the
+    // RAF loop start as soon as the panel is unfolded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const applyPreset = (p: Preset) => {
     const e = getEngine();

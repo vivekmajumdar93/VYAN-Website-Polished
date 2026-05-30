@@ -521,3 +521,74 @@ phase_7_vistara_cinematic_camera_travel:
         • Audio swell 1.05 × 0.45 s fired on transition.
 
     - No regressions in console (only benign WebGL perf warnings).
+
+
+phase_8_user_priority_batch:
+  status: COMPLETE
+  description: |
+    User-priority batch (items 1–6 from the most recent feedback).
+
+    ITEM 1 — Medhā chat "not responding":
+      VERIFIED API works (POST /api/medha returns 200 with text "Greetings"
+      from Emergent LLM). Orb has 5 model nodes (prajna/mantra/darsana/
+      smarana/kavi). The user-perceived "not responding" is the consent
+      slab gating chat access — a deliberate legal flow. No code change.
+
+    ITEM 2 — Outside-click closes Vistāra slab:
+      DONE. Added an independent document-level capture-phase listener in
+      `app/(cosmic)/CosmicCanvas.tsx` (`onDocClickOutside`) that fires
+      regardless of canvas/raycaster routing. Closes the active product
+      slab via dual-strategy router.push + 250 ms window.location fallback
+      (mirrors P0 fix). Verified Playwright: click at (500, 1000) on empty
+      canvas → "Execution context destroyed" (= navigation happened).
+
+    ITEM 3 — Nāvika tagline "The Navigator of VYAN":
+      ALREADY PRESENT. `ConciergeOrb.tsx` has aria-label="Nāvika — The
+      Navigator of VYAN" plus visible nav title/subtitle on expand. Size
+      40×40 px (≈ 1 cm). No code change.
+
+    ITEM 4 — Per-product neural rail tag:
+      DONE. `lib/vyan/ui/Overlay.ts::setShunyaRail` now reads
+      `window.location.pathname` directly and maps the product key to a
+      diacritic-rich display name (Ṛtam, Ojas, Mudrā, Netra, Ākṛti, Sūtra,
+      Prājña, Mantra, Darśana, Smaraṇa, Kavi). Verified: rail badge now
+      reads `ENTERED · ṚTAM`, `ENTERED · SŪTRA`, etc.
+
+    ITEM 5 — Sound Console "breaking":
+      DONE. Root cause was two compounding issues in
+      `app/(cosmic)/SoundConsole.tsx`:
+        a) The visualizer canvas is only mounted when the panel is `open`,
+           but the viz `useEffect` had `[]` deps → `vizRef.current` was
+           null on first run → the RAF draw loop never started. Fixed deps
+           → `[open]`.
+        b) The ambient fallback only fired when the audio engine was
+           missing entirely; when the engine existed and was muted, bars
+           clamped at 0. Now always blend a cosmic-flux sine into `v` so
+           the panel never goes flat (39 % of pixels lit verified).
+      The futuristic energy ring + scan arc + spectrum bars + waveform all
+      render correctly.
+
+    ITEM 6 — Stronger cinematic camera travel between Vistāra products:
+      DONE. In `lib/vyan/app/CameraRig.ts::updateVoid` the target camera
+      position is now `lookAt + (arcX, 3 + liftY, 26 + dollyZ)` instead
+      of a static `(0, 3, 26)`. During the 900 ms node-change `sin(t·π)`
+      envelope:
+        • dollyZ peaks at –5 (camera moves 5 u closer)
+        • arcX peaks at ±3 (camera sweeps sideways; sign hashed off the
+          node-key char code so different products arc to different sides)
+        • liftY peaks at +2 (camera tilts up)
+      Combined with the existing look-at boost (40 % → 70 %) and FOV
+      punch (–4°), the transition between products is now a visible
+      dolly-zoom + arc swing rather than a subtle look-tilt.
+      Verified: camera X swings 120 → 116 → 117 (4 u range), FOV drops
+      38 → 32 (6° punch) during /vistara/ritam → /vistara/sutra transit.
+
+  files_touched:
+    - app/(cosmic)/CosmicCanvas.tsx
+    - lib/vyan/ui/Overlay.ts
+    - app/(cosmic)/SoundConsole.tsx
+    - lib/vyan/app/CameraRig.ts
+
+  not_changed_intentionally:
+    - app/api/medha/route.ts (verified working)
+    - app/(cosmic)/ConciergeOrb.tsx (Nāvika name + tagline already present)

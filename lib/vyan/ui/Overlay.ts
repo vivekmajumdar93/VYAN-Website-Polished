@@ -612,8 +612,31 @@ setShunyaCaption(name: string, tagline: string, focus: number) {
   // nodes are flex-centered with gaps, not evenly distributed 0-100%).
   if (this.depthLy) {
     const ly = Math.max(0, Math.round((1 - focus) * 420));
-    const name = names[activeIndex] ?? '';
+    let name = names[activeIndex] ?? '';
     const nextName = names[(activeIndex + 1) % total] ?? '';
+    // PHASE 8 — per-product rail tag. When the URL is /vistara/<product>
+    // or /medha?model=<key>, override the orb name with the product/model
+    // name so the rail badge reads `ENTERED · ṚTAM` instead of
+    // `ENTERED · VISTĀRA`. Read directly from window.location to avoid the
+    // ~5–10 s settle latency that `__vyanIX` sometimes exhibits on deep
+    // links — the URL is the source of truth.
+    try {
+      const PRODUCT_DISPLAY: Record<string, string> = {
+        ritam: 'Ṛtam', ojas: 'Ojas', mudra: 'Mudrā', netra: 'Netra',
+        akriti: 'Ākṛti', sutra: 'Sūtra',
+        prajna: 'Prājña', mantra: 'Mantra', darsana: 'Darśana',
+        smarana: 'Smaraṇa', kavi: 'Kavi',
+      };
+      const path = window.location.pathname;
+      const search = window.location.search;
+      const m = /^\/vistara\/([^/]+)$/.exec(path);
+      if (m && PRODUCT_DISPLAY[m[1]]) {
+        name = PRODUCT_DISPLAY[m[1]];
+      } else if ((path === '/medha' || path.startsWith('/medha/')) && search) {
+        const mm = /[?&]model=([^&]+)/.exec(search);
+        if (mm && PRODUCT_DISPLAY[mm[1]]) name = PRODUCT_DISPLAY[mm[1]];
+      }
+    } catch {}
     this.depthLy.textContent = ly === 0
       ? `ENTERED · ${name}`
       : `${ly.toLocaleString()} LY → ${nextName}`;

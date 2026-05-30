@@ -54,20 +54,22 @@ async function applyRouteState(pathname: string | null, isInitial = false) {
     // setNode (instant) instead of expand (full tween) and fire an audio
     // swell so the camera's FOV-punch + look-at swing feels synchronized.
     const cur = ix.get();
+    const nextNodeKey = targetOrb === 'vistara' ? (seg ?? null) : null;
     if (cur.target === targetOrb && cur.phase !== 'dormant') {
-      const nextNode = targetOrb === 'vistara' ? (seg ?? null) : null;
-      if (cur.node !== nextNode) {
-        ix.setNode(nextNode, spectrum);
+      if (cur.node !== nextNodeKey) {
+        ix.setNode(nextNodeKey, spectrum);
         try { app.audioEngine?.swell?.(1.05, 0.45); } catch {}
-        // Also trigger the camera-rig FOV punch directly (belt + braces —
-        // the rig's auto-detect will also fire, but this guarantees the cue
-        // even if the IX node-change isn't observed in the same frame).
         try { app.worldRef?.cameraRig?.pulseNodeChange?.(); } catch {}
       } else if (spectrum && cur.spectrum !== spectrum) {
         ix.setSpectrum(spectrum);
       }
     } else {
-      ix.expand(targetOrb, targetOrb === 'vistara' ? (seg ?? null) : null, spectrum);
+      ix.expand(targetOrb, nextNodeKey, spectrum);
+      // PHASE 8 — also fire the cinematic pulse on first expand so the
+      // initial transition into a product (deep-link OR first click into
+      // Vistāra) feels like an arrival rather than a passive load.
+      try { app.audioEngine?.swell?.(1.05, 0.45); } catch {}
+      try { app.worldRef?.cameraRig?.pulseNodeChange?.(); } catch {}
     }
   } else {
     ix.fold();
@@ -184,13 +186,74 @@ export default function CosmicCanvas() {
             } catch {
               window.location.href = target;
             }
+            return;
           }
+
+          // PHASE 8 (item #2 outside-click close) — if a Vistāra or Medhā
+          // slab is currently open AND the click did NOT land on a product
+          // socket AND the target wasn't the slab itself, close the slab by
+          // routing back to the parent orb.
+          try {
+            const path = window.location.pathname;
+            const onVistaraProduct = /^\/vistara\/[^/]+$/.test(path);
+            const onMedha = path === '/medha' || path.startsWith('/medha/');
+            const clickedSlab = !!target?.closest('.vpd-slab, .mlv-modal, .mlv-composer, .mlv-orb-pane, .mlv-thread, .glass-panel.open, .mcc-veil, .medha-quota-lock, .gateway-info-panel.open, .sound-panel-overlay.open, .sound-card, .vac-root.is-open, .sc-root, .concierge-nav');
+            if (!clickedSlab && onVistaraProduct) {
+              const freshRouter = (window as any).__vyanRouter ?? router;
+              try { freshRouter.push('/vistara'); }
+              catch { window.location.href = '/vistara'; }
+            }
+            // For /medha we do NOT auto-close because Medhā IS the page
+            // (not a slab) — closing it would force the user to redo consent.
+          } catch {}
         } catch (err) {
           (window as any).__vyanLastClickError = String(err);
         }
       };
       rootEl?.addEventListener('click', onDomClick);
       (window as any).__vyanDomClick = onDomClick;
+
+      // PHASE 8b (item #2) — independent document-level outside-click
+      // closer for Vistāra product slabs. Decoupled from the canvas raycast
+      // path because some click targets never reach #vyan-root in capture
+      // (e.g. clicks land directly on .vyan-ui UI children that re-enable
+      // pointer-events). This handler fires on the document and closes the
+      // open product slab when the click is NOT on the slab itself or any
+      // interactive overlay.
+      const onDocClickOutside = (ev: MouseEvent) => {
+        try {
+          const t = ev.target as HTMLElement | null;
+          // Allow normal interaction with: the slab itself, any open modal,
+          // top-level controls (concierge nav/orb, sound console, gateway
+          // info, neural rail), and any explicit interactive ancestor that
+          // sets data-vyan-keepopen="1".
+          const keep = t?.closest(
+            '.vpd-slab, .vpd-veil > *:not(canvas), .mlv-modal, .mlv-composer, .mlv-orb-pane, .mlv-thread, ' +
+            '.glass-panel.open, .mcc-veil, .medha-quota-lock, .gateway-info-panel.open, ' +
+            '.sound-panel-overlay.open, .sound-card, .vac-root.is-open, .sc-root, ' +
+            '.concierge-root, .concierge-nav, .neural-depth, [data-vyan-keepopen="1"]',
+          );
+          if (keep) return;
+          const path = window.location.pathname;
+          if (/^\/vistara\/[^/]+$/.test(path)) {
+            (window as any).__vyanLastOutsideClose = { at: Date.now(), x: ev.clientX, y: ev.clientY };
+            const freshRouter = (window as any).__vyanRouter ?? router;
+            try { freshRouter.push('/vistara'); } catch {}
+            // Belt-and-braces: same dual-strategy as the socket click —
+            // router.push from outside React render context can silently
+            // no-op, so fall back to a hard nav if the URL hasn't moved.
+            setTimeout(() => {
+              if (window.location.pathname !== '/vistara') {
+                window.location.href = '/vistara';
+              }
+            }, 250);
+          }
+          // Medhā page is its own route — outside-click does not close it
+          // (closing would force consent to be re-entered).
+        } catch {}
+      };
+      document.addEventListener('click', onDocClickOutside, true); // capture phase so we beat slab-internal handlers
+      (window as any).__vyanDocClickOutside = onDocClickOutside;
 
       // Apply the current route state — fires the in-place expansion if the
       // URL already points at /medha or /vistara/<product>.
@@ -207,6 +270,10 @@ export default function CosmicCanvas() {
       try {
         const dc = (window as any).__vyanDomClick;
         if (dc && rootEl) rootEl.removeEventListener('click', dc);
+      } catch {}
+      try {
+        const doc = (window as any).__vyanDocClickOutside;
+        if (doc) document.removeEventListener('click', doc, true);
       } catch {}
       try { appInstance?.destroy?.(); } catch {}
       if (rootEl) rootEl.innerHTML = '';

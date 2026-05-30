@@ -234,7 +234,26 @@ export class CameraRig {
     // Udbhava at z=0, Sandhi at z=-220, etc.). The look-target itself is
     // spring-lerped between adjacent orbs, so motion stays cinematic; the
     // camera just rides 26 units behind it dead-on every frame.
-    const targetPos = this.currentLookAt.clone().add(new THREE.Vector3(0, 3, 26));
+    //
+    // PHASE 8 (#6 stronger Vistāra cinematic) — during the node-change
+    // punch envelope, the camera also DOLLIES toward the orb (Z -5) and
+    // sweeps a small arc around the focal axis (X ±3, Y +2) so the
+    // transition between products feels like a fly-over rather than a
+    // subtle look-tilt. The envelope is the same sin(t·π) so all cinematic
+    // components (FOV, look-lerp, position) peak together.
+    const tPunchPos = (performance.now() - this.nodeChangeAt) / this.nodeChangeDur;
+    const punchPosEnv = tPunchPos < 0 || tPunchPos > 1 ? 0 : Math.sin(tPunchPos * Math.PI);
+    // Sign the arc direction with the node-key hash so different products
+    // arc to different sides — feels less repetitive.
+    const arcSign = this.lastNodeKey
+      ? (this.lastNodeKey.charCodeAt(0) % 2 === 0 ? 1 : -1)
+      : 1;
+    const dollyZ = -5 * punchPosEnv;             // dolly 5 units closer at peak
+    const arcX   = 3 * punchPosEnv * arcSign;    // sweep ±3 units sideways
+    const liftY  = 2 * punchPosEnv;              // tilt up 2 units at peak
+    const targetPos = this.currentLookAt.clone().add(
+      new THREE.Vector3(arcX, 3 + liftY, 26 + dollyZ)
+    );
     this.posSpring.step(this.currentCamPos, targetPos, dt, 6.0, 3.5);
 
     // Decay the arrival offset (if active).
