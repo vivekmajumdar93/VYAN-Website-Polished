@@ -98,6 +98,43 @@ export default function CosmicCanvas() {
       // Expose router for in-canvas socket clicks (Vistāra product nodes).
       (window as any).__vyanRouter = router;
 
+      // PHASE 3 v3 — direct DOM click handler that raycasts against the
+      // focused orb's socket dots at the EXACT click moment + coordinates.
+      // This is more reliable than the polling `interaction.clicked` flag
+      // (which can miss the click if the orb has drifted between frames).
+      const THREE = await import('three');
+      const raycaster = new THREE.Raycaster();
+      const ndc = new THREE.Vector2();
+      const onDomClick = (ev: MouseEvent) => {
+        try {
+          // Ignore clicks on UI overlays (panels, buttons, console).
+          const target = ev.target as HTMLElement | null;
+          if (target?.closest('.vpd-slab, .mlv-modal, .concierge-nav, .sc-panel, .mlv-composer, .mlv-orb-pane, button')) return;
+          const app: any = appInstance;
+          const w = app?.worldRef;
+          const shunya = w?.realms?.shunya;
+          if (!shunya || !w?.camera) return;
+          const focused = shunya.orbs?.[shunya.activeIndex];
+          if (!focused?.socketGroup?.children?.length) return;
+          ndc.x = (ev.clientX / window.innerWidth) * 2 - 1;
+          ndc.y = -((ev.clientY / window.innerHeight) * 2 - 1);
+          raycaster.setFromCamera(ndc, w.camera);
+          const hits = raycaster.intersectObjects(focused.socketGroup.children, true);
+          const productHit = hits.find((h: any) =>
+            h.object?.userData?.isProductSocket && h.object?.userData?.productKey,
+          );
+          if (productHit) {
+            const productKey = (productHit as any).object.userData.productKey as string;
+            const orbKey = shunya.defs?.[shunya.activeIndex]?.key;
+            const target = orbKey === 'medha' ? `/medha?model=${productKey}` : `/vistara/${productKey}`;
+            try { app.audioEngine?.swell?.(1.06, 0.25); } catch {}
+            router.push(target);
+          }
+        } catch {}
+      };
+      rootEl?.addEventListener('click', onDomClick);
+      (window as any).__vyanDomClick = onDomClick;
+
       // Apply the current route state — fires the in-place expansion if the
       // URL already points at /medha or /vistara/<product>.
       await applyRouteState(pathname);
@@ -110,6 +147,10 @@ export default function CosmicCanvas() {
 
     return () => {
       cancelled = true;
+      try {
+        const dc = (window as any).__vyanDomClick;
+        if (dc && rootEl) rootEl.removeEventListener('click', dc);
+      } catch {}
       try { appInstance?.destroy?.(); } catch {}
       if (rootEl) rootEl.innerHTML = '';
       try { delete (window as any).__vyan; } catch {}

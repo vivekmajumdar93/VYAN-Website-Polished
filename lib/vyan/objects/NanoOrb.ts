@@ -435,13 +435,22 @@ export class NanoOrb {
 
       // Invisible larger hit-sphere for raycast click — stays generous so
       // tiny dots remain easy to tap on touch screens.
+      // NOTE: must keep `visible: true` (with transparent material) so the
+      // raycaster actually tests against it — `visible: false` is skipped.
       const hit = new THREE.Mesh(
         new THREE.SphereGeometry(0.42, 8, 8),
-        new THREE.MeshBasicMaterial({ visible: false, depthWrite: false }),
+        new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          depthTest: false,
+        }),
       );
+      hit.visible = true;
       hit.position.copy(lp);
       hit.userData.isProductSocket = true;
       hit.userData.productKey = key;
+      hit.userData.isHit = true;
 
       this.socketGroup.add(hit);
       this.socketGroup.add(halo);
@@ -736,19 +745,19 @@ export class NanoOrb {
         else if (signal === 'response'){ speedMul = 2.30; intensityMul = 1.5; }
         else if (signal === 'interaction'){ speedMul = 1.0; intensityMul = 0.95; }
 
-        // -- DOTS + HALOS: pulse like the bright core. --
+        // -- DOTS + HALOS: pulse like the bright core. Skip the invisible
+        // hit-spheres (userData.isHit) so they never become visible. --
         let nodeIdx = 0;
         for (const c of this.socketGroup.children) {
+          if ((c as any).userData?.isHit) continue;
           const m = (c as any).material as THREE.MeshBasicMaterial | undefined;
-          if (!m || (m as any).visible === false) continue;
+          if (!m) continue;
           const isHalo = (c as any).userData?.isHalo;
           const fadeIn = Math.min(1, Math.max(0, (expForSockets - 0.15) / 0.5));
-          // Core-like rapid pulse + slow swell.
           const fastPulse = 0.55 + Math.sin(t * 6.0 + nodeIdx * 0.9) * 0.20;
           const slowSwell = 0.85 + Math.sin(t * 1.8 + nodeIdx) * 0.15;
           const baseOp = isHalo ? 0.32 : 0.95;
           m.opacity = fadeIn * baseOp * fastPulse * slowSwell * intensityMul;
-          // Subtle scale breathing.
           const sScale = 1 + Math.sin(t * 3.0 + nodeIdx) * 0.18;
           c.scale.setScalar(sScale);
           if (!isHalo) nodeIdx++;
