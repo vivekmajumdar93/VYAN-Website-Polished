@@ -119,18 +119,55 @@ export default function CosmicCanvas() {
           ndc.x = (ev.clientX / window.innerWidth) * 2 - 1;
           ndc.y = -((ev.clientY / window.innerHeight) * 2 - 1);
           raycaster.setFromCamera(ndc, w.camera);
+          // Generous click radius for the tiny dots — increase the Points
+          // threshold and ensure hit-spheres at depth match.
+          (raycaster.params as any).Points = { threshold: 1.2 };
+          (raycaster.params as any).Line = { threshold: 0.6 };
           const hits = raycaster.intersectObjects(focused.socketGroup.children, true);
           const productHit = hits.find((h: any) =>
             h.object?.userData?.isProductSocket && h.object?.userData?.productKey,
           );
+          // Diagnostic trace — exposed for testing scripts and removed via
+          // window.__vyanClickTrace=false in prod.
+          if ((window as any).__vyanClickTrace !== false) {
+            (window as any).__vyanLastClick = {
+              x: ev.clientX, y: ev.clientY,
+              hits: hits.length,
+              productHit: !!productHit,
+              productKey: productHit ? (productHit as any).object.userData.productKey : null,
+              socketCount: focused.socketGroup.children.length,
+              ndc: { x: ndc.x, y: ndc.y },
+            };
+          }
           if (productHit) {
             const productKey = (productHit as any).object.userData.productKey as string;
             const orbKey = shunya.defs?.[shunya.activeIndex]?.key;
             const target = orbKey === 'medha' ? `/medha?model=${productKey}` : `/vistara/${productKey}`;
             try { app.audioEngine?.swell?.(1.06, 0.25); } catch {}
-            router.push(target);
+            // PHASE 6: dual-strategy navigation. The cosmic canvas's click
+            // handler runs OUTSIDE React's render context (it's attached
+            // directly to the DOM in a useEffect with empty deps), so
+            // router.push() captures a stale closure and silently no-ops.
+            // We use the fresh router on window + a hard-fallback to
+            // guarantee navigation.
+            try {
+              const freshRouter = (window as any).__vyanRouter ?? router;
+              freshRouter.push(target);
+              // Belt-and-braces: if the route hasn't committed within a beat,
+              // fall through to a native nav. This is silent if router.push
+              // already worked.
+              setTimeout(() => {
+                if (window.location.pathname + window.location.search !== target) {
+                  window.location.href = target;
+                }
+              }, 250);
+            } catch {
+              window.location.href = target;
+            }
           }
-        } catch {}
+        } catch (err) {
+          (window as any).__vyanLastClickError = String(err);
+        }
       };
       rootEl?.addEventListener('click', onDomClick);
       (window as any).__vyanDomClick = onDomClick;

@@ -462,3 +462,28 @@ frontend:
       - Visual verification screenshots taken for Udbhava (long-form scroll),
         Sandhi (4-card translucent grid), and Shunya entry arrivals at T+0.5,
         T+1.3 and T+3.5s.
+
+
+phase_6_vistara_click_fix:
+  status: COMPLETE
+  description: |
+    Vistāra socket clicks (3D raycasting) were blocked by an invisible 720px-wide
+    DOM panel covering the centre of the viewport. Resolved across three layers:
+    1. `lib/vyan/ui/styles.css` — removed stray `.glass-panel { pointer-events: auto; }`
+       override that broke the conditional `pointer-events: none → auto on .open`.
+    2. `lib/vyan/ui/Overlay.ts` — `clearFade()` & `fadeFromBlack()` now keep the
+       `.vyan-ui` container at `pointer-events: none` (was setting `auto`, which
+       inline-overrode the CSS rule and swallowed canvas clicks).
+    3. `app/(cosmic)/medha/MedhaHUD.tsx` — unmount cleanup now restores
+       `pointer-events: none` (was restoring to `auto`).
+    4. `app/(cosmic)/CosmicCanvas.tsx` — bullet-proofed the click→navigate path:
+       generous raycaster thresholds (Points 1.2 / Line 0.6) + dual-strategy
+       router.push with `window.location.href` fallback for cases where the
+       Next.js router closure goes stale outside React render context.
+
+  verification:
+    - Programmatic socket projection + Playwright click at (1624, 589) →
+      navigated to `/vistara/ojas` and opened the VYAN OJAS product slab.
+    - Direct nav `/vistara/ritam` still loads slab.
+    - `/medha` HUD still loads; `.vyan-ui` pe=`none` preserved on /medha.
+    - No regressions in console (only benign WebGL perf warnings).

@@ -1203,9 +1203,11 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
 
 /* 7) Glass panel close-on-outside-click — handled in JS, but we add a
    click-veil layer behind the panel that swallows clicks and triggers close.
-   Existing veil class .glass-panel::before already covers this; ensure it
-   actually receives pointer events. */
-.glass-panel { pointer-events: auto; }
+   IMPORTANT: do NOT force pointer-events:auto on .glass-panel here — the
+   base rule (line 244) sets it to `none`, and `.glass-panel.open` re-enables
+   it. Overriding that here makes the (invisible, scaled) 720px panel
+   permanently swallow clicks even when closed, blocking the WebGL
+   raycaster behind it. */
 .glass-panel.open .glass-close { z-index: 60; }
 
 /* 8) NEURAL DEPTH — legacy override; superseded by the rail-riding LY at end of file. */

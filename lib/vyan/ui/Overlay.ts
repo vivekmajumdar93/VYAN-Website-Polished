@@ -427,10 +427,13 @@ this.element.style.pointerEvents = 'none';
 clearFade() {
   document.querySelectorAll('[data-vyan-fade="1"]').forEach(el => el.remove());
   this.fadeOverlay = null;
-  // Restore overlay visibility
+  // Restore overlay visibility. IMPORTANT: keep pointer-events:none on the
+  // .vyan-ui root so 3D raycasting works — interactive children (sound
+  // console, neural rail, gateway hint, glass panels, etc.) re-enable
+  // pointer-events themselves in CSS.
   this.element.style.transition = 'opacity 0.6s ease-out';
   this.element.style.opacity = '1';
-  this.element.style.pointerEvents = 'auto';
+  this.element.style.pointerEvents = 'none';
 }
 fadeFromBlack(durationSeconds = 1.4) {
   // Ensures a black overlay exists, then fades it out (used when emerging into a void).
@@ -451,10 +454,12 @@ fadeFromBlack(durationSeconds = 1.4) {
     this.fadeOverlay = darkness;
     darkness.getBoundingClientRect();
   }
-  // Restore overlay UI visibility in parallel
+  // Restore overlay UI visibility in parallel. IMPORTANT: keep .vyan-ui
+  // pointer-events:none so the WebGL canvas underneath receives clicks —
+  // interactive children (rail, console, panels) re-enable pe:auto in CSS.
   this.element.style.transition = `opacity ${durationSeconds}s ease-out`;
   this.element.style.opacity = '1';
-  this.element.style.pointerEvents = 'auto';
+  this.element.style.pointerEvents = 'none';
   // Then fade the darkness out
   darkness.style.transition = `opacity ${durationSeconds}s ease-out`;
   darkness.style.opacity = '0';

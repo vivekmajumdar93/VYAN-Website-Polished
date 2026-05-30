@@ -141,7 +141,10 @@ export default function MedhaHUD() {
     } catch {}
     return () => {
       const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
-      if (ui) { ui.style.opacity = '1'; ui.style.pointerEvents = 'auto'; }
+      // Restore .vyan-ui visibility but KEEP pointer-events:none so the
+      // WebGL canvas underneath continues to receive raycaster clicks.
+      // Interactive children (rail, console, panels) re-enable pe:auto via CSS.
+      if (ui) { ui.style.opacity = '1'; ui.style.pointerEvents = 'none'; }
       window.dispatchEvent(new CustomEvent('vyan:resume'));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
