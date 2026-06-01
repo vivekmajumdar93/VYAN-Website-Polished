@@ -915,3 +915,60 @@
   .mcc-title { font-size: 18px; }
   .mcc-grid { grid-template-columns: 1fr; }
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+   PHASE 10 — User batch 7 fixes (CSS-only, applied 2026-06-01)
+   Targets items #1 (overlapping slabs), #2 (hide Nāvika + neural rail in
+   chat), #3 (settings orb → bottom-left, right side clean), #6 (suppress
+   marketing CTA visible alongside Medhā chat). Uses `body:has(.mlv)` so
+   these rules ONLY apply while the Medhā HUD is mounted; the gateway,
+   /vistara and /shunya routes are unaffected.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* #2 + #6 — hide global Nāvika orb, expanded nav, and neural-depth rail
+   while in the Medhā chat interface so the user only sees Medhā UI. */
+body:has(.mlv) .concierge-root,
+body:has(.mlv) .concierge-nav,
+body:has(.mlv) .neural-depth,
+body:has(.mlv) .depth-ly-rail {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* #3 — settings orb moves to BOTTOM-LEFT; right side stays clean for the
+   user input bar only. Overrides the existing top-right placement. */
+body:has(.mlv) .mlv-settings-orb {
+  top: auto !important;
+  right: auto !important;
+  bottom: 22px !important;
+  left: 22px !important;
+}
+
+/* #1a — SHUNYA exit button moves to TOP-RIGHT (where Nāvika used to sit,
+   now hidden) so it no longer overlaps the Sound Console panel that
+   slides out from top-left. */
+body:has(.mlv) .mlv-back {
+  top: 18px !important;
+  left: auto !important;
+  right: 22px !important;
+}
+
+/* #1b — ensure the latest assistant bubble never sits under the composer.
+   Adds breathing room at the bottom of the conversation thread. */
+body:has(.mlv) .mlv-thread {
+  padding-bottom: 140px !important;
+}
+
+/* Mobile: tighter placements */
+@media (max-width: 760px) {
+  body:has(.mlv) .mlv-settings-orb {
+    bottom: 86px !important; left: 14px !important;
+    width: 34px !important; height: 34px !important;
+  }
+  body:has(.mlv) .mlv-back {
+    top: 14px !important; right: 14px !important;
+    padding: 6px 11px; font-size: 9px;
+  }
+  body:has(.mlv) .mlv-thread { padding-bottom: 160px !important; }
+}
