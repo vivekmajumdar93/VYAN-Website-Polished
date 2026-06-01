@@ -67,7 +67,8 @@ export class CameraRig {
 
   // ── Constants ───────────────────────────────────────────────────────────────
   // How long the camera hovers at the node before signalling panel-open (ms).
-  private static readonly HOVER_DWELL_MS = 1400;
+  // 600ms — enough to feel cinematic without blank-screen lag.
+  private static readonly HOVER_DWELL_MS = 600;
   // How close the camera gets to the orb centre when fully expanded (units from orb).
   private static readonly EXPAND_DIST = 14;
   // How far the camera sits from a node when flying to it.

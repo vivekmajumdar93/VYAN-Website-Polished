@@ -210,6 +210,9 @@ export class NanoOrb {
     // FLOATING SATELLITES
     this.satellites = new THREE.Group();
     this.group.add(this.satellites);
+    // SATELLITES are hidden — they render as cheap geometric clusters that
+    // break the premium cosmic aesthetic. The node network + stardust is sufficient.
+    this.satellites.visible = false;
 
     for (let s = 0; s < 10; s++) {
         const cluster = new THREE.Group();
@@ -625,10 +628,14 @@ export class NanoOrb {
         Math.sin(t * 0.12 + this.seed * 0.7) * 0.038
       ).multiplyScalar(motion);
 
+      // FIX: circle amplitude capped at 0.8 world units max so nodes remain
+      // reachable by the user's pointer. Previous values (3.2, 2.8, 6.0) made
+      // the orb orbit so wide that clickable sockets were never where they appeared.
+      const circleAmp = presence > 0.5 ? 0.5 : 1.2; // near-zero when focused
       const circle = new THREE.Vector3(
-        Math.cos(t * 0.44 + this.seed * 0.41) * 3.2 * presence,
-        Math.sin(t * 0.39 + this.seed * 0.77) * 2.8 * presence,
-        Math.sin(t * 0.22 + this.seed * 0.93) * 6.0 * presence
+        Math.cos(t * 0.18 + this.seed * 0.41) * circleAmp * presence,
+        Math.sin(t * 0.15 + this.seed * 0.77) * circleAmp * 0.7 * presence,
+        Math.sin(t * 0.10 + this.seed * 0.93) * circleAmp * presence
       ).multiplyScalar(motion);
 
       this.group.position.copy(this.home).add(drift).add(circle);
@@ -662,7 +669,8 @@ export class NanoOrb {
     // anchored to its sockets.
     const expT = (this as any).expansionT ?? 0;
     const unfoldEase = expT < 0.5 ? 2 * expT * expT : 1 - Math.pow(-2 * expT + 2, 2) / 2;
-    const expandScale = 1 + unfoldEase * 0.7;
+    // CAP at 1.28× — was 1.7× which pushed the orb beyond the viewport edges
+    const expandScale = 1 + unfoldEase * 0.28;
     const targetScale = baseScale * expandScale;
 
     if (this.scale < 10) {
@@ -718,12 +726,7 @@ export class NanoOrb {
     (this.coreDust.material as THREE.Material).opacity = (0.82 + Math.sin(t * 2.5) * 0.08) * dim;
     (this.dust.material as THREE.PointsMaterial).opacity = 0.22 * dim;
 
-    // SATELLITES
-    this.satellites.children.forEach((c, i) => {
-        c.rotation.x += 0.016 * motion * (0.12 + i * 0.01);
-        c.rotation.y += 0.016 * motion * (0.18 + i * 0.01);
-        c.position.y += Math.sin(t + i) * 0.0008 * motion;
-    });
+    // SATELLITES hidden — skip update loop
 
     // DUST
     this.dust.rotation.y += 0.003 * motion * 0.016;

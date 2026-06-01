@@ -38,6 +38,8 @@ export class ShunyaRealm {
   // Track which orb is currently in "orb-full" expansion mode so we can
   // route subnode clicks to CameraRig.flyToNode correctly.
   private expandedOrbKey: string | null = null;
+  // Force Medhā orb sockets visible when in perspective mode (expansionT may be 0)
+  private medhaNodeActive = false;
 
   constructor() {
     for (const def of this.defs) {
@@ -129,8 +131,19 @@ export class ShunyaRealm {
         // Track which orb is expanded for subnode-click routing
         if (s.phase === 'expanded') {
           this.expandedOrbKey = targetKey;
+          if (targetKey === 'medha') {
+            this.medhaNodeActive = true;
+            // Force sockets visible immediately — don't wait for expansionT
+            const medhaOrb = this.getOrbByKey('medha');
+            if (medhaOrb) {
+              (medhaOrb as any).socketGroup.visible = true;
+              (medhaOrb as any).signalGroup.visible = true;
+              (medhaOrb as any).expansionT = 1.0;
+            }
+          }
         } else if (s.phase === 'dormant') {
           this.expandedOrbKey = null;
+          this.medhaNodeActive = false;
         }
 
         (window as any).__vyanExpansion = {
@@ -180,6 +193,7 @@ export class ShunyaRealm {
     }
     this.magnifiedIdx = null;
     this.expandedOrbKey = null;
+    this.medhaNodeActive = false;
 
     for (const orb of this.orbs) {
       orb.setArrivalOffset(randomArrivalOffset(3), 0.9);
@@ -305,7 +319,19 @@ export class ShunyaRealm {
       const isMag = this.magnifiedIdx === i;
       const focusForOrb = isMag ? 1 : (i === this.activeIndex ? this.activeFocus : 0);
       const motion = isMag ? 0.9 : 0.45 + focusForOrb * 1.4;
-      orb.update(t, energy, focusForOrb > 0.5, false, focusForOrb, motion);
+
+      // Hide orbs that are far out of focus so they don't visually pollute the
+      // active orb's view (e.g. Udbhava at 0,0,0 bleeding through behind Medhā).
+      // Keep them visible only when they have some focus or are adjacent.
+      const adjacent = Math.abs(i - this.activeIndex) <= 1 ||
+        (this.activeIndex === 0 && i === this.orbs.length - 1) ||
+        (this.activeIndex === this.orbs.length - 1 && i === 0);
+      const shouldBeVisible = focusForOrb > 0.02 || adjacent || isMag;
+      orb.setVisible(shouldBeVisible);
+
+      if (shouldBeVisible) {
+        orb.update(t, energy, focusForOrb > 0.5, false, focusForOrb, motion);
+      }
     }
 
     this.starfield.rotation.y += 0.00015 + Math.abs(this.deps.scroll.speed) * 0.0009;

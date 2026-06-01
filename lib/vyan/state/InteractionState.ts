@@ -160,13 +160,25 @@ class InteractionStore {
 
   // ── Camera bridge helpers ──────────────────────────────────────────────────
   private triggerCameraExpansion(target: NonNullable<InteractionTarget>) {
-    try {
-      const vyan: any = (window as any).__vyan;
-      const orb = vyan?.worldRef?.realms?.shunya?.getOrbByKey?.(target);
-      if (!orb) return;
-      const orbPos = orb.group.position.clone();
-      vyan.worldRef.cameraRig?.beginOrbExpansion?.(orbPos);
-    } catch {}
+    // Retry up to 10 frames in case the orb isn't positioned yet on deep-link
+    let attempts = 0;
+    const tryExpand = () => {
+      try {
+        const vyan: any = (window as any).__vyan;
+        const orb = vyan?.worldRef?.realms?.shunya?.getOrbByKey?.(target);
+        if (!orb) { if (++attempts < 10) requestAnimationFrame(tryExpand); return; }
+        const orbPos = orb.group.position.clone();
+        // Only expand if position is not still at default 0,0,0 (not yet placed)
+        // Exception: Udbhava legitimately lives at 0,0,0
+        if (orbPos.lengthSq() === 0 && target !== 'vistara' && target !== 'medha') {
+          if (++attempts < 10) { requestAnimationFrame(tryExpand); return; }
+        }
+        vyan.worldRef.cameraRig?.beginOrbExpansion?.(orbPos);
+      } catch {
+        if (++attempts < 10) requestAnimationFrame(tryExpand);
+      }
+    };
+    requestAnimationFrame(tryExpand);
   }
 
   private triggerCameraReturn() {

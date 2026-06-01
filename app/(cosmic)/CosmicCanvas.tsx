@@ -23,31 +23,47 @@ function modeFromPath(pathname: string | null): 'gateway' | 'shunya' {
 async function applyRouteState(pathname: string | null, _isInitial = false) {
   if (!appInstance) return;
   const app = appInstance;
-  const seg = pathname?.split('/')[2];
+  // seg is the third path segment: /vistara/[seg] or /shunya/[seg]
+  const parts = (pathname ?? '').split('/').filter(Boolean);
+  const root = parts[0] ?? '';          // 'vistara' | 'shunya' | 'medha' | 'vyoma'
+  const seg  = parts[1] ?? null;        // product key or orb key
+
   const m = await import('../../lib/vyan/state/InteractionState');
   const ix = m.getInteractionStore();
 
-  const isMedha   = pathname === '/medha' || pathname?.startsWith('/medha/');
-  const isVistara = pathname === '/vistara' || pathname?.startsWith('/vistara/');
-  const targetOrb: 'medha' | 'vistara' | null = isMedha ? 'medha' : isVistara ? 'vistara' : null;
+  const isMedha   = root === 'medha';
+  const isVistara = root === 'vistara';
+  const isShunya  = root === 'shunya';
+  const targetOrb: 'medha' | 'vistara' | null =
+    isMedha ? 'medha' : isVistara ? 'vistara' : null;
 
-  const targetMode = (pathname === '/vyoma' || pathname === '/' || !pathname) ? 'gateway' : 'shunya';
+  // For /shunya/vistara or /shunya/medha, treat as expansion too
+  const shunyaExpand: 'medha' | 'vistara' | null =
+    isShunya && (seg === 'vistara' || seg === 'medha')
+      ? (seg as 'medha' | 'vistara')
+      : null;
+
+  const effectiveOrb = targetOrb ?? shunyaExpand;
+
+  const targetMode = (root === 'vyoma' || !root) ? 'gateway' : 'shunya';
   if (app.getMode?.() !== targetMode) app.setMode(targetMode);
 
   if (targetMode === 'shunya') {
-    if (targetOrb === 'medha')   app.focusShunyaOrb?.('medha', true);
-    else if (targetOrb === 'vistara') app.focusShunyaOrb?.('vistara', true);
-    else if (seg) app.focusShunyaOrb?.(seg, true);
+    if (effectiveOrb === 'medha')   app.focusShunyaOrb?.('medha', true);
+    else if (effectiveOrb === 'vistara') app.focusShunyaOrb?.('vistara', true);
+    else if (isShunya && seg)       app.focusShunyaOrb?.(seg, true);
   }
 
-  if (targetOrb) {
-    const spectrum = targetOrb === 'vistara' && seg && seg !== 'placeholder'
-      ? (m.VISTARA_SPECTRUM[seg] ?? 'crimson')
+  if (effectiveOrb) {
+    const productSeg = isVistara ? seg : null;
+    const spectrum = effectiveOrb === 'vistara' && productSeg && productSeg !== 'placeholder'
+      ? (m.VISTARA_SPECTRUM[productSeg] ?? 'crimson')
       : 'crimson';
 
     const cur = ix.get();
-    const nextNodeKey = targetOrb === 'vistara' ? (seg ?? null) : null;
-    if (cur.target === targetOrb && cur.phase !== 'dormant') {
+    const nextNodeKey = effectiveOrb === 'vistara' ? productSeg : null;
+
+    if (cur.target === effectiveOrb && cur.phase !== 'dormant') {
       if (cur.node !== nextNodeKey) {
         ix.setNode(nextNodeKey, spectrum);
         try { app.audioEngine?.swell?.(1.05, 0.45); } catch {}
@@ -56,7 +72,11 @@ async function applyRouteState(pathname: string | null, _isInitial = false) {
         ix.setSpectrum(spectrum);
       }
     } else {
-      ix.expand(targetOrb, nextNodeKey, spectrum);
+      // Defer by two rAF frames so ShunyaRealm.onEnter() and focusShunyaOrb()
+      // have run and the orb world-position is live before triggerCameraExpansion fires.
+      await new Promise<void>(res => requestAnimationFrame(() => requestAnimationFrame(() => res())));
+      if (!appInstance) return; // guard against unmount during defer
+      ix.expand(effectiveOrb, nextNodeKey, spectrum);
       try { app.audioEngine?.swell?.(1.05, 0.45); } catch {}
       try { app.worldRef?.cameraRig?.pulseNodeChange?.(); } catch {}
     }
@@ -104,11 +124,22 @@ export default function CosmicCanvas() {
       (window as any).__vyan.audio = appInstance.audioEngine;
       (window as any).__vyanRouter = router;
 
-      const THREE = await import('three');
-      const raycaster = new THREE.Raycaster();
-      const ndc = new THREE.Vector2();
+      // Use Three.js from the already-loaded App bundle to avoid the
+      // "Multiple instances of Three.js" warning.
+      // We access the raycaster lazily via the world's camera.
+      const getRaycaster = () => {
+        const w = appInstance?.worldRef;
+        if (!w) return null;
+        // Reuse a single raycaster attached to the world
+        if (!(w as any).__ccRaycaster) {
+          const THREE = (window as any).__THREE_INSTANCE__ || require('three');
+          (w as any).__ccRaycaster = new THREE.Raycaster();
+          (w as any).__ccNdc = new THREE.Vector2();
+        }
+        return { raycaster: (w as any).__ccRaycaster, ndc: (w as any).__ccNdc };
+      };
 
-      const onDomClick = async (ev: MouseEvent) => {
+      const onDomClick = (ev: MouseEvent) => {
         try {
           const target = ev.target as HTMLElement | null;
           if (target?.closest('.vpd-slab, .mlv-modal, .concierge-nav, .sc-panel, .mlv-composer, .mlv-orb-pane, button')) return;
@@ -118,6 +149,9 @@ export default function CosmicCanvas() {
           if (!shunya || !w?.camera) return;
           const focused = shunya.orbs?.[shunya.activeIndex];
           if (!focused?.socketGroup?.children?.length) return;
+          const rc = getRaycaster();
+          if (!rc) return;
+          const { raycaster, ndc } = rc;
           ndc.x = (ev.clientX / window.innerWidth) * 2 - 1;
           ndc.y = -((ev.clientY / window.innerHeight) * 2 - 1);
           raycaster.setFromCamera(ndc, w.camera);
@@ -194,7 +228,7 @@ export default function CosmicCanvas() {
       // ── Document-level outside-click closer (belt-and-braces) ──────────────
       // Same fix applied here: use closeWithoutNavigation to avoid the
       // Udbhava navigation bug.
-      const onDocClickOutside = async (ev: MouseEvent) => {
+      const onDocClickOutside = (ev: MouseEvent) => {
         try {
           const t = ev.target as HTMLElement | null;
           const keep = t?.closest(
