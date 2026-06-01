@@ -345,29 +345,52 @@ export class ShunyaRealm {
             const nodeKey = nodeHit.object.userData.productKey as string;
             const nodeWorldPos = new THREE.Vector3();
             nodeHit.object.getWorldPosition(nodeWorldPos);
-
-            // Fly camera to this node, then open panel after dwell
             const rig = this.deps.cameraRig;
+
+            if (focusedDef.key === 'medha') {
+              // Medhā: fly to perspective FROM the node, no panel — the orb IS the interface
+              if (rig?.flyToMedhaNodePerspective) {
+                const orbCenter = focused.group.position.clone();
+                rig.flyToMedhaNodePerspective(nodeWorldPos, orbCenter);
+              }
+              // Update model selection in InteractionState + MedhaHUD
+              try {
+                const ixMod = (window as any).__vyanIX;
+                ixMod?.setNode?.(nodeKey);
+                // Fire model-color update on the orb
+                const MODEL_COLOR: Record<string, string> = {
+                  prajna:   '#ff4a4a',
+                  dhyana:   '#22e0d4',
+                  akshaya:  '#3a90ff',
+                  java:     '#ffb84d',
+                  sanchara: '#ff6688',
+                };
+                focused.setSocketColors?.(MODEL_COLOR[nodeKey] ?? '#ff4a4a');
+              } catch {}
+              // Navigate to model route so MedhaHUD picks it up
+              this.deps?.audio?.swell?.(1.05, 0.28);
+              try {
+                const router = (window as any).__vyanRouter;
+                const target = `/medha?model=${nodeKey}`;
+                if (router?.push) router.push(target);
+                else window.location.assign(target);
+              } catch { window.location.assign(`/medha?model=${nodeKey}`); }
+              return;
+            }
+
+            // Vistāra: fly camera to node, hover, then open panel
             if (rig?.flyToNode) {
               rig.flyToNode(nodeWorldPos, () => {
-                // Panel opens after hover dwell — route to product/model URL
                 const router = (window as any).__vyanRouter;
-                const target = focusedDef.key === 'medha'
-                  ? `/medha?model=${nodeKey}`
-                  : `/vistara/${nodeKey}`;
+                const target = `/vistara/${nodeKey}`;
                 try {
                   if (router?.push) router.push(target);
                   else window.location.assign(target);
-                } catch {
-                  window.location.assign(target);
-                }
+                } catch { window.location.assign(target); }
               });
             } else {
-              // CameraRig upgrade not available — fall back to direct route
               const router = (window as any).__vyanRouter;
-              const target = focusedDef.key === 'medha'
-                ? `/medha?model=${nodeKey}`
-                : `/vistara/${nodeKey}`;
+              const target = `/vistara/${nodeKey}`;
               try {
                 if (router?.push) router.push(target);
                 else window.location.assign(target);

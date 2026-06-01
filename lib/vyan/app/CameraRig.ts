@@ -215,6 +215,52 @@ export class CameraRig {
     this.onHoverComplete = null;
   }
 
+  // ── Medhā node perspective: camera flies to a view FROM the node looking
+  //    through the orb. All other nodes remain visible at depth. No panel opens.
+  //    The 5 nodes form a constellation — depth is created by the ~10-unit
+  //    spread of their surface positions relative to the camera.
+  //
+  //    nodeWorldPos: world position of the selected model node on the orb surface
+  //    orbCenter:    world position of the Medhā orb centre
+  //
+  //    Camera ends up: OUTSIDE the orb on the node's radial axis, looking inward
+  //    so the selected node is close (~8 units) and the other 4 are visible at
+  //    depth through the orb lattice.
+  flyToMedhaNodePerspective(nodeWorldPos: THREE.Vector3, orbCenter: THREE.Vector3) {
+    if (this.flyPhase === 'orb-full' ||
+        this.flyPhase === 'hover-node' ||
+        this.flyPhase === 'medha-node') {
+      // Already in orb context — just re-fly to new node
+    } else if (this.flyPhase !== 'orbital') {
+      return;
+    }
+
+    // Direction from orb centre to the node (outward radial)
+    const radial = nodeWorldPos.clone().sub(orbCenter).normalize();
+
+    // Camera sits just OUTSIDE the node on the radial axis, looking back at
+    // the orb. Distance: EXPAND_DIST keeps the full orb in frame with all nodes.
+    // 18 units gives a field where the near node is ~8u away and the far
+    // nodes on the opposite side are ~28u away — good depth range.
+    this.flyTarget.copy(nodeWorldPos.clone().add(radial.multiplyScalar(18)));
+    this.flyOrbCenter.copy(orbCenter);
+
+    this.flyPhase = 'medha-node' as any;
+    this.flySpring.reset();
+    this.flyLookSpring.reset();
+    this.currentFlyPos.copy(this.camera.position);
+    this.currentFlyLook.copy(this.currentLookAt);
+    this.preExpansionPos.copy(this.camera.position);
+    this.preExpansionLook.copy(this.currentLookAt);
+  }
+
+  // ── Return to orb-full from Medhā node perspective ───────────────────────
+  returnToMedhaOrbFull() {
+    (this as any).flyPhase = 'orb-full';
+    this.flySpring.reset();
+    this.flyLookSpring.reset();
+  }
+
   // ── Main update ─────────────────────────────────────────────────────────────
   update(dt: number) {
     if (this.locked) return;
@@ -299,6 +345,9 @@ export class CameraRig {
         return;
       case 'returning':
         this.updateReturning(dt);
+        return;
+      case 'medha-node' as any:
+        this.updateMedhaNode(dt);
         return;
       default:
         this.updateOrbital(dt, path, realm, defs);
@@ -494,6 +543,29 @@ export class CameraRig {
       this.onHoverComplete = null;
       try { cb(); } catch {}
     }
+  }
+
+  // ── Medhā node perspective: settle into the radial viewpoint ─────────────
+  private updateMedhaNode(dt: number) {
+    const px = this.deps.interaction.pointer.x;
+    const py = this.deps.interaction.pointer.y;
+    // Very subtle pointer sway so the view feels alive without drifting
+    const sway = new THREE.Vector3(px * 0.6, py * 0.4, 0);
+    const target = this.flyTarget.clone().add(sway);
+
+    this.flySpring.step(this.currentFlyPos, target, dt,
+      CameraRig.NODE_STIFFNESS, CameraRig.NODE_DAMPING);
+    // Look-at: the orb centre so all nodes are framed in the shot
+    this.flyLookSpring.step(this.currentFlyLook, this.flyOrbCenter, dt, 8.0, 4.0);
+
+    this.camera.position.copy(this.currentFlyPos);
+    this.camera.lookAt(this.currentFlyLook);
+    // FOV: slightly wider than node-fly (32) so more of the orb is visible
+    // and all 5 nodes fit in frame with depth
+    this.camera.fov = 32;
+    this.camera.updateProjectionMatrix();
+    this.currentCamPos.copy(this.currentFlyPos);
+    this.currentLookAt.copy(this.currentFlyLook);
   }
 
   // ── Returning: spring back to pre-expansion orbital position ─────────────

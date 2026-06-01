@@ -1,80 +1,72 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { COGNITIVE_MODES, CognitiveModeKey, getMode } from '@/lib/medha/cognitive';
+import React, {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { COGNITIVE_MODES, CognitiveModeKey, getMode, MODEL_GREETINGS } from '@/lib/medha/cognitive';
 import { chatComplete, type ChatMessage } from '@/lib/medha/MedhaClient';
 import { renderMarkdown, isForbiddenQuery, SANDHI_REDIRECT_MARKDOWN } from '@/lib/medha/markdown';
 import {
-  listChats, getChat, upsertChat, deleteChat, getCurrentChatId, setCurrentChatId, newChatId,
+  listChats, getChat, upsertChat, deleteChat,
+  getCurrentChatId, setCurrentChatId, newChatId,
   type StoredChat, type StoredMsg,
 } from '@/lib/medha/storage';
 import { STT, TTS } from '@/lib/medha/voice';
-import { incrementQuota, quotaRemaining, getUser, setUser, quotaLimit, type LocalUser } from '@/lib/quota/quota';
-import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './MedhaConsentSlab';
+import {
+  incrementQuota, quotaRemaining, getUser, setUser,
+  quotaLimit, type LocalUser,
+} from '@/lib/quota/quota';
+import MedhaConsentSlab, {
+  hasLocalConsent, type ConsentSnapshot,
+} from './MedhaConsentSlab';
 import './medha.css';
 
-// ============================================================
-// MODEL GREETINGS — in-character, cosmic VYAN brand voice.
-// Each fires as a dialogue from the node when the model is selected.
-// ============================================================
-const MODEL_GREETINGS: Record<CognitiveModeKey, string> = {
-  prajna:
-    'Prājña here. You have arrived at the layer of strategic cognition. ' +
-    'What needs to be understood, structured, or solved?',
-  dhyana:
-    'Dhyāna welcomes you — softly, with full attention. ' +
-    'What is weighing on your mind? Speak, and we shall sit with it together.',
-  akshaya:
-    'Akṣaya — the boundless archive — is open. ' +
-    'I hold vast context and deep recall. What do you seek to know?',
-  java:
-    'Javā. Ready. What do you need?',
-  sanchara:
-    'Sañcāra bridges the cognitive lattice. ' +
-    'Tell me what you need and I will find the right path through the void.',
+// ─── Model colours ────────────────────────────────────────────────────────────
+const MODEL_COLOR: Record<CognitiveModeKey, string> = {
+  prajna:   '#ff4a4a',
+  dhyana:   '#22e0d4',
+  akshaya:  '#3a90ff',
+  java:     '#ffb84d',
+  sanchara: '#ff6688',
 };
-
-type Phase = 'sleeping' | 'awake';
-
-const GREETING_NEW =
-  'Hello — I am Medhā, the Cognitive Intelligence of VYAN. ' +
-  'It is a quiet honour to meet you. What would you like to explore today?';
-
-function buildContinuationGreeting(prevTopic?: string): string {
-  if (prevTopic && prevTopic.length > 6) {
-    return `Welcome back. Last time we touched on ${prevTopic}. Shall we continue — or step into something new?`;
-  }
-  return 'Welcome back. The conversation is still warm. Where shall we begin again?';
-}
 
 const uid = () =>
   typeof crypto !== 'undefined' && (crypto as any).randomUUID
     ? (crypto as any).randomUUID()
     : Math.random().toString(36).slice(2);
 
-function summariseTopic(messages: StoredMsg[]): string {
-  const first = messages.find(m => m.role === 'user')?.content?.trim() ?? '';
-  if (!first) return '';
-  return first.length > 60 ? first.slice(0, 57) + '…' : first;
+function summariseTopic(msgs: StoredMsg[]): string {
+  const f = msgs.find(m => m.role === 'user')?.content?.trim() ?? '';
+  return f.length > 60 ? f.slice(0, 57) + '…' : f;
 }
 
+const GREETING_NEW =
+  'Hello — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. What would you like to explore?';
+
+function buildContinuationGreeting(prevTopic?: string): string {
+  if (prevTopic && prevTopic.length > 6)
+    return `Welcome back. Last time we touched on ${prevTopic}. Shall we continue — or step into something new?`;
+  return 'Welcome back. The conversation is still warm. Where shall we begin?';
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function MedhaHUD() {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>('sleeping');
+  const searchParams = useSearchParams();
+
   const [mode, setMode] = useState<CognitiveModeKey>('prajna');
-  const [chatId, setChatId] = useState<string>('');
+  const [chatId, setChatId] = useState('');
   const [messages, setMessages] = useState<StoredMsg[]>([]);
   const [composerText, setComposerText] = useState('');
   const [busy, setBusy] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [hoverDot, setHoverDot] = useState<number | null>(null);
   const [stickyDot, setStickyDot] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [shock, setShock] = useState(0);
   const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [chats, setChats] = useState<StoredChat[]>([]);
   const [quotaUser, setQuotaUser] = useState<LocalUser | null>(null);
@@ -83,32 +75,26 @@ export default function MedhaHUD() {
   const [regErr, setRegErr] = useState('');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [consentGranted, setConsentGranted] = useState<boolean>(false);
-  const [consentReady, setConsentReady] = useState<boolean>(false);
-  const [linkPulse, setLinkPulse] = useState(0);
-  const [isTyping, setIsTyping] = useState(false);
-  // Greeting dialogue shown from node on model selection
+  const [consentGranted, setConsentGranted] = useState(false);
+  const [consentReady, setConsentReady] = useState(false);
+  // Greeting: appears from node on model selection
   const [greetingText, setGreetingText] = useState<string | null>(null);
   const [greetingMode, setGreetingMode] = useState<CognitiveModeKey>('prajna');
-
-  useEffect(() => {
-    setConsentGranted(hasLocalConsent());
-    setConsentReady(true);
-  }, []);
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const sttRef = useRef<STT | null>(null);
   const ttsRef = useRef<TTS | null>(null);
-  const wakeInitRef = useRef(false);
-  const greetingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const greetingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dataRef = useRef({ chatId: '', messages: [] as StoredMsg[], mode: 'prajna' as CognitiveModeKey });
   useEffect(() => { dataRef.current = { chatId, messages, mode }; }, [chatId, messages, mode]);
 
   const modeDef = useMemo(() => getMode(mode), [mode]);
 
-  // ── Bootstrap ──────────────────────────────────────────────────────────────
-  useEffect(() => { setQuotaUser(getUser()); }, []);
+  // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
+    setConsentGranted(hasLocalConsent());
+    setConsentReady(true);
+    setQuotaUser(getUser());
     sttRef.current = new STT();
     ttsRef.current = new TTS();
     const stored = listChats();
@@ -121,72 +107,39 @@ export default function MedhaHUD() {
     } else {
       const prev = stored[0];
       const id = newChatId();
-      setChatId(id);
-      setCurrentChatId(id);
+      setChatId(id); setCurrentChatId(id);
       const greeting: StoredMsg = {
         id: uid(), role: 'assistant',
         content: prev ? buildContinuationGreeting(prev.topic) : GREETING_NEW,
-        mode, ts: Date.now(),
+        mode: 'prajna', ts: Date.now(),
       };
       setMessages([greeting]);
-      upsertChat({
-        id, title: 'New Conversation', messages: [greeting],
-        createdAt: Date.now(), lastInteractionAt: Date.now(), topic: prev?.topic,
-      });
+      upsertChat({ id, title: 'New Conversation', messages: [greeting], createdAt: Date.now(), lastInteractionAt: Date.now() });
     }
-    try {
-      document.querySelectorAll('[data-vyan-fade="1"]').forEach((el) => {
-        (el as HTMLElement).style.transition = 'opacity 0.7s ease-out';
-        (el as HTMLElement).style.opacity = '0';
-        setTimeout(() => el.remove(), 800);
-      });
-      const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
-      if (ui) { ui.style.opacity = '0'; ui.style.pointerEvents = 'none'; }
-    } catch {}
+    setTimeout(() => setComposerOpen(true), 400);
     return () => {
-      const ui = document.querySelector('.vyan-ui') as HTMLElement | null;
-      if (ui) { ui.style.opacity = '1'; ui.style.pointerEvents = 'none'; }
-      window.dispatchEvent(new CustomEvent('vyan:resume'));
-      if (greetingTimerRef.current) clearTimeout(greetingTimerRef.current);
+      if (greetingTimer.current) clearTimeout(greetingTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Wake on first interaction ──────────────────────────────────────────────
+  // ── Sync model from URL ?model= param ─────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'sleeping') return;
-    const wake = () => {
-      if (wakeInitRef.current) return;
-      wakeInitRef.current = true;
-      setPhase('awake');
-      setTimeout(() => setComposerOpen(true), 600);
-      const last = dataRef.current.messages[dataRef.current.messages.length - 1];
-      if (last?.role === 'assistant' && ttsEnabled && ttsRef.current?.isSupported()) {
-        setSpeaking(true);
-        ttsRef.current.speak(last.content, { onEnd: () => setSpeaking(false) });
-      }
-    };
-    const opts = { passive: true, once: true } as AddEventListenerOptions;
-    window.addEventListener('mousemove', wake, opts);
-    window.addEventListener('keydown', wake, opts);
-    window.addEventListener('click', wake, opts);
-    window.addEventListener('touchstart', wake, opts);
-    return () => {
-      window.removeEventListener('mousemove', wake);
-      window.removeEventListener('keydown', wake);
-      window.removeEventListener('click', wake);
-      window.removeEventListener('touchstart', wake);
-    };
-  }, [phase, ttsEnabled]);
+    const m = searchParams?.get('model') as CognitiveModeKey | null;
+    if (m && COGNITIVE_MODES.find(x => x.key === m) && m !== mode) {
+      activateModel(m);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
-  // ── Persist on changes ─────────────────────────────────────────────────────
+  // ── Persist chats ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!chatId) return;
     const topic = summariseTopic(messages);
-    const title = topic ? topic.slice(0, 36) : 'New Conversation';
     upsertChat({
-      id: chatId, title, messages,
-      createdAt: messages[0]?.ts ?? Date.now(),
+      id: chatId,
+      title: topic ? topic.slice(0, 36) : 'New Conversation',
+      messages, createdAt: messages[0]?.ts ?? Date.now(),
       lastInteractionAt: Date.now(), topic,
     });
     setChats(listChats());
@@ -198,42 +151,76 @@ export default function MedhaHUD() {
       if (e.key === 'Escape') {
         if (showHistory || showSettings) { setShowHistory(false); setShowSettings(false); return; }
         if (stickyDot !== null) { setStickyDot(null); return; }
-        router.push('/shunya/medha');
+        handleBack();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [router, showHistory, showSettings, stickyDot]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showHistory, showSettings, stickyDot]);
 
-  // ── Model strike animation ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (linkPulse === 0) return;
-    const w = document.querySelector('.mlv-orb-float-wrap');
-    if (!w) return;
-    w.classList.remove('is-struck');
-    (w as HTMLElement).offsetWidth; // force reflow
-    w.classList.add('is-struck');
-    const t = setTimeout(() => w.classList.remove('is-struck'), 1100);
-    return () => clearTimeout(t);
-  }, [linkPulse]);
+  // ── Back: camera returns to orb-full, route back to /medha ────────────────
+  const handleBack = () => {
+    try {
+      const vyan: any = (window as any).__vyan;
+      vyan?.worldRef?.cameraRig?.returnToMedhaOrbFull?.();
+    } catch {}
+    router.push('/shunya/medha');
+  };
 
-  // ── Send ───────────────────────────────────────────────────────────────────
+  // ── Activate a model node: camera perspective + greeting + color pulse ────
+  const activateModel = useCallback((k: CognitiveModeKey) => {
+    if (k === mode) return;
+    setMode(k);
+
+    // Greeting from node
+    if (greetingTimer.current) clearTimeout(greetingTimer.current);
+    setGreetingText(MODEL_GREETINGS[k]);
+    setGreetingMode(k);
+    greetingTimer.current = setTimeout(() => setGreetingText(null), 5500);
+
+    // Update orb branch colors
+    try {
+      const vyan: any = (window as any).__vyan;
+      const orb = vyan?.worldRef?.realms?.shunya?.getOrbByKey?.('medha');
+      orb?.setSocketColors?.(MODEL_COLOR[k]);
+    } catch {}
+
+    // Camera: fly to this node's radial perspective (if not already done by ShunyaRealm click)
+    // This path handles URL-driven switches (e.g. from ConciergeOrb nav)
+    try {
+      const vyan: any = (window as any).__vyan;
+      const rig = vyan?.worldRef?.cameraRig;
+      const shunya = vyan?.worldRef?.realms?.shunya;
+      if (rig?.flyToMedhaNodePerspective && shunya) {
+        const medhaOrb = shunya.getOrbByKey?.('medha');
+        if (medhaOrb?.socketGroup?.children?.length) {
+          const sock = medhaOrb.socketGroup.children.find(
+            (c: any) => c.userData?.isProductSocket && c.userData?.productKey === k && c.geometry,
+          );
+          if (sock) {
+            const THREE = require('three');
+            const nodePos = new THREE.Vector3();
+            sock.getWorldPosition(nodePos);
+            const orbCenter = medhaOrb.group.position.clone();
+            rig.flyToMedhaNodePerspective(nodePos, orbCenter);
+          }
+        }
+      }
+    } catch {}
+  }, [mode]);
+
+  // ── Send ──────────────────────────────────────────────────────────────────
   const send = useCallback(async () => {
     const text = composerText.trim();
     if (!text || busy) return;
-
     if (!quotaUser && !getUser()) {
-      const remaining = quotaRemaining('medha');
-      if (remaining <= 0) { setShowQuotaLock(true); return; }
-      const inc = incrementQuota('medha');
-      if (!inc.ok) { setShowQuotaLock(true); return; }
+      if (quotaRemaining('medha') <= 0) { setShowQuotaLock(true); return; }
+      if (!incrementQuota('medha').ok) { setShowQuotaLock(true); return; }
     }
-
-    setComposerText('');
+    setComposerText(''); setIsTyping(false); setStickyDot(null);
     const userMsg: StoredMsg = { id: uid(), role: 'user', content: text, mode, ts: Date.now() };
     setMessages(prev => [...prev, userMsg]);
-    setStickyDot(null);
-    setIsTyping(false);
 
     if (isForbiddenQuery(text)) {
       const aiMsg: StoredMsg = { id: uid(), role: 'assistant', content: SANDHI_REDIRECT_MARKDOWN, mode, ts: Date.now() };
@@ -243,9 +230,7 @@ export default function MedhaHUD() {
 
     setBusy(true);
     const history: ChatMessage[] = [...dataRef.current.messages, userMsg]
-      .slice(-12)
-      .map(m => ({ role: m.role, content: m.content }));
-
+      .slice(-12).map(m => ({ role: m.role, content: m.content }));
     try {
       const full = await chatComplete(modeDef, history);
       const aiMsg: StoredMsg = {
@@ -256,20 +241,16 @@ export default function MedhaHUD() {
       setMessages(prev => [...prev, aiMsg]);
       if (ttsEnabled && ttsRef.current?.isSupported()) {
         const plain = full.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/[*_`#>]/g, '');
-        setSpeaking(true);
-        ttsRef.current.speak(plain, { onEnd: () => setSpeaking(false) });
+        ttsRef.current.speak(plain, { onEnd: () => {} });
       }
     } catch {
-      const aiMsg: StoredMsg = {
-        id: uid(), role: 'assistant',
-        content: 'Cognition is busy on the channel. Give it a breath and try again.',
-        mode, ts: Date.now(),
-      };
-      setMessages(prev => [...prev, aiMsg]);
-    } finally {
-      setBusy(false);
-    }
+      setMessages(prev => [...prev, { id: uid(), role: 'assistant', content: 'Cognition is busy. Give it a breath and try again.', mode, ts: Date.now() }]);
+    } finally { setBusy(false); }
   }, [composerText, busy, mode, modeDef, ttsEnabled, quotaUser]);
+
+  const onComposerKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  };
 
   const submitRegistration = useCallback(async () => {
     if (!regEmail.trim() || regBusy) return;
@@ -288,63 +269,6 @@ export default function MedhaHUD() {
     finally { setRegBusy(false); }
   }, [regName, regEmail, regBusy]);
 
-  const onComposerKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-  };
-
-  // ── Model switch with greeting ─────────────────────────────────────────────
-  const switchMode = (k: CognitiveModeKey, ev?: React.MouseEvent<HTMLButtonElement>) => {
-    if (k === mode) return;
-    setMode(k);
-    setShock(s => s + 1);
-
-    if (ev?.currentTarget) {
-      const r = ev.currentTarget.getBoundingClientRect();
-      document.documentElement.style.setProperty('--mlv-zap-x', `${r.left + r.width / 2}px`);
-      document.documentElement.style.setProperty('--mlv-zap-y', `${r.top + r.height / 2}px`);
-    }
-    setLinkPulse(p => p + 1);
-
-    // Show greeting dialogue from node
-    if (greetingTimerRef.current) clearTimeout(greetingTimerRef.current);
-    setGreetingText(MODEL_GREETINGS[k]);
-    setGreetingMode(k);
-    greetingTimerRef.current = setTimeout(() => setGreetingText(null), 5000);
-
-    // Update node colors and interaction state
-    try {
-      const MODEL_COLOR: Record<CognitiveModeKey, string> = {
-        prajna:   '#ff4a4a',
-        dhyana:   '#22e0d4',
-        akshaya:  '#3a90ff',
-        java:     '#ffb84d',
-        sanchara: '#ff6688',
-      };
-      const color = MODEL_COLOR[k];
-      const vyan: any = (window as any).__vyan;
-      const orb = vyan?.worldRef?.realms?.shunya?.getOrbByKey?.('medha');
-      orb?.setSocketColors?.(color);
-      const ix = (window as any).__vyanIX;
-      ix?.expand?.('medha', k, 'crimson');
-    } catch {}
-  };
-
-  const toggleListening = () => {
-    const stt = sttRef.current;
-    if (!stt?.isSupported()) return;
-    if (listening) { stt.stop(); setListening(false); return; }
-    setListening(true);
-    stt.start({
-      onText: (txt) => setComposerText(txt),
-      onEnd: () => setListening(false),
-      onError: () => setListening(false),
-    });
-  };
-
-  const toggleTts = () => {
-    setTtsEnabled(v => { if (v) ttsRef.current?.cancel(); return !v; });
-  };
-
   const startNewChat = () => {
     const prev = chats[0];
     const id = newChatId();
@@ -354,28 +278,20 @@ export default function MedhaHUD() {
       content: prev ? buildContinuationGreeting(prev.topic) : GREETING_NEW,
       mode, ts: Date.now(),
     };
-    setMessages([greeting]);
-    setStickyDot(null); setShowHistory(false);
-  };
-
-  const openChatId = (id: string) => {
-    const c = getChat(id);
-    if (!c) return;
-    setChatId(c.id); setCurrentChatId(c.id);
-    setMessages(c.messages);
-    setStickyDot(null);
+    setMessages([greeting]); setStickyDot(null); setShowHistory(false);
   };
 
   const userMsgs = useMemo(
-    () => messages.map((m, i) => ({ ...m, idx: i })).filter(m => m.role === 'user'),
+    () => messages.map((m, i) => ({ ...m, origIdx: i })).filter(m => m.role === 'user'),
     [messages],
   );
   const lastMsg = messages[messages.length - 1] ?? null;
   const focusMsg: StoredMsg | null = stickyDot !== null
     ? (messages[stickyDot] ?? null)
-    : busy ? (messages[userMsgs[userMsgs.length - 1]?.idx] ?? null)
+    : busy ? (userMsgs[userMsgs.length - 1] ?? null)
            : (lastMsg?.role === 'assistant' ? lastMsg : null);
-  const previewMsg: StoredMsg | null = hoverDot !== null && stickyDot === null ? messages[hoverDot] ?? null : null;
+  const previewMsg: StoredMsg | null = hoverDot !== null && stickyDot === null
+    ? (messages[hoverDot] ?? null) : null;
   const showMsg = previewMsg ?? focusMsg;
 
   const copyMsg = async (m: StoredMsg) => {
@@ -384,56 +300,54 @@ export default function MedhaHUD() {
 
   return (
     <div
-      className={`mlv mlv-phase-${phase} ${consentGranted ? '' : 'mlv-consent-locked'}`}
+      className="mlv"
       data-mode={mode}
       style={{
-        ['--mode-a' as any]: modeDef.colorA,
+        ['--mode-a' as any]: MODEL_COLOR[mode],
         ['--mode-b' as any]: modeDef.colorB,
       }}
     >
-      {/* ── Consent gate ─────────────────────────────────────────────────── */}
+      {/* ── Consent gate ─────────────────────────────────────────────── */}
       {consentReady && !consentGranted && (
-        <MedhaConsentSlab onGranted={(_snap: ConsentSnapshot) => {
-          setConsentGranted(true);
-        }} />
+        <MedhaConsentSlab onGranted={(_snap: ConsentSnapshot) => setConsentGranted(true)} />
       )}
 
-      {/* ── Orb click hit area (opens history) ──────────────────────────── */}
+      {/* ── Invisible orb-click zone (opens history) ─────────────────── */}
       <div
-        className={`mlv-orb-hit ${speaking ? 'is-speaking' : ''} ${busy ? 'is-listening' : ''}`}
-        onClick={() => phase === 'awake' && setShowHistory(v => !v)}
+        className="mlv-orb-hit"
+        onClick={() => setShowHistory(v => !v)}
         role="button"
         aria-label="Open conversation history"
-      >
-        {phase === 'sleeping' && (
-          <div className="mlv-orb-cue">a presence stirs · move, touch, or speak</div>
-        )}
-      </div>
+      />
 
-      {/* ── Back button ─────────────────────────────────────────────────── */}
-      <button type="button" className="mlv-back" onClick={() => router.push('/shunya/medha')}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {/* ── Back button ──────────────────────────────────────────────── */}
+      <button type="button" className="mlv-back" onClick={handleBack}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
         </svg>
         <span>Shunya</span>
       </button>
 
-      {/* ── Hidden legacy rail ───────────────────────────────────────────── */}
-      <aside className="mlv-rail mlv-rail--hidden" aria-hidden="true" />
-
-      {/* ── Floating Medhā dialogue box (hides while typing) ────────────── */}
-      {showMsg && phase === 'awake' && !isTyping && !composerOpen && (
-        <div className={`mlv-medha-dialog mlv-medha-dialog--${showMsg.role} ${stickyDot !== null ? 'is-sticky' : ''}`}>
+      {/* ── Floating dialogue (one at a time, hides while typing) ─────── */}
+      {showMsg && !isTyping && (
+        <div
+          className={`mlv-medha-dialog mlv-medha-dialog--${showMsg.role}`}
+          key={showMsg.id}
+        >
           <div className="mlv-medha-dialog__meta">
             <span>{showMsg.role === 'user' ? 'you' : getMode(showMsg.mode as CognitiveModeKey).name}</span>
             <span>{new Date(showMsg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
           {showMsg.role === 'assistant' ? (
-            <div className="mlv-medha-dialog__body medha-md"
-                 dangerouslySetInnerHTML={{ __html: renderMarkdown(showMsg.content) }} />
+            <div
+              className="mlv-medha-dialog__body medha-md"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(showMsg.content) }}
+            />
           ) : (
-            <div className="mlv-medha-dialog__body mlv-medha-dialog__body--user">{showMsg.content}</div>
+            <div className="mlv-medha-dialog__body mlv-medha-dialog__body--user">
+              {showMsg.content}
+            </div>
           )}
           <div className="mlv-medha-dialog__actions">
             <button type="button" onClick={() => copyMsg(showMsg)}>⧉ copy</button>
@@ -444,182 +358,142 @@ export default function MedhaHUD() {
         </div>
       )}
 
-      {/* ── Model greeting dialogue (appears from node on selection) ──────── */}
-      {greetingText && phase === 'awake' && (
-        <div className="mlv-greeting-dialog" style={{ bottom: '120px', left: '50%', transform: 'translateX(-50%)' }}>
-          <span className="mlv-greeting-dialog__who">{getMode(greetingMode).name}</span>
+      {/* ── Model greeting (fires from node on selection) ─────────────── */}
+      {greetingText && (
+        <div
+          className="mlv-greeting-dialog"
+          style={{ bottom: '120px', left: '50%', transform: 'translateX(-50%)' }}
+        >
+          <span className="mlv-greeting-dialog__who">
+            {getMode(greetingMode).name}
+          </span>
           <p className="mlv-greeting-dialog__text">{greetingText}</p>
         </div>
       )}
 
-      {/* ── Right-rail vertical dots (user inputs only) ───────────────────── */}
-      {phase === 'awake' && (
-        <div className="mlv-thread mlv-thread--user-only">
-          <div className="mlv-thread__line" />
-          <div className="mlv-thread__dots">
-            {messages.map((m, i) => m.role !== 'user' ? null : (
-              <button
-                key={m.id}
-                type="button"
-                className={`mlv-dot mlv-dot--user ${(stickyDot === i || hoverDot === i) ? 'is-glow' : ''}`}
-                data-msg={m.content.slice(0, 200)}
-                onMouseEnter={() => setHoverDot(i)}
-                onMouseLeave={() => setHoverDot(null)}
-                onClick={() => setStickyDot(stickyDot === i ? null : i)}
-                aria-label={`Your message ${i + 1}`}
-              />
-            ))}
-            {busy && <span className="mlv-thread__pending" />}
-          </div>
+      {/* ── Right-rail: user inputs only ─────────────────────────────── */}
+      <div className="mlv-thread">
+        <div className="mlv-thread__line" />
+        <div className="mlv-thread__dots">
+          {userMsgs.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`mlv-dot mlv-dot--user ${(stickyDot === m.origIdx || hoverDot === m.origIdx) ? 'is-glow' : ''}`}
+              data-msg={m.content.slice(0, 200)}
+              onMouseEnter={() => setHoverDot(m.origIdx)}
+              onMouseLeave={() => setHoverDot(null)}
+              onClick={() => setStickyDot(stickyDot === m.origIdx ? null : m.origIdx)}
+              aria-label={`Message ${userMsgs.indexOf(m) + 1}`}
+            />
+          ))}
+          {busy && <span className="mlv-thread__pending" />}
         </div>
-      )}
+      </div>
 
-      {/* ── Bottom composer (minimalistic) ───────────────────────────────── */}
-      {phase === 'awake' && (
-        <div className={`mlv-composer ${composerOpen ? 'is-open' : ''} ${composerText.length > 220 ? 'is-tall' : ''}`}>
-          {!composerOpen && (
+      {/* ── Composer ─────────────────────────────────────────────────── */}
+      <div className={`mlv-composer ${composerOpen ? 'is-open' : ''} ${composerText.length > 220 ? 'is-tall' : ''}`}>
+        {!composerOpen ? (
+          <button
+            type="button"
+            className="mlv-composer__pill"
+            onClick={() => { setComposerOpen(true); setTimeout(() => composerRef.current?.focus(), 50); }}
+          >
+            <span className="mlv-composer__dot" />
+            <span>speak to {modeDef.name}</span>
+          </button>
+        ) : (
+          <div className="mlv-composer__wrap">
+            <span className="mlv-composer__bind">{modeDef.glyph} {modeDef.name}</span>
+            <textarea
+              ref={composerRef}
+              value={composerText}
+              placeholder={listening ? '(listening…)' : `Speak to ${modeDef.name}…`}
+              maxLength={1000}
+              onChange={e => { setComposerText(e.target.value); setIsTyping(e.target.value.length > 0); }}
+              onFocus={() => setIsTyping(true)}
+              onBlur={() => { if (!composerText.trim()) setIsTyping(false); }}
+              onKeyDown={onComposerKey}
+              rows={composerText.length > 220 ? 3 : 1}
+              disabled={busy}
+            />
             <button
               type="button"
-              className="mlv-composer__pill"
-              onClick={() => {
-                setComposerOpen(true);
-                setIsTyping(true);
-                setTimeout(() => composerRef.current?.focus(), 50);
-              }}
+              className="mlv-composer__attach"
+              onClick={() => (document.getElementById('mlv-file-input') as HTMLInputElement | null)?.click()}
+              title="Attach"
             >
-              <span className="mlv-composer__dot" />
-              <span>speak to {modeDef.name}</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
             </button>
-          )}
-          {composerOpen && (
-            <div className="mlv-composer__wrap">
-              <span className="mlv-composer__bind">{modeDef.glyph} {modeDef.name}</span>
-              <textarea
-                ref={composerRef}
-                value={composerText}
-                placeholder={listening ? '(listening…)' : `Speak to ${modeDef.name}…`}
-                maxLength={1000}
-                onChange={(e) => {
-                  setComposerText(e.target.value);
-                  setIsTyping(e.target.value.length > 0);
-                }}
-                onFocus={() => setIsTyping(true)}
-                onBlur={() => { if (!composerText.trim()) setIsTyping(false); }}
-                onKeyDown={onComposerKey}
-                rows={composerText.length > 220 ? 3 : 1}
-                disabled={busy}
-              />
-              <span className={`mlv-composer__count ${composerText.length > 900 ? 'is-warn' : ''}`}>
-                {composerText.length}/1000
-              </span>
-              <button
-                type="button"
-                className="mlv-composer__attach"
-                onClick={() => (document.getElementById('mlv-file-input') as HTMLInputElement | null)?.click()}
-                title="Attach"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                </svg>
-              </button>
-              <input
-                id="mlv-file-input" type="file" accept="image/*,.pdf,.txt,.md,.json,.csv"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  setComposerText(cur => `${cur}\n\n[attached: ${f.name} · ${(f.size / 1024).toFixed(1)}KB]`);
-                  setIsTyping(true);
-                }}
-              />
-              <button
-                type="button"
-                className={`mlv-composer__mic ${listening ? 'is-on' : ''}`}
-                onClick={toggleListening}
-                disabled={!sttRef.current?.isSupported()}
-              >◉</button>
-              <button
-                type="button"
-                className="mlv-composer__send"
-                onClick={send}
-                disabled={busy || !composerText.trim()}
-              >
-                {busy ? <span className="mlv-composer__spin" /> : '→'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+            <input
+              id="mlv-file-input" type="file" accept="image/*,.pdf,.txt,.md,.json,.csv"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                setComposerText(cur => `${cur}\n\n[attached: ${f.name} · ${(f.size / 1024).toFixed(1)}KB]`);
+                setIsTyping(true);
+              }}
+            />
+            <button
+              type="button"
+              className={`mlv-composer__mic ${listening ? 'is-on' : ''}`}
+              onClick={() => {
+                const stt = sttRef.current;
+                if (!stt?.isSupported()) return;
+                if (listening) { stt.stop(); setListening(false); return; }
+                setListening(true);
+                stt.start({ onText: txt => setComposerText(txt), onEnd: () => setListening(false), onError: () => setListening(false) });
+              }}
+              disabled={!sttRef.current?.isSupported()}
+            >◉</button>
+            <button
+              type="button"
+              className="mlv-composer__send"
+              onClick={send}
+              disabled={busy || !composerText.trim()}
+            >
+              {busy ? <span className="mlv-composer__spin" /> : '→'}
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/* ── Settings orb — TOP RIGHT, below Nāvika ───────────────────────── */}
-      {phase === 'awake' && (
-        <button
-          type="button"
-          className="mlv-settings-orb"
-          onClick={() => setShowSettings(true)}
-          aria-label="Open Medhā settings"
-          title="Medhā settings"
-        >
-          <span className="mlv-settings-orb__ring" />
-          <span className="mlv-settings-orb__core" />
-          <span className="mlv-settings-orb__glyph">⚙</span>
-        </button>
-      )}
+      {/* ── Settings orb — top-right, below Nāvika ───────────────────── */}
+      <button
+        type="button"
+        className="mlv-settings-orb"
+        onClick={() => setShowSettings(true)}
+        aria-label="Medhā settings"
+      >
+        <span className="mlv-settings-orb__ring" />
+        <span className="mlv-settings-orb__core" />
+        <span className="mlv-settings-orb__glyph">⚙</span>
+      </button>
 
-      {/* ── Electrifying link animation ───────────────────────────────────── */}
-      {linkPulse > 0 && (
-        <svg
-          key={linkPulse}
-          className="mlv-electric-link"
-          viewBox="0 0 1000 600"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id={`mlv-elec-grad-${linkPulse}`} x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%"   stopColor={modeDef.colorA} stopOpacity="0" />
-              <stop offset="40%"  stopColor={modeDef.colorA} stopOpacity="1" />
-              <stop offset="100%" stopColor={modeDef.colorB} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M 750 320 Q 600 260 500 300 Q 400 340 300 280"
-            stroke={`url(#mlv-elec-grad-${linkPulse})`}
-            strokeWidth="2" fill="none"
-            className="mlv-electric-link__bolt"
-          />
-          <path
-            d="M 750 320 Q 600 260 500 300 Q 400 340 300 280"
-            stroke={modeDef.colorA} strokeWidth="0.8" fill="none" opacity="0.7"
-            className="mlv-electric-link__crackle"
-          />
-        </svg>
-      )}
-
-      {/* ── History modal ─────────────────────────────────────────────────── */}
+      {/* ── History modal ─────────────────────────────────────────────── */}
       {showHistory && (
         <div className="mlv-modal" role="dialog" aria-modal="true"
-             onClick={(e) => { if (e.target === e.currentTarget) setShowHistory(false); }}>
-          <div className="mlv-modal__inner" onClick={(e) => e.stopPropagation()}>
+             onClick={e => { if (e.target === e.currentTarget) setShowHistory(false); }}>
+          <div className="mlv-modal__inner" onClick={e => e.stopPropagation()}>
             <header className="mlv-modal__head">
               <h2>Conversation Threads</h2>
               <button type="button" className="mlv-modal__x" onClick={() => setShowHistory(false)}>✕</button>
             </header>
             <div className="mlv-modal__body">
               {chats.length === 0 && <p className="mlv-modal__empty">No conversations yet.</p>}
-              {chats.map((c) => (
+              {chats.map(c => (
                 <div key={c.id} className={`mlv-chat-row ${c.id === chatId ? 'is-current' : ''}`}>
-                  <button type="button" className="mlv-chat-row__open" onClick={() => openChatId(c.id)}>
+                  <button type="button" className="mlv-chat-row__open"
+                          onClick={() => { const ch = getChat(c.id); if (!ch) return; setChatId(ch.id); setCurrentChatId(ch.id); setMessages(ch.messages); setStickyDot(null); setShowHistory(false); }}>
                     <div className="mlv-chat-row__title">{c.title || 'Untitled'}</div>
-                    <div className="mlv-chat-row__meta">
-                      {new Date(c.lastInteractionAt).toLocaleString()} · {c.messages.length} messages
-                    </div>
+                    <div className="mlv-chat-row__meta">{new Date(c.lastInteractionAt).toLocaleString()} · {c.messages.length} messages</div>
                   </button>
-                  <button
-                    type="button" className="mlv-chat-row__del"
-                    onClick={() => { deleteChat(c.id); setChats(listChats()); if (c.id === chatId) startNewChat(); }}
-                  >✕</button>
+                  <button type="button" className="mlv-chat-row__del"
+                          onClick={() => { deleteChat(c.id); setChats(listChats()); if (c.id === chatId) startNewChat(); }}>✕</button>
                 </div>
               ))}
             </div>
@@ -630,26 +504,24 @@ export default function MedhaHUD() {
         </div>
       )}
 
-      {/* ── Settings side-panel ───────────────────────────────────────────── */}
+      {/* ── Settings panel ────────────────────────────────────────────── */}
       {showSettings && (
         <div className="mlv-modal mlv-modal--side" role="dialog" aria-modal="true"
-             onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false); }}>
-          <div className="mlv-modal__inner mlv-modal__inner--side" onClick={(e) => e.stopPropagation()}>
+             onClick={e => { if (e.target === e.currentTarget) setShowSettings(false); }}>
+          <div className="mlv-modal__inner mlv-modal__inner--side" onClick={e => e.stopPropagation()}>
             <header className="mlv-modal__head">
               <h2>Cognitive Settings</h2>
               <button type="button" className="mlv-modal__x" onClick={() => setShowSettings(false)}>✕</button>
             </header>
             <div className="mlv-modal__body mlv-settings">
-              {/* Model picker — selecting fires electrifying link + greeting */}
               <div className="mlv-settings__section">
                 <div className="mlv-settings__lbl">Cognitive Mode</div>
                 <div className="mlv-settings__modes">
-                  {COGNITIVE_MODES.map((m) => (
+                  {COGNITIVE_MODES.map(m => (
                     <button
                       key={m.key} type="button"
                       className={`mlv-mind ${mode === m.key ? 'is-active' : ''}`}
-                      onClick={(ev) => { switchMode(m.key, ev); setShowSettings(false); }}
-                      title={`${m.name} — ${m.englishName}`}
+                      onClick={() => { activateModel(m.key); setShowSettings(false); }}
                       style={{ ['--mind-a' as any]: m.colorA, ['--mind-b' as any]: m.colorB }}
                     >
                       <span className="mlv-mind__glyph">{m.glyph}</span>
@@ -657,33 +529,12 @@ export default function MedhaHUD() {
                     </button>
                   ))}
                 </div>
-                <p className="mlv-settings__hint">
-                  Active: <strong>{modeDef.name}</strong> · {modeDef.englishName}
-                </p>
-              </div>
-              <div className="mlv-settings__section">
-                <div className="mlv-settings__lbl">Response Tone</div>
-                <div className="mlv-settings__pills">
-                  {(['Sūtra', 'Poetic', 'Direct', 'Mythic'] as const).map((t) => (
-                    <button key={t} type="button"
-                            className={`mlv-pill ${typeof window !== 'undefined' && localStorage.getItem('vyan.medha.tone') === t ? 'is-active' : ''}`}
-                            onClick={() => { try { localStorage.setItem('vyan.medha.tone', t); } catch {} setShock(s => s + 1); }}>{t}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="mlv-settings__section">
-                <div className="mlv-settings__lbl">Response Length</div>
-                <div className="mlv-settings__pills">
-                  {(['Tight', 'Standard', 'Expansive'] as const).map((t) => (
-                    <button key={t} type="button"
-                            className={`mlv-pill ${typeof window !== 'undefined' && localStorage.getItem('vyan.medha.length') === t ? 'is-active' : ''}`}
-                            onClick={() => { try { localStorage.setItem('vyan.medha.length', t); } catch {} setShock(s => s + 1); }}>{t}</button>
-                  ))}
-                </div>
+                <p className="mlv-settings__hint">Active: <strong>{modeDef.name}</strong> · {modeDef.englishName}</p>
               </div>
               <div className="mlv-set-row">
                 <span className="mlv-set-row__k">Voice reply (TTS)</span>
-                <button type="button" className={`mlv-toggle ${ttsEnabled ? 'is-on' : ''}`} onClick={toggleTts}>
+                <button type="button" className={`mlv-toggle ${ttsEnabled ? 'is-on' : ''}`}
+                        onClick={() => setTtsEnabled(v => { if (v) ttsRef.current?.cancel(); return !v; })}>
                   {ttsEnabled ? 'on' : 'off'}
                 </button>
               </div>
@@ -692,28 +543,17 @@ export default function MedhaHUD() {
                 <span className="mlv-set-row__v">{chats.length}</span>
               </div>
               <div className="mlv-set-row">
-                <span className="mlv-set-row__k">Local persistence</span>
-                <span className="mlv-set-row__v">30 days · device + VYAN cloud</span>
-              </div>
-              <div className="mlv-set-row">
                 <button type="button" className="mlv-modal__danger" onClick={() => {
-                  if (!confirm('Erase ALL conversations stored on this device?')) return;
-                  chats.forEach(c => deleteChat(c.id));
-                  setChats([]);
-                  startNewChat();
-                }}>
-                  Erase all conversations
-                </button>
+                  if (!confirm('Erase ALL conversations on this device?')) return;
+                  chats.forEach(c => deleteChat(c.id)); setChats([]); startNewChat();
+                }}>Erase all conversations</button>
               </div>
-              <p className="mlv-settings__note">
-                Tone, length and voice persona will manifest here in the next emergence.
-              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Quota lock ────────────────────────────────────────────────────── */}
+      {/* ── Quota lock ────────────────────────────────────────────────── */}
       {showQuotaLock && (
         <div className="medha-quota-lock" role="dialog" aria-modal="true">
           <div className="medha-quota-lock__card">
@@ -722,21 +562,16 @@ export default function MedhaHUD() {
             <p className="medha-quota-lock__p">
               Medhā grants every wanderer <strong>{quotaLimit('medha')} conversations</strong> as a first taste.
             </p>
-            <p className="medha-quota-lock__p">
-              Register with VYAN to unlock the <strong>full cognitive lattice</strong>.
-            </p>
             <div className="medha-quota-lock__form">
-              <input type="text" placeholder="Your name" value={regName} onChange={(e) => setRegName(e.target.value)} />
-              <input type="email" placeholder="you@domain.com" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} />
+              <input type="text" placeholder="Your name" value={regName} onChange={e => setRegName(e.target.value)} />
+              <input type="email" placeholder="you@domain.com" value={regEmail} onChange={e => setRegEmail(e.target.value)} />
               {regErr && <div className="medha-quota-lock__err">{regErr}</div>}
               <button type="button" className="medha-quota-lock__cta"
                       onClick={submitRegistration} disabled={regBusy || !regEmail.trim()}>
                 {regBusy ? 'Transmitting…' : 'Register with VYAN'}
               </button>
             </div>
-            <p className="medha-quota-lock__foot">
-              VYAN will send a verification to your address. No tracking — only continuity.
-            </p>
+            <p className="medha-quota-lock__foot">VYAN will send a verification to your address.</p>
           </div>
         </div>
       )}
