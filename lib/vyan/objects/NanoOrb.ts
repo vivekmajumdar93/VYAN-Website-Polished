@@ -409,13 +409,8 @@ export class NanoOrb {
       used.add(nodeIdx);
       const lp = webNodes[nodeIdx]?.clone() ?? new THREE.Vector3();
 
-      // -- DOT: bright additive sphere + soft halo, behaves like core. --
-      // PHASE 9 — dots are now PROMINENTLY VISIBLE (radius 0.025 → 0.10,
-      // halo 0.07 → 0.22) so users can actually see and target them. The
-      // previous tiny size was an over-correction after the "giant floating
-      // balls" complaint; this size keeps them clearly intersection-locked
-      // without being giant balls floating in space.
-      const dotGeom = new THREE.SphereGeometry(0.10, 14, 14);
+      // -- DOT: tiny bright additive sphere + soft halo, behaves like core. --
+      const dotGeom = new THREE.SphereGeometry(0.025, 10, 10);
       const dotMat = new THREE.MeshBasicMaterial({
         color, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -426,10 +421,9 @@ export class NanoOrb {
       dot.userData.productKey = key;
       dot.userData.color = color;
       dot.userData.basePos = lp.clone();
-      dot.userData.socketIndex = i; // for sequenced hint-pulse
 
       // Soft halo billboard for the "glowing core" feel.
-      const haloGeom = new THREE.SphereGeometry(0.22, 14, 14);
+      const haloGeom = new THREE.SphereGeometry(0.07, 10, 10);
       const haloMat = new THREE.MeshBasicMaterial({
         color, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -438,7 +432,6 @@ export class NanoOrb {
       halo.position.copy(lp);
       halo.userData.isHalo = true;
       halo.userData.productKey = key;
-      halo.userData.socketIndex = i;
 
       // Invisible larger hit-sphere for raycast click — stays generous so
       // tiny dots remain easy to tap on touch screens.
@@ -657,11 +650,13 @@ export class NanoOrb {
     }
 
     const pulse = 1 + Math.sin(t * 1.5 + this.seed) * 0.045 + energy * 0.06;
-    // EQUALIZATION (item 2): keep all orbs visually substantial even when
-    // partially out-of-focus, and let the focused orb confidently fill the
-    // frame. Floor 0.92x, focus boost up to ~1.32x — uniform across all 6
-    // Shunya orbs so Medhā / Sandhi never feel small or distant.
-    const baseScale = ((active ? 1.10 : 1.0) * pulse) * (0.92 + presence * 0.40);
+    // See SCALE DIFFERENTIAL FIX comment below.
+    // SCALE DIFFERENTIAL FIX: inactive orbs shrink to 0.55× so the focused
+    // orb dominates the void clearly. Range: 0.55 (unfocused) → ~1.0 (focused).
+    // The old floor of 0.92 made all orbs nearly the same size — not dramatic
+    // enough. Now Medhā / Sandhi / Vyūha feel genuinely distant when you're
+    // parked on Vistāra, and the clicked orb feels confidently large.
+    const baseScale = ((active ? 1.05 : 0.92) * pulse) * (0.55 + presence * 0.45);
     // PHASE 2: in-place unfold. expansionT 0..1 multiplies size up to ~1.7x.
     // We keep the orb comfortably in-frame so the user can read the slabs
     // anchored to its sockets.
@@ -673,21 +668,12 @@ export class NanoOrb {
     if (this.scale < 10) {
         this.scale += (targetScale - this.scale) * 0.08;
     }
-    // PHASE 9 — BREATHING (per user request, replacing continuous rotation).
-    // Orbs now hover in place with a gentle sine-driven breathing pulse so
-    // users can actually catch up to and click the product/model sockets.
-    // The previous `group.rotation.y += 0.15 * motion * dt` made dots
-    // continually orbit out of reach.
-    const breath = 1 + Math.sin(t * 0.9) * 0.018; // ±1.8% scale breath, period ~7s
-    const hoverY = Math.sin(t * 0.6) * 0.02;       // tiny vertical hover
-    this.group.scale.setScalar(this.scale * (panelOpen ? 1.08 : 1.0) * this.magnifyFactor * breath);
-    this.group.position.y = hoverY;
+    this.group.scale.setScalar(this.scale * (panelOpen ? 1.08 : 1.0) * this.magnifyFactor);
 
-    // ORB MOTION — rotation is now FIXED. Only a micro-wobble (±0.5°) so the
-    // web doesn't look frozen-dead. Sockets stay reachable to the user.
-    this.group.rotation.y = Math.sin(t * 0.22) * 0.009;
-    this.group.rotation.x = Math.sin(t * 0.18) * 0.018;
-    this.group.rotation.z = Math.cos(t * 0.11) * 0.012;
+    // ORB MOTION
+    this.group.rotation.y += 0.15 * motion * 0.016; // Approx dt=.016
+    this.group.rotation.x = Math.sin(t * 0.18) * 0.18;
+    this.group.rotation.z = Math.cos(t * 0.11) * 0.08;
 
     // NODE TURBULENCE
     const posAttr = this.nodeGeo.attributes.position;
@@ -761,17 +747,6 @@ export class NanoOrb {
         else if (signal === 'response'){ speedMul = 2.30; intensityMul = 1.5; }
         else if (signal === 'interaction'){ speedMul = 1.0; intensityMul = 0.95; }
 
-        // PHASE 9 — HINT PULSE on first appearance. When sockets transition
-        // from invisible to visible, fire a sequenced wave (0.25 s stagger)
-        // across all 6 dots so the user immediately sees "these are the
-        // things to click". After 4 s the hint fades and the steady-state
-        // breathing/pulse takes over.
-        if (!(this as any).hintPulseStart) {
-          (this as any).hintPulseStart = t;
-        }
-        const hintElapsed = t - (this as any).hintPulseStart;
-        const hintActive = hintElapsed >= 0 && hintElapsed < 4.0;
-
         // -- DOTS + HALOS: pulse like the bright core. Skip the invisible
         // hit-spheres (userData.isHit) so they never become visible. --
         let nodeIdx = 0;
@@ -783,26 +758,9 @@ export class NanoOrb {
           const fadeIn = Math.min(1, Math.max(0, (expForSockets - 0.15) / 0.5));
           const fastPulse = 0.55 + Math.sin(t * 6.0 + nodeIdx * 0.9) * 0.20;
           const slowSwell = 0.85 + Math.sin(t * 1.8 + nodeIdx) * 0.15;
-          const baseOp = isHalo ? 0.52 : 1.00; // brighter (was 0.32 / 0.95)
-
-          // Hint envelope: each socket peaks at its own stagger offset,
-          // ramping the dot to 1.55× brightness + 1.40× scale briefly.
-          let hintBoost = 1.0;
-          let hintScale = 1.0;
-          if (hintActive) {
-            const socketIdx = (c as any).userData?.socketIndex ?? nodeIdx;
-            const peak = 0.6 + socketIdx * 0.25; // staggered peaks 0.6, 0.85, 1.10, ...
-            const dt2 = hintElapsed - peak;
-            // Sharp bell centred at peak, width ~0.45 s
-            const env = Math.exp(-(dt2 * dt2) / 0.10);
-            // Global decay so the hint fades out over the 4 s window
-            const decay = Math.max(0, 1 - (hintElapsed / 4.0));
-            hintBoost = 1 + env * 0.55 * decay;
-            hintScale = 1 + env * 0.40 * decay;
-          }
-
-          m.opacity = fadeIn * baseOp * fastPulse * slowSwell * intensityMul * hintBoost;
-          const sScale = (1 + Math.sin(t * 3.0 + nodeIdx) * 0.18) * hintScale;
+          const baseOp = isHalo ? 0.32 : 0.95;
+          m.opacity = fadeIn * baseOp * fastPulse * slowSwell * intensityMul;
+          const sScale = 1 + Math.sin(t * 3.0 + nodeIdx) * 0.18;
           c.scale.setScalar(sScale);
           if (!isHalo) nodeIdx++;
         }
