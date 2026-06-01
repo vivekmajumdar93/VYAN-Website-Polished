@@ -4,11 +4,11 @@ import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import '../../lib/vyan/ui/styles.css';
 
-// Singleton VYAN app reference, persists across child-route navigations.
 let appInstance: any = null;
 let rootEl: HTMLDivElement | null = null;
 let appReadyResolvers: Array<() => void> = [];
 let appReady = false;
+
 function whenAppReady(): Promise<void> {
   if (appReady) return Promise.resolve();
   return new Promise<void>(res => { appReadyResolvers.push(res); });
@@ -16,15 +16,11 @@ function whenAppReady(): Promise<void> {
 
 function modeFromPath(pathname: string | null): 'gateway' | 'shunya' {
   if (!pathname) return 'gateway';
-  // PHASE 1 in-place architecture: every route except /vyoma renders the
-  // Shunya field. /vistara/* and /medha are now URL aliases that focus a
-  // Shunya orb + expand it in-place (driven via InteractionState).
   if (pathname === '/vyoma' || pathname === '/') return 'gateway';
   return 'shunya';
 }
 
-// Apply the in-place focus + expand for a given pathname. Idempotent.
-async function applyRouteState(pathname: string | null, isInitial = false) {
+async function applyRouteState(pathname: string | null, _isInitial = false) {
   if (!appInstance) return;
   const app = appInstance;
   const seg = pathname?.split('/')[2];
@@ -39,7 +35,7 @@ async function applyRouteState(pathname: string | null, isInitial = false) {
   if (app.getMode?.() !== targetMode) app.setMode(targetMode);
 
   if (targetMode === 'shunya') {
-    if (targetOrb === 'medha') app.focusShunyaOrb?.('medha', true);
+    if (targetOrb === 'medha')   app.focusShunyaOrb?.('medha', true);
     else if (targetOrb === 'vistara') app.focusShunyaOrb?.('vistara', true);
     else if (seg) app.focusShunyaOrb?.(seg, true);
   }
@@ -49,10 +45,6 @@ async function applyRouteState(pathname: string | null, isInitial = false) {
       ? (m.VISTARA_SPECTRUM[seg] ?? 'crimson')
       : 'crimson';
 
-    // PHASE 6 — same-orb node-change cinematic. When the user navigates from
-    // /vistara/A → /vistara/B (same orb, different product socket), use
-    // setNode (instant) instead of expand (full tween) and fire an audio
-    // swell so the camera's FOV-punch + look-at swing feels synchronized.
     const cur = ix.get();
     const nextNodeKey = targetOrb === 'vistara' ? (seg ?? null) : null;
     if (cur.target === targetOrb && cur.phase !== 'dormant') {
@@ -65,9 +57,6 @@ async function applyRouteState(pathname: string | null, isInitial = false) {
       }
     } else {
       ix.expand(targetOrb, nextNodeKey, spectrum);
-      // PHASE 8 — also fire the cinematic pulse on first expand so the
-      // initial transition into a product (deep-link OR first click into
-      // Vistāra) feels like an arrival rather than a passive load.
       try { app.audioEngine?.swell?.(1.05, 0.45); } catch {}
       try { app.worldRef?.cameraRig?.pulseNodeChange?.(); } catch {}
     }
@@ -103,33 +92,24 @@ export default function CosmicCanvas() {
         initialMode,
         onEnterVoid: () => { router.push('/shunya'); },
         onOrbActivate: (key: string) => {
-          // PHASE 2+5 in-place: Medhā + Vistāra get their own URLs and unfold
-          // in-place via InteractionState. Other Shunya orbs route to /shunya/<key>.
-          // Legacy onEnterVistara/onProductActivate callbacks removed — those
-          // code paths are obsolete under the in-place architecture.
           if (key === 'medha') router.push('/medha');
           else if (key === 'vistara') router.push('/vistara');
           else router.push(`/shunya/${key}`);
         },
         onEnterVistara: () => { router.push('/vistara'); },
-        onEnterMedha:   () => { router.push('/medha');   },
+        onEnterMedha:   () => { router.push('/medha'); },
       });
       appInstance.start();
       (window as any).__vyan = appInstance;
       (window as any).__vyan.audio = appInstance.audioEngine;
-      // Expose router for in-canvas socket clicks (Vistāra product nodes).
       (window as any).__vyanRouter = router;
 
-      // PHASE 3 v3 — direct DOM click handler that raycasts against the
-      // focused orb's socket dots at the EXACT click moment + coordinates.
-      // This is more reliable than the polling `interaction.clicked` flag
-      // (which can miss the click if the orb has drifted between frames).
       const THREE = await import('three');
       const raycaster = new THREE.Raycaster();
       const ndc = new THREE.Vector2();
+
       const onDomClick = (ev: MouseEvent) => {
         try {
-          // Ignore clicks on UI overlays (panels, buttons, console).
           const target = ev.target as HTMLElement | null;
           if (target?.closest('.vpd-slab, .mlv-modal, .concierge-nav, .sc-panel, .mlv-composer, .mlv-orb-pane, button')) return;
           const app: any = appInstance;
@@ -141,16 +121,13 @@ export default function CosmicCanvas() {
           ndc.x = (ev.clientX / window.innerWidth) * 2 - 1;
           ndc.y = -((ev.clientY / window.innerHeight) * 2 - 1);
           raycaster.setFromCamera(ndc, w.camera);
-          // Generous click radius for the tiny dots — increase the Points
-          // threshold and ensure hit-spheres at depth match.
           (raycaster.params as any).Points = { threshold: 1.2 };
-          (raycaster.params as any).Line = { threshold: 0.6 };
+          (raycaster.params as any).Line   = { threshold: 0.6 };
           const hits = raycaster.intersectObjects(focused.socketGroup.children, true);
           const productHit = hits.find((h: any) =>
             h.object?.userData?.isProductSocket && h.object?.userData?.productKey,
           );
-          // Diagnostic trace — exposed for testing scripts and removed via
-          // window.__vyanClickTrace=false in prod.
+
           if ((window as any).__vyanClickTrace !== false) {
             (window as any).__vyanLastClick = {
               x: ev.clientX, y: ev.clientY,
@@ -161,50 +138,51 @@ export default function CosmicCanvas() {
               ndc: { x: ndc.x, y: ndc.y },
             };
           }
+
           if (productHit) {
             const productKey = (productHit as any).object.userData.productKey as string;
             const orbKey = shunya.defs?.[shunya.activeIndex]?.key;
-            const target = orbKey === 'medha' ? `/medha?model=${productKey}` : `/vistara/${productKey}`;
+            const navTarget = orbKey === 'medha' ? `/medha?model=${productKey}` : `/vistara/${productKey}`;
             try { app.audioEngine?.swell?.(1.06, 0.25); } catch {}
-            // PHASE 6: dual-strategy navigation. The cosmic canvas's click
-            // handler runs OUTSIDE React's render context (it's attached
-            // directly to the DOM in a useEffect with empty deps), so
-            // router.push() captures a stale closure and silently no-ops.
-            // We use the fresh router on window + a hard-fallback to
-            // guarantee navigation.
             try {
               const freshRouter = (window as any).__vyanRouter ?? router;
-              freshRouter.push(target);
-              // Belt-and-braces: if the route hasn't committed within a beat,
-              // fall through to a native nav. This is silent if router.push
-              // already worked.
+              freshRouter.push(navTarget);
               setTimeout(() => {
-                if (window.location.pathname + window.location.search !== target) {
-                  window.location.href = target;
+                if (window.location.pathname + window.location.search !== navTarget) {
+                  window.location.href = navTarget;
                 }
               }, 250);
-            } catch {
-              window.location.href = target;
-            }
+            } catch { window.location.href = navTarget; }
             return;
           }
 
-          // PHASE 8 (item #2 outside-click close) — if a Vistāra or Medhā
-          // slab is currently open AND the click did NOT land on a product
-          // socket AND the target wasn't the slab itself, close the slab by
-          // routing back to the parent orb.
+          // ── Outside-click panel close ───────────────────────────────────────
+          // CRITICAL BUG FIX: closing a Vistāra product panel via outside-click
+          // previously called router.push('/vistara') which triggered
+          // applyRouteState → focusShunyaOrb('vistara') → camera traversed
+          // through Udbhava (index 0) before landing on Vistāra.
+          //
+          // The fix: use ix.closeWithoutNavigation() which resets the node state
+          // WITHOUT triggering any camera movement or navigation — the camera is
+          // already looking at Vistāra orb, we just need to collapse the panel.
           try {
             const path = window.location.pathname;
             const onVistaraProduct = /^\/vistara\/[^/]+$/.test(path);
-            const onMedha = path === '/medha' || path.startsWith('/medha/');
-            const clickedSlab = !!target?.closest('.vpd-slab, .mlv-modal, .mlv-composer, .mlv-orb-pane, .mlv-thread, .glass-panel.open, .mcc-veil, .medha-quota-lock, .gateway-info-panel.open, .sound-panel-overlay.open, .sound-card, .vac-root.is-open, .sc-root, .concierge-nav');
+            const clickedSlab = !!target?.closest(
+              '.vpd-slab, .vpd-veil > *:not(canvas), .mlv-modal, .mlv-composer, .mlv-orb-pane, ' +
+              '.mlv-thread, .glass-panel.open, .mcc-veil, .medha-quota-lock, ' +
+              '.gateway-info-panel.open, .sound-panel-overlay.open, .sound-card, ' +
+              '.vac-root.is-open, .sc-root, .concierge-root, .concierge-nav, ' +
+              '.neural-depth, [data-vyan-keepopen="1"]',
+            );
             if (!clickedSlab && onVistaraProduct) {
+              // Close panel without navigating — no Udbhava traversal
+              const ixMod = await import('../../lib/vyan/state/InteractionState');
+              ixMod.getInteractionStore().closeWithoutNavigation();
+              // Then navigate to /vistara without triggering focusShunyaOrb
               const freshRouter = (window as any).__vyanRouter ?? router;
-              try { freshRouter.push('/vistara'); }
-              catch { window.location.href = '/vistara'; }
+              try { freshRouter.push('/vistara'); } catch { window.location.href = '/vistara'; }
             }
-            // For /medha we do NOT auto-close because Medhā IS the page
-            // (not a slab) — closing it would force the user to redo consent.
           } catch {}
         } catch (err) {
           (window as any).__vyanLastClickError = String(err);
@@ -213,20 +191,12 @@ export default function CosmicCanvas() {
       rootEl?.addEventListener('click', onDomClick);
       (window as any).__vyanDomClick = onDomClick;
 
-      // PHASE 8b (item #2) — independent document-level outside-click
-      // closer for Vistāra product slabs. Decoupled from the canvas raycast
-      // path because some click targets never reach #vyan-root in capture
-      // (e.g. clicks land directly on .vyan-ui UI children that re-enable
-      // pointer-events). This handler fires on the document and closes the
-      // open product slab when the click is NOT on the slab itself or any
-      // interactive overlay.
+      // ── Document-level outside-click closer (belt-and-braces) ──────────────
+      // Same fix applied here: use closeWithoutNavigation to avoid the
+      // Udbhava navigation bug.
       const onDocClickOutside = (ev: MouseEvent) => {
         try {
           const t = ev.target as HTMLElement | null;
-          // Allow normal interaction with: the slab itself, any open modal,
-          // top-level controls (concierge nav/orb, sound console, gateway
-          // info, neural rail), and any explicit interactive ancestor that
-          // sets data-vyan-keepopen="1".
           const keep = t?.closest(
             '.vpd-slab, .vpd-veil > *:not(canvas), .mlv-modal, .mlv-composer, .mlv-orb-pane, .mlv-thread, ' +
             '.glass-panel.open, .mcc-veil, .medha-quota-lock, .gateway-info-panel.open, ' +
@@ -237,26 +207,23 @@ export default function CosmicCanvas() {
           const path = window.location.pathname;
           if (/^\/vistara\/[^/]+$/.test(path)) {
             (window as any).__vyanLastOutsideClose = { at: Date.now(), x: ev.clientX, y: ev.clientY };
+            // FIX: close without camera navigation instead of router.push('/vistara')
+            import('../../lib/vyan/state/InteractionState').then(ixMod => {
+              ixMod.getInteractionStore().closeWithoutNavigation();
+            }).catch(() => {});
             const freshRouter = (window as any).__vyanRouter ?? router;
             try { freshRouter.push('/vistara'); } catch {}
-            // Belt-and-braces: same dual-strategy as the socket click —
-            // router.push from outside React render context can silently
-            // no-op, so fall back to a hard nav if the URL hasn't moved.
             setTimeout(() => {
               if (window.location.pathname !== '/vistara') {
                 window.location.href = '/vistara';
               }
             }, 250);
           }
-          // Medhā page is its own route — outside-click does not close it
-          // (closing would force consent to be re-entered).
         } catch {}
       };
-      document.addEventListener('click', onDocClickOutside, true); // capture phase so we beat slab-internal handlers
+      document.addEventListener('click', onDocClickOutside, true);
       (window as any).__vyanDocClickOutside = onDocClickOutside;
 
-      // Apply the current route state — fires the in-place expansion if the
-      // URL already points at /medha or /vistara/<product>.
       await applyRouteState(pathname);
 
       appReady = true;
@@ -287,8 +254,6 @@ export default function CosmicCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // PHASE 1+2 routing — in-place orb expansion. Waits for the App to finish
-  // booting before applying state so deep-links land in the correct phase.
   useEffect(() => {
     let cancelled = false;
     (async () => {

@@ -1,7 +1,20 @@
 /* ==================================================================
-   MEDHĀ — The Living Orb  (full reset of /medha page styles)
+   MEDHĀ — The Living Orb  |  Clean rewrite — zero !important chains
    ================================================================== */
 
+/* ── CSS Variables (set per mode via data-mode attribute) ────────── */
+.mlv {
+  --mode-a: #ff5a7a;
+  --mode-b: #ff8a5a;
+  --mode-node-glow: rgba(255, 90, 122, 0.55);
+}
+.mlv[data-mode="prajna"]   { --mode-a: #ff4a4a; --mode-b: #ff8a5a; --mode-node-glow: rgba(255, 74, 74, 0.6); }
+.mlv[data-mode="dhyana"]   { --mode-a: #22e0d4; --mode-b: #9a55ff; --mode-node-glow: rgba(34, 224, 212, 0.6); }
+.mlv[data-mode="akshaya"]  { --mode-a: #3a90ff; --mode-b: #22e0a4; --mode-node-glow: rgba(58, 144, 255, 0.6); }
+.mlv[data-mode="java"]     { --mode-a: #ffb84d; --mode-b: #ff2a4a; --mode-node-glow: rgba(255, 184, 77, 0.6); }
+.mlv[data-mode="sanchara"] { --mode-a: #ff6688; --mode-b: #3ad4ff; --mode-node-glow: rgba(255, 102, 136, 0.6); }
+
+/* ── Root ──────────────────────────────────────────────────────────── */
 .mlv {
   position: fixed;
   inset: 0;
@@ -11,15 +24,14 @@
   overflow: hidden;
   isolation: isolate;
   z-index: 30;
-  pointer-events: none; /* let cosmic canvas receive events except where we re-enable */
-  --mode-a: #7a5cff;
-  --mode-b: #ff2a4a;
+  pointer-events: none;
 }
-/* Re-enable interaction for actual UI children (everything inside re-receives events). */
 .mlv * { pointer-events: auto; }
-.mlv-bg, .mlv-stars, .mlv-stars--slow { pointer-events: none !important; }
+.mlv-bg,
+.mlv-stars,
+.mlv-stars--slow { pointer-events: none; }
 
-/* Starfield backdrop */
+/* ── Starfield backdrop ─────────────────────────────────────────────── */
 .mlv-bg { position: absolute; inset: 0; pointer-events: none; }
 .mlv-stars,
 .mlv-stars--slow {
@@ -38,7 +50,7 @@
 .mlv-stars--slow { animation-duration: 14s; opacity: 0.4; transform: scale(1.3); }
 @keyframes mlv-twinkle { from { opacity: 0.4; } to { opacity: 0.8; } }
 
-/* =================== The Orb =================== */
+/* ── Orb wrapper ─────────────────────────────────────────────────────── */
 .mlv-orb-wrap {
   position: absolute;
   top: 50%; left: 50%;
@@ -61,27 +73,18 @@
   filter: brightness(0.55) saturate(0.7);
   animation: none;
 }
-
-.mlv-orb {
-  position: relative;
-  width: 100%; height: 100%;
-  display: grid; place-items: center;
-}
+.mlv-orb { position: relative; width: 100%; height: 100%; display: grid; place-items: center; }
 .mlv-orb__corona {
-  position: absolute; inset: -40px;
-  border-radius: 50%;
+  position: absolute; inset: -40px; border-radius: 50%;
   background: radial-gradient(circle, var(--mode-a) 0%, transparent 60%);
-  opacity: 0.32;
-  filter: blur(36px);
+  opacity: 0.32; filter: blur(36px);
   animation: mlv-breathe 4.8s ease-in-out infinite;
 }
 .mlv-phase-sleeping .mlv-orb__corona { opacity: 0.14; animation-duration: 7.2s; }
-.mlv-orb-wrap.is-speaking .mlv-orb__corona { animation-duration: 0.85s; opacity: 0.55; }
+.mlv-orb-wrap.is-speaking .mlv-orb__corona  { animation-duration: 0.85s; opacity: 0.55; }
 .mlv-orb-wrap.is-listening .mlv-orb__corona { animation-duration: 1.6s; opacity: 0.45; }
-
 .mlv-orb__ring {
-  position: absolute;
-  border-radius: 50%;
+  position: absolute; border-radius: 50%;
   border: 1px solid rgba(220, 190, 255, 0.24);
   pointer-events: none;
 }
@@ -90,25 +93,17 @@
 .mlv-orb__ring--c { inset: 36%; border-color: rgba(190,150,255,0.4); animation: mlv-rot 9s linear infinite; }
 @keyframes mlv-rot     { to { transform: rotate(360deg); } }
 @keyframes mlv-rot-rev { to { transform: rotate(-360deg); } }
-
 .mlv-orb__core {
-  position: relative;
-  width: 36%; height: 36%;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, #ffffff 0%, rgba(255,255,255,0.7) 30%, var(--mode-a) 65%, var(--mode-b) 100%);
-  box-shadow:
-    0 0 60px var(--mode-a),
-    0 0 120px var(--mode-b),
-    inset 0 0 22px rgba(255,255,255,0.5);
+  position: relative; width: 36%; height: 36%; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, rgba(255,255,255,0.7) 30%, var(--mode-a) 65%, var(--mode-b) 100%);
+  box-shadow: 0 0 60px var(--mode-a), 0 0 120px var(--mode-b), inset 0 0 22px rgba(255,255,255,0.5);
   animation: mlv-breathe 4.8s ease-in-out infinite;
 }
-.mlv-phase-sleeping .mlv-orb__core { animation-duration: 7.2s; box-shadow: 0 0 30px var(--mode-a), 0 0 70px var(--mode-b); }
-.mlv-orb-wrap.is-speaking .mlv-orb__core { animation-duration: 0.85s; }
+.mlv-phase-sleeping .mlv-orb__core { animation-duration: 7.2s; }
+.mlv-orb-wrap.is-speaking .mlv-orb__core  { animation-duration: 0.85s; }
 .mlv-orb-wrap.is-listening .mlv-orb__core { animation-duration: 1.6s; }
 .mlv-orb__core-inner {
-  position: absolute; inset: 25%;
-  border-radius: 50%;
+  position: absolute; inset: 25%; border-radius: 50%;
   background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.4) 70%, transparent 100%);
   filter: blur(3px);
 }
@@ -116,614 +111,67 @@
   0%, 100% { transform: scale(1); filter: brightness(1); }
   50%      { transform: scale(1.08); filter: brightness(1.18); }
 }
-
 .mlv-orb__particles { position: absolute; inset: 0; pointer-events: none; }
 .mlv-orb__particle {
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 3px; height: 3px;
-  border-radius: 50%;
+  position: absolute; top: 50%; left: 50%;
+  width: 3px; height: 3px; border-radius: 50%;
   background: rgba(255, 220, 255, 0.85);
   box-shadow: 0 0 8px rgba(220, 180, 255, 0.6);
   margin: -1.5px 0 0 -1.5px;
   animation: mlv-orbit calc(8s + var(--p-i) * 0.6s) linear infinite;
-  transform-origin: 0 0;
-  opacity: 0.7;
 }
 @keyframes mlv-orbit {
-  from { transform: rotate(calc(var(--p-i) * 30deg))   translateX(110px) rotate(0deg); }
+  from { transform: rotate(calc(var(--p-i) * 30deg)) translateX(110px) rotate(0deg); }
   to   { transform: rotate(calc(var(--p-i) * 30deg + 360deg)) translateX(110px) rotate(-360deg); }
 }
-
 .mlv-orb__shockwave {
-  position: absolute;
-  inset: 50%;
-  width: 6px; height: 6px;
-  margin: -3px;
-  border-radius: 50%;
-  border: 2px solid var(--mode-a);
-  opacity: 0;
+  position: absolute; inset: 50%; width: 6px; height: 6px; margin: -3px;
+  border-radius: 50%; border: 2px solid var(--mode-a); opacity: 0;
   pointer-events: none;
   animation: mlv-shock 1.4s cubic-bezier(0.2, 0.9, 0.3, 1.05) forwards;
 }
 @keyframes mlv-shock {
-  0%   { width: 6px;  height: 6px;  opacity: 0.95; border-width: 2px; margin: -3px; }
+  0%   { width: 6px; height: 6px; opacity: 0.95; border-width: 2px; margin: -3px; }
   100% { width: 480px; height: 480px; opacity: 0; border-width: 0.5px; margin: -240px; }
 }
-
 .mlv-orb-cue {
-  position: absolute;
-  bottom: -42px; left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  letter-spacing: 0.36em;
-  text-transform: uppercase;
-  color: rgba(206, 173, 255, 0.55);
-  white-space: nowrap;
+  position: absolute; bottom: -42px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; letter-spacing: 0.36em; text-transform: uppercase;
+  color: rgba(206, 173, 255, 0.55); white-space: nowrap;
   animation: mlv-cue-breath 3.4s ease-in-out infinite;
 }
 @keyframes mlv-cue-breath { 0%,100% { opacity: 0.42; } 50% { opacity: 0.95; } }
 
-/* =================== Back to Shunya =================== */
+/* ── Back button ───────────────────────────────────────────────────── */
 .mlv-back {
-  position: absolute;
-  top: 22px; left: 22px;
-  z-index: 10;
+  position: fixed;
+  top: 70px; left: 22px;
+  z-index: 20;
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 14px;
+  padding: 7px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(180, 130, 255, 0.2);
-  background: rgba(8, 7, 16, 0.55);
-  color: rgba(232, 232, 240, 0.85);
-  font-size: 10px;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
+  border: 1px solid rgba(255, 138, 138, 0.4);
+  background: linear-gradient(180deg, rgba(36, 8, 12, 0.7), rgba(20, 4, 6, 0.55));
+  color: rgba(255, 220, 220, 0.92);
+  font: 500 10.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.34em; text-transform: uppercase;
   cursor: pointer;
-  backdrop-filter: blur(10px);
-  transition: background 0.2s ease, color 0.2s ease;
-}
-.mlv-back:hover { background: rgba(40, 24, 64, 0.65); color: #fff; }
-
-/* =================== Left rail =================== */
-.mlv-rail {
-  position: absolute;
-  top: 80px; left: 22px; bottom: 110px;
-  width: 64px;
-  display: flex; flex-direction: column; gap: 8px;
-  z-index: 9;
-  padding: 8px;
-  background: linear-gradient(180deg, rgba(10, 8, 22, 0.55), rgba(8, 7, 16, 0.45));
-  border: 1px solid rgba(180, 130, 255, 0.12);
-  border-radius: 22px;
   backdrop-filter: blur(8px);
-  overflow-y: auto;
+  box-shadow: 0 0 14px rgba(255, 90, 122, 0.32);
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
-.mlv-rail__btn {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 8px 0;
-  background: transparent;
-  border: 0; border-radius: 12px;
-  color: rgba(220, 200, 255, 0.7);
-  cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
-}
-.mlv-rail__btn:hover:not(:disabled) { background: rgba(180, 130, 255, 0.12); color: #fff; transform: scale(1.04); }
-.mlv-rail__btn:disabled { opacity: 0.32; cursor: not-allowed; }
-.mlv-rail__btn.is-on {
-  background: linear-gradient(180deg, rgba(180, 130, 255, 0.25), rgba(255, 60, 90, 0.18));
+.mlv-back:hover {
+  background: linear-gradient(180deg, rgba(80, 24, 30, 0.85), rgba(40, 12, 16, 0.75));
+  border-color: rgba(255, 138, 138, 0.78);
+  box-shadow: 0 0 22px rgba(255, 90, 122, 0.55);
   color: #fff;
-  box-shadow: 0 0 18px rgba(180, 130, 255, 0.35);
-}
-.mlv-rail__glyph { font-size: 18px; line-height: 1; }
-.mlv-rail__lbl   { font-size: 8px; letter-spacing: 0.24em; text-transform: uppercase; opacity: 0.75; }
-
-.mlv-rail__divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
-.mlv-rail__modes  { display: flex; flex-direction: column; gap: 6px; }
-.mlv-mind {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 6px 0;
-  background: transparent;
-  border: 1px solid transparent; border-radius: 10px;
-  cursor: pointer;
-  color: rgba(220, 200, 255, 0.55);
-  transition: all 0.2s ease;
-}
-.mlv-mind:hover { color: #fff; border-color: rgba(180, 130, 255, 0.25); }
-.mlv-mind.is-active {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--mind-a) 22%, transparent), transparent);
-  border-color: var(--mind-a);
-  color: #fff;
-  box-shadow: 0 0 14px color-mix(in srgb, var(--mind-a) 40%, transparent);
-}
-.mlv-mind__glyph { font-size: 16px; }
-.mlv-mind__name  { font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; }
-
-/* =================== Focus slab =================== */
-.mlv-slab {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, calc(-50% + 200px));
-  width: min(560px, calc(100vw - 200px));
-  max-height: 38vh; overflow-y: auto;
-  background: linear-gradient(160deg, rgba(15, 10, 30, 0.86), rgba(8, 6, 18, 0.78));
-  border: 1px solid rgba(180, 130, 255, 0.22);
-  border-radius: 18px;
-  padding: 16px 20px 14px;
-  backdrop-filter: blur(14px) saturate(120%);
-  color: rgba(232, 232, 240, 0.92);
-  box-shadow: 0 30px 80px rgba(80, 40, 180, 0.25);
-  animation: mlv-slab-in 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.05);
-  z-index: 8;
-}
-@keyframes mlv-slab-in {
-  from { opacity: 0; transform: translate(-50%, calc(-50% + 220px)) scale(0.96); }
-  to   { opacity: 1; transform: translate(-50%, calc(-50% + 200px)) scale(1); }
-}
-.mlv-slab--user {
-  border-color: rgba(255, 200, 230, 0.28);
-  background: linear-gradient(160deg, rgba(35, 20, 50, 0.78), rgba(20, 8, 28, 0.72));
-}
-.mlv-slab.is-preview { opacity: 0.85; border-style: dashed; }
-.mlv-slab__meta {
-  display: flex; justify-content: space-between; align-items: baseline;
-  margin-bottom: 8px;
-  font-size: 9.5px; letter-spacing: 0.32em; text-transform: uppercase;
-  color: rgba(206, 173, 255, 0.65);
-}
-.mlv-slab__body { font-size: 14px; line-height: 1.66; }
-.mlv-slab__body--user { color: rgba(255, 235, 240, 0.95); }
-.mlv-slab__actions {
-  display: flex; gap: 8px; margin-top: 10px; padding-top: 8px;
-  border-top: 1px dashed rgba(255,255,255,0.06);
-}
-.mlv-slab__actions button {
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.1);
-  color: rgba(220, 200, 255, 0.7);
-  font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
-  padding: 5px 10px; border-radius: 999px; cursor: pointer;
-  transition: all 0.18s ease;
-}
-.mlv-slab__actions button:hover { background: rgba(180, 130, 255, 0.12); color: #fff; }
-
-/* =================== Conversation thread =================== */
-.mlv-thread {
-  position: absolute;
-  left: 110px; right: 24px; bottom: 76px;
-  height: 32px;
-  display: grid; place-items: center;
-  z-index: 6;
-}
-.mlv-thread__line {
-  position: absolute;
-  left: 0; right: 0; top: 50%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(180, 130, 255, 0.4) 20%, rgba(180, 130, 255, 0.4) 80%, transparent);
-  box-shadow: 0 0 12px rgba(180, 130, 255, 0.18);
-  transform: translateY(-50%);
-}
-.mlv-thread__dots {
-  position: relative;
-  display: flex; align-items: center; justify-content: center; gap: 14px;
-  flex-wrap: wrap;
-  max-width: 100%;
-}
-.mlv-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  border: 0;
-  background: rgba(180, 130, 255, 0.4);
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-.mlv-dot--user { background: rgba(255, 200, 230, 0.55); }
-.mlv-dot--assistant { background: rgba(180, 130, 255, 0.55); }
-.mlv-dot:hover, .mlv-dot.is-glow {
-  transform: scale(1.6);
-  background: #fff;
-  box-shadow: 0 0 14px rgba(220, 190, 255, 0.9), 0 0 28px rgba(180, 130, 255, 0.55);
-}
-.mlv-thread__pending {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--mode-a);
-  box-shadow: 0 0 18px var(--mode-a);
-  animation: mlv-pend 0.9s ease-in-out infinite;
-}
-@keyframes mlv-pend {
-  0%, 100% { transform: scale(0.7); opacity: 0.7; }
-  50%      { transform: scale(1.3); opacity: 1; }
 }
 
-/* =================== Composer =================== */
-.mlv-composer {
-  position: absolute;
-  left: 110px; right: 24px; bottom: 22px;
-  display: grid; place-items: center;
-  z-index: 7;
-}
-.mlv-composer__pill {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(180, 130, 255, 0.28);
-  background: rgba(10, 8, 22, 0.65);
-  backdrop-filter: blur(10px);
-  color: rgba(220, 200, 255, 0.85);
-  font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.22s ease;
-}
-.mlv-composer__pill:hover { background: rgba(40, 24, 64, 0.82); color: #fff; border-color: rgba(180, 130, 255, 0.55); }
-.mlv-composer__dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--mode-a);
-  box-shadow: 0 0 10px var(--mode-a);
-  animation: mlv-pulse-dot 1.8s ease-in-out infinite;
-}
-@keyframes mlv-pulse-dot { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+/* ── Hidden legacy rail ────────────────────────────────────────────── */
+.mlv-rail.mlv-rail--hidden { display: none; }
+.mlv-rail { display: none; } /* always hidden in new spec */
 
-.mlv-composer__wrap {
-  display: flex; align-items: flex-end; gap: 8px;
-  width: min(720px, 100%);
-  padding: 10px 14px 10px 16px;
-  border-radius: 22px;
-  border: 1px solid rgba(180, 130, 255, 0.28);
-  background: rgba(10, 8, 22, 0.78);
-  backdrop-filter: blur(14px) saturate(120%);
-  box-shadow: 0 18px 50px rgba(80, 40, 180, 0.18);
-}
-.mlv-composer__bind {
-  font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase;
-  color: var(--mode-a);
-  padding: 6px 4px;
-  white-space: nowrap;
-}
-.mlv-composer__wrap textarea {
-  flex: 1;
-  background: transparent; border: 0; resize: none;
-  color: #fff;
-  font-size: 14px; line-height: 1.5;
-  padding: 6px 0;
-  outline: none;
-  font-family: inherit;
-  max-height: 120px;
-}
-.mlv-composer__wrap textarea::placeholder { color: rgba(220, 200, 255, 0.4); }
-.mlv-composer__mic, .mlv-composer__send {
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(180, 130, 255, 0.28);
-  background: rgba(10, 8, 22, 0.6);
-  color: rgba(220, 200, 255, 0.85);
-  cursor: pointer;
-  font-size: 14px;
-  display: grid; place-items: center;
-  transition: all 0.2s ease;
-}
-.mlv-composer__mic:hover:not(:disabled), .mlv-composer__send:hover:not(:disabled) {
-  background: rgba(180, 130, 255, 0.22); color: #fff;
-}
-.mlv-composer__mic.is-on {
-  background: var(--mode-a); color: #fff; border-color: var(--mode-a);
-  box-shadow: 0 0 18px var(--mode-a);
-  animation: mlv-mic-pulse 1.2s ease-in-out infinite;
-}
-@keyframes mlv-mic-pulse {
-  0%,100% { box-shadow: 0 0 14px var(--mode-a); }
-  50%     { box-shadow: 0 0 30px var(--mode-a); }
-}
-.mlv-composer__send:disabled, .mlv-composer__mic:disabled { opacity: 0.3; cursor: not-allowed; }
-.mlv-composer__spin {
-  width: 12px; height: 12px;
-  border: 2px solid rgba(255,255,255,0.2);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: mlv-spin 0.7s linear infinite;
-}
-@keyframes mlv-spin { to { transform: rotate(360deg); } }
-
-/* =================== Modal (history / settings) =================== */
-.mlv-modal {
-  position: fixed; inset: 0;
-  background: radial-gradient(ellipse at center, rgba(8, 6, 18, 0.78), rgba(0,0,0,0.92));
-  backdrop-filter: blur(10px);
-  z-index: 200;
-  display: grid; place-items: center;
-  animation: mlv-fade-in 0.32s ease;
-}
-@keyframes mlv-fade-in { from { opacity: 0; } to { opacity: 1; } }
-.mlv-modal__inner {
-  width: min(640px, calc(100vw - 32px));
-  max-height: 80vh;
-  display: flex; flex-direction: column;
-  background: linear-gradient(180deg, rgba(15, 10, 30, 0.94), rgba(8, 6, 18, 0.94));
-  border: 1px solid rgba(180, 130, 255, 0.28);
-  border-radius: 22px;
-  box-shadow: 0 30px 80px rgba(80, 40, 180, 0.32);
-  overflow: hidden;
-  transform: translateY(8px);
-  animation: mlv-modal-pop 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.05) forwards;
-}
-@keyframes mlv-modal-pop { to { transform: translateY(0); } }
-.mlv-modal__head {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-.mlv-modal__head h2 {
-  font-size: 13px; letter-spacing: 0.32em; text-transform: uppercase;
-  font-weight: 500; color: #fff; margin: 0;
-}
-.mlv-modal__x {
-  width: 30px; height: 30px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: transparent; color: rgba(220, 200, 255, 0.7);
-  border-radius: 8px; cursor: pointer;
-}
-.mlv-modal__x:hover { background: rgba(180, 130, 255, 0.18); color: #fff; }
-.mlv-modal__body { padding: 12px 16px; overflow-y: auto; flex: 1; }
-.mlv-modal__empty { padding: 30px 0; text-align: center; opacity: 0.55; font-size: 13px; }
-.mlv-modal__foot {
-  padding: 14px 20px;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  display: flex; justify-content: center;
-}
-.mlv-modal__cta {
-  padding: 10px 22px;
-  border-radius: 999px;
-  border: 1px solid rgba(180, 130, 255, 0.4);
-  background: rgba(40, 24, 64, 0.7);
-  color: #fff;
-  font-size: 10.5px; letter-spacing: 0.3em; text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-.mlv-modal__cta:hover { background: rgba(70, 40, 110, 0.92); }
-.mlv-modal__danger {
-  padding: 9px 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 90, 110, 0.4);
-  background: rgba(40, 12, 18, 0.6);
-  color: rgba(255, 180, 190, 0.9);
-  font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase;
-  cursor: pointer;
-}
-.mlv-modal__danger:hover { background: rgba(80, 18, 30, 0.78); color: #fff; }
-
-.mlv-chat-row {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 6px;
-  border-radius: 10px;
-  transition: background 0.18s ease;
-}
-.mlv-chat-row:hover { background: rgba(180, 130, 255, 0.08); }
-.mlv-chat-row.is-current { background: rgba(180, 130, 255, 0.14); }
-.mlv-chat-row__open {
-  flex: 1; text-align: left;
-  background: transparent; border: 0;
-  padding: 8px 10px; cursor: pointer; color: inherit;
-}
-.mlv-chat-row__title { font-size: 13px; color: #fff; margin-bottom: 4px; }
-.mlv-chat-row__meta { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.55; }
-.mlv-chat-row__del {
-  width: 28px; height: 28px;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.1);
-  color: rgba(220, 200, 255, 0.55);
-  border-radius: 8px; cursor: pointer;
-  font-size: 11px;
-}
-.mlv-chat-row__del:hover { background: rgba(255, 80, 110, 0.18); color: #fff; border-color: rgba(255, 80, 110, 0.4); }
-
-.mlv-set-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 6px;
-  border-bottom: 1px dashed rgba(255,255,255,0.06);
-  font-size: 13px;
-}
-.mlv-set-row:last-child { border-bottom: 0; }
-.mlv-set-row__k { color: rgba(220, 200, 255, 0.75); font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; }
-.mlv-set-row__v { color: #fff; font-size: 12.5px; }
-.mlv-toggle {
-  width: 50px; padding: 4px 0;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(20, 14, 32, 0.55);
-  color: rgba(220, 200, 255, 0.7);
-  border-radius: 999px;
-  font-size: 9.5px; letter-spacing: 0.32em; text-transform: uppercase; cursor: pointer;
-}
-.mlv-toggle.is-on { background: rgba(180, 130, 255, 0.32); color: #fff; border-color: rgba(180, 130, 255, 0.55); }
-.mlv-settings__note { margin-top: 18px; font-size: 12px; opacity: 0.55; font-style: italic; }
-
-/* =================== Edge swipe overlay (global) =================== */
-.edge-swipe-overlay {
-  position: fixed; inset: 0;
-  pointer-events: none;
-  z-index: 9990;
-  transition: opacity 0.1s ease;
-}
-
-/* =================== Markdown inside slab =================== */
-.medha-md { color: rgba(232, 232, 240, 0.92); font-size: 14px; line-height: 1.7; }
-.medha-md .md-p { margin: 0 0 10px 0; }
-.medha-md .md-p:last-child { margin-bottom: 0; }
-.medha-md strong { color: #ffd9e4; font-weight: 600; }
-.medha-md em { color: rgba(216, 200, 255, 0.92); font-style: italic; }
-.medha-md code { background: rgba(120, 80, 200, 0.18); border: 1px solid rgba(180, 130, 255, 0.18); padding: 1px 6px; border-radius: 4px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
-.medha-md .md-ul, .medha-md .md-ol { margin: 6px 0 10px 0; padding-left: 22px; }
-.medha-md .md-ul { list-style: none; padding-left: 4px; }
-.medha-md .md-ul li { position: relative; padding-left: 18px; margin-bottom: 3px; }
-.medha-md .md-ul li::before { content: ''; position: absolute; left: 4px; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: linear-gradient(135deg, var(--mode-a), var(--mode-b)); box-shadow: 0 0 8px var(--mode-a); }
-.medha-md .md-h { margin: 12px 0 6px; color: #fff; }
-.medha-md .md-h1 { font-size: 17px; }
-.medha-md .md-h2 { font-size: 15px; }
-.medha-md .md-h3 { font-size: 13.5px; color: #ffd9e4; letter-spacing: 0.04em; }
-.medha-md .md-quote { margin: 10px 0; padding: 8px 12px; border-left: 2px solid var(--mode-a); background: linear-gradient(90deg, color-mix(in srgb, var(--mode-a) 12%, transparent), transparent); font-style: italic; }
-.medha-md a.md-mail, .medha-md a.md-link { color: var(--mode-a); text-decoration: none; border-bottom: 1px dashed; }
-.medha-md a.md-mail:hover, .medha-md a.md-link:hover { color: #fff; border-color: #fff; }
-
-/* =================== Mobile =================== */
-@media (max-width: 767px) {
-  .mlv-orb-wrap { width: 220px; height: 220px; }
-  .mlv-phase-sleeping .mlv-orb-wrap { width: 130px; height: 130px; }
-  .mlv-rail {
-    top: auto; bottom: 138px; left: 12px; right: 12px;
-    width: auto; height: auto;
-    flex-direction: row; flex-wrap: wrap; gap: 6px;
-    padding: 6px 8px;
-    border-radius: 16px;
-    justify-content: center;
-  }
-  .mlv-rail__btn { padding: 5px 8px; }
-  .mlv-rail__lbl { display: none; }
-  .mlv-rail__glyph { font-size: 16px; }
-  .mlv-rail__divider { width: 1px; height: 22px; margin: 0 4px; }
-  .mlv-rail__modes { flex-direction: row; }
-  .mlv-mind { padding: 5px 6px; }
-  .mlv-mind__name { font-size: 7.5px; }
-  .mlv-slab { width: calc(100vw - 24px); transform: translate(-50%, calc(-50% + 180px)); max-height: 30vh; padding: 12px 14px 10px; }
-  .mlv-slab__body { font-size: 13px; }
-  /* Vertical rail stays on extreme right even on mobile per user spec.
-     Override the legacy horizontal mobile layout. */
-  .mlv-thread {
-    left: auto !important;
-    right: 0 !important;
-    top: 80px !important;
-    bottom: 92px !important;
-    width: 24px !important;
-    flex-direction: column !important;
-  }
-  .mlv-composer { left: 12px; right: 56px; bottom: 12px; }
-  .mlv-composer__wrap { padding: 8px 10px; gap: 6px; }
-  .mlv-composer__bind { display: none; }
-  .mlv-composer__wrap textarea { font-size: 13px; }
-  .mlv-composer__mic, .mlv-composer__send { width: 32px; height: 32px; }
-  .mlv-back { padding: 6px 10px; font-size: 9px; letter-spacing: 0.24em; }
-  .mlv-modal__inner { max-height: 86vh; }
-}
-
-/* Canvas orb fills the whole viewport behind UI */
-.mlv-canvas-orb {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-  pointer-events: none;
-}
-/* Hit area for opening history (overlaps canvas center) */
-.mlv-orb-hit {
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 28vw; height: 60vh;
-  min-width: 200px; min-height: 280px;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-  cursor: pointer;
-  z-index: 4;
-}
-.mlv-orb-hit .mlv-orb-cue {
-  position: absolute;
-  bottom: -10%; left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  letter-spacing: 0.36em;
-  text-transform: uppercase;
-  color: rgba(255, 130, 140, 0.65);
-  white-space: nowrap;
-  animation: mlv-cue-breath 3.4s ease-in-out infinite;
-}
-/* Bring UI above canvas */
-.mlv-rail, .mlv-back, .mlv-slab, .mlv-thread, .mlv-composer, .mlv-modal { z-index: 10; }
-.mlv-slab { z-index: 8; }
-
-/* ================================================================
-   STRICT 7-COMPONENT INTERFACE OVERLAY
-   ================================================================ */
-
-/* Hide legacy left-side action rail (consolidated into Settings orb). */
-.mlv-rail.mlv-rail--hidden { display: none !important; }
-
-/* Lock interactive layers while consent gate is up. */
-.mlv-consent-locked .mlv-thread,
-.mlv-consent-locked .mlv-composer,
-.mlv-consent-locked .mlv-settings-orb,
-.mlv-consent-locked .mlv-back,
-.mlv-consent-locked .mlv-orb-hit { pointer-events: none; opacity: 0.18; filter: blur(2px); transition: opacity 0.5s ease, filter 0.5s ease; }
-
-/* -------------- A · USER-ONLY RIGHT RAIL (dots) -------------- */
-.mlv-thread.mlv-thread--user-only {
-  /* keep the existing positioning rules; this class is decorative for now */
-}
-.mlv-thread--user-only .mlv-dot--user {
-  background: radial-gradient(circle, var(--mode-a, #d4a8ff) 0%, rgba(255,255,255,0.0) 70%);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 0 8px var(--mode-a, #d4a8ff);
-}
-.mlv-thread--user-only .mlv-dot.is-glow {
-  transform: scale(1.6);
-  box-shadow: 0 0 18px var(--mode-a, #d4a8ff), 0 0 36px var(--mode-b, #88e0ff);
-}
-
-/* -------------- D · SETTINGS ORB (floating cosmic glyph) -------------- */
-.mlv-settings-orb {
-  position: fixed;
-  bottom: calc(11vh + 28px);
-  left: 22px;
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  border: 1px solid rgba(212, 168, 255, 0.45);
-  background: radial-gradient(circle at 30% 30%, rgba(40, 22, 70, 0.92), rgba(8, 6, 18, 0.95));
-  display: grid; place-items: center;
-  cursor: pointer;
-  z-index: 28;
-  box-shadow:
-    0 0 22px rgba(176, 112, 255, 0.45),
-    inset 0 0 12px rgba(212, 168, 255, 0.16);
-  transition: transform 0.22s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.22s ease, border-color 0.22s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-.mlv-settings-orb:hover, .mlv-settings-orb:focus-visible {
-  transform: scale(1.1) rotate(45deg);
-  box-shadow:
-    0 0 30px rgba(212, 168, 255, 0.85),
-    inset 0 0 14px rgba(212, 168, 255, 0.32);
-  border-color: rgba(212, 168, 255, 0.85);
-  outline: none;
-}
-.mlv-settings-orb__ring {
-  position: absolute;
-  inset: -5px;
-  border-radius: 50%;
-  border: 1px dashed rgba(212, 168, 255, 0.4);
-  animation: mlv-set-orbit 16s linear infinite;
-  pointer-events: none;
-}
-@keyframes mlv-set-orbit { to { transform: rotate(360deg); } }
-.mlv-settings-orb__core {
-  position: absolute;
-  inset: 8px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(212, 168, 255, 0.35) 0%, transparent 70%);
-  filter: blur(3px);
-  animation: mlv-set-pulse 3.2s ease-in-out infinite;
-}
-@keyframes mlv-set-pulse { 0%,100%{opacity:0.5;transform:scale(0.9);} 50%{opacity:1;transform:scale(1.15);} }
-.mlv-settings-orb__glyph {
-  position: relative;
-  z-index: 2;
-  font-size: 16px;
-  color: #d4a8ff;
-  text-shadow: 0 0 10px rgba(212, 168, 255, 0.85);
-}
-@media (max-width: 767px) {
-  .mlv-settings-orb { bottom: calc(13vh + 18px); left: 14px; width: 40px; height: 40px; }
-  .mlv-settings-orb__glyph { font-size: 14px; }
-}
-
-/* -------------- Floating MEDHĀ DIALOG (movable, hides on typing) -------------- */
+/* ── Medhā floating dialogue box ───────────────────────────────────── */
 .mlv-medha-dialog {
   position: fixed;
   left: 50%;
@@ -733,24 +181,28 @@
   min-width: min(360px, 78vw);
   padding: 18px 22px;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(18, 10, 36, 0.78), rgba(6, 4, 18, 0.84));
-  border: 1px solid rgba(212, 168, 255, 0.32);
+  background: linear-gradient(180deg, rgba(36, 8, 12, 0.78), rgba(20, 4, 6, 0.86));
+  border: 1px solid rgba(255, 100, 130, 0.42);
   backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
   color: rgba(244, 235, 255, 0.92);
   z-index: 22;
   pointer-events: auto;
-  box-shadow:
-    0 0 36px rgba(176, 112, 255, 0.28),
-    inset 0 0 18px rgba(212, 168, 255, 0.06),
-    0 12px 36px rgba(0, 0, 0, 0.6);
-  animation: mlv-dialog-rise 0.62s cubic-bezier(0.23, 1, 0.32, 1), mlv-dialog-float 9s ease-in-out infinite;
+  box-shadow: 0 0 36px rgba(255, 90, 122, 0.28), inset 0 0 18px rgba(255, 138, 138, 0.06), 0 12px 36px rgba(0,0,0,0.6);
+  animation: mlv-dialog-rise 0.62s cubic-bezier(0.23, 1, 0.32, 1),
+             mlv-dialog-float 9s ease-in-out infinite;
   animation-delay: 0s, 0.62s;
 }
 .mlv-medha-dialog--user {
   background: linear-gradient(180deg, rgba(34, 22, 18, 0.78), rgba(18, 10, 6, 0.84));
   border-color: rgba(255, 184, 120, 0.32);
-  box-shadow: 0 0 28px rgba(255, 138, 90, 0.22), inset 0 0 14px rgba(255, 184, 120, 0.08), 0 12px 36px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 28px rgba(255, 138, 90, 0.22), inset 0 0 14px rgba(255, 184, 120, 0.08), 0 12px 36px rgba(0,0,0,0.6);
+}
+/* Tint dialog accent to match active model */
+.mlv-medha-dialog {
+  border-color: color-mix(in srgb, var(--mode-a) 55%, transparent);
+  box-shadow: 0 0 36px color-mix(in srgb, var(--mode-a) 28%, transparent),
+              inset 0 0 18px color-mix(in srgb, var(--mode-a) 6%, transparent),
+              0 12px 36px rgba(0,0,0,0.6);
 }
 @keyframes mlv-dialog-rise {
   from { opacity: 0; transform: translate(-50%, 22px) scale(0.96); }
@@ -764,72 +216,314 @@
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 10px;
   font: 500 9.5px/1 'Inter', system-ui, sans-serif;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: rgba(212, 168, 255, 0.7);
+  letter-spacing: 0.32em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--mode-a) 80%, white 20%);
 }
 .mlv-medha-dialog__body {
   font: 400 14.5px/1.65 'Inter', system-ui, sans-serif;
   color: rgba(244, 235, 255, 0.94);
-  max-height: 38vh;
-  overflow-y: auto;
+  max-height: 38vh; overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(212, 168, 255, 0.3) transparent;
 }
-.mlv-medha-dialog__body--user {
-  font-size: 14px;
-  color: rgba(255, 235, 220, 0.92);
-  font-style: italic;
-}
-.mlv-medha-dialog__actions {
-  margin-top: 10px;
-  display: flex; gap: 10px;
-}
+.mlv-medha-dialog__body--user { font-size: 14px; color: rgba(255, 235, 220, 0.92); font-style: italic; }
+.mlv-medha-dialog__actions { margin-top: 10px; display: flex; gap: 10px; }
 .mlv-medha-dialog__actions button {
   background: transparent;
-  border: 1px solid rgba(212, 168, 255, 0.25);
-  border-radius: 999px;
-  padding: 5px 12px;
-  color: rgba(244, 235, 255, 0.7);
+  border: 1px solid rgba(255, 138, 138, 0.3); border-radius: 999px;
+  padding: 5px 12px; color: rgba(244, 235, 255, 0.7);
   font: 500 9px/1 'Inter', system-ui, sans-serif;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  cursor: pointer;
+  letter-spacing: 0.28em; text-transform: uppercase; cursor: pointer;
   transition: all 0.18s ease;
 }
 .mlv-medha-dialog__actions button:hover { background: rgba(70, 40, 110, 0.55); color: #fff; }
-@media (max-width: 767px) {
-  .mlv-medha-dialog { top: 50%; max-width: 88vw; padding: 14px 16px; }
-  .mlv-medha-dialog__body { font-size: 13px; }
+
+/* ── Greeting dialogue from node (appears on model selection) ─────── */
+.mlv-greeting-dialog {
+  position: fixed;
+  z-index: 24;
+  max-width: min(440px, 70vw);
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(20, 8, 12, 0.88), rgba(8, 4, 6, 0.92));
+  border: 1px solid color-mix(in srgb, var(--mode-a) 60%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  color: rgba(244, 235, 255, 0.95);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--mode-a) 30%, transparent),
+              0 8px 28px rgba(0,0,0,0.7);
+  animation: mlv-greeting-in 0.55s cubic-bezier(0.23, 1, 0.32, 1);
+  pointer-events: none;
+}
+@keyframes mlv-greeting-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.mlv-greeting-dialog__who {
+  display: block;
+  font: 500 9px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.42em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--mode-a) 80%, white 20%);
+  margin-bottom: 8px;
+}
+.mlv-greeting-dialog__text {
+  font: 400 13.5px/1.65 'Inter', system-ui, sans-serif;
+  color: rgba(244, 235, 255, 0.92);
+  font-style: italic;
 }
 
-/* -------------- E · COMPOSER · char counter + tall mode -------------- */
-.mlv-composer.is-tall .mlv-composer__wrap textarea { min-height: 78px; max-height: 110px; overflow-y: auto; }
-.mlv-composer__count {
+/* ── Node pulse: electrifying branches on model select ──────────────
+   Each model node pulses its color along the orb branches when active.
+   The animation is driven by a class applied from MedhaHUD. ──────── */
+.mlv-node-pulse {
   position: absolute;
-  right: 96px; top: 8px;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+  animation: mlv-node-pulse-ring 1.2s cubic-bezier(0.2, 0.9, 0.3, 1.05) forwards;
+}
+@keyframes mlv-node-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 var(--mode-node-glow); opacity: 1; }
+  70%  { box-shadow: 0 0 0 40px rgba(0,0,0,0); opacity: 0.8; }
+  100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); opacity: 0; }
+}
+
+/* ── Right-rail vertical dots (user inputs only) ────────────────────── */
+.mlv-thread {
+  position: fixed;
+  top: 80px;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 110px);
+  left: auto;
+  width: 28px;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  z-index: 16;
+  pointer-events: auto;
+}
+.mlv-thread__line {
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg,
+    rgba(255, 138, 138, 0.04),
+    color-mix(in srgb, var(--mode-a) 45%, transparent),
+    rgba(255, 138, 138, 0.04));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--mode-a) 28%, transparent);
+}
+.mlv-thread__dots {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  overflow-y: auto;
+  max-height: 100%;
+  scrollbar-width: none;
+}
+.mlv-thread__dots::-webkit-scrollbar { display: none; }
+.mlv-dot--user {
+  position: relative;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: radial-gradient(circle, var(--mode-a) 0%, rgba(255, 90, 122, 0) 70%);
+  border: 1px solid rgba(255, 180, 180, 0.55);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--mode-a) 55%, transparent);
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  cursor: pointer;
+}
+.mlv-dot--user:hover,
+.mlv-dot--user.is-glow {
+  transform: scale(1.6);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--mode-a) 90%, transparent),
+              0 0 36px color-mix(in srgb, var(--mode-a) 50%, transparent);
+}
+/* Hover glass-slab for user dot */
+.mlv-dot--user::after {
+  content: attr(data-msg);
+  position: absolute;
+  right: 22px; top: 50%;
+  transform: translateY(-50%) translateX(8px);
+  width: 240px;
+  max-width: calc(100vw - 80px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(36, 8, 12, 0.94), rgba(20, 4, 6, 0.94));
+  border: 1px solid color-mix(in srgb, var(--mode-a) 32%, transparent);
+  color: rgba(255, 230, 220, 0.92);
+  font: 400 12px/1.5 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.02em; text-align: left;
+  text-transform: none; white-space: normal; word-break: break-word;
+  opacity: 0; pointer-events: none;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+  z-index: 18;
+}
+.mlv-dot--user:hover::after,
+.mlv-dot--user.is-glow::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+.mlv-thread__pending {
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 1.5px solid rgba(255, 138, 138, 0.4);
+  border-top-color: var(--mode-a);
+  animation: mlv-spin 0.85s linear infinite;
+  margin-top: 6px;
+}
+@keyframes mlv-spin { to { transform: rotate(360deg); } }
+
+/* ── Composer (bottom glass bar) ────────────────────────────────────── */
+.mlv-composer {
+  position: fixed;
+  left: 22px;
+  right: 44px; /* clears the right-rail */
+  bottom: 22px;
+  display: grid; place-items: center;
+  z-index: 17;
+}
+.mlv-composer__pill {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--mode-a) 28%, transparent);
+  background: rgba(10, 8, 22, 0.65);
+  backdrop-filter: blur(10px);
+  color: rgba(220, 200, 255, 0.85);
+  font: 500 11px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  cursor: pointer; transition: all 0.22s ease;
+}
+.mlv-composer__pill:hover {
+  background: rgba(40, 24, 64, 0.82); color: #fff;
+  border-color: color-mix(in srgb, var(--mode-a) 55%, transparent);
+}
+.mlv-composer__dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--mode-a); box-shadow: 0 0 10px var(--mode-a);
+  animation: mlv-pulse-dot 1.8s ease-in-out infinite;
+}
+@keyframes mlv-pulse-dot { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+.mlv-composer__wrap {
+  display: flex; align-items: flex-end; gap: 8px;
+  width: min(720px, 100%);
+  padding: 10px 14px 10px 16px; border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--mode-a) 28%, transparent);
+  background: rgba(10, 8, 22, 0.78);
+  backdrop-filter: blur(14px) saturate(120%);
+  box-shadow: 0 18px 50px rgba(80, 40, 180, 0.18);
+  /* Tint the composer glass to match the active model */
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+.mlv-composer__bind {
+  font: 500 10px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--mode-a); padding: 6px 4px; white-space: nowrap;
+}
+.mlv-composer__wrap textarea {
+  flex: 1; background: transparent; border: 0; resize: none;
+  color: #fff; font: 14px/1.5 'Inter', system-ui, sans-serif;
+  padding: 6px 0; outline: none; max-height: 120px;
+}
+.mlv-composer__wrap textarea::placeholder { color: rgba(220, 200, 255, 0.4); }
+.mlv-composer__count {
+  position: absolute; right: 130px; top: 8px;
   font: 500 9px/1 'Inter', system-ui, sans-serif;
-  letter-spacing: 0.18em;
-  color: rgba(212, 168, 255, 0.45);
+  letter-spacing: 0.18em; color: rgba(212, 168, 255, 0.45);
   pointer-events: none;
 }
 .mlv-composer__count.is-warn { color: #ff8a3a; }
-@media (max-width: 767px) {
-  .mlv-composer__count { right: 78px; top: 6px; font-size: 8px; }
+.mlv-composer.is-tall .mlv-composer__wrap textarea { min-height: 78px; max-height: 110px; overflow-y: auto; }
+.mlv-composer__mic,
+.mlv-composer__send,
+.mlv-composer__attach {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--mode-a) 28%, transparent);
+  background: rgba(10, 8, 22, 0.6);
+  color: rgba(220, 200, 255, 0.85); cursor: pointer;
+  font-size: 14px; display: grid; place-items: center;
+  transition: all 0.2s ease;
+}
+.mlv-composer__attach { width: 30px; height: 30px; margin-right: 4px; }
+.mlv-composer__mic:hover:not(:disabled),
+.mlv-composer__send:hover:not(:disabled),
+.mlv-composer__attach:hover {
+  background: color-mix(in srgb, var(--mode-a) 22%, rgba(0,0,0,0.6));
+  color: #fff;
+}
+.mlv-composer__mic.is-on {
+  background: var(--mode-a); color: #fff; border-color: var(--mode-a);
+  box-shadow: 0 0 18px var(--mode-a);
+  animation: mlv-mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mlv-mic-pulse {
+  0%,100% { box-shadow: 0 0 14px var(--mode-a); }
+  50%     { box-shadow: 0 0 30px var(--mode-a); }
+}
+.mlv-composer__send:disabled,
+.mlv-composer__mic:disabled { opacity: 0.3; cursor: not-allowed; }
+.mlv-composer__spin {
+  width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff;
+  border-radius: 50%; animation: mlv-spin 0.7s linear infinite;
 }
 
-/* -------------- ELECTRIFYING LINK (mode → Medhā) -------------- */
-.mlv-electric-link {
+/* ── Settings orb — TOP RIGHT, below Nāvika ────────────────────────── */
+.mlv-settings-orb {
   position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 24;
+  top: 70px;   /* sits just below the Nāvika orb at top: 18px + 40px + ~12px gap */
+  right: 22px;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--mode-a) 60%, transparent);
+  background: radial-gradient(circle at 30% 28%,
+    color-mix(in srgb, var(--mode-a) 34%, rgba(40,6,10,0.94)),
+    rgba(8, 4, 6, 0.96) 60%);
+  display: grid; place-items: center;
+  cursor: pointer; z-index: 28;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--mode-a) 45%, transparent),
+              inset 0 0 10px color-mix(in srgb, var(--mode-a) 16%, transparent);
+  transition: transform 0.22s cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.mlv-settings-orb:hover,
+.mlv-settings-orb:focus-visible {
+  transform: scale(1.1) rotate(45deg);
+  box-shadow: 0 0 28px color-mix(in srgb, var(--mode-a) 85%, transparent),
+              inset 0 0 14px color-mix(in srgb, var(--mode-a) 32%, transparent);
+  border-color: color-mix(in srgb, var(--mode-a) 85%, transparent);
+  outline: none;
+}
+.mlv-settings-orb__ring {
+  position: absolute; inset: -5px; border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--mode-a) 40%, transparent);
+  animation: mlv-set-orbit 16s linear infinite; pointer-events: none;
+}
+@keyframes mlv-set-orbit { to { transform: rotate(360deg); } }
+.mlv-settings-orb__core {
+  position: absolute; inset: 8px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--mode-a) 35%, transparent) 0%, transparent 70%);
+  filter: blur(3px); animation: mlv-set-pulse 3.2s ease-in-out infinite;
+}
+@keyframes mlv-set-pulse {
+  0%,100% { opacity: 0.5; transform: scale(0.9); }
+  50%     { opacity: 1; transform: scale(1.15); }
+}
+.mlv-settings-orb__glyph {
+  position: relative; z-index: 2; font-size: 15px;
+  color: color-mix(in srgb, var(--mode-a) 90%, white 10%);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--mode-a) 85%, transparent);
+}
+
+/* ── Electrifying link (mode → Medhā) ──────────────────────────────── */
+.mlv-electric-link {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  pointer-events: none; z-index: 24;
 }
 .mlv-electric-link__bolt {
-  stroke-dasharray: 1200;
-  stroke-dashoffset: 1200;
+  stroke-dasharray: 1200; stroke-dashoffset: 1200;
   animation: mlv-elec-zap 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor);
 }
@@ -841,7 +535,7 @@
 @keyframes mlv-elec-zap {
   0%   { stroke-dashoffset: 1200; opacity: 0; }
   20%  { opacity: 1; }
-  100% { stroke-dashoffset: 0;    opacity: 0; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
 }
 @keyframes mlv-elec-crackle {
   0%   { opacity: 0; stroke-width: 0.4; }
@@ -849,66 +543,330 @@
   100% { opacity: 0; stroke-width: 0.4; }
 }
 
-/* -------------- SETTINGS PANEL — mode picker section -------------- */
-.mlv-settings__section { padding: 10px 0 18px; border-bottom: 1px solid rgba(212, 168, 255, 0.1); margin-bottom: 12px; }
+/* ── Modal (history / settings) ─────────────────────────────────────── */
+.mlv-modal {
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(8, 6, 18, 0.78), rgba(0,0,0,0.92));
+  backdrop-filter: blur(10px); z-index: 200;
+  display: grid; place-items: center;
+  animation: mlv-fade-in 0.32s ease;
+}
+@keyframes mlv-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.mlv-modal--side {
+  background: linear-gradient(90deg, rgba(8, 4, 6, 0.74) 0%, rgba(0,0,0,0) 50%);
+  backdrop-filter: blur(4px);
+  justify-items: start; align-items: stretch; display: flex;
+}
+.mlv-modal__inner {
+  width: min(640px, calc(100vw - 32px)); max-height: 80vh;
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, rgba(18, 8, 14, 0.94), rgba(8, 4, 6, 0.97));
+  border: 1px solid color-mix(in srgb, var(--mode-a) 32%, transparent);
+  border-radius: 22px;
+  box-shadow: 0 30px 80px rgba(80, 40, 180, 0.32);
+  overflow: hidden;
+  transform: translateY(8px);
+  animation: mlv-modal-pop 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.05) forwards;
+}
+.mlv-modal__inner--side {
+  width: min(440px, 92vw); height: 100vh;
+  border-radius: 0 18px 18px 0;
+  border-left: none;
+  animation: mlv-side-in 0.42s cubic-bezier(0.23, 1, 0.32, 1);
+  background: linear-gradient(180deg, rgba(28, 8, 12, 0.94), rgba(12, 4, 6, 0.97));
+  box-shadow: 8px 0 40px rgba(0,0,0,0.6), 0 0 60px color-mix(in srgb, var(--mode-a) 12%, transparent);
+}
+@keyframes mlv-modal-pop { to { transform: translateY(0); } }
+@keyframes mlv-side-in { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.mlv-modal__head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mlv-modal__head h2 {
+  font: 500 13px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.32em; text-transform: uppercase; color: #fff; margin: 0;
+}
+.mlv-modal__x {
+  width: 30px; height: 30px; border: 1px solid rgba(255,255,255,0.12);
+  background: transparent; color: rgba(220, 200, 255, 0.7);
+  border-radius: 8px; cursor: pointer;
+}
+.mlv-modal__x:hover { background: color-mix(in srgb, var(--mode-a) 18%, transparent); color: #fff; }
+.mlv-modal__body { padding: 12px 16px; overflow-y: auto; flex: 1; }
+.mlv-modal__empty { padding: 30px 0; text-align: center; opacity: 0.55; font-size: 13px; }
+.mlv-modal__foot {
+  padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; justify-content: center;
+}
+.mlv-modal__cta {
+  padding: 10px 22px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--mode-a) 40%, transparent);
+  background: rgba(40, 24, 64, 0.7); color: #fff;
+  font: 500 10.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.3em; text-transform: uppercase; cursor: pointer;
+}
+.mlv-modal__cta:hover { background: rgba(70, 40, 110, 0.92); }
+.mlv-modal__danger {
+  padding: 9px 18px; border-radius: 999px;
+  border: 1px solid rgba(255, 90, 110, 0.4);
+  background: rgba(40, 12, 18, 0.6); color: rgba(255, 180, 190, 0.9);
+  font: 500 10px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.26em; text-transform: uppercase; cursor: pointer;
+}
+.mlv-modal__danger:hover { background: rgba(80, 18, 30, 0.78); color: #fff; }
+.mlv-chat-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px; border-radius: 10px; transition: background 0.18s ease;
+}
+.mlv-chat-row:hover { background: color-mix(in srgb, var(--mode-a) 8%, transparent); }
+.mlv-chat-row.is-current { background: color-mix(in srgb, var(--mode-a) 14%, transparent); }
+.mlv-chat-row__open {
+  flex: 1; text-align: left; background: transparent; border: 0;
+  padding: 8px 10px; cursor: pointer; color: inherit;
+}
+.mlv-chat-row__title { font-size: 13px; color: #fff; margin-bottom: 4px; }
+.mlv-chat-row__meta { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.55; }
+.mlv-chat-row__del {
+  width: 28px; height: 28px; background: transparent;
+  border: 1px solid rgba(255,255,255,0.1); color: rgba(220, 200, 255, 0.55);
+  border-radius: 8px; cursor: pointer; font-size: 11px;
+}
+.mlv-chat-row__del:hover { background: rgba(255, 80, 110, 0.18); color: #fff; border-color: rgba(255, 80, 110, 0.4); }
+.mlv-set-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 6px; border-bottom: 1px dashed rgba(255,255,255,0.06); font-size: 13px;
+}
+.mlv-set-row:last-child { border-bottom: 0; }
+.mlv-set-row__k { color: rgba(220, 200, 255, 0.75); font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; }
+.mlv-set-row__v { color: #fff; font-size: 12.5px; }
+.mlv-toggle {
+  width: 50px; padding: 4px 0; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(20, 14, 32, 0.55); color: rgba(220, 200, 255, 0.7);
+  border-radius: 999px; font: 500 9.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.32em; text-transform: uppercase; cursor: pointer;
+}
+.mlv-toggle.is-on {
+  background: color-mix(in srgb, var(--mode-a) 32%, transparent);
+  color: #fff; border-color: color-mix(in srgb, var(--mode-a) 55%, transparent);
+}
+.mlv-settings__note { margin-top: 18px; font-size: 12px; opacity: 0.55; font-style: italic; }
+
+/* ── Settings panel sections ────────────────────────────────────────── */
+.mlv-settings__section {
+  padding: 10px 0 18px;
+  border-bottom: 1px solid rgba(255, 100, 130, 0.1);
+  margin-bottom: 12px;
+}
 .mlv-settings__lbl {
   font: 500 10px/1 'Inter', system-ui, sans-serif;
-  letter-spacing: 0.34em;
-  text-transform: uppercase;
-  color: rgba(212, 168, 255, 0.7);
+  letter-spacing: 0.34em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--mode-a) 70%, white 30%);
   margin-bottom: 12px;
 }
 .mlv-settings__modes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px;
 }
 .mlv-settings__modes .mlv-mind {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px;
-  padding: 12px 8px;
-  border-radius: 12px;
+  gap: 4px; padding: 12px 8px; border-radius: 12px;
   background: linear-gradient(180deg, rgba(20, 12, 38, 0.55), rgba(8, 6, 18, 0.4));
-  border: 1px solid rgba(212, 168, 255, 0.18);
-  color: rgba(244, 235, 255, 0.7);
-  cursor: pointer;
-  transition: all 0.22s ease;
+  border: 1px solid rgba(255, 100, 130, 0.18);
+  color: rgba(244, 235, 255, 0.7); cursor: pointer; transition: all 0.22s ease;
 }
 .mlv-settings__modes .mlv-mind:hover {
   background: linear-gradient(180deg, rgba(40, 24, 70, 0.78), rgba(20, 12, 38, 0.6));
-  border-color: rgba(212, 168, 255, 0.55);
+  border-color: color-mix(in srgb, var(--mode-a) 55%, transparent);
 }
 .mlv-settings__modes .mlv-mind.is-active {
   background: linear-gradient(180deg, var(--mind-a, rgba(80, 50, 140, 0.85)), var(--mind-b, rgba(40, 24, 70, 0.85)));
-  border-color: var(--mind-a, #d4a8ff);
-  box-shadow: 0 0 22px var(--mind-a, #d4a8ff), inset 0 0 12px rgba(212, 168, 255, 0.18);
+  border-color: var(--mind-a, var(--mode-a));
+  box-shadow: 0 0 22px var(--mind-a, var(--mode-a)), inset 0 0 12px rgba(212, 168, 255, 0.18);
   color: #fff;
 }
 .mlv-settings__modes .mlv-mind__glyph { font-size: 22px; line-height: 1; }
 .mlv-settings__modes .mlv-mind__name { font: 500 10px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.2em; text-transform: uppercase; }
 .mlv-settings__hint { margin: 12px 0 0; font-size: 11px; color: rgba(244, 235, 255, 0.55); }
+.mlv-settings__pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.mlv-pill {
+  background: rgba(20, 6, 10, 0.55); border: 1px solid rgba(255, 100, 130, 0.22);
+  border-radius: 999px; padding: 7px 14px;
+  color: rgba(255, 220, 220, 0.78); font: 500 10.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.22em; text-transform: uppercase; cursor: pointer; transition: all 0.18s ease;
+}
+.mlv-pill:hover { border-color: color-mix(in srgb, var(--mode-a) 55%, transparent); color: #fff; }
+.mlv-pill.is-active {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mode-a) 40%, transparent), color-mix(in srgb, var(--mode-a) 18%, transparent));
+  border-color: color-mix(in srgb, var(--mode-a) 70%, transparent);
+  color: #fff; box-shadow: 0 0 14px color-mix(in srgb, var(--mode-a) 45%, transparent);
+}
 
-/* ================================================================
-   CONSENT GATE — MedhaConsentSlab
-   ================================================================ */
-.mcc-veil {
+/* ── Consent lock ────────────────────────────────────────────────────── */
+.mlv-consent-locked .mlv-thread,
+.mlv-consent-locked .mlv-composer,
+.mlv-consent-locked .mlv-settings-orb,
+.mlv-consent-locked .mlv-back,
+.mlv-consent-locked .mlv-orb-hit {
+  pointer-events: none; opacity: 0.18; filter: blur(2px);
+  transition: opacity 0.5s ease, filter 0.5s ease;
+}
+
+/* ── Hit area for opening history ───────────────────────────────────── */
+.mlv-orb-hit {
+  position: absolute; top: 50%; left: 50%;
+  width: 28vw; height: 60vh;
+  min-width: 200px; min-height: 280px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto; cursor: pointer; z-index: 4;
+}
+.mlv-orb-hit .mlv-orb-cue {
+  position: absolute; bottom: -10%; left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px; letter-spacing: 0.36em; text-transform: uppercase;
+  color: rgba(255, 130, 140, 0.65); white-space: nowrap;
+  animation: mlv-cue-breath 3.4s ease-in-out infinite;
+}
+
+/* ── Orb float wrap ─────────────────────────────────────────────────── */
+.mlv-orb-float-wrap {
   position: fixed; inset: 0;
-  z-index: 70;
-  background: radial-gradient(ellipse at center, rgba(8, 6, 18, 0.92), rgba(0, 0, 0, 0.98));
-  backdrop-filter: blur(16px);
   display: grid; place-items: center;
-  padding: 24px;
+  pointer-events: none; z-index: 1;
+  animation: mlv-orb-float 26s ease-in-out infinite;
+}
+.mlv-orb-float-wrap > canvas {
+  display: block;
+  filter: drop-shadow(0 0 24px color-mix(in srgb, var(--mode-a) 18%, transparent));
+}
+@keyframes mlv-orb-float {
+  0%   { transform: translate(0%, 0%) rotate(0deg); }
+  20%  { transform: translate(6%, -2%) rotate(0.4deg); }
+  40%  { transform: translate(-4%, 4%) rotate(-0.5deg); }
+  60%  { transform: translate(-7%, -3%) rotate(0.3deg); }
+  80%  { transform: translate(5%, 4%) rotate(-0.4deg); }
+  100% { transform: translate(0%, 0%) rotate(0deg); }
+}
+.mlv-orb-float-wrap.is-struck > canvas {
+  animation: mlv-orb-struck 0.9s ease-out;
+}
+@keyframes mlv-orb-struck {
+  0%   { transform: scale(1); filter: drop-shadow(0 0 24px color-mix(in srgb, var(--mode-a) 18%, transparent)) brightness(1); }
+  20%  { transform: scale(1.05); filter: drop-shadow(0 0 60px var(--mode-a)) brightness(1.55); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 24px color-mix(in srgb, var(--mode-a) 22%, transparent)) brightness(1); }
+}
+
+/* ── Markdown in dialogue ───────────────────────────────────────────── */
+.medha-md { color: rgba(232, 232, 240, 0.92); font-size: 14px; line-height: 1.7; }
+.medha-md .md-p { margin: 0 0 10px 0; }
+.medha-md .md-p:last-child { margin-bottom: 0; }
+.medha-md strong { color: #ffd9e4; font-weight: 600; }
+.medha-md em { color: rgba(216, 200, 255, 0.92); font-style: italic; }
+.medha-md code {
+  background: rgba(120, 80, 200, 0.18); border: 1px solid rgba(180, 130, 255, 0.18);
+  padding: 1px 6px; border-radius: 4px;
+  font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+}
+.medha-md .md-ul, .medha-md .md-ol { margin: 6px 0 10px 0; padding-left: 22px; }
+.medha-md .md-ul { list-style: none; padding-left: 4px; }
+.medha-md .md-ul li { position: relative; padding-left: 18px; margin-bottom: 3px; }
+.medha-md .md-ul li::before {
+  content: ''; position: absolute; left: 4px; top: 9px;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--mode-a), var(--mode-b));
+  box-shadow: 0 0 8px var(--mode-a);
+}
+.medha-md .md-h { margin: 12px 0 6px; color: #fff; }
+.medha-md .md-h1 { font-size: 17px; } .medha-md .md-h2 { font-size: 15px; } .medha-md .md-h3 { font-size: 13.5px; color: #ffd9e4; }
+.medha-md .md-quote {
+  margin: 10px 0; padding: 8px 12px;
+  border-left: 2px solid var(--mode-a);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mode-a) 12%, transparent), transparent);
+  font-style: italic;
+}
+.medha-md a.md-mail, .medha-md a.md-link { color: var(--mode-a); text-decoration: none; border-bottom: 1px dashed; }
+.medha-md a.md-mail:hover, .medha-md a.md-link:hover { color: #fff; border-color: #fff; }
+
+/* ── Canvas orb fills viewport behind UI ───────────────────────────── */
+.mlv-canvas-orb {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 1; pointer-events: none;
+}
+
+/* ── Edge swipe overlay (global) ────────────────────────────────────── */
+.edge-swipe-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 9990;
+  transition: opacity 0.1s ease;
+}
+
+/* ── Quota lock ──────────────────────────────────────────────────────── */
+.medha-quota-lock {
+  position: fixed; inset: 0; z-index: 300;
+  background: radial-gradient(ellipse at center, rgba(8, 6, 18, 0.92), rgba(0,0,0,0.98));
+  backdrop-filter: blur(16px); display: grid; place-items: center; padding: 24px;
+}
+.medha-quota-lock__card {
+  width: min(500px, 92vw); max-height: 90vh; overflow-y: auto;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(20, 8, 14, 0.94), rgba(8, 4, 6, 0.97));
+  border: 1px solid color-mix(in srgb, var(--mode-a) 40%, transparent);
+  box-shadow: 0 30px 80px rgba(80, 40, 180, 0.42), inset 0 0 22px color-mix(in srgb, var(--mode-a) 8%, transparent);
+  padding: 32px 30px 24px; color: rgba(244, 235, 255, 0.92);
+}
+.medha-quota-lock__kicker { font: 500 10px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.42em; text-transform: uppercase; color: color-mix(in srgb, var(--mode-a) 78%, transparent); margin-bottom: 8px; }
+.medha-quota-lock__title { margin: 0 0 12px; font: 500 22px/1.2 'Inter', system-ui, sans-serif; letter-spacing: 0.16em; text-transform: uppercase; color: #fff; }
+.medha-quota-lock__p { margin: 0 0 18px; font-size: 13.5px; line-height: 1.7; color: rgba(244, 235, 255, 0.72); }
+.medha-quota-lock__p strong { color: #fff; font-weight: 600; }
+.medha-quota-lock__form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.medha-quota-lock__form input {
+  background: rgba(10, 6, 22, 0.6); border: 1px solid color-mix(in srgb, var(--mode-a) 22%, transparent);
+  border-radius: 9px; padding: 10px 12px; color: rgba(244, 235, 255, 0.92);
+  font: 13px 'Inter', system-ui, sans-serif; outline: none;
+  transition: border-color 0.18s ease;
+}
+.medha-quota-lock__form input:focus { border-color: color-mix(in srgb, var(--mode-a) 65%, transparent); }
+.medha-quota-lock__err { background: rgba(255, 100, 130, 0.1); border: 1px solid rgba(255, 100, 130, 0.4); color: #ffc6c6; padding: 8px 12px; border-radius: 8px; font-size: 12px; }
+.medha-quota-lock__cta {
+  width: 100%; padding: 14px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--mode-a) 45%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mode-a) 65%, rgba(0,0,0,0)), color-mix(in srgb, var(--mode-a) 30%, rgba(0,0,0,0)));
+  color: #fff; font: 600 11.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.34em; text-transform: uppercase; cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.medha-quota-lock__cta:hover { transform: translateY(-1px); }
+.medha-quota-lock__cta:disabled { opacity: 0.5; cursor: not-allowed; }
+.medha-quota-lock__foot { margin: 14px 0 0; font-size: 10.5px; line-height: 1.6; color: rgba(220, 235, 255, 0.45); }
+
+/* ── Mobile ──────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .mlv-orb-wrap { width: 220px; height: 220px; }
+  .mlv-phase-sleeping .mlv-orb-wrap { width: 130px; height: 130px; }
+  .mlv-back { top: 58px; left: 14px; padding: 6px 11px; font-size: 9px; letter-spacing: 0.28em; }
+  .mlv-settings-orb { top: 62px; right: 14px; width: 34px; height: 34px; }
+  .mlv-settings-orb__glyph { font-size: 13px; }
+  .mlv-thread { right: 0; width: 24px; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); }
+  .mlv-composer { left: 12px; right: 36px; bottom: 12px; }
+  .mlv-composer__wrap { padding: 8px 10px; gap: 6px; }
+  .mlv-composer__bind { display: none; }
+  .mlv-composer__wrap textarea { font-size: 13px; }
+  .mlv-composer__mic,
+  .mlv-composer__send { width: 32px; height: 32px; }
+  .mlv-composer__count { right: 108px; }
+  .mlv-modal__inner { max-height: 86vh; }
+}
+
+/* ── Consent gate ────────────────────────────────────────────────────── */
+.mcc-veil {
+  position: fixed; inset: 0; z-index: 70;
+  background: radial-gradient(ellipse at center, rgba(8, 6, 18, 0.92), rgba(0,0,0,0.98));
+  backdrop-filter: blur(16px); display: grid; place-items: center; padding: 24px;
 }
 .mcc-card {
-  width: min(540px, 92vw);
-  max-height: 92vh;
-  overflow-y: auto;
+  width: min(540px, 92vw); max-height: 92vh; overflow-y: auto;
   border-radius: 20px;
   background: linear-gradient(180deg, rgba(20, 12, 38, 0.94), rgba(8, 6, 18, 0.96));
   border: 1px solid rgba(212, 168, 255, 0.4);
   box-shadow: 0 30px 80px rgba(80, 40, 180, 0.42), inset 0 0 22px rgba(212, 168, 255, 0.08);
-  padding: 32px 30px 24px;
-  color: rgba(244, 235, 255, 0.92);
+  padding: 32px 30px 24px; color: rgba(244, 235, 255, 0.92);
   animation: mcc-rise 0.5s cubic-bezier(0.23, 1, 0.32, 1);
 }
 @keyframes mcc-rise { from { opacity: 0; transform: translateY(20px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -923,48 +881,28 @@
 .mcc-field > span em { color: #ff8aa2; font-style: normal; }
 .mcc-opt { color: rgba(220, 235, 255, 0.35); font-style: italic; text-transform: none; letter-spacing: 0.04em; font-size: 9.5px; }
 .mcc-field input, .mcc-field textarea {
-  background: rgba(10, 6, 22, 0.6);
-  border: 1px solid rgba(212, 168, 255, 0.22);
-  border-radius: 9px;
-  padding: 10px 12px;
-  color: rgba(244, 235, 255, 0.92);
-  font: 13px 'Inter', system-ui, sans-serif;
-  outline: none;
+  background: rgba(10, 6, 22, 0.6); border: 1px solid rgba(212, 168, 255, 0.22);
+  border-radius: 9px; padding: 10px 12px; color: rgba(244, 235, 255, 0.92);
+  font: 13px 'Inter', system-ui, sans-serif; outline: none; resize: vertical;
   transition: border-color 0.18s ease, background 0.18s ease;
-  resize: vertical;
 }
 .mcc-field input:focus, .mcc-field textarea:focus {
-  border-color: rgba(212, 168, 255, 0.65);
-  background: rgba(30, 18, 52, 0.7);
+  border-color: rgba(212, 168, 255, 0.65); background: rgba(30, 18, 52, 0.7);
   box-shadow: 0 0 0 3px rgba(212, 168, 255, 0.1);
 }
 .mcc-agree {
   display: flex; align-items: flex-start; gap: 10px;
   font: 400 12px/1.6 'Inter', system-ui, sans-serif;
-  color: rgba(220, 235, 255, 0.72);
-  margin-bottom: 16px;
+  color: rgba(220, 235, 255, 0.72); margin-bottom: 16px;
 }
 .mcc-agree input { accent-color: #d4a8ff; transform: translateY(3px); }
-.mcc-err {
-  background: rgba(255, 100, 130, 0.1);
-  border: 1px solid rgba(255, 100, 130, 0.4);
-  color: #ffc6c6;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  margin-bottom: 12px;
-}
+.mcc-err { background: rgba(255, 100, 130, 0.1); border: 1px solid rgba(255, 100, 130, 0.4); color: #ffc6c6; padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; }
 .mcc-cta {
-  width: 100%;
-  padding: 14px;
-  border-radius: 12px;
+  width: 100%; padding: 14px; border-radius: 12px;
   border: 1px solid rgba(212, 168, 255, 0.45);
   background: linear-gradient(180deg, rgba(80, 40, 140, 0.85), rgba(40, 20, 70, 0.85));
-  color: #fff;
-  font: 600 11.5px/1 'Inter', system-ui, sans-serif;
-  letter-spacing: 0.34em;
-  text-transform: uppercase;
-  cursor: pointer;
+  color: #fff; font: 600 11.5px/1 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.34em; text-transform: uppercase; cursor: pointer;
   box-shadow: 0 0 22px rgba(176, 112, 255, 0.42), inset 0 0 12px rgba(212, 168, 255, 0.18);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
@@ -972,344 +910,8 @@
 .mcc-cta:disabled { opacity: 0.5; cursor: not-allowed; }
 .mcc-foot { margin: 14px 0 0; font-size: 10.5px; line-height: 1.6; color: rgba(220, 235, 255, 0.45); }
 .mcc-foot em { color: #d4a8ff; font-style: normal; }
-
 @media (max-width: 640px) {
   .mcc-card { padding: 24px 20px; }
   .mcc-title { font-size: 18px; }
   .mcc-grid { grid-template-columns: 1fr; }
-}
-
-/* ================================================================
-   BATCH 4 OVERRIDES — red theme + floating Buddha + side-panel +
-   right-edge vertical rail + hover-slabs + redesigned settings orb
-   + thunderbolt-from-pill + composer attach button.
-   ================================================================ */
-
-/* ---- RED THEME (purple → red, matching Shunya orbs) ---- */
-.mlv {
-  --mode-a: #ff5a7a !important;     /* primary ember-red */
-  --mode-b: #ff8a5a !important;     /* warm coral */
-}
-.mlv[data-mode="prajna"]   { --mode-a: #ff4a4a !important; --mode-b: #ff8a5a !important; }
-.mlv[data-mode="dhyana"]   { --mode-a: #ff5e90 !important; --mode-b: #ff9a7a !important; }
-.mlv[data-mode="akshaya"]  { --mode-a: #ff7050 !important; --mode-b: #ffb070 !important; }
-.mlv[data-mode="java"]     { --mode-a: #ff3a5a !important; --mode-b: #ff6a40 !important; }
-.mlv[data-mode="sanchara"] { --mode-a: #ff4060 !important; --mode-b: #ff7080 !important; }
-
-/* Override mode-pill native colours so settings panel pills render red. */
-.mlv .mlv-mind {
-  --mind-a: var(--mode-a) !important;
-  --mind-b: var(--mode-b) !important;
-}
-.mlv .mlv-medha-dialog {
-  background: linear-gradient(180deg, rgba(36, 8, 12, 0.78), rgba(20, 4, 6, 0.86)) !important;
-  border-color: rgba(255, 100, 130, 0.42) !important;
-  box-shadow: 0 0 36px rgba(255, 90, 122, 0.32), inset 0 0 18px rgba(255, 138, 138, 0.08), 0 12px 36px rgba(0,0,0,0.6) !important;
-}
-.mlv .mlv-medha-dialog__meta { color: rgba(255, 180, 180, 0.7) !important; }
-.mlv .mlv-back { color: rgba(255, 200, 200, 0.78) !important; border-color: rgba(255, 100, 130, 0.32) !important; }
-.mlv .mlv-back:hover { background: rgba(80, 24, 30, 0.55) !important; color: #fff !important; }
-
-/* ---- FLOATING BUDDHA WRAPPER ---- */
-.mlv-orb-float-wrap {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  z-index: 1;
-  animation: mlv-orb-float 26s ease-in-out infinite;
-}
-.mlv-orb-float-wrap > canvas {
-  display: block;
-  /* The inner canvas already renders at ~half viewport; the wrapper drifts it. */
-  filter: drop-shadow(0 0 24px rgba(255, 100, 130, 0.18));
-}
-@keyframes mlv-orb-float {
-  0%   { transform: translate(0%, 0%) rotate(0deg); }
-  20%  { transform: translate(6%, -2%) rotate(0.4deg); }
-  40%  { transform: translate(-4%, 4%) rotate(-0.5deg); }
-  60%  { transform: translate(-7%, -3%) rotate(0.3deg); }
-  80%  { transform: translate(5%, 4%) rotate(-0.4deg); }
-  100% { transform: translate(0%, 0%) rotate(0deg); }
-}
-/* When mode switches, Medhā subtly pulses (thunderbolt impact). */
-.mlv .mlv-orb-float-wrap { transition: filter 0.6s ease; }
-.mlv-orb-float-wrap.is-struck > canvas { animation: mlv-orb-struck 0.9s ease-out; }
-@keyframes mlv-orb-struck {
-  0%   { transform: scale(1); filter: drop-shadow(0 0 24px rgba(255, 100, 130, 0.18)) brightness(1); }
-  20%  { transform: scale(1.05); filter: drop-shadow(0 0 60px var(--mode-a)) brightness(1.55); }
-  100% { transform: scale(1); filter: drop-shadow(0 0 24px rgba(255, 100, 130, 0.22)) brightness(1); }
-}
-
-/* Hide the old (now obsolete) center "presence stirs" cue glow ring. */
-.mlv-orb-hit { z-index: 5 !important; }
-
-/* ---- VERTICAL RIGHT-EDGE USER RAIL ---- */
-.mlv .mlv-thread,
-.mlv .mlv-thread--user-only {
-  position: fixed !important;
-  top: 80px !important;
-  right: 0px !important;          /* EXTREME RIGHT EDGE per user spec */
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 110px) !important;
-  left: auto !important;
-  width: 28px !important;
-  padding-right: 6px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  z-index: 16 !important;
-  pointer-events: auto !important;
-}
-.mlv .mlv-thread__line {
-  position: absolute !important;
-  top: 0; bottom: 0;
-  left: 50%;
-  width: 1px !important;
-  transform: translateX(-50%) !important;
-  background: linear-gradient(180deg, rgba(255, 138, 138, 0.04), rgba(255, 90, 122, 0.45), rgba(255, 138, 138, 0.04)) !important;
-  box-shadow: 0 0 8px rgba(255, 90, 122, 0.28);
-}
-.mlv .mlv-thread__dots {
-  position: relative !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  gap: 10px !important;
-  padding-top: 8px !important;
-  overflow-y: auto !important;
-  max-height: 100% !important;
-  scrollbar-width: none !important;
-}
-.mlv .mlv-thread__dots::-webkit-scrollbar { display: none; }
-.mlv .mlv-dot--user {
-  position: relative !important;
-  width: 9px !important; height: 9px !important;
-  border-radius: 50% !important;
-  background: radial-gradient(circle, var(--mode-a, #ff5a7a) 0%, rgba(255, 90, 122, 0) 70%) !important;
-  border: 1px solid rgba(255, 180, 180, 0.55) !important;
-  box-shadow: 0 0 8px rgba(255, 90, 122, 0.55) !important;
-  transition: transform 0.22s ease, box-shadow 0.22s ease !important;
-}
-.mlv .mlv-dot--user:hover,
-.mlv .mlv-dot--user.is-glow {
-  transform: scale(1.6) !important;
-  box-shadow: 0 0 18px rgba(255, 90, 122, 0.9), 0 0 36px rgba(255, 138, 138, 0.5) !important;
-}
-.mlv .mlv-thread__pending {
-  width: 9px; height: 9px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255, 138, 138, 0.4);
-  border-top-color: var(--mode-a, #ff5a7a);
-  animation: mlv-spin 0.85s linear infinite;
-  margin-top: 6px;
-}
-@keyframes mlv-spin { to { transform: rotate(360deg); } }
-
-/* ---- HOVER GLASS-SLAB for the user dot ----
-   Renders the message text in a temporary slab to the LEFT of the rail.
-   Click pins it via mlv-dot stickyDot state (existing react logic). */
-.mlv .mlv-dot--user::after {
-  content: attr(data-msg);
-  position: absolute;
-  right: 22px;
-  top: 50%;
-  transform: translateY(-50%) translateX(8px);
-  width: 240px;
-  max-width: calc(100vw - 80px);
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(36, 8, 12, 0.94), rgba(20, 4, 6, 0.94));
-  border: 1px solid rgba(255, 100, 130, 0.32);
-  color: rgba(255, 230, 220, 0.92);
-  font: 400 12px/1.5 'Inter', system-ui, sans-serif;
-  letter-spacing: 0.02em;
-  text-align: left;
-  text-transform: none;
-  white-space: normal;
-  word-break: break-word;
-  opacity: 0;
-  pointer-events: none;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
-  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.23, 1, 0.32, 1);
-  z-index: 18;
-}
-.mlv .mlv-dot--user:hover::after,
-.mlv .mlv-dot--user.is-glow::after {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0);
-}
-
-/* ---- SETTINGS as SIDE PANEL (slide in from the LEFT) ---- */
-.mlv-modal.mlv-modal--side {
-  background: linear-gradient(90deg, rgba(8, 4, 6, 0.74) 0%, rgba(0,0,0,0) 50%) !important;
-  backdrop-filter: blur(4px) !important;
-  justify-items: start !important;
-  align-items: stretch !important;
-  display: flex !important;
-}
-.mlv-modal__inner--side {
-  width: min(440px, 92vw) !important;
-  height: 100vh !important;
-  border-radius: 0 18px 18px 0 !important;
-  margin: 0 !important;
-  border-left: none !important;
-  border-color: rgba(255, 100, 130, 0.32) !important;
-  animation: mlv-side-in 0.42s cubic-bezier(0.23, 1, 0.32, 1) !important;
-  background: linear-gradient(180deg, rgba(28, 8, 12, 0.94), rgba(12, 4, 6, 0.97)) !important;
-  box-shadow: 8px 0 40px rgba(0, 0, 0, 0.6), 0 0 60px rgba(255, 90, 122, 0.12) !important;
-}
-@keyframes mlv-side-in { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-/* Pills used by tone / length / model picker inside settings. */
-.mlv .mlv-settings__pills { display: flex; gap: 6px; flex-wrap: wrap; }
-.mlv .mlv-pill {
-  background: rgba(20, 6, 10, 0.55);
-  border: 1px solid rgba(255, 100, 130, 0.22);
-  border-radius: 999px;
-  padding: 7px 14px;
-  color: rgba(255, 220, 220, 0.78);
-  font: 500 10.5px/1 'Inter', system-ui, sans-serif;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-.mlv .mlv-pill:hover { border-color: rgba(255, 138, 138, 0.55); color: #fff; }
-.mlv .mlv-pill.is-active {
-  background: linear-gradient(180deg, rgba(255, 90, 122, 0.4), rgba(255, 90, 122, 0.18));
-  border-color: rgba(255, 138, 138, 0.7);
-  color: #fff;
-  box-shadow: 0 0 14px rgba(255, 90, 122, 0.45);
-}
-
-/* ---- ENVELOPED SETTINGS ORB — redesigned creative glyph ---- */
-.mlv .mlv-settings-orb {
-  background:
-    radial-gradient(circle at 30% 28%, rgba(255, 220, 200, 0.34), rgba(40, 6, 10, 0.94) 60%) !important;
-  border-color: rgba(255, 138, 138, 0.6) !important;
-  box-shadow:
-    0 0 22px rgba(255, 90, 122, 0.55),
-    inset 0 0 14px rgba(255, 180, 180, 0.2) !important;
-}
-.mlv .mlv-settings-orb__ring { border-color: rgba(255, 138, 138, 0.55) !important; }
-.mlv .mlv-settings-orb__core { background: radial-gradient(circle, rgba(255, 138, 138, 0.5) 0%, transparent 70%) !important; }
-.mlv .mlv-settings-orb__glyph {
-  /* Replace the gear with a custom sacred-geometry glyph (six-petalled bindu) */
-  font-family: inherit !important;
-  font-size: 0 !important;
-}
-.mlv .mlv-settings-orb__glyph::before,
-.mlv .mlv-settings-orb__glyph::after {
-  content: '';
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-.mlv .mlv-settings-orb__glyph::before {
-  background: conic-gradient(from 0deg, #ffb0b0, #ff5a7a, #ffb0b0, #ff5a7a, #ffb0b0);
-  filter: blur(2.5px);
-  opacity: 0.85;
-  animation: mlv-set-conic 6s linear infinite;
-}
-.mlv .mlv-settings-orb__glyph::after {
-  width: 6px; height: 6px;
-  background: #fff;
-  box-shadow: 0 0 10px rgba(255, 230, 230, 0.9), 0 0 22px rgba(255, 138, 138, 0.65);
-}
-@keyframes mlv-set-conic { to { transform: translate(-50%, -50%) rotate(360deg); } }
-
-/* ---- THUNDERBOLT FROM PILL → ORB ----
-   Uses --mlv-zap-x / --mlv-zap-y (set in JS from getBoundingClientRect) for
-   the origin. The bolt SVG covers the full viewport; we overlay a CSS-only
-   "spark + jagged line" that originates at the pill and converges on the
-   centre (where Medhā floats). */
-.mlv .mlv-electric-link {
-  /* keep the SVG element but visually deemphasise — we add a precise
-     CSS-line overlay below */
-  opacity: 0.4 !important;
-}
-.mlv .mlv-electric-link::before {
-  content: '';
-  position: fixed;
-  left: var(--mlv-zap-x, 50%);
-  top:  var(--mlv-zap-y, 50%);
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow:
-    0 0 14px var(--mode-a, #ff5a7a),
-    0 0 30px var(--mode-a, #ff5a7a),
-    0 0 60px var(--mode-b, #ff8a5a);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 28;
-  animation: mlv-spark 0.85s ease-out forwards;
-}
-@keyframes mlv-spark {
-  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
-  15%  { transform: translate(-50%, -50%) scale(1.6); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
-}
-
-/* ---- COMPOSER · attach button ---- */
-.mlv .mlv-composer__attach {
-  background: transparent;
-  border: 1px solid rgba(255, 138, 138, 0.32);
-  border-radius: 50%;
-  width: 30px; height: 30px;
-  display: grid; place-items: center;
-  color: rgba(255, 220, 220, 0.78);
-  cursor: pointer;
-  transition: all 0.18s ease;
-  margin-right: 4px;
-}
-.mlv .mlv-composer__attach:hover {
-  border-color: rgba(255, 138, 138, 0.7);
-  color: #fff;
-  background: rgba(80, 24, 30, 0.4);
-  box-shadow: 0 0 12px rgba(255, 90, 122, 0.4);
-}
-
-/* Composer count repositioning so the new attach button fits. */
-.mlv-composer__count { right: 130px !important; }
-@media (max-width: 767px) {
-  .mlv-composer__count { right: 108px !important; }
-}
-
-/* Settings orb \u2014 nudge so it doesn't collide with the right rail or footer. */
-.mlv .mlv-settings-orb { left: auto !important; right: 22px !important; bottom: 110px !important; }
-@media (max-width: 767px) {
-  .mlv .mlv-settings-orb { right: 14px !important; bottom: 96px !important; }
-}
-
-/* Move Shunya back button to clear the acoustic console (also top-left). */
-.mlv .mlv-back {
-  top: 70px !important;
-  left: 22px !important;
-  z-index: 20 !important;
-  background: linear-gradient(180deg, rgba(36, 8, 12, 0.7), rgba(20, 4, 6, 0.55)) !important;
-  border: 1px solid rgba(255, 138, 138, 0.4) !important;
-  border-radius: 999px !important;
-  padding: 7px 14px !important;
-  font: 500 10.5px/1 'Inter', system-ui, sans-serif !important;
-  letter-spacing: 0.34em !important;
-  text-transform: uppercase !important;
-  color: rgba(255, 220, 220, 0.92) !important;
-  backdrop-filter: blur(8px) !important;
-  box-shadow: 0 0 14px rgba(255, 90, 122, 0.32) !important;
-  cursor: pointer !important;
-}
-.mlv .mlv-back:hover {
-  background: linear-gradient(180deg, rgba(80, 24, 30, 0.85), rgba(40, 12, 16, 0.75)) !important;
-  border-color: rgba(255, 138, 138, 0.78) !important;
-  box-shadow: 0 0 22px rgba(255, 90, 122, 0.55) !important;
-}
-@media (max-width: 767px) {
-  .mlv .mlv-back { top: 58px !important; left: 14px !important; padding: 6px 11px !important; font-size: 9px !important; letter-spacing: 0.28em !important; }
 }

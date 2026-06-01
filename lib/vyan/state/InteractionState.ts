@@ -1,41 +1,38 @@
 // ============================================================
 // VYAN · InteractionState
 // Single source of truth for the in-place orb-expansion architecture.
-// Replaces the old realm-switching (vistara / medha modes) — the camera
-// stays in Shunya throughout. URL routes /medha and /vistara/<product>
-// are now deep links that set this state and trigger orb expansion.
 // ============================================================
 
 export type InteractionTarget = 'medha' | 'vistara' | null;
 
 export type InteractionPhase =
-  | 'dormant'     // no orb expanded
-  | 'unfolding'   // 0..1 expansion in progress
-  | 'expanded'    // fully open, persistent
-  | 'folding';    // 1..0 retraction
+  | 'dormant'
+  | 'unfolding'
+  | 'expanded'
+  | 'folding';
 
 export type SignalState =
-  | 'idle'         // weak dormant pulses
-  | 'hover'        // localised brighten near pointer
-  | 'interaction'  // user typed / clicked something inside
-  | 'listening'    // STT / awaiting input
-  | 'processing'   // backend call in flight
-  | 'response'     // streaming a reply
-  | 'decay';       // calming back to idle
+  | 'idle'
+  | 'hover'
+  | 'interaction'
+  | 'listening'
+  | 'processing'
+  | 'response'
+  | 'decay';
 
 export type Spectrum =
-  | 'crimson'    // ember-red (Prājña / Ṛtam)
-  | 'gold'       // sunshine (Dhyāna / Ojas)
-  | 'deepBlue'   // sapphire (Akṣaya / Mudrā)
-  | 'cyan'       // teal (Javā / Netra)
-  | 'darkViolet' // amethyst (Sañcāra / Ākṛti)
-  | 'hybrid';    // multi-stop (Sūtra)
+  | 'crimson'
+  | 'gold'
+  | 'deepBlue'
+  | 'cyan'
+  | 'darkViolet'
+  | 'hybrid';
 
 export type InteractionSnapshot = {
   target: InteractionTarget;
   phase: InteractionPhase;
-  progress: number;        // 0..1 — drives shaders + react UI
-  node: string | null;     // Vistāra branch-intersection id (e.g. 'ritam', 'netra')
+  progress: number;
+  node: string | null;
   signal: SignalState;
   spectrum: Spectrum;
 };
@@ -49,7 +46,6 @@ export const SPECTRUM_HEX: Record<Spectrum, { lo: string; hi: string }> = {
   hybrid:     { lo: '#220a4a', hi: '#ffd070' },
 };
 
-// Mode / product → spectrum mapping (from blueprint).
 export const COGNITIVE_SPECTRUM: Record<string, Spectrum> = {
   prajna:   'crimson',
   dhyana:   'gold',
@@ -57,6 +53,7 @@ export const COGNITIVE_SPECTRUM: Record<string, Spectrum> = {
   java:     'cyan',
   sanchara: 'darkViolet',
 };
+
 export const VISTARA_SPECTRUM: Record<string, Spectrum> = {
   ritam:    'crimson',
   ojas:     'gold',
@@ -94,10 +91,8 @@ class InteractionStore {
 
   private emit() { for (const fn of this.listeners) fn(this.get()); }
 
-  /** Expand a target orb. If another is open, fold it first via setTimeout chain. */
   expand(target: NonNullable<InteractionTarget>, node: string | null = null, spectrum?: Spectrum) {
     if (this.state.target && this.state.target !== target) {
-      // collapse current then expand new
       this.fold();
       window.setTimeout(() => this.expand(target, node, spectrum), this.animDuration + 80);
       return;
@@ -107,12 +102,19 @@ class InteractionStore {
     this.state.signal = 'interaction';
     if (spectrum) this.state.spectrum = spectrum;
     this.startTween(this.state.progress, 1, 1200, 'unfolding', 'expanded');
+
+    // Bridge: tell CameraRig to begin orb-expansion fly-in
+    this.triggerCameraExpansion(target);
   }
 
-  /** Collapse the currently expanded orb back to dormant. */
   fold() {
     if (!this.state.target) return;
     this.state.signal = 'decay';
+
+    // Bridge: tell CameraRig to return to orbital BEFORE folding
+    // so the animation plays while the orb contracts
+    this.triggerCameraReturn();
+
     this.startTween(this.state.progress, 0, 900, 'folding', 'dormant', () => {
       this.state.target = null;
       this.state.node = null;
@@ -121,14 +123,29 @@ class InteractionStore {
     });
   }
 
-  /** Set a child node within the currently-expanded orb (Vistāra product selection). */
+  /**
+   * Close the current expanded state WITHOUT triggering any camera movement
+   * or re-navigation. Used when the user closes a Vistāra product panel via
+   * outside-click — camera is already in the right place, no movement needed.
+   * This fixes the bug where closing a panel caused the camera to travel
+   * through Udbhava before landing back on Vistāra.
+   */
+  closeWithoutNavigation() {
+    if (!this.state.target) return;
+    this.state.signal = 'decay';
+    // Return camera to orb-full view (not all the way to orbital)
+    this.triggerCameraToOrbFull();
+    this.startTween(this.state.progress, 1, 600, 'expanded', 'expanded');
+    this.state.node = null;
+    this.emit();
+  }
+
   setNode(node: string | null, spectrum?: Spectrum) {
     this.state.node = node;
     if (spectrum) this.state.spectrum = spectrum;
     this.emit();
   }
 
-  /** Set the live signal state (driven by hover / typing / processing / streaming). */
   setSignal(s: SignalState) {
     if (this.state.signal === s) return;
     this.state.signal = s;
@@ -141,7 +158,39 @@ class InteractionStore {
     this.emit();
   }
 
-  private startTween(from: number, to: number, ms: number, midPhase: InteractionPhase, endPhase: InteractionPhase, onEnd?: () => void) {
+  // ── Camera bridge helpers ──────────────────────────────────────────────────
+  private triggerCameraExpansion(target: NonNullable<InteractionTarget>) {
+    try {
+      const vyan: any = (window as any).__vyan;
+      const orb = vyan?.worldRef?.realms?.shunya?.getOrbByKey?.(target);
+      if (!orb) return;
+      const orbPos = orb.group.position.clone();
+      vyan.worldRef.cameraRig?.beginOrbExpansion?.(orbPos);
+    } catch {}
+  }
+
+  private triggerCameraReturn() {
+    try {
+      const vyan: any = (window as any).__vyan;
+      vyan?.worldRef?.cameraRig?.returnToOrbital?.();
+    } catch {}
+  }
+
+  private triggerCameraToOrbFull() {
+    try {
+      const vyan: any = (window as any).__vyan;
+      const rig = vyan?.worldRef?.cameraRig;
+      if (rig && typeof rig.returnToOrbFull === 'function') {
+        rig.returnToOrbFull();
+      }
+    } catch {}
+  }
+
+  private startTween(
+    from: number, to: number, ms: number,
+    midPhase: InteractionPhase, endPhase: InteractionPhase,
+    onEnd?: () => void,
+  ) {
     if (this.animFrame) cancelAnimationFrame(this.animFrame);
     this.animFrom = from; this.animTo = to;
     this.animStart = performance.now();
@@ -152,8 +201,9 @@ class InteractionStore {
       const t = Math.min(1, (performance.now() - this.animStart) / this.animDuration);
       this.state.progress = this.animFrom + (this.animTo - this.animFrom) * ease(t);
       this.emit();
-      if (t < 1) { this.animFrame = requestAnimationFrame(step); }
-      else {
+      if (t < 1) {
+        this.animFrame = requestAnimationFrame(step);
+      } else {
         this.animFrame = null;
         this.state.phase = endPhase;
         this.state.progress = this.animTo;
@@ -171,7 +221,6 @@ export function getInteractionStore(): InteractionStore {
   return _store;
 }
 
-// Browser-only helper to mirror state on window for debugging.
 if (typeof window !== 'undefined') {
   (window as any).__vyanIX = getInteractionStore();
 }

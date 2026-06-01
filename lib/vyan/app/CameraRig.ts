@@ -11,6 +11,22 @@ type Deps = {
 
 export type CameraMode = 'gateway' | 'shunya' | 'vistara';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Orb-expansion state machine
+// When a Vistāra or Medhā orb expands, the camera dollies toward the orb
+// centre and the FOV tightens so the orb fills ~85% of the viewport.
+// When a subnode is clicked, the camera flies to that node position and hovers
+// for HOVER_DWELL_MS before the panel emerges. On panel close the camera
+// springs back to the pre-expansion orbital position.
+// ─────────────────────────────────────────────────────────────────────────────
+type FlyPhase =
+  | 'orbital'       // normal path-following
+  | 'expanding'     // orb growing to fill screen
+  | 'orb-full'      // orb fills screen, nodes visible
+  | 'flying-node'   // camera flying to selected node
+  | 'hover-node'    // camera hovering at node (panel about to open)
+  | 'returning';    // camera returning to orbital after panel close
+
 export class CameraRig {
   private deps!: Deps;
   private offset = new THREE.Vector3();
@@ -26,18 +42,47 @@ export class CameraRig {
   private arrivalSpring = new SpringV3();
   private arrivalActive = false;
 
-  // PHASE 6 — cinematic Vistāra node-change "fly-over".
-  // When the active socket key changes while target = 'vistara', we kick a
-  // transient FOV "punch" (38 → 30 → 38) over ~0.9s and momentarily boost the
-  // look-at lerp toward the new socket, so the camera *swings* to face it.
+  // ── Expansion / fly-to-node state ──────────────────────────────────────────
+  private flyPhase: FlyPhase = 'orbital';
+  private flyTarget = new THREE.Vector3();        // world pos of the selected node
+  private flyOrbCenter = new THREE.Vector3();     // world pos of the expanded orb
+  private preExpansionPos = new THREE.Vector3();  // camera pos before expansion began
+  private preExpansionLook = new THREE.Vector3(); // look-at before expansion
+  private hoverStartAt = 0;                       // performance.now() when hover began
+  private onHoverComplete: (() => void) | null = null;
+  private flySpring = new SpringV3();
+  private flyLookSpring = new SpringV3();
+  private currentFlyPos = new THREE.Vector3();
+  private currentFlyLook = new THREE.Vector3();
+
+  // ── Vistāra node-change cinematic (preserved from Phase 8) ─────────────────
   private lastNodeKey: string | null = null;
   private nodeChangeAt: number = 0;
-  private nodeChangeDur: number = 900; // ms
+  private readonly nodeChangeDur: number = 900;
 
-  /** Public: called when route changes to a new Vistāra product to trigger the cinematic. */
+  /** Called by CosmicCanvas when route changes to a new Vistāra product. */
   public pulseNodeChange() {
     this.nodeChangeAt = performance.now();
   }
+
+  // ── Constants ───────────────────────────────────────────────────────────────
+  // How long the camera hovers at the node before signalling panel-open (ms).
+  private static readonly HOVER_DWELL_MS = 1400;
+  // How close the camera gets to the orb centre when fully expanded (units from orb).
+  private static readonly EXPAND_DIST = 14;
+  // How far the camera sits from a node when flying to it.
+  private static readonly NODE_FLY_DIST = 8;
+  // Spring params for expansion fly-in (confident, arrogant feel).
+  private static readonly EXP_STIFFNESS = 5.0;
+  private static readonly EXP_DAMPING   = 3.2;
+  // Spring params for node fly-to (decisive).
+  private static readonly NODE_STIFFNESS = 7.0;
+  private static readonly NODE_DAMPING   = 3.8;
+  // Spring params for return-to-orbital (smooth, unhurried).
+  private static readonly RET_STIFFNESS  = 4.5;
+  private static readonly RET_DAMPING    = 3.0;
+
+  public locked = false;
 
   constructor(private camera: THREE.PerspectiveCamera) {}
 
@@ -50,22 +95,29 @@ export class CameraRig {
   setMode(mode: CameraMode) {
     this.mode = mode;
     this.locked = false;
+    this.flyPhase = 'orbital';
     this.posSpring.reset();
     this.lookSpring.reset();
+    this.flySpring.reset();
+    this.flyLookSpring.reset();
     if (mode === 'shunya') {
       const p = this.shunyaPath.cameraAt(0);
       this.camera.position.copy(p);
       this.currentCamPos.copy(p);
+      this.currentFlyPos.copy(p);
       this.camera.fov = 38;
       this.camera.updateProjectionMatrix();
       this.currentLookAt.copy(SHUNYA_ORBS[0].position);
+      this.currentFlyLook.copy(SHUNYA_ORBS[0].position);
     } else if (mode === 'vistara') {
       const p = this.vistaraPath.cameraAt(0);
       this.camera.position.copy(p);
       this.currentCamPos.copy(p);
+      this.currentFlyPos.copy(p);
       this.camera.fov = 38;
       this.camera.updateProjectionMatrix();
       this.currentLookAt.copy(VISTARA_PRODUCTS[0].position);
+      this.currentFlyLook.copy(VISTARA_PRODUCTS[0].position);
     } else {
       this.camera.position.set(0, 0, 280);
       this.camera.fov = 38;
@@ -75,11 +127,7 @@ export class CameraRig {
 
   getMode() { return this.mode; }
 
-  /**
-   * Snap the camera + look-target instantly to a specific Shunya orb.
-   * Called on deep-link entry so the user doesn't watch the camera
-   * spring 200+ units across the void — they arrive parked on the orb.
-   */
+  // ── Snap methods (deep-link entry) ──────────────────────────────────────────
   snapToShunyaOrb(idx: number) {
     const total = SHUNYA_ORBS.length;
     const safe = ((idx % total) + total) % total;
@@ -87,12 +135,19 @@ export class CameraRig {
     if (!orb) return;
     const target = orb.position.clone();
     this.currentLookAt.copy(target);
-    this.currentCamPos.copy(target).add(new THREE.Vector3(0, 3, 26));
-    this.camera.position.copy(this.currentCamPos);
+    this.currentFlyLook.copy(target);
+    const pos = target.clone().add(new THREE.Vector3(0, 3, 26));
+    this.currentCamPos.copy(pos);
+    this.currentFlyPos.copy(pos);
+    this.camera.position.copy(pos);
     this.camera.lookAt(this.currentLookAt);
     this.posSpring.reset();
     this.lookSpring.reset();
+    this.flySpring.reset();
+    this.flyLookSpring.reset();
+    this.flyPhase = 'orbital';
   }
+
   snapToVistaraProduct(idx: number) {
     const total = VISTARA_PRODUCTS.length;
     const safe = ((idx % total) + total) % total;
@@ -100,28 +155,67 @@ export class CameraRig {
     if (!p) return;
     const target = p.position.clone();
     this.currentLookAt.copy(target);
-    this.currentCamPos.copy(target).add(new THREE.Vector3(0, 3, 26));
-    this.camera.position.copy(this.currentCamPos);
+    this.currentFlyLook.copy(target);
+    const pos = target.clone().add(new THREE.Vector3(0, 3, 26));
+    this.currentCamPos.copy(pos);
+    this.currentFlyPos.copy(pos);
+    this.camera.position.copy(pos);
     this.camera.lookAt(this.currentLookAt);
     this.posSpring.reset();
     this.lookSpring.reset();
+    this.flyPhase = 'orbital';
   }
 
-  /**
-   * Cinematic arrival — camera springs in from an off-axis offset.
-   * Called by ShunyaRealm.onEnter to give the camera an "arrogant" entrance.
-   */
+  // ── Cinematic arrival (ShunyaRealm.onEnter) ─────────────────────────────────
   triggerArrival() {
-    // Magnitude 5 — enough to feel like a non-linear drift-in but small
-    // enough that the focused orb stays well within the frame the whole time.
     this.arrivalOffset.copy(randomArrivalOffset(5));
     this.arrivalSpring.reset();
     this.arrivalSpring.velocity.copy(this.arrivalOffset.clone().multiplyScalar(-0.4));
     this.arrivalActive = true;
   }
 
-  public locked = false;
+  // ── Orb expansion: camera dollies toward orb until it fills screen ──────────
+  /**
+   * Call this when Vistāra or Medhā orb is clicked.
+   * orbWorldPos: the live world position of the orb.
+   */
+  beginOrbExpansion(orbWorldPos: THREE.Vector3) {
+    if (this.flyPhase !== 'orbital') return;
+    this.preExpansionPos.copy(this.camera.position);
+    this.preExpansionLook.copy(this.currentLookAt);
+    this.flyOrbCenter.copy(orbWorldPos);
+    this.flyPhase = 'expanding';
+    this.currentFlyPos.copy(this.camera.position);
+    this.currentFlyLook.copy(this.currentLookAt);
+    this.flySpring.reset();
+    this.flyLookSpring.reset();
+  }
 
+  // ── Node fly-to: camera flies from orb-fill view toward selected node ───────
+  /**
+   * Call this when a subnode is clicked.
+   * nodeWorldPos: world position of the clicked node.
+   * onHoverComplete: called after HOVER_DWELL_MS hover — panel should open then.
+   */
+  flyToNode(nodeWorldPos: THREE.Vector3, onHoverComplete: () => void) {
+    if (this.flyPhase !== 'orb-full' && this.flyPhase !== 'hover-node') return;
+    this.flyTarget.copy(nodeWorldPos);
+    this.onHoverComplete = onHoverComplete;
+    this.flyPhase = 'flying-node';
+    this.flySpring.reset();
+    this.flyLookSpring.reset();
+  }
+
+  // ── Return to orbital view (panel close) ─────────────────────────────────────
+  returnToOrbital() {
+    if (this.flyPhase === 'orbital') return;
+    this.flyPhase = 'returning';
+    this.flySpring.reset();
+    this.flyLookSpring.reset();
+    this.onHoverComplete = null;
+  }
+
+  // ── Main update ─────────────────────────────────────────────────────────────
   update(dt: number) {
     if (this.locked) return;
     if (this.mode === 'shunya') {
@@ -135,18 +229,13 @@ export class CameraRig {
     this.updateGateway(dt);
   }
 
+  // ── Gateway mode ─────────────────────────────────────────────────────────────
   private updateGateway(dt: number) {
     const px = this.deps.interaction.pointer.x;
     const py = this.deps.interaction.pointer.y;
     const t = performance.now() * 0.001;
-
-    // ORIGINAL gateway fly-in (per user request, restored from canonical zip):
-    // Camera lerps from z=280 (Vy\u014dma is a distant glint) \u2192 z=26 (full Vy\u014dma
-    // mesh fills the frame, ready for "Initiate Displacement").
-    // Drive: realms.activeApproach (0..1) derived from scroll progress.
     const p = (this.deps.realms as any).activeApproach ?? 0;
     const z = THREE.MathUtils.lerp(280, 26, p);
-
     this.targetOffset.set(
       px * 1.8 + Math.sin(t * 0.4) * 0.8,
       py * 1.1 + Math.cos(t * 0.3) * 0.8,
@@ -159,20 +248,77 @@ export class CameraRig {
     this.camera.updateProjectionMatrix();
   }
 
+  // ── Void mode (Shunya / Vistāra) ─────────────────────────────────────────────
   private updateVoid(
     dt: number,
     path: { cameraAt: (p: number) => THREE.Vector3; lookAt: (p: number, oi?: any) => THREE.Vector3 },
     realm: any,
-    defs: Array<{ position: THREE.Vector3 }>
+    defs: Array<{ position: THREE.Vector3 }>,
+  ) {
+    // ── Check InteractionState for orb expansion ──────────────────────────────
+    try {
+      const ix = (window as any).__vyanIX?.get?.();
+      if (ix && ix.target && realm?.getOrbByKey) {
+        const orb = realm.getOrbByKey(ix.target);
+        if (orb) {
+          const orbPos = orb.group.position.clone();
+
+          // Transition from orbital → expanding when expansion starts
+          if (ix.phase === 'unfolding' && ix.progress > 0.05 && this.flyPhase === 'orbital') {
+            this.beginOrbExpansion(orbPos);
+          }
+          // Transition expanding → orb-full when fully expanded
+          if ((ix.phase === 'expanded') && this.flyPhase === 'expanding') {
+            this.flyPhase = 'orb-full';
+          }
+          // Fold back: return to orbital when folding
+          if ((ix.phase === 'folding' || ix.phase === 'dormant') &&
+              (this.flyPhase === 'orb-full' || this.flyPhase === 'hover-node')) {
+            this.returnToOrbital();
+          }
+        }
+      } else if (this.flyPhase !== 'orbital' && this.flyPhase !== 'returning') {
+        // No active expansion target — ensure we return
+        this.returnToOrbital();
+      }
+    } catch {}
+
+    // ── Delegate to the appropriate sub-updater ───────────────────────────────
+    switch (this.flyPhase) {
+      case 'expanding':
+        this.updateExpanding(dt);
+        return;
+      case 'orb-full':
+        this.updateOrbFull(dt);
+        return;
+      case 'flying-node':
+        this.updateFlyingNode(dt);
+        return;
+      case 'hover-node':
+        this.updateHoverNode(dt);
+        return;
+      case 'returning':
+        this.updateReturning(dt);
+        return;
+      default:
+        this.updateOrbital(dt, path, realm, defs);
+    }
+  }
+
+  // ── Orbital: normal path following ────────────────────────────────────────
+  private updateOrbital(
+    dt: number,
+    path: { cameraAt: (p: number) => THREE.Vector3; lookAt: (p: number, oi?: any) => THREE.Vector3 },
+    realm: any,
+    defs: Array<{ position: THREE.Vector3 }>,
   ) {
     const progress = this.deps.scroll.loopProgress;
     const px = this.deps.interaction.pointer.x;
     const py = this.deps.interaction.pointer.y;
 
-    // Look-at follows focused orb's live world position (drift included).
     let lookTarget: THREE.Vector3;
-    if (realm && realm.getFocusedWorldPosition) {
-      const focusedHome = defs[realm.activeIndex].position;
+    if (realm?.getFocusedWorldPosition) {
+      const focusedHome = defs[realm.activeIndex ?? 0].position;
       const focusedLive = realm.getFocusedWorldPosition();
       const focus = realm.activeFocus ?? 0;
       lookTarget = new THREE.Vector3().lerpVectors(focusedHome, focusedLive, focus);
@@ -180,41 +326,27 @@ export class CameraRig {
       lookTarget = path.lookAt(progress);
     }
 
-    // PHASE 4 — CINEMATIC NODE FOCUS. When a specific socket is selected
-    // (Vistāra product OR Medhā model), shift the look-target subtly toward
-    // that socket's world position. Combined with the FOV pull below, this
-    // gives a "camera cinematically turns to face the node" feel without
-    // teleporting away from the orb.
-    //
-    // PHASE 6 — Vistāra node-change "fly-over". When the active socket key
-    // changes (e.g. /vistara/ritam → /vistara/sutra) we briefly amplify the
-    // look-at commitment (40% → 70%) and trigger an FOV punch via
-    // `pulseNodeChange()`. The transient eases out over `nodeChangeDur` ms.
+    // Node-key focus boost (Phase 6 cinematic preserved)
     let focusBoost = 0;
     try {
       const ix = (window as any).__vyanIX?.get?.();
       const tgtKey = ix?.target;
       const nodeKey = ix?.node;
       if (tgtKey && nodeKey && realm?.getOrbByKey) {
-        // Detect a node-key change → kick the cinematic.
         if (nodeKey !== this.lastNodeKey && this.lastNodeKey !== null && tgtKey === 'vistara') {
           this.pulseNodeChange();
         }
         this.lastNodeKey = nodeKey;
-
         const orb = realm.getOrbByKey(tgtKey);
         if (orb?.socketGroup?.children?.length) {
-          // Find the hit-sphere with matching productKey.
           const sock = orb.socketGroup.children.find((c: any) =>
             c.userData?.isProductSocket && c.userData?.productKey === nodeKey && c.geometry,
           );
           if (sock) {
             const sockWorld = new THREE.Vector3();
             sock.getWorldPosition(sockWorld);
-            // Base: 40% lerp during steady state. Burst: ramps up to +30% during
-            // the node-change pulse so the camera visibly swings to the new socket.
             const t = (performance.now() - this.nodeChangeAt) / this.nodeChangeDur;
-            const pulseEnv = t < 0 || t > 1 ? 0 : Math.sin(t * Math.PI); // 0 → 1 → 0 over the duration
+            const pulseEnv = t < 0 || t > 1 ? 0 : Math.sin(t * Math.PI);
             focusBoost = pulseEnv * 0.3;
             const baseFocus = Math.max(0, Math.min(0.4, (ix.progress ?? 0) * 0.4));
             const focusAmount = Math.min(0.85, baseFocus + focusBoost);
@@ -228,35 +360,20 @@ export class CameraRig {
 
     this.lookSpring.step(this.currentLookAt, lookTarget, dt, 9.0, 4.5);
 
-    // EQUALIZATION FIX (item 2): camera is ALWAYS look-target + (0,3,26).
-    // No catmullrom blend — guarantees identical on-screen size for every
-    // orb regardless of where it sits in world space (Medhā at z=-360,
-    // Udbhava at z=0, Sandhi at z=-220, etc.). The look-target itself is
-    // spring-lerped between adjacent orbs, so motion stays cinematic; the
-    // camera just rides 26 units behind it dead-on every frame.
-    //
-    // PHASE 8 (#6 stronger Vistāra cinematic) — during the node-change
-    // punch envelope, the camera also DOLLIES toward the orb (Z -5) and
-    // sweeps a small arc around the focal axis (X ±3, Y +2) so the
-    // transition between products feels like a fly-over rather than a
-    // subtle look-tilt. The envelope is the same sin(t·π) so all cinematic
-    // components (FOV, look-lerp, position) peak together.
+    // Camera position: always look-target + constant offset
     const tPunchPos = (performance.now() - this.nodeChangeAt) / this.nodeChangeDur;
     const punchPosEnv = tPunchPos < 0 || tPunchPos > 1 ? 0 : Math.sin(tPunchPos * Math.PI);
-    // Sign the arc direction with the node-key hash so different products
-    // arc to different sides — feels less repetitive.
     const arcSign = this.lastNodeKey
-      ? (this.lastNodeKey.charCodeAt(0) % 2 === 0 ? 1 : -1)
-      : 1;
-    const dollyZ = -5 * punchPosEnv;             // dolly 5 units closer at peak
-    const arcX   = 3 * punchPosEnv * arcSign;    // sweep ±3 units sideways
-    const liftY  = 2 * punchPosEnv;              // tilt up 2 units at peak
+      ? (this.lastNodeKey.charCodeAt(0) % 2 === 0 ? 1 : -1) : 1;
+    const dollyZ = -5 * punchPosEnv;
+    const arcX   =  3 * punchPosEnv * arcSign;
+    const liftY  =  2 * punchPosEnv;
     const targetPos = this.currentLookAt.clone().add(
-      new THREE.Vector3(arcX, 3 + liftY, 26 + dollyZ)
+      new THREE.Vector3(arcX, 3 + liftY, 26 + dollyZ),
     );
     this.posSpring.step(this.currentCamPos, targetPos, dt, 6.0, 3.5);
 
-    // Decay the arrival offset (if active).
+    // Arrival offset decay
     if (this.arrivalActive) {
       const ZERO = new THREE.Vector3(0, 0, 0);
       this.arrivalSpring.step(this.arrivalOffset, ZERO, dt, 16.0, 7.8);
@@ -270,24 +387,141 @@ export class CameraRig {
     const sway = new THREE.Vector3(px * 0.8, py * 0.5, 0);
     this.camera.position.copy(this.currentCamPos).add(sway).add(this.arrivalOffset);
     this.camera.lookAt(this.currentLookAt);
-    // PHASE 2: subtle FOV focus-pull when an orb unfolds in-place. FOV
-    // tightens from 38 → 32 as expansion progresses, giving a cinematic
-    // dolly-in without losing the orb out of frame.
-    //
-    // PHASE 6: ADD a transient FOV PUNCH (extra –4) on Vistāra node change
-    // so the cinematic feels like a "dolly-zoom" toward the new socket.
+
+    // FOV: tighten during expansion progress + node-change punch
     let exp = 0;
     try {
       const ex = (window as any).__vyanExpansion;
-      if (ex && ex.target) exp = Math.max(0, Math.min(1, ex.progress ?? 0));
+      if (ex?.target) exp = Math.max(0, Math.min(1, ex.progress ?? 0));
     } catch {}
     const tPunch = (performance.now() - this.nodeChangeAt) / this.nodeChangeDur;
-    const punchEnv = tPunch < 0 || tPunch > 1 ? 0 : Math.sin(tPunch * Math.PI); // ease in-out
+    const punchEnv = tPunch < 0 || tPunch > 1 ? 0 : Math.sin(tPunch * Math.PI);
     this.camera.fov = 38 - exp * 6 - punchEnv * 4;
     this.camera.updateProjectionMatrix();
   }
 
-  private updateShunya(dt: number) {
-    this.updateVoid(dt, this.shunyaPath, (this.deps.realms as any).shunya, SHUNYA_ORBS);
+  // ── Expanding: camera dollies toward orb centre ───────────────────────────
+  private updateExpanding(dt: number) {
+    // Target: sit EXPAND_DIST units in front of the orb, looking straight at it
+    const dir = this.camera.position.clone().sub(this.flyOrbCenter).normalize();
+    const targetPos = this.flyOrbCenter.clone().add(dir.multiplyScalar(CameraRig.EXPAND_DIST));
+
+    this.flySpring.step(this.currentFlyPos, targetPos, dt,
+      CameraRig.EXP_STIFFNESS, CameraRig.EXP_DAMPING);
+    this.flyLookSpring.step(this.currentFlyLook, this.flyOrbCenter, dt, 8.0, 4.0);
+
+    this.camera.position.copy(this.currentFlyPos);
+    this.camera.lookAt(this.currentFlyLook);
+
+    // FOV narrows as we approach — orb fills ~85% of viewport at full
+    const dist = this.currentFlyPos.distanceTo(this.flyOrbCenter);
+    const fillT = THREE.MathUtils.clamp(1 - (dist - CameraRig.EXPAND_DIST) / 20, 0, 1);
+    this.camera.fov = THREE.MathUtils.lerp(38, 22, fillT * fillT);
+    this.camera.updateProjectionMatrix();
+
+    // Sync currentCamPos / currentLookAt for seamless transition back
+    this.currentCamPos.copy(this.currentFlyPos);
+    this.currentLookAt.copy(this.currentFlyLook);
+  }
+
+  // ── Orb full: orbiting gently, nodes visible and clickable ────────────────
+  private updateOrbFull(dt: number) {
+    const px = this.deps.interaction.pointer.x;
+    const py = this.deps.interaction.pointer.y;
+    // Gentle sway so the orb feels alive
+    const sway = new THREE.Vector3(px * 1.2, py * 0.8, 0);
+    const targetPos = this.flyOrbCenter.clone().add(
+      new THREE.Vector3(0, 0, CameraRig.EXPAND_DIST),
+    ).add(sway);
+    this.flySpring.step(this.currentFlyPos, targetPos, dt,
+      CameraRig.EXP_STIFFNESS, CameraRig.EXP_DAMPING);
+    this.flyLookSpring.step(this.currentFlyLook, this.flyOrbCenter, dt, 8.0, 4.0);
+
+    this.camera.position.copy(this.currentFlyPos);
+    this.camera.lookAt(this.currentFlyLook);
+    this.camera.fov = 22;
+    this.camera.updateProjectionMatrix();
+    this.currentCamPos.copy(this.currentFlyPos);
+    this.currentLookAt.copy(this.currentFlyLook);
+  }
+
+  // ── Flying to node: cinematic approach ────────────────────────────────────
+  private updateFlyingNode(dt: number) {
+    // Target: NODE_FLY_DIST units behind the node, looking at node from orb-side
+    const toNode = this.flyTarget.clone().sub(this.flyOrbCenter).normalize();
+    const targetPos = this.flyTarget.clone().add(toNode.multiplyScalar(CameraRig.NODE_FLY_DIST));
+
+    this.flySpring.step(this.currentFlyPos, targetPos, dt,
+      CameraRig.NODE_STIFFNESS, CameraRig.NODE_DAMPING);
+    this.flyLookSpring.step(this.currentFlyLook, this.flyTarget, dt, 10.0, 4.5);
+
+    this.camera.position.copy(this.currentFlyPos);
+    this.camera.lookAt(this.currentFlyLook);
+    this.camera.fov = 28;
+    this.camera.updateProjectionMatrix();
+
+    // Check if we've arrived (spring mostly settled)
+    const dist = this.currentFlyPos.distanceTo(targetPos);
+    if (dist < 0.6) {
+      this.flyPhase = 'hover-node';
+      this.hoverStartAt = performance.now();
+    }
+  }
+
+  // ── Hover at node: subtle drift, waiting for dwell timer ──────────────────
+  private updateHoverNode(dt: number) {
+    const toNode = this.flyTarget.clone().sub(this.flyOrbCenter).normalize();
+    const targetPos = this.flyTarget.clone().add(toNode.multiplyScalar(CameraRig.NODE_FLY_DIST));
+    const t = performance.now() * 0.001;
+    // Very subtle breathing sway so camera feels alive
+    const breathe = new THREE.Vector3(
+      Math.sin(t * 0.9) * 0.15,
+      Math.cos(t * 0.7) * 0.1,
+      0,
+    );
+    this.flySpring.step(this.currentFlyPos, targetPos.clone().add(breathe), dt, 4.0, 2.8);
+    this.flyLookSpring.step(this.currentFlyLook, this.flyTarget, dt, 9.0, 4.0);
+
+    this.camera.position.copy(this.currentFlyPos);
+    this.camera.lookAt(this.currentFlyLook);
+    this.camera.fov = 28;
+    this.camera.updateProjectionMatrix();
+
+    // Fire panel-open callback after dwell
+    const elapsed = performance.now() - this.hoverStartAt;
+    if (elapsed >= CameraRig.HOVER_DWELL_MS && this.onHoverComplete) {
+      const cb = this.onHoverComplete;
+      this.onHoverComplete = null;
+      try { cb(); } catch {}
+    }
+  }
+
+  // ── Returning: spring back to pre-expansion orbital position ─────────────
+  private updateReturning(dt: number) {
+    this.flySpring.step(this.currentFlyPos, this.preExpansionPos, dt,
+      CameraRig.RET_STIFFNESS, CameraRig.RET_DAMPING);
+    this.flyLookSpring.step(this.currentFlyLook, this.preExpansionLook, dt, 6.0, 3.2);
+
+    this.camera.position.copy(this.currentFlyPos);
+    this.camera.lookAt(this.currentFlyLook);
+
+    // FOV relaxes back to standard
+    const dist = this.currentFlyPos.distanceTo(this.preExpansionPos);
+    const returnT = THREE.MathUtils.clamp(1 - dist / 20, 0, 1);
+    this.camera.fov = THREE.MathUtils.lerp(28, 38, returnT * returnT);
+    this.camera.updateProjectionMatrix();
+
+    // Sync orbital tracking so transition is seamless
+    this.currentCamPos.copy(this.currentFlyPos);
+    this.currentLookAt.copy(this.currentFlyLook);
+
+    // When settled, restore orbital phase
+    if (dist < 0.8 && this.flySpring.velocity.lengthSq() < 0.01) {
+      this.flyPhase = 'orbital';
+      this.currentCamPos.copy(this.preExpansionPos);
+      this.currentLookAt.copy(this.preExpansionLook);
+      this.posSpring.reset();
+      this.lookSpring.reset();
+    }
   }
 }
