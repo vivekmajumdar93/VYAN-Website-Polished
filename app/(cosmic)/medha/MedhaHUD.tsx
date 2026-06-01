@@ -139,8 +139,18 @@ export default function MedhaHUD() {
       const caption = document.querySelector('.shunya-caption') as HTMLElement | null;
       if (rail) { rail.style.opacity = ''; rail.style.pointerEvents = ''; }
       if (caption) { caption.style.opacity = ''; }
+      // PHASE 10 — re-enable ScrollJourney when leaving Medhā.
+      try { document.body.classList.remove('vyan-paused'); } catch {}
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // PHASE 10 — pause the cosmic ScrollJourney while the Medhā chat is
+  // mounted. Wheel events were flying the camera through Shunya orbs
+  // while the user scrolled chat content.
+  useEffect(() => {
+    document.body.classList.add('vyan-paused');
+    return () => { document.body.classList.remove('vyan-paused'); };
   }, []);
 
   // ── Sync model from URL ?model= param ─────────────────────────────────────

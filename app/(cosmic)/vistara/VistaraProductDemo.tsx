@@ -126,7 +126,13 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // PHASE 10 — pause cosmic ScrollJourney while a product slab is open
+    // so wheel-scroll doesn't fly the camera past other Shunya orbs.
+    document.body.classList.add('vyan-paused');
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.classList.remove('vyan-paused');
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
