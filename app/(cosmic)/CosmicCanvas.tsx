@@ -139,7 +139,7 @@ export default function CosmicCanvas() {
         return { raycaster: (w as any).__ccRaycaster, ndc: (w as any).__ccNdc };
       };
 
-      const onDomClick = (ev: MouseEvent) => {
+      const onDomClick = async (ev: MouseEvent) => {
         try {
           const target = ev.target as HTMLElement | null;
           if (target?.closest('.vpd-slab, .mlv-modal, .concierge-nav, .sc-panel, .mlv-composer, .mlv-orb-pane, button')) return;
@@ -228,7 +228,7 @@ export default function CosmicCanvas() {
       // ── Document-level outside-click closer (belt-and-braces) ──────────────
       // Same fix applied here: use closeWithoutNavigation to avoid the
       // Udbhava navigation bug.
-      const onDocClickOutside = (ev: MouseEvent) => {
+      const onDocClickOutside = async (ev: MouseEvent) => {
         try {
           const t = ev.target as HTMLElement | null;
           const keep = t?.closest(
