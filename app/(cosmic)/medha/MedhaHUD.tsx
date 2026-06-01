@@ -97,6 +97,14 @@ export default function MedhaHUD() {
     setQuotaUser(getUser());
     sttRef.current = new STT();
     ttsRef.current = new TTS();
+
+    // Hide the Overlay's neural-depth rail and shunya caption — they're
+    // part of the Shunya navigation UI and have no meaning inside Medhā.
+    const rail = document.querySelector('.neural-depth') as HTMLElement | null;
+    const caption = document.querySelector('.shunya-caption') as HTMLElement | null;
+    if (rail) { rail.style.opacity = '0'; rail.style.pointerEvents = 'none'; }
+    if (caption) { caption.style.opacity = '0'; }
+
     const stored = listChats();
     setChats(stored);
     const currId = getCurrentChatId();
@@ -117,8 +125,20 @@ export default function MedhaHUD() {
       upsertChat({ id, title: 'New Conversation', messages: [greeting], createdAt: Date.now(), lastInteractionAt: Date.now() });
     }
     setTimeout(() => setComposerOpen(true), 400);
+    // Fire greeting for the default/initial model
+    const initialModel = (searchParams?.get('model') as CognitiveModeKey) || 'prajna';
+    const validInitial = COGNITIVE_MODES.find(x => x.key === initialModel) ? initialModel : 'prajna';
+    setMode(validInitial);
+    setGreetingText(MODEL_GREETINGS[validInitial]);
+    setGreetingMode(validInitial);
+    greetingTimer.current = setTimeout(() => setGreetingText(null), 5500);
     return () => {
       if (greetingTimer.current) clearTimeout(greetingTimer.current);
+      // Restore Overlay elements when leaving Medhā
+      const rail = document.querySelector('.neural-depth') as HTMLElement | null;
+      const caption = document.querySelector('.shunya-caption') as HTMLElement | null;
+      if (rail) { rail.style.opacity = ''; rail.style.pointerEvents = ''; }
+      if (caption) { caption.style.opacity = ''; }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -126,8 +146,8 @@ export default function MedhaHUD() {
   // ── Sync model from URL ?model= param ─────────────────────────────────────
   useEffect(() => {
     const m = searchParams?.get('model') as CognitiveModeKey | null;
-    if (m && COGNITIVE_MODES.find(x => x.key === m) && m !== mode) {
-      activateModel(m);
+    if (m && COGNITIVE_MODES.find(x => x.key === m)) {
+      activateModel(m, m === mode); // force=true only when mode hasn't changed (re-select)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -169,8 +189,8 @@ export default function MedhaHUD() {
   };
 
   // ── Activate a model node: camera perspective + greeting + color pulse ────
-  const activateModel = useCallback((k: CognitiveModeKey) => {
-    if (k === mode) return;
+  const activateModel = useCallback((k: CognitiveModeKey, force = false) => {
+    if (k === mode && !force) return;
     setMode(k);
 
     // Greeting from node
@@ -286,10 +306,15 @@ export default function MedhaHUD() {
     [messages],
   );
   const lastMsg = messages[messages.length - 1] ?? null;
+  // Only show last message if it matches the CURRENT active mode.
+  // This prevents a Javā response persisting when the user switches to Akṣaya.
+  const lastMsgForMode = [...messages].reverse().find(
+    m => m.role === 'assistant' && m.mode === mode,
+  ) ?? null;
   const focusMsg: StoredMsg | null = stickyDot !== null
     ? (messages[stickyDot] ?? null)
     : busy ? (userMsgs[userMsgs.length - 1] ?? null)
-           : (lastMsg?.role === 'assistant' ? lastMsg : null);
+           : lastMsgForMode;
   const previewMsg: StoredMsg | null = hoverDot !== null && stickyDot === null
     ? (messages[hoverDot] ?? null) : null;
   const showMsg = previewMsg ?? focusMsg;
