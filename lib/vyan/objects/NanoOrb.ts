@@ -533,6 +533,67 @@ export class NanoOrb {
     }
   }
 
+  /**
+   * PHASE 10 (#7) — Cinematic color sweep from the orb's CORE outward.
+   * Each socket's distance from the orb centre is computed, normalised,
+   * and used as a per-socket animation start-delay. Sockets near the
+   * core flip to the new colour first; sockets at the periphery flip
+   * last. The entire sweep completes within `durationMs`.
+   *
+   * Pulse colours follow the same staggered ramp so the electric signals
+   * carrying through the web change colour as they travel.
+   */
+  setSocketColorsCinematic(targetColor: string, durationMs: number = 1400) {
+    if (!this.socketGroup || !this.signalGroup) return;
+    const target = new THREE.Color(targetColor);
+    // Compute distance of each socket from the orb local origin.
+    const sockets: { obj: THREE.Object3D; from: THREE.Color; dist: number; isPulse: boolean }[] = [];
+    let maxDist = 0;
+    for (const c of this.socketGroup.children) {
+      const m = (c as any).material as THREE.MeshBasicMaterial | undefined;
+      if (!m || !('color' in m)) continue;
+      const d = c.position.length();
+      sockets.push({ obj: c, from: m.color.clone(), dist: d, isPulse: false });
+      if (d > maxDist) maxDist = d;
+    }
+    for (const p of this.signalGroup.children) {
+      const m = (p as any).material as THREE.MeshBasicMaterial | undefined;
+      if (!m || !('color' in m)) continue;
+      const d = p.position.length();
+      sockets.push({ obj: p, from: m.color.clone(), dist: d, isPulse: true });
+      if (d > maxDist) maxDist = d;
+    }
+    if (!sockets.length) return;
+    maxDist = Math.max(maxDist, 0.001);
+
+    // Per-socket animation: each element gets a start-delay proportional
+    // to its distance from the centre (0 = inner-most, 1 = farthest).
+    // Each element's own ramp takes 35% of the total duration. The wave
+    // therefore reaches every node within `durationMs`.
+    const rampFraction = 0.35;
+    const startedAt = performance.now();
+    const tmpColor = new THREE.Color();
+
+    const step = () => {
+      const now = performance.now();
+      const t = (now - startedAt) / durationMs;
+      let allDone = true;
+      for (const s of sockets) {
+        const startDelayNorm = (s.dist / maxDist) * (1 - rampFraction); // 0 → 0.65
+        const localT = Math.max(0, Math.min(1, (t - startDelayNorm) / rampFraction));
+        if (localT < 1) allDone = false;
+        // Smoothstep for a softer ease
+        const eased = localT * localT * (3 - 2 * localT);
+        tmpColor.copy(s.from).lerp(target, eased);
+        const m = (s.obj as any).material as THREE.MeshBasicMaterial | undefined;
+        if (m && 'color' in m) m.color.copy(tmpColor);
+        (s.obj as any).userData.color = tmpColor.clone();
+      }
+      if (!allDone) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
   setHomePosition(p: THREE.Vector3) {
     this.home.copy(p);
     this.group.position.copy(p);

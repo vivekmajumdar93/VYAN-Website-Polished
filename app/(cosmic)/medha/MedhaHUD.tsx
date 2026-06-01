@@ -209,11 +209,17 @@ export default function MedhaHUD() {
     setGreetingMode(k);
     greetingTimer.current = setTimeout(() => setGreetingText(null), 5500);
 
-    // Update orb branch colors
+    // Update orb branch colors — CINEMATIC sweep from core outward.
     try {
       const vyan: any = (window as any).__vyan;
       const orb = vyan?.worldRef?.realms?.shunya?.getOrbByKey?.('medha');
-      orb?.setSocketColors?.(MODEL_COLOR[k]);
+      // PHASE 10 (#7) — use the cinematic ripple instead of an instant flip.
+      // Falls back to setSocketColors if older orb instance is loaded.
+      if (orb?.setSocketColorsCinematic) {
+        orb.setSocketColorsCinematic(MODEL_COLOR[k], 1500);
+      } else {
+        orb?.setSocketColors?.(MODEL_COLOR[k]);
+      }
     } catch {}
 
     // Camera: fly to this node's radial perspective (if not already done by ShunyaRealm click)
@@ -523,12 +529,12 @@ export default function MedhaHUD() {
               {chats.map(c => (
                 <div key={c.id} className={`mlv-chat-row ${c.id === chatId ? 'is-current' : ''}`}>
                   <button type="button" className="mlv-chat-row__open"
-                          onClick={() => { const ch = getChat(c.id); if (!ch) return; setChatId(ch.id); setCurrentChatId(ch.id); setMessages(ch.messages); setStickyDot(null); setShowHistory(false); }}>
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); const ch = getChat(c.id); if (!ch) { console.warn('[Medhā] chat row click: getChat returned null for id', c.id); return; } setChatId(ch.id); setCurrentChatId(ch.id); setMessages(ch.messages); setStickyDot(null); setShowHistory(false); }}>
                     <div className="mlv-chat-row__title">{c.title || 'Untitled'}</div>
                     <div className="mlv-chat-row__meta">{new Date(c.lastInteractionAt).toLocaleString()} · {c.messages.length} messages</div>
                   </button>
                   <button type="button" className="mlv-chat-row__del"
-                          onClick={() => { deleteChat(c.id); setChats(listChats()); if (c.id === chatId) startNewChat(); }}>✕</button>
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteChat(c.id); setChats(listChats()); if (c.id === chatId) startNewChat(); }}>✕</button>
                 </div>
               ))}
             </div>

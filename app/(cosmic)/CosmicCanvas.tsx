@@ -37,11 +37,12 @@ async function applyRouteState(pathname: string | null, _isInitial = false) {
   const targetOrb: 'medha' | 'vistara' | null =
     isMedha ? 'medha' : isVistara ? 'vistara' : null;
 
-  // For /shunya/vistara or /shunya/medha, treat as expansion too
-  const shunyaExpand: 'medha' | 'vistara' | null =
-    isShunya && (seg === 'vistara' || seg === 'medha')
-      ? (seg as 'medha' | 'vistara')
-      : null;
+  // PHASE 10 (#5 fix) — /shunya/<orb> is for FOCUS ONLY. Re-expanding
+  // Medhā when the user clicked SHUNYA to EXIT was freezing further
+  // navigation (the IX was stuck in 'expanded'/'medha' state). Now
+  // /shunya/* only focuses the orb visually in the void; expansion is
+  // exclusive to /medha and /vistara/<product>.
+  const shunyaExpand: 'medha' | 'vistara' | null = null;
 
   const effectiveOrb = targetOrb ?? shunyaExpand;
 
