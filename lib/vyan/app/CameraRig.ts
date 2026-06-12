@@ -25,7 +25,8 @@ type FlyPhase =
   | 'orb-full'      // orb fills screen, nodes visible
   | 'flying-node'   // camera flying to selected node
   | 'hover-node'    // camera hovering at node (panel about to open)
-  | 'returning';    // camera returning to orbital after panel close
+  | 'returning'     // camera returning to orbital after panel close
+  | 'medha-node';   // camera flown to Medhā's node perspective
 
 export class CameraRig {
   private deps!: Deps;
@@ -246,7 +247,7 @@ export class CameraRig {
     this.flyTarget.copy(nodeWorldPos.clone().add(radial.multiplyScalar(18)));
     this.flyOrbCenter.copy(orbCenter);
 
-    this.flyPhase = 'medha-node' as any;
+    this.flyPhase = 'medha-node';
     this.flySpring.reset();
     this.flyLookSpring.reset();
     this.currentFlyPos.copy(this.camera.position);
@@ -257,7 +258,7 @@ export class CameraRig {
 
   // ── Return to orb-full from Medhā node perspective ───────────────────────
   returnToMedhaOrbFull() {
-    (this as any).flyPhase = 'orb-full';
+    this.flyPhase = 'orb-full';
     this.flySpring.reset();
     this.flyLookSpring.reset();
   }
@@ -347,7 +348,7 @@ export class CameraRig {
       case 'returning':
         this.updateReturning(dt);
         return;
-      case 'medha-node' as any:
+      case 'medha-node':
         this.updateMedhaNode(dt);
         return;
       default:

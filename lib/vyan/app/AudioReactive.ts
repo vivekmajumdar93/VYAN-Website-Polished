@@ -22,6 +22,13 @@ export class AudioReactive {
   private audio?: HTMLAudioElement;
   private panner?: StereoPannerNode;
   private gain?: GainNode;
+  private bassFilter?: BiquadFilterNode;
+  private trebleFilter?: BiquadFilterNode;
+  private lowpass?: BiquadFilterNode;
+  private reverb?: ConvolverNode;
+  private dryGain?: GainNode;
+  private wetGain?: GainNode;
+  private pulseSync = false;
 
   // Envelope state — target-gain tween that smoothly slides between values.
   private currentGain = 0;

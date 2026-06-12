@@ -36,7 +36,7 @@ const _smtp: SmtpConfig = {
 // Expose via globalThis so /api/sankalpa can read without circular imports.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).__VYAN_SMTP__ = _smtp;
-export function getSmtpConfig(): SmtpConfig {
+function getSmtpConfig(): SmtpConfig {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return ((globalThis as any).__VYAN_SMTP__ as SmtpConfig) ?? _smtp;
 }

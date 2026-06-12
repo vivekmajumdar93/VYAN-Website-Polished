@@ -116,6 +116,19 @@ export default function ConciergeOrb() {
     setBubble({ id: uid(), text, kind, ttl });
   }, []);
 
+  // ---------- Signal-orb cinematic ----------
+  const triggerSignalExchange = useCallback(() => {
+    const count = 2 + Math.floor(Math.random() * 2);
+    const newSignals: Signal[] = [];
+    for (let i = 0; i < count; i++) {
+      newSignals.push({ id: uid(), angle: Math.random() * 360 });
+    }
+    setSignals((prev) => [...prev, ...newSignals]);
+    setTimeout(() => {
+      setSignals((prev) => prev.filter((s) => !newSignals.find((n) => n.id === s.id)));
+    }, 3600);
+  }, []);
+
   const speakFromGemini = useCallback(async (kind: Bubble['kind']) => {
     const style =
       'You are the Concierge of VYAN — a brief, warm, slightly-cosmic guide. ' +
@@ -147,20 +160,7 @@ export default function ConciergeOrb() {
       speakStatic(kind);
       if (kind === 'fact') triggerSignalExchange();
     }
-  }, [speakStatic]);
-
-  // ---------- Signal-orb cinematic ----------
-  const triggerSignalExchange = useCallback(() => {
-    const count = 2 + Math.floor(Math.random() * 2);
-    const newSignals: Signal[] = [];
-    for (let i = 0; i < count; i++) {
-      newSignals.push({ id: uid(), angle: Math.random() * 360 });
-    }
-    setSignals((prev) => [...prev, ...newSignals]);
-    setTimeout(() => {
-      setSignals((prev) => prev.filter((s) => !newSignals.find((n) => n.id === s.id)));
-    }, 3600);
-  }, []);
+  }, [speakStatic, triggerSignalExchange]);
 
   // Auto-collapse bubble
   useEffect(() => {

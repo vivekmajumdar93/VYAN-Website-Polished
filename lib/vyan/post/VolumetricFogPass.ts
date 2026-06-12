@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 const FogShader = {
   uniforms: {

@@ -7,6 +7,7 @@ import { Overlay } from '../ui/Overlay';
 import { IntroDirector } from './IntroDirector';
 import type { RealmMode } from '../scenes/RealmManager';
 import type { ShunyaOrbKey } from '../scenes/PathCurve';
+import type { VistaraProductKey } from '../scenes/VistaraPath';
 
 export type AppOptions = {
   skipIntro?: boolean;
@@ -14,6 +15,8 @@ export type AppOptions = {
   onEnterVoid?: () => void;
   onOrbActivate?: (key: ShunyaOrbKey) => void;
   onEnterVistara?: () => void;
+  onProductActivate?: (key: VistaraProductKey) => void;
+  onExitVistara?: () => void;
   onEnterMedha?: () => void;
 };
 

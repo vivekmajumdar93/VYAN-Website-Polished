@@ -510,7 +510,7 @@ export class NanoOrb {
   setSocketColors(colors: string | string[]) {
     if (!this.socketGroup || !this.signalGroup) return;
     const arr = Array.isArray(colors) ? colors : null;
-    const single = !arr ? new THREE.Color(colors) : null;
+    const single = typeof colors === 'string' ? new THREE.Color(colors) : null;
     let i = 0;
     for (const c of this.socketGroup.children) {
       const m = (c as any).material as THREE.MeshBasicMaterial | undefined;
@@ -772,7 +772,7 @@ export class NanoOrb {
     const pulseFreq = signal === 'processing' ? 3.8 : signal === 'response' ? 5.2 : 2.4;
     // INVERT: web fades down as expansion grows, so signals show through.
     const webBase = 0.30 * (1 - expT2 * 0.68) + signalBoost;
-    this.web.material.opacity = (webBase + Math.sin(t * pulseFreq) * (0.06 + signalPulse * 0.5)) * dim;
+    (this.web.material as THREE.LineBasicMaterial).opacity = (webBase + Math.sin(t * pulseFreq) * (0.06 + signalPulse * 0.5)) * dim;
     // Nodes (the orb's intrinsic web-junctions) also dim.
     this.nodeMat.opacity = (0.82 * (1 - expT2 * 0.55) + Math.sin(t * 1.7) * 0.06 + signalBoost) * dim;
 
