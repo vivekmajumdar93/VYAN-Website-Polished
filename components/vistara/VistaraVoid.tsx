@@ -1,565 +1,781 @@
+```tsx
 'use client'
 
 import {
-  useRef, useState, useEffect, useCallback, useMemo, useReducer,
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
 } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
+import type {
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  TouchEvent as ReactTouchEvent,
+} from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import * as THREE from 'three'
 import {
   VISTARA_PRODUCTS,
-  CAMERA_ENTRY, CAMERA_ENTRY_LOOK,
-  CAMERA_CAVE, CAMERA_CAVE_LOOK,
-  SCROLL_DEPTH_PX, NODE_DWELL_MS, NODE_APPROACH_DIST,
-  NODE_RADIUS, NODE_GLOW_RADIUS,
-  CURRENT_SPEED, INACTIVITY_MIN_MS, INACTIVITY_MAX_MS,
-  FADE_OUT_MS, BLACK_PAUSE_MS, FADE_IN_MS,
+  INACTIVITY_MIN_MS,
+  INACTIVITY_MAX_MS,
+  FADE_OUT_MS,
+  BLACK_PAUSE_MS,
   CURRENT_COLORS,
-} from '@/lib/vistara/config'
-import {
-  buildWebNodes, buildOrganicLine, edgeEntryPoint,
-  bfsPath, spawnAmbientCurrent, createSignalWave,
-  type WebNode, type ActiveCurrent, type LineState, type SignalWave,
-} from '@/lib/vistara/neural'
-import type { VistaraProduct } from '@/lib/vistara/config'
+  NODE_RADIUS,
+} from '../lib/config'
+import type { VistaraProduct } from '../lib/config'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type SystemState = 'ambient' | 'user-active' | 'node-locked' | 'fading' | 'black'
-
-interface VistaraState {
-  nodes: WebNode[]
-  lines: Map<string, LineState>
-  currents: ActiveCurrent[]
-  signalWave: SignalWave | null
-  systemState: SystemState
-  activeNodeIdx: number | null
-  globalOpacity: number
+interface Node {
+  id: string
+  productIdx: number
+  x: number
+  y: number
+  depth: number
+  connections: number[]
+  glowIntensity: number
+  isActive: boolean
+  isDormant: boolean
+  labelOpacity: number
+  isEdge?: boolean
 }
 
-// ─── Line cache — built once per connection pair ───────────────────────────────
-
-const LINE_CACHE = new Map<string, THREE.Vector3[]>()
-function getLine(nodes: WebNode[], i: number, j: number): THREE.Vector3[] {
-  const key = `${Math.min(i,j)}-${Math.max(i,j)}`
-  if (!LINE_CACHE.has(key)) LINE_CACHE.set(key, buildOrganicLine(nodes[i].position, nodes[j].position))
-  return LINE_CACHE.get(key)!
+interface WebLine {
+  from: number
+  to: number
+  cp1x: number
+  cp1y: number
+  cp2x: number
+  cp2y: number
+  pts: { x: number; y: number }[]
+  baseOpacity: number
+  energy: number
 }
 
-// ─── Single animated web line ──────────────────────────────────────────────────
+interface RopeCurrent {
+  id: string
+  linePath: number[]
+  segIdx: number
+  progress: number
+  color: string
+  speed: number
+  strandCount: number
+  strandPhase: number
+  type: 'ambient' | 'signal'
+  active: boolean
+}
 
-function WebLine({ points, color, drawProgress, opacity }: {
-  points: THREE.Vector3[]; color: string; drawProgress: number; opacity: number
-}) {
-  if (opacity < 0.01 || drawProgress < 0.01) return null
-  const count = Math.max(2, Math.floor(points.length * drawProgress))
-  const sliced = points.slice(0, count)
-  const positions = new Float32Array(sliced.flatMap(p => [p.x, p.y, p.z]))
-  return (
-    <line>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
-      <lineBasicMaterial color={color} transparent opacity={opacity} linewidth={1.5} />
-    </line>
+interface SignalWave {
+  sourceIdx: number
+  reached: Set<number>
+  frontier: number[]
+  color: string
+  type: 'sleep' | 'wake'
+  lastStep: number
+}
+
+interface Star {
+  x: number
+  y: number
+  z: number
+  r: number
+  twinkle: number
+}
+
+// ─── Utility ───────────────────────────────────────────────────────────────────
+
+function hexToRgba(hex: string, alpha: number) {
+  if (!hex.startsWith('#')) return hex
+
+  const clean = hex.replace('#', '')
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map(c => c + c)
+          .join('')
+      : clean
+
+  const num = parseInt(full, 16)
+  const r = (num >> 16) & 255
+  const g = (num >> 8) & 255
+  const b = num & 255
+
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+function makeStars(w: number, h: number, count = 620): Star[] {
+  return Array.from({ length: count }, () => ({
+    x: Math.random() * w,
+    y: Math.random() * h,
+    z: Math.random(),
+    r: 0.35 + Math.random() * 1.25,
+    twinkle: Math.random() * Math.PI * 2,
+  }))
+}
+
+// ─── Build bezier line points ──────────────────────────────────────────────────
+
+function buildLine(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): {
+  cp1x: number
+  cp1y: number
+  cp2x: number
+  cp2y: number
+  pts: { x: number; y: number }[]
+} {
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1
+  const snake = 0.24 + Math.random() * 0.26
+
+  const px = -dy / dist
+  const py = dx / dist
+
+  const off1 = (Math.random() - 0.5) * dist * snake
+  const off2 = (Math.random() - 0.5) * dist * snake
+
+  const cp1x = x1 + dx * 0.32 + px * off1
+  const cp1y = y1 + dy * 0.32 + py * off1
+  const cp2x = x1 + dx * 0.68 + px * off2
+  const cp2y = y1 + dy * 0.68 + py * off2
+
+  const pts: { x: number; y: number }[] = []
+
+  for (let i = 0; i <= 64; i++) {
+    const t = i / 64
+    const mt = 1 - t
+
+    pts.push({
+      x:
+        mt ** 3 * x1 +
+        3 * mt ** 2 * t * cp1x +
+        3 * mt * t ** 2 * cp2x +
+        t ** 3 * x2,
+      y:
+        mt ** 3 * y1 +
+        3 * mt ** 2 * t * cp1y +
+        3 * mt * t ** 2 * cp2y +
+        t ** 3 * y2,
+    })
+  }
+
+  return { cp1x, cp1y, cp2x, cp2y, pts }
+}
+
+// ─── Draw helpers ──────────────────────────────────────────────────────────────
+
+function drawStarVoid(
+  ctx: CanvasRenderingContext2D,
+  stars: Star[],
+  w: number,
+  h: number,
+  t: number,
+  camOffX: number,
+  camOffY: number,
+  globalOpacity: number,
+) {
+  ctx.save()
+
+  const bg = ctx.createRadialGradient(
+    w * 0.5,
+    h * 0.5,
+    0,
+    w * 0.5,
+    h * 0.5,
+    Math.max(w, h) * 0.75,
   )
-}
 
-// ─── Product node ──────────────────────────────────────────────────────────────
+  bg.addColorStop(0, 'rgba(5,4,12,1)')
+  bg.addColorStop(0.42, 'rgba(0,0,0,1)')
+  bg.addColorStop(1, 'rgba(0,0,0,1)')
 
-function ProductNode({ node, product, onActivate, globalOpacity }: {
-  node: WebNode; product: VistaraProduct
-  onActivate: () => void; globalOpacity: number
-}) {
-  const coreRef = useRef<THREE.Mesh>(null)
-  const glowRef = useRef<THREE.Mesh>(null)
-  const ringRef = useRef<THREE.Mesh>(null)
-  const t = useRef(0)
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, w, h)
 
-  const baseGlow = node.isActive ? 1 : node.glowIntensity
-  const coreOpacity = baseGlow * globalOpacity * 0.9
-  const glowOpacity = baseGlow * globalOpacity * 0.35
+  ctx.globalCompositeOperation = 'lighter'
 
-  useFrame((_, delta) => {
-    t.current += delta
-    if (!coreRef.current || !glowRef.current) return
+  stars.forEach(star => {
+    const px = star.x + camOffX * (0.015 + star.z * 0.06)
+    const py = star.y + camOffY * (0.015 + star.z * 0.06)
 
-    if (node.isActive) {
-      const pulse = 1 + Math.sin(t.current * 2.2) * 0.12
-      coreRef.current.scale.setScalar(pulse)
-      glowRef.current.scale.setScalar(pulse * 2.4)
-      if (ringRef.current) {
-        ringRef.current.rotation.z += delta * 0.6
-        ringRef.current.rotation.x += delta * 0.3
-      }
-    } else {
-      const breathe = 1 + node.glowIntensity * Math.sin(t.current * 1.1) * 0.06
-      coreRef.current.scale.setScalar(breathe)
-      glowRef.current.scale.setScalar(breathe * 1.9)
+    if (px < -20 || px > w + 20 || py < -20 || py > h + 20) return
+
+    const alpha =
+      (0.08 + star.z * 0.42 + Math.sin(t * 0.018 + star.twinkle) * 0.16) *
+      globalOpacity
+
+    if (alpha <= 0) return
+
+    ctx.beginPath()
+    ctx.arc(px, py, star.r * (0.6 + star.z), 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(220,225,255,${alpha})`
+    ctx.fill()
+
+    if (star.z > 0.86) {
+      ctx.beginPath()
+      ctx.arc(px, py, star.r * 4.5, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(125,90,255,${alpha * 0.14})`
+      ctx.fill()
     }
   })
 
-  if (coreOpacity < 0.02 && !node.isActive) return null
+  ctx.restore()
+}
 
-  return (
-    <group position={node.position}>
-      {/* Core */}
-      <mesh ref={coreRef} onClick={onActivate}>
-        <sphereGeometry args={[NODE_RADIUS, 16, 16]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={coreOpacity} />
-      </mesh>
+function drawGlowPolyline(
+  ctx: CanvasRenderingContext2D,
+  pts: { x: number; y: number }[],
+  color: string,
+  alpha: number,
+  width: number,
+) {
+  if (pts.length < 2 || alpha <= 0) return
 
-      {/* Glow */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[NODE_GLOW_RADIUS, 12, 12]} />
-        <meshBasicMaterial
-          color={node.isActive ? '#c026d3' : '#7b2fff'}
-          transparent opacity={glowOpacity}
-          side={THREE.BackSide}
-        />
-      </mesh>
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
 
-      {/* Active ring */}
-      {node.isActive && (
-        <mesh ref={ringRef}>
-          <torusGeometry args={[NODE_RADIUS * 2.2, 0.4, 6, 40]} />
-          <meshBasicMaterial color="#c026d3" transparent opacity={0.55 * globalOpacity} wireframe />
-        </mesh>
-      )}
+  ctx.beginPath()
+  ctx.moveTo(pts[0].x, pts[0].y)
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+  ctx.strokeStyle = hexToRgba(color, alpha * 0.22)
+  ctx.lineWidth = width * 6
+  ctx.lineCap = 'round'
+  ctx.shadowBlur = 20
+  ctx.shadowColor = color
+  ctx.stroke()
 
-      {/* Outer pulse ring when active */}
-      {node.isActive && (
-        <mesh>
-          <torusGeometry args={[NODE_RADIUS * 3.5, 0.2, 6, 40]} />
-          <meshBasicMaterial color="#7b2fff" transparent
-            opacity={(0.2 + 0.15 * Math.sin(Date.now() * 0.003)) * globalOpacity} />
-        </mesh>
-      )}
+  ctx.beginPath()
+  ctx.moveTo(pts[0].x, pts[0].y)
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+  ctx.strokeStyle = hexToRgba(color, alpha * 0.55)
+  ctx.lineWidth = width * 2.25
+  ctx.lineCap = 'round'
+  ctx.shadowBlur = 10
+  ctx.shadowColor = color
+  ctx.stroke()
 
-      {/* HTML label — projects to screen correctly via drei */}
-      <Html
-        center
-        distanceFactor={120}
-        style={{ pointerEvents: node.isActive ? 'none' : 'all' }}
-        occlude={false}
-      >
-        <div
-          onClick={onActivate}
-          style={{
-            cursor: 'pointer',
-            textAlign: 'center',
-            opacity: Math.max(node.glowIntensity, node.isActive ? 1 : 0) * globalOpacity,
-            transition: 'opacity 0.4s ease',
-            userSelect: 'none',
-            transform: 'translateY(28px)',
-          }}
-        >
-          <div style={{
-            fontFamily: 'Georgia, serif',
-            fontSize: '11px',
-            letterSpacing: '0.25em',
-            color: node.isActive ? 'rgba(255,200,220,0.95)' : 'rgba(255,255,255,0.8)',
-            textTransform: 'uppercase',
-            whiteSpace: 'nowrap',
-            textShadow: node.isActive ? '0 0 12px rgba(192,38,211,0.8)' : 'none',
-          }}>
-            {product.name}
-          </div>
-          <div style={{
-            fontFamily: 'system-ui',
-            fontSize: '8px',
-            letterSpacing: '0.18em',
-            color: 'rgba(255,255,255,0.35)',
-            textTransform: 'uppercase',
-            marginTop: '3px',
-            whiteSpace: 'nowrap',
-          }}>
-            {product.tagline}
-          </div>
-        </div>
-      </Html>
+  ctx.beginPath()
+  ctx.moveTo(pts[0].x, pts[0].y)
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+  ctx.strokeStyle = `rgba(235,240,255,${alpha})`
+  ctx.lineWidth = Math.max(0.42, width * 0.5)
+  ctx.lineCap = 'round'
+  ctx.shadowBlur = 0
+  ctx.stroke()
 
-      {/* Invisible click platform — larger than node, easier to tap */}
-      <mesh onClick={onActivate}>
-        <boxGeometry args={[NODE_RADIUS * 5, NODE_RADIUS * 5, NODE_RADIUS * 2]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
-    </group>
+  ctx.restore()
+}
+
+function drawMicroNodesOnLine(
+  ctx: CanvasRenderingContext2D,
+  pts: { x: number; y: number }[],
+  t: number,
+  opacity: number,
+) {
+  if (opacity <= 0) return
+
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+
+  for (let i = 5; i < pts.length; i += 8) {
+    const p = pts[i]
+    const tw = 0.5 + Math.sin(t * 0.03 + i * 0.7) * 0.5
+    const a = opacity * (0.18 + tw * 0.52)
+
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, 0.55 + tw * 0.8, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(230,235,255,${a})`
+    ctx.fill()
+  }
+
+  ctx.restore()
+}
+
+function drawProductSphere(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  label: string,
+  glow: number,
+  active: boolean,
+  t: number,
+) {
+  const pulse = active ? 1 + Math.sin(t * 0.06) * 0.08 : 1
+  const r = radius * pulse
+
+  ctx.save()
+
+  ctx.globalCompositeOperation = 'lighter'
+
+  const auraR = r * (4.8 + glow * 2.3)
+  const aura = ctx.createRadialGradient(x, y, 0, x, y, auraR)
+
+  aura.addColorStop(0, `rgba(210,220,255,${0.18 + glow * 0.36})`)
+  aura.addColorStop(0.24, `rgba(130,90,255,${0.11 + glow * 0.25})`)
+  aura.addColorStop(0.7, `rgba(70,40,180,${0.03 + glow * 0.08})`)
+  aura.addColorStop(1, 'rgba(0,0,0,0)')
+
+  ctx.beginPath()
+  ctx.arc(x, y, auraR, 0, Math.PI * 2)
+  ctx.fillStyle = aura
+  ctx.fill()
+
+  ctx.globalCompositeOperation = 'source-over'
+
+  const sphere = ctx.createRadialGradient(
+    x - r * 0.35,
+    y - r * 0.45,
+    r * 0.08,
+    x,
+    y,
+    r,
   )
+
+  sphere.addColorStop(0, 'rgba(95,100,140,0.46)')
+  sphere.addColorStop(0.2, 'rgba(18,20,36,0.96)')
+  sphere.addColorStop(0.72, 'rgba(2,2,8,0.99)')
+  sphere.addColorStop(1, 'rgba(0,0,0,1)')
+
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fillStyle = sphere
+  ctx.fill()
+
+  ctx.globalCompositeOperation = 'lighter'
+
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.strokeStyle = `rgba(225,230,255,${0.3 + glow * 0.48})`
+  ctx.lineWidth = active ? 1.5 : 0.9
+  ctx.shadowBlur = active ? 22 : 12
+  ctx.shadowColor = 'rgba(170,140,255,0.9)'
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.arc(x - r * 0.28, y - r * 0.34, r * 0.16, 0, Math.PI * 2)
+  ctx.fillStyle = `rgba(255,255,255,${0.14 + glow * 0.38})`
+  ctx.fill()
+
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+
+  const fontSize = Math.max(7, Math.min(12, r * 0.24))
+  ctx.font = `${fontSize}px Georgia, serif`
+
+  ctx.fillStyle = active
+    ? 'rgba(255,230,245,0.95)'
+    : `rgba(245,245,255,${0.56 + glow * 0.35})`
+
+  ctx.shadowBlur = active ? 16 : 8
+  ctx.shadowColor = 'rgba(170,130,255,0.9)'
+
+  ctx.fillText(label.toUpperCase(), x, y + 1, r * 1.55)
+
+  ctx.restore()
 }
 
-// ─── Peripheral glow — nodes just outside frame cast edge light ────────────────
+// ─── Build node + web graph ────────────────────────────────────────────────────
 
-function PeripheralGlow({ nodes, camera, globalOpacity }: {
-  nodes: WebNode[]; camera: THREE.Camera; globalOpacity: number
-}) {
-  // This is a CSS overlay — rendered in HTML layer, not Three.js
-  return null // handled in HTML layer below
-}
+function buildGraph(w: number, h: number): { nodes: Node[]; lines: WebLine[] } {
+  const nodes: Node[] = []
 
-// ─── Camera controller ─────────────────────────────────────────────────────────
+  const productPlacements = [
+    { rx: 0.28, ry: 0.26, depth: 0.58 },
+    { rx: 0.59, ry: 0.23, depth: 0.48 },
+    { rx: 0.46, ry: 0.51, depth: 0.82 },
+    { rx: 0.14, ry: 0.60, depth: 0.52 },
+    { rx: 0.73, ry: 0.50, depth: 0.7 },
+    { rx: 0.40, ry: 0.82, depth: 0.62 },
+    { rx: 0.84, ry: 0.82, depth: 0.76 },
+  ]
 
-interface CameraState {
-  scrollT: number           // 0–1 scroll progress
-  dragX: number             // accumulated drag rotation X
-  dragY: number             // accumulated drag rotation Y
-  dwellNodeIdx: number | null
-  isDwelling: boolean
-}
+  productPlacements.forEach((p, i) => {
+    nodes.push({
+      id: `product-${i}`,
+      productIdx: i,
+      x: w * p.rx + (Math.random() - 0.5) * w * 0.025,
+      y: h * p.ry + (Math.random() - 0.5) * h * 0.025,
+      depth: p.depth,
+      connections: [],
+      glowIntensity: 0.28,
+      isActive: false,
+      isDormant: false,
+      labelOpacity: 1,
+    })
+  })
 
-function CameraRig({ scrollT, dragX, dragY, nodes, onDwellNode }: {
-  scrollT: number; dragX: number; dragY: number
-  nodes: WebNode[]; onDwellNode: (idx: number | null) => void
-}) {
-  const { camera } = useThree()
-  const currentDragX = useRef(0)
-  const currentDragY = useRef(0)
-  const lastDwellIdx = useRef<number | null>(null)
-  const dwellTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const webCount = 58
 
-  useFrame(() => {
-    // Smooth drag
-    currentDragX.current += (dragX * 0.006 - currentDragX.current) * 0.07
-    currentDragY.current += (dragY * 0.003 - currentDragY.current) * 0.07
+  for (let i = 0; i < webCount; i++) {
+    nodes.push({
+      id: `web-${i}`,
+      productIdx: -1,
+      x: w * (0.02 + Math.random() * 0.96),
+      y: h * (0.02 + Math.random() * 0.94),
+      depth: 0.12 + Math.random() * 0.72,
+      connections: [],
+      glowIntensity: Math.random() * 0.4,
+      isActive: false,
+      isDormant: false,
+      labelOpacity: 0,
+    })
+  }
 
-    // Ease scroll
-    const eased = scrollT < 0.5
-      ? 2 * scrollT * scrollT
-      : 1 - Math.pow(-2 * scrollT + 2, 2) / 2
+  const edgeMargin = Math.max(w, h) * 0.12
+  const edgeCountPerSide = 5
 
-    // Camera position: entry → cave
-    const basePos = new THREE.Vector3().lerpVectors(CAMERA_ENTRY, CAMERA_CAVE, eased)
-    const baseLook = new THREE.Vector3().lerpVectors(CAMERA_ENTRY_LOOK, CAMERA_CAVE_LOOK, eased)
+  for (let i = 0; i < edgeCountPerSide; i++) {
+    const u = (i + 0.5) / edgeCountPerSide
 
-    // Apply drag offset
-    basePos.x += Math.sin(currentDragX.current) * 50
-    basePos.y += Math.sin(currentDragY.current) * 25
-    baseLook.x += Math.sin(currentDragX.current) * 35
-
-    camera.position.lerp(basePos, 0.05)
-    camera.lookAt(baseLook)
-
-    // Detect which product node is nearest — trigger dwell
-    const camZ = camera.position.z
-    const productNodes = nodes.filter(n => n.productIndex >= 0)
-
-    let closestIdx: number | null = null
-    let closestDist = Infinity
-
-    nodes.forEach((node, i) => {
-      if (node.productIndex < 0) return
-      // Distance in Z — how close is camera to this node's depth
-      const zDist = Math.abs(camZ - node.position.z - NODE_APPROACH_DIST)
-      // Also check X/Y proximity in screen space (rough)
-      const screenDist = Math.sqrt(
-        Math.pow(camera.position.x - node.position.x, 2) +
-        Math.pow(camera.position.y - node.position.y, 2)
-      )
-      const totalDist = zDist + screenDist * 0.3
-      if (totalDist < 80 && totalDist < closestDist) {
-        closestDist = totalDist
-        closestIdx = i
-      }
+    nodes.push({
+      id: `edge-top-${i}`,
+      productIdx: -1,
+      x: w * u,
+      y: -edgeMargin,
+      depth: 0.2 + Math.random() * 0.7,
+      connections: [],
+      glowIntensity: 0,
+      isActive: false,
+      isDormant: false,
+      labelOpacity: 0,
+      isEdge: true,
     })
 
-    if (closestIdx !== lastDwellIdx.current) {
-      lastDwellIdx.current = closestIdx
-      onDwellNode(closestIdx)
-    }
-  })
+    nodes.push({
+      id: `edge-bottom-${i}`,
+      productIdx: -1,
+      x: w * u,
+      y: h + edgeMargin,
+      depth: 0.2 + Math.random() * 0.7,
+      connections: [],
+      glowIntensity: 0,
+      isActive: false,
+      isDormant: false,
+      labelOpacity: 0,
+      isEdge: true,
+    })
 
-  return null
-}
+    nodes.push({
+      id: `edge-left-${i}`,
+      productIdx: -1,
+      x: -edgeMargin,
+      y: h * u,
+      depth: 0.2 + Math.random() * 0.7,
+      connections: [],
+      glowIntensity: 0,
+      isActive: false,
+      isDormant: false,
+      labelOpacity: 0,
+      isEdge: true,
+    })
 
-// ─── Neural system — runs currents, signal waves, node glow ───────────────────
+    nodes.push({
+      id: `edge-right-${i}`,
+      productIdx: -1,
+      x: w + edgeMargin,
+      y: h * u,
+      depth: 0.2 + Math.random() * 0.7,
+      connections: [],
+      glowIntensity: 0,
+      isActive: false,
+      isDormant: false,
+      labelOpacity: 0,
+      isEdge: true,
+    })
+  }
 
-function NeuralSystem({
-  nodes, setNodes,
-  lines, setLines,
-  currents, setCurrents,
-  signalWave, setSignalWave,
-  systemState,
-}: {
-  nodes: WebNode[]
-  setNodes: (fn: (prev: WebNode[]) => WebNode[]) => void
-  lines: Map<string, LineState>
-  setLines: (fn: (prev: Map<string, LineState>) => Map<string, LineState>) => void
-  currents: ActiveCurrent[]
-  setCurrents: (fn: (prev: ActiveCurrent[]) => ActiveCurrent[]) => void
-  signalWave: SignalWave | null
-  setSignalWave: (s: SignalWave | null) => void
-  systemState: SystemState
-}) {
-  const nodesRef = useRef(nodes)
-  const linesRef = useRef(lines)
-  useEffect(() => { nodesRef.current = nodes }, [nodes])
-  useEffect(() => { linesRef.current = lines }, [lines])
+  const lines: WebLine[] = []
+  const seen = new Set<string>()
 
-  const lastAmbientSpawn = useRef(0)
-  const ambientInterval = useRef(700 + Math.random() * 1100)
-  const waveLastStep = useRef(0)
+  nodes.forEach((node, i) => {
+    const dists = nodes
+      .map((n, j) => ({ j, d: Math.hypot(n.x - node.x, n.y - node.y) }))
+      .filter(({ j }) => j !== i)
+      .filter(({ j }) => !(node.isEdge && nodes[j].isEdge))
+      .sort((a, b) => a.d - b.d)
 
-  useFrame((_, delta) => {
-    const now = performance.now()
-    const ns = nodesRef.current
+    const connectCount = node.isEdge
+      ? 3
+      : node.productIdx >= 0
+        ? 9
+        : 4 + Math.floor(Math.random() * 4)
 
-    // ── Spawn ambient currents ──────────────────────────────────────────────
-    if (systemState === 'ambient' || systemState === 'user-active') {
-      const maxCurrents = systemState === 'user-active' ? 3 : 1
-      const activeCurrents = currents.filter(c => c.progress < 1 || c.pathRemaining.length > 0)
-      if (activeCurrents.length < maxCurrents && now - lastAmbientSpawn.current > ambientInterval.current) {
-        const newCurrents = spawnAmbientCurrent(ns)
-        if (newCurrents.length > 0) {
-          setCurrents(prev => [...prev.filter(c => c.pathRemaining.length > 0 || c.progress < 1), ...newCurrents])
-          lastAmbientSpawn.current = now
-          ambientInterval.current = systemState === 'user-active'
-            ? 300 + Math.random() * 500
-            : 600 + Math.random() * 1200
-        }
-      }
-    }
+    dists.slice(0, connectCount).forEach(({ j }) => {
+      const key = `${Math.min(i, j)}-${Math.max(i, j)}`
 
-    // ── Advance currents ────────────────────────────────────────────────────
-    setCurrents(prevCurrents => {
-      const nextCurrents: ActiveCurrent[] = []
-      const newLines = new Map(linesRef.current)
+      if (seen.has(key)) return
 
-      for (const curr of prevCurrents) {
-        const fromNode = ns[curr.fromIdx]
-        const toNode = ns[curr.toIdx]
-        if (!fromNode || !toNode) continue
+      seen.add(key)
 
-        const lineKey = `${Math.min(curr.fromIdx, curr.toIdx)}-${Math.max(curr.fromIdx, curr.toIdx)}`
-        const pts = getLine(ns, curr.fromIdx, curr.toIdx)
-        const dist = fromNode.position.distanceTo(toNode.position)
-        const newProgress = curr.progress + (delta * curr.speed) / Math.max(dist, 1)
+      const lineData = buildLine(node.x, node.y, nodes[j].x, nodes[j].y)
 
-        newLines.set(lineKey, {
-          points: pts,
-          color: curr.color,
-          drawProgress: Math.min(newProgress, 1),
-          opacity: 0.75,
-          fadeAt: newProgress >= 1 ? now + 800 : Infinity,
-        })
-
-        if (newProgress >= 1) {
-          // Reached toIdx — light it up if it's a product node
-          if (toNode.productIndex >= 0 && !toNode.isDormant && !toNode.isActive) {
-            setNodes(prev => prev.map((n, i) =>
-              i === curr.toIdx ? { ...n, glowIntensity: 1 } : n
-            ))
-            setTimeout(() => {
-              setNodes(prev => prev.map((n, i) =>
-                i === curr.toIdx && !n.isActive ? { ...n, glowIntensity: 0 } : n
-              ))
-            }, 1800 + Math.random() * 800)
-          }
-
-          // Move to next segment
-          if (curr.pathRemaining.length > 0) {
-            nextCurrents.push({
-              ...curr,
-              fromIdx: curr.toIdx,
-              toIdx: curr.pathRemaining[0],
-              progress: 0,
-              pathRemaining: curr.pathRemaining.slice(1),
-            })
-          }
-          // else current is done — don't add back
-        } else {
-          nextCurrents.push({ ...curr, progress: newProgress })
-        }
-      }
-
-      // Fade out expired lines
-      const cleanLines = new Map<string, LineState>()
-      newLines.forEach((line, key) => {
-        if (line.fadeAt === Infinity || now < line.fadeAt) {
-          cleanLines.set(key, line)
-        } else {
-          const fadeProgress = (now - line.fadeAt) / 600
-          if (fadeProgress < 1) {
-            cleanLines.set(key, { ...line, opacity: 0.75 * (1 - fadeProgress) })
-          }
-          // else fully faded — drop it
-        }
+      lines.push({
+        from: i,
+        to: j,
+        cp1x: lineData.cp1x,
+        cp1y: lineData.cp1y,
+        cp2x: lineData.cp2x,
+        cp2y: lineData.cp2y,
+        pts: lineData.pts,
+        baseOpacity: 0.018 + Math.random() * 0.045,
+        energy: 0.4 + Math.random() * 1.2,
       })
 
-      setLines(() => cleanLines)
-      return nextCurrents
+      nodes[i].connections.push(j)
+      nodes[j].connections.push(i)
     })
-
-    // ── Signal wave propagation ─────────────────────────────────────────────
-    if (signalWave && now - waveLastStep.current > 80) {
-      waveLastStep.current = now
-      const nextFrontier: number[] = []
-
-      for (const nodeIdx of signalWave.frontier) {
-        for (const neighbor of ns[nodeIdx].connections) {
-          if (!signalWave.reachedSet.has(neighbor)) {
-            signalWave.reachedSet.add(neighbor)
-            nextFrontier.push(neighbor)
-
-            // Draw signal line
-            const lineKey = `${Math.min(nodeIdx, neighbor)}-${Math.max(nodeIdx, neighbor)}`
-            const pts = getLine(ns, nodeIdx, neighbor)
-            setLines(prev => new Map(prev).set(lineKey, {
-              points: pts,
-              color: signalWave.color,
-              drawProgress: 1,
-              opacity: 0.8,
-              fadeAt: now + 500,
-            }))
-
-            // Apply wave effect to node
-            if (ns[neighbor].productIndex >= 0) {
-              if (signalWave.type === 'sleep') {
-                setNodes(prev => prev.map((n, i) =>
-                  i === neighbor && !n.isActive
-                    ? { ...n, glowIntensity: 0.4, isDormant: true }
-                    : n
-                ))
-                setTimeout(() => {
-                  setNodes(prev => prev.map((n, i) =>
-                    i === neighbor ? { ...n, glowIntensity: 0 } : n
-                  ))
-                }, 300 + Math.random() * 200)
-              } else {
-                setNodes(prev => prev.map((n, i) =>
-                  i === neighbor
-                    ? { ...n, isDormant: false, glowIntensity: 0.15 }
-                    : n
-                ))
-              }
-            }
-          }
-        }
-      }
-
-      if (nextFrontier.length === 0) {
-        setSignalWave(null)
-      } else {
-        setSignalWave({ ...signalWave, frontier: nextFrontier })
-      }
-    }
   })
 
-  return null
+  return { nodes, lines }
 }
 
-// ─── Main Vistara scene ────────────────────────────────────────────────────────
+// ─── BFS path ─────────────────────────────────────────────────────────────────
 
-function VistaraScene({
-  nodes, lines, currents, signalWave, systemState,
-  setNodes, setLines, setCurrents, setSignalWave,
-  globalOpacity, onNodeActivate, activeNodeIdx,
-  scrollT, dragX, dragY, onDwellNode,
-}: {
-  nodes: WebNode[]; lines: Map<string, LineState>
-  currents: ActiveCurrent[]; signalWave: SignalWave | null
-  systemState: SystemState
-  setNodes: (fn: (prev: WebNode[]) => WebNode[]) => void
-  setLines: (fn: (prev: Map<string, LineState>) => Map<string, LineState>) => void
-  setCurrents: (fn: (prev: ActiveCurrent[]) => ActiveCurrent[]) => void
-  setSignalWave: (s: SignalWave | null) => void
-  globalOpacity: number; onNodeActivate: (idx: number) => void
-  activeNodeIdx: number | null; scrollT: number
-  dragX: number; dragY: number; onDwellNode: (idx: number | null) => void
-}) {
-  const handleNodeClick = useCallback((idx: number) => {
-    const wave = createSignalWave(idx, 'sleep')
-    setSignalWave(wave)
-    setNodes(prev => prev.map((n, i) => ({
-      ...n,
-      isActive: i === idx,
-      isDormant: i !== idx && n.productIndex >= 0 ? true : n.isDormant,
-      glowIntensity: i === idx ? 1 : n.glowIntensity,
-    })))
-    onNodeActivate(idx)
-  }, [setSignalWave, setNodes, onNodeActivate])
+function bfs(nodes: Node[], from: number, to: number): number[] {
+  if (from === to) return [from]
 
-  return (
-    <>
-      <CameraRig
-        scrollT={scrollT} dragX={dragX} dragY={dragY}
-        nodes={nodes} onDwellNode={onDwellNode}
-      />
+  const visited = new Set([from])
+  const queue: number[][] = [[from]]
 
-      <NeuralSystem
-        nodes={nodes} setNodes={setNodes}
-        lines={lines} setLines={setLines}
-        currents={currents} setCurrents={setCurrents}
-        signalWave={signalWave} setSignalWave={setSignalWave}
-        systemState={systemState}
-      />
+  while (queue.length) {
+    const path = queue.shift()!
+    const cur = path[path.length - 1]
 
-      {/* Web lines */}
-      {Array.from(lines.entries()).map(([key, line]) => (
-        <WebLine
-          key={key}
-          points={line.points}
-          color={line.color}
-          drawProgress={line.drawProgress}
-          opacity={line.opacity * globalOpacity}
-        />
-      ))}
+    for (const nb of nodes[cur].connections) {
+      if (nb === to) return [...path, nb]
 
-      {/* Product nodes */}
-      {nodes.map((node, i) => {
-        if (node.productIndex < 0) return null
-        const product = VISTARA_PRODUCTS[node.productIndex]
-        return (
-          <ProductNode
-            key={i}
-            node={node}
-            product={product}
-            onActivate={() => handleNodeClick(i)}
-            globalOpacity={globalOpacity}
-          />
-        )
-      })}
-    </>
+      if (!visited.has(nb)) {
+        visited.add(nb)
+        queue.push([...path, nb])
+      }
+    }
+  }
+
+  return []
+}
+
+// ─── Spawn ambient current from screen edge ────────────────────────────────────
+
+function spawnCurrent(nodes: Node[], id: string): RopeCurrent | null {
+  const edgeNodes = nodes
+    .map((n, i) => ({ n, i }))
+    .filter(({ n }) => n.isEdge)
+
+  const productNodes = nodes
+    .map((n, i) => ({ n, i }))
+    .filter(({ n }) => n.productIdx >= 0 && !n.isDormant)
+
+  if (edgeNodes.length < 1 || productNodes.length < 1) return null
+
+  const start = edgeNodes[Math.floor(Math.random() * edgeNodes.length)]
+
+  const groupSize = 1 + Math.floor(Math.random() * Math.min(4, productNodes.length))
+  const shuffled = [...productNodes].sort(() => Math.random() - 0.5)
+  const group = shuffled.slice(0, groupSize)
+
+  let fullPath: number[] = [start.i]
+
+  for (let g = 0; g < group.length; g++) {
+    const seg = bfs(nodes, fullPath[fullPath.length - 1], group[g].i)
+
+    if (seg.length > 1) {
+      fullPath.push(...seg.slice(1))
+    }
+  }
+
+  if (fullPath.length < 2) return null
+
+  return {
+    id,
+    linePath: fullPath,
+    segIdx: 0,
+    progress: 0,
+    color: CURRENT_COLORS[Math.floor(Math.random() * CURRENT_COLORS.length)],
+    speed: 0.007 + Math.random() * 0.007,
+    strandCount: 3 + Math.floor(Math.random() * 3),
+    strandPhase: Math.random() * Math.PI * 2,
+    type: 'ambient',
+    active: true,
+  }
+}
+
+// ─── Draw twisted rope current ─────────────────────────────────────────────────
+
+function drawRopeCurrent(
+  ctx: CanvasRenderingContext2D,
+  line: WebLine,
+  progress: number,
+  color: string,
+  strandCount: number,
+  strandPhase: number,
+  t: number,
+  trailProgress: number,
+  cameraDepth: number,
+) {
+  const pts = line.pts
+  const startIdx = Math.floor(trailProgress * (pts.length - 1))
+  const endIdx = Math.floor(progress * (pts.length - 1))
+
+  if (endIdx - startIdx < 2) return
+
+  const visiblePts = pts.slice(startIdx, endIdx + 1)
+  const totalPts = visiblePts.length
+
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+
+  drawGlowPolyline(
+    ctx,
+    visiblePts,
+    color,
+    0.45 + cameraDepth * 0.35,
+    1.4 + cameraDepth * 1.4,
   )
+
+  for (let s = 0; s < strandCount; s++) {
+    const phaseOffset = (s / strandCount) * Math.PI * 2 + strandPhase
+    const strandColor = s === 1 ? '#ffffff' : color
+
+    ctx.beginPath()
+
+    for (let i = 0; i < totalPts; i++) {
+      const pt = visiblePts[i]
+      const localT = i / Math.max(totalPts - 1, 1)
+
+      const segProgress =
+        startIdx / pts.length + localT * ((endIdx - startIdx) / pts.length)
+
+      const twistAngle = segProgress * Math.PI * 8 + phaseOffset + t * 0.035
+      const twistAmp = 3.2 + cameraDepth * 3
+
+      let perpX = 0
+      let perpY = 0
+
+      if (i < totalPts - 1) {
+        const next = visiblePts[i + 1]
+        const dx = next.x - pt.x
+        const dy = next.y - pt.y
+        const len = Math.sqrt(dx * dx + dy * dy) || 1
+
+        perpX = -dy / len
+        perpY = dx / len
+      }
+
+      const twist = Math.sin(twistAngle) * twistAmp
+      const rx = pt.x + perpX * twist
+      const ry = pt.y + perpY * twist
+
+      if (i === 0) ctx.moveTo(rx, ry)
+      else ctx.lineTo(rx, ry)
+    }
+
+    const strandAlpha = s === 1 ? 0.68 : 0.48
+
+    ctx.strokeStyle = hexToRgba(strandColor, strandAlpha)
+    ctx.lineWidth = s === 1 ? 0.75 : 1.15
+    ctx.lineCap = 'round'
+    ctx.shadowBlur = s === 1 ? 5 : 11
+    ctx.shadowColor = color
+    ctx.stroke()
+  }
+
+  const leadPt = visiblePts[visiblePts.length - 1]
+
+  if (leadPt) {
+    const glow = ctx.createRadialGradient(
+      leadPt.x,
+      leadPt.y,
+      0,
+      leadPt.x,
+      leadPt.y,
+      24,
+    )
+
+    glow.addColorStop(0, 'rgba(255,255,255,0.92)')
+    glow.addColorStop(0.25, hexToRgba(color, 0.72))
+    glow.addColorStop(1, hexToRgba(color, 0))
+
+    ctx.beginPath()
+    ctx.arc(leadPt.x, leadPt.y, 24, 0, Math.PI * 2)
+    ctx.fillStyle = glow
+    ctx.fill()
+  }
+
+  ctx.restore()
 }
 
-// ─── Main export ───────────────────────────────────────────────────────────────
+// ─── Main Vistara canvas ───────────────────────────────────────────────────────
 
 export function VistaraVoid({ onBack }: { onBack?: () => void }) {
-  const [nodes, setNodes] = useState<WebNode[]>(() => buildWebNodes())
-  const [lines, setLines] = useState<Map<string, LineState>>(new Map())
-  const [currents, setCurrents] = useState<ActiveCurrent[]>([])
-  const [signalWave, setSignalWave] = useState<SignalWave | null>(null)
-  const [systemState, setSystemState] = useState<SystemState>('ambient')
-  const [activeNodeIdx, setActiveNodeIdx] = useState<number | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const animRef = useRef<number>(0)
+
+  const stateRef = useRef({
+    nodes: [] as Node[],
+    lines: [] as WebLine[],
+    stars: [] as Star[],
+    currents: [] as RopeCurrent[],
+    signalWave: null as SignalWave | null,
+    cameraDepth: 0,
+    dragX: 0,
+    dragY: 0,
+    smoothDragX: 0,
+    smoothDragY: 0,
+    t: 0,
+    lastCurrentSpawn: 0,
+    currentInterval: 700,
+    systemState: 'ambient' as 'ambient' | 'user-active' | 'node-locked',
+    globalOpacity: 1,
+    inactivityTimer: null as ReturnType<typeof setTimeout> | null,
+    activeNodeIdx: null as number | null,
+  })
+
   const [openProduct, setOpenProduct] = useState<VistaraProduct | null>(null)
   const [globalOpacity, setGlobalOpacity] = useState(1)
-  const [scrollT, setScrollT] = useState(0)
-  const [dragX, setDragX] = useState(0)
-  const [dragY, setDragY] = useState(0)
-  const [dwellNodeIdx, setDwellNodeIdx] = useState<number | null>(null)
-  const [inCave, setInCave] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDragging = useRef(false)
   const lastDrag = useRef({ x: 0, y: 0 })
-  const dragAccum = useRef({ x: 0, y: 0 })
-  const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const dwellActive = useRef(false)
+  const scrollRef = useRef(0)
+  const touchStartY = useRef(0)
 
-  // ── Inactivity timer ────────────────────────────────────────────────────────
+  // ── Inactivity ───────────────────────────────────────────────────────────────
+
   const scheduleInactivity = useCallback(() => {
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
-    const delay = INACTIVITY_MIN_MS + Math.random() * (INACTIVITY_MAX_MS - INACTIVITY_MIN_MS)
-    inactivityTimer.current = setTimeout(() => {
+    const s = stateRef.current
+
+    if (s.systemState === 'node-locked') return
+
+    if (s.inactivityTimer) clearTimeout(s.inactivityTimer)
+
+    const delay =
+      INACTIVITY_MIN_MS +
+      Math.random() * (INACTIVITY_MAX_MS - INACTIVITY_MIN_MS)
+
+    s.inactivityTimer = setTimeout(() => {
       setGlobalOpacity(0)
+      s.globalOpacity = 0
+
       setTimeout(() => {
-        setActiveNodeIdx(null)
-        setOpenProduct(null)
-        setNodes(prev => prev.map(n => ({ ...n, isActive: false, isDormant: false, glowIntensity: 0 })))
-        setSystemState('black')
+        s.activeNodeIdx = null
+        s.systemState = 'ambient'
+        s.currents = []
+        s.nodes.forEach(n => {
+          n.isActive = false
+          n.isDormant = false
+          n.glowIntensity = n.productIdx >= 0 ? 0.28 : 0
+        })
+        s.signalWave = null
+
         setTimeout(() => {
-          setSystemState('ambient')
+          s.globalOpacity = 1
           setGlobalOpacity(1)
           scheduleInactivity()
         }, BLACK_PAUSE_MS)
@@ -567,302 +783,738 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
     }, delay)
   }, [])
 
+  // ── Init canvas ──────────────────────────────────────────────────────────────
+
   useEffect(() => {
+    setMounted(true)
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const s = stateRef.current
+
+    const resize = () => {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+
+      const { nodes, lines } = buildGraph(canvas.width, canvas.height)
+
+      s.nodes = nodes
+      s.lines = lines
+      s.stars = makeStars(canvas.width, canvas.height)
+      s.currents = []
+    }
+
+    resize()
+    window.addEventListener('resize', resize)
     scheduleInactivity()
-    return () => { if (inactivityTimer.current) clearTimeout(inactivityTimer.current) }
+
+    const draw = () => {
+      const w = canvas.width
+      const h = canvas.height
+      const ctx = canvas.getContext('2d')
+
+      if (!ctx) return
+
+      s.t++
+      const t = s.t
+
+      s.smoothDragX += (s.dragX * 0.005 - s.smoothDragX) * 0.06
+      s.smoothDragY += (s.dragY * 0.003 - s.smoothDragY) * 0.06
+
+      const camOffX = Math.sin(s.smoothDragX) * w * 0.12
+      const camOffY = Math.sin(s.smoothDragY) * h * 0.08
+      const camZ = s.cameraDepth
+
+      ctx.clearRect(0, 0, w, h)
+      ctx.globalAlpha = 1
+
+      drawStarVoid(ctx, s.stars, w, h, t, camOffX, camOffY, s.globalOpacity)
+
+      ctx.globalAlpha = s.globalOpacity
+
+      // ── Neural web lines ────────────────────────────────────────────────────
+
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+
+      s.lines.forEach(line => {
+        const fromNode = s.nodes[line.from]
+        const toNode = s.nodes[line.to]
+
+        const avgDepth = (fromNode.depth + toNode.depth) / 2
+        const depthVis = 0.45 + camZ * 0.55
+
+        const dormantPenalty =
+          fromNode.isDormant || toNode.isDormant ? 0.25 : 1
+
+        const activeLine = s.currents.some(curr => {
+          for (let i = 0; i < curr.linePath.length - 1; i++) {
+            const a = curr.linePath[i]
+            const b = curr.linePath[i + 1]
+
+            if (
+              (a === line.from && b === line.to) ||
+              (a === line.to && b === line.from)
+            ) {
+              return true
+            }
+          }
+
+          return false
+        })
+
+        const lineOpacity =
+          (line.baseOpacity * line.energy * depthVis +
+            (activeLine ? 0.055 : 0)) *
+          dormantPenalty *
+          s.globalOpacity
+
+        if (lineOpacity < 0.003) return
+
+        const offX = camOffX * (1 - avgDepth * 0.5)
+        const offY = camOffY * (1 - avgDepth * 0.5)
+
+        ctx.save()
+        ctx.translate(offX, offY)
+
+        const colorPick = activeLine
+          ? CURRENT_COLORS[Math.floor((line.energy * 999) % CURRENT_COLORS.length)]
+          : '#bfc6ff'
+
+        drawGlowPolyline(
+          ctx,
+          line.pts,
+          colorPick,
+          activeLine ? lineOpacity * 2.4 : lineOpacity,
+          activeLine ? 1.15 + avgDepth * 1.2 : 0.45 + avgDepth * 0.45,
+        )
+
+        drawMicroNodesOnLine(ctx, line.pts, t, lineOpacity * 1.6)
+
+        ctx.restore()
+      })
+
+      ctx.restore()
+
+      // ── Currents ────────────────────────────────────────────────────────────
+
+      const now = performance.now()
+
+      if (
+        (s.systemState === 'ambient' || s.systemState === 'user-active') &&
+        now - s.lastCurrentSpawn > s.currentInterval
+      ) {
+        const maxC = s.systemState === 'user-active' ? 3 : 2
+        const active = s.currents.filter(c => c.active).length
+
+        if (active < maxC) {
+          const nc = spawnCurrent(s.nodes, `c-${now}`)
+
+          if (nc) {
+            s.currents.push(nc)
+            s.lastCurrentSpawn = now
+            s.currentInterval =
+              s.systemState === 'user-active'
+                ? 260 + Math.random() * 360
+                : 500 + Math.random() * 900
+          }
+        }
+      }
+
+      s.currents = s.currents.filter(c => c.active)
+
+      s.currents.forEach(curr => {
+        if (!curr.active || curr.linePath.length < 2) return
+
+        const fromIdx = curr.linePath[curr.segIdx]
+        const toIdx = curr.linePath[curr.segIdx + 1]
+
+        if (toIdx === undefined) {
+          curr.active = false
+          return
+        }
+
+        const line = s.lines.find(
+          l =>
+            (l.from === fromIdx && l.to === toIdx) ||
+            (l.from === toIdx && l.to === fromIdx),
+        )
+
+        if (!line) {
+          curr.segIdx++
+          curr.progress = 0
+          return
+        }
+
+        const avgDepth = (s.nodes[fromIdx].depth + s.nodes[toIdx].depth) / 2
+        const offX = camOffX * (1 - avgDepth * 0.5)
+        const offY = camOffY * (1 - avgDepth * 0.5)
+
+        const pts = line.from === fromIdx ? line.pts : [...line.pts].reverse()
+
+        curr.progress += curr.speed * (s.systemState === 'user-active' ? 1.25 : 1)
+        const trailStart = Math.max(0, curr.progress - 0.38)
+
+        ctx.save()
+        ctx.translate(offX, offY)
+
+        drawRopeCurrent(
+          ctx,
+          { ...line, pts },
+          Math.min(curr.progress, 1),
+          curr.color,
+          curr.strandCount,
+          curr.strandPhase + t * 0.008,
+          t,
+          trailStart,
+          camZ,
+        )
+
+        ctx.restore()
+
+        if (curr.progress >= 1) {
+          const destNode = s.nodes[toIdx]
+
+          if (
+            destNode.productIdx >= 0 &&
+            !destNode.isDormant &&
+            !destNode.isActive
+          ) {
+            destNode.glowIntensity = 1
+
+            setTimeout(() => {
+              if (!destNode.isActive) destNode.glowIntensity = 0.32
+            }, 1800 + Math.random() * 600)
+          }
+
+          curr.segIdx++
+          curr.progress = 0
+
+          if (curr.segIdx >= curr.linePath.length - 1) {
+            curr.active = false
+          }
+        }
+      })
+
+      // ── Signal wave ─────────────────────────────────────────────────────────
+
+      const wave = s.signalWave
+
+      if (wave && now - wave.lastStep > 70) {
+        wave.lastStep = now
+
+        const next: number[] = []
+
+        wave.frontier.forEach(idx => {
+          s.nodes[idx].connections.forEach(nb => {
+            if (!wave.reached.has(nb)) {
+              wave.reached.add(nb)
+              next.push(nb)
+
+              const nbNode = s.nodes[nb]
+
+              if (nbNode.productIdx >= 0) {
+                if (wave.type === 'sleep') {
+                  nbNode.glowIntensity = 0.22
+                  nbNode.isDormant = true
+
+                  setTimeout(() => {
+                    nbNode.glowIntensity = 0.08
+                  }, 300)
+                } else {
+                  nbNode.isDormant = false
+                  nbNode.glowIntensity = 0.38
+                }
+              }
+            }
+          })
+        })
+
+        wave.frontier = next
+
+        if (next.length === 0) {
+          s.signalWave = null
+        }
+      }
+
+      // ── Product spheres ─────────────────────────────────────────────────────
+
+      s.nodes.forEach((node, i) => {
+        if (node.productIdx < 0) return
+
+        const product = VISTARA_PRODUCTS[node.productIdx]
+
+        const depthScale = 0.55 + node.depth * 0.75
+        const offX = camOffX * (1 - node.depth * 0.5)
+        const offY = camOffY * (1 - node.depth * 0.5)
+
+        const nx = node.x + offX
+        const ny = node.y + offY
+
+        const baseGlow = node.isActive
+          ? 1
+          : node.isDormant
+            ? 0.08
+            : Math.max(node.glowIntensity, 0.34)
+
+        const nodeR =
+          NODE_RADIUS *
+          depthScale *
+          (node.isActive ? 1.5 : 1.25) *
+          (0.9 + camZ * 0.45)
+
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+
+        node.connections.forEach(nbIdx => {
+          const nb = s.nodes[nbIdx]
+
+          const line = s.lines.find(
+            l =>
+              (l.from === i && l.to === nbIdx) ||
+              (l.from === nbIdx && l.to === i),
+          )
+
+          if (!line) return
+
+          const avgDepth = (node.depth + nb.depth) / 2
+          const lx = camOffX * (1 - avgDepth * 0.5)
+          const ly = camOffY * (1 - avgDepth * 0.5)
+
+          ctx.save()
+          ctx.translate(lx, ly)
+
+          drawGlowPolyline(
+            ctx,
+            line.from === i ? line.pts : [...line.pts].reverse(),
+            '#dfe6ff',
+            baseGlow * 0.035,
+            0.8,
+          )
+
+          ctx.restore()
+        })
+
+        ctx.restore()
+
+        drawProductSphere(
+          ctx,
+          nx,
+          ny,
+          nodeR,
+          product.name,
+          baseGlow,
+          node.isActive,
+          t,
+        )
+
+        node.labelOpacity += ((baseGlow > 0.12 ? 1 : 0) - node.labelOpacity) * 0.06
+      })
+
+      animRef.current = requestAnimationFrame(draw)
+    }
+
+    animRef.current = requestAnimationFrame(draw)
+
+    return () => {
+      cancelAnimationFrame(animRef.current)
+      window.removeEventListener('resize', resize)
+
+      const s = stateRef.current
+
+      if (s.inactivityTimer) clearTimeout(s.inactivityTimer)
+    }
   }, [scheduleInactivity])
 
-  // ── Scroll ──────────────────────────────────────────────────────────────────
+  // ── Scroll → camera depth ────────────────────────────────────────────────────
+
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      setScrollT(prev => Math.min(Math.max(prev + e.deltaY / SCROLL_DEPTH_PX, 0), 1))
-      // Entering cave
-      setInCave(prev => scrollT > 0.4 ? true : prev)
+
+      scrollRef.current = Math.min(
+        Math.max(scrollRef.current + e.deltaY / 600, 0),
+        1,
+      )
+
+      stateRef.current.cameraDepth = scrollRef.current
     }
+
     window.addEventListener('wheel', onWheel, { passive: false })
+
     return () => window.removeEventListener('wheel', onWheel)
-  }, [scrollT])
-
-  // ── Drag ────────────────────────────────────────────────────────────────────
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    isDragging.current = true
-    lastDrag.current = { x: e.clientX, y: e.clientY }
-    setSystemState(s => s === 'ambient' ? 'user-active' : s)
-    scheduleInactivity()
-  }, [scheduleInactivity])
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isDragging.current) return
-    dragAccum.current.x += e.clientX - lastDrag.current.x
-    dragAccum.current.y += e.clientY - lastDrag.current.y
-    lastDrag.current = { x: e.clientX, y: e.clientY }
-    setDragX(dragAccum.current.x)
-    setDragY(dragAccum.current.y)
   }, [])
-
-  const onPointerUp = useCallback(() => { isDragging.current = false }, [])
 
   // ── Touch ───────────────────────────────────────────────────────────────────
-  const touchStart = useRef({ x: 0, y: 0 })
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+
+  const onTouchStart = useCallback((e: ReactTouchEvent) => {
+    touchStartY.current = e.touches[0].clientY
     isDragging.current = true
-    lastDrag.current = touchStart.current
-    scheduleInactivity()
-  }, [scheduleInactivity])
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current) return
-    const dx = e.touches[0].clientX - lastDrag.current.x
-    const dy = e.touches[0].clientY - lastDrag.current.y
-    dragAccum.current.x += dx
-    dragAccum.current.y += dy
-    lastDrag.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-    setDragX(dragAccum.current.x)
-    setDragY(dragAccum.current.y)
-  }, [])
-
-  const onTouchEnd = useCallback(() => { isDragging.current = false }, [])
-
-  // ── Dwell ───────────────────────────────────────────────────────────────────
-  const handleDwellNode = useCallback((idx: number | null) => {
-    if (dwellTimer.current) clearTimeout(dwellTimer.current)
-    setDwellNodeIdx(idx)
-    if (idx !== null && !dwellActive.current) {
-      dwellActive.current = true
-      // Camera halts here for NODE_DWELL_MS — handled by CameraRig's lerp slowing
-      dwellTimer.current = setTimeout(() => {
-        dwellActive.current = false
-      }, NODE_DWELL_MS)
+    lastDrag.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
     }
   }, [])
 
-  // ── Node activation ─────────────────────────────────────────────────────────
-  const handleNodeActivate = useCallback((idx: number) => {
-    setActiveNodeIdx(idx)
-    setOpenProduct(VISTARA_PRODUCTS[idx])
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
-    setSystemState('node-locked')
-    scheduleInactivity()
-  }, [scheduleInactivity])
+  const onTouchMove = useCallback(
+    (e: ReactTouchEvent) => {
+      const dy = e.touches[0].clientY - touchStartY.current
 
-  // ── Panel close ─────────────────────────────────────────────────────────────
+      scrollRef.current = Math.min(
+        Math.max(scrollRef.current - dy * 0.002, 0),
+        1,
+      )
+
+      stateRef.current.cameraDepth = scrollRef.current
+
+      const dx2 = e.touches[0].clientX - lastDrag.current.x
+      const dy2 = e.touches[0].clientY - lastDrag.current.y
+
+      stateRef.current.dragX += dx2
+      stateRef.current.dragY += dy2
+
+      lastDrag.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      }
+
+      stateRef.current.systemState = 'user-active'
+      scheduleInactivity()
+    },
+    [scheduleInactivity],
+  )
+
+  // ── Drag → parallax ─────────────────────────────────────────────────────────
+
+  const onPointerDown = useCallback(
+    (e: ReactPointerEvent) => {
+      isDragging.current = true
+
+      lastDrag.current = {
+        x: e.clientX,
+        y: e.clientY,
+      }
+
+      stateRef.current.systemState = 'user-active'
+      scheduleInactivity()
+    },
+    [scheduleInactivity],
+  )
+
+  const onPointerMove = useCallback((e: ReactPointerEvent) => {
+    if (!isDragging.current) return
+
+    stateRef.current.dragX += e.clientX - lastDrag.current.x
+    stateRef.current.dragY += e.clientY - lastDrag.current.y
+
+    lastDrag.current = {
+      x: e.clientX,
+      y: e.clientY,
+    }
+  }, [])
+
+  const onPointerUp = useCallback(() => {
+    isDragging.current = false
+  }, [])
+
+  // ── Node click ───────────────────────────────────────────────────────────────
+
+  const lockNode = useCallback(
+    (idx: number) => {
+      const s = stateRef.current
+
+      s.activeNodeIdx = idx
+      s.systemState = 'node-locked'
+
+      if (s.inactivityTimer) {
+        clearTimeout(s.inactivityTimer)
+        s.inactivityTimer = null
+      }
+
+      s.signalWave = {
+        sourceIdx: idx,
+        reached: new Set([idx]),
+        frontier: [idx],
+        color: CURRENT_COLORS[Math.floor(Math.random() * CURRENT_COLORS.length)],
+        type: 'sleep',
+        lastStep: performance.now(),
+      }
+
+      s.nodes.forEach((n, j) => {
+        n.isActive = j === idx
+
+        if (j !== idx && n.productIdx >= 0) {
+          n.isDormant = true
+        }
+      })
+
+      setOpenProduct(VISTARA_PRODUCTS[s.nodes[idx].productIdx])
+    },
+    [],
+  )
+
+  const handleCanvasClick = useCallback(
+    (e: ReactMouseEvent<HTMLCanvasElement>) => {
+      const s = stateRef.current
+
+      if (s.systemState !== 'node-locked') {
+        s.systemState = 'user-active'
+      }
+
+      scheduleInactivity()
+
+      const rect = canvasRef.current!.getBoundingClientRect()
+      const mx = e.clientX - rect.left
+      const my = e.clientY - rect.top
+
+      const camOffX = Math.sin(s.smoothDragX) * rect.width * 0.12
+      const camOffY = Math.sin(s.smoothDragY) * rect.height * 0.08
+
+      let hitIdx = -1
+
+      s.nodes.forEach((node, i) => {
+        if (node.productIdx < 0) return
+
+        const offX = camOffX * (1 - node.depth * 0.5)
+        const offY = camOffY * (1 - node.depth * 0.5)
+
+        const nx = node.x + offX
+        const ny = node.y + offY
+
+        const depthScale = 0.55 + node.depth * 0.75
+        const hitR =
+          NODE_RADIUS *
+            depthScale *
+            1.55 *
+            (0.9 + s.cameraDepth * 0.45) +
+          24
+
+        const dist = Math.hypot(mx - nx, my - ny)
+
+        if (dist < hitR) hitIdx = i
+      })
+
+      if (hitIdx >= 0) {
+        lockNode(hitIdx)
+      }
+    },
+    [scheduleInactivity, lockNode],
+  )
+
   const handlePanelClose = useCallback(() => {
     setOpenProduct(null)
-    const wakeWave = createSignalWave(activeNodeIdx ?? 0, 'wake')
-    setSignalWave(wakeWave)
-    setNodes(prev => prev.map(n => ({
-      ...n, isActive: false, isDormant: false,
-    })))
-    setActiveNodeIdx(null)
-    setSystemState('user-active')
-    scheduleInactivity()
-  }, [activeNodeIdx, scheduleInactivity])
 
-  const isBlack = systemState === 'black'
+    const s = stateRef.current
+    const source = s.activeNodeIdx ?? 0
+
+    s.signalWave = {
+      sourceIdx: source,
+      reached: new Set([source]),
+      frontier: [source],
+      color: '#ffffff',
+      type: 'wake',
+      lastStep: performance.now(),
+    }
+
+    s.nodes.forEach(n => {
+      n.isActive = false
+
+      if (n.productIdx >= 0) {
+        n.isDormant = false
+        n.glowIntensity = 0.34
+      }
+    })
+
+    s.activeNodeIdx = null
+    s.systemState = 'user-active'
+
+    scheduleInactivity()
+  }, [scheduleInactivity])
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: '#000', overflow: 'hidden' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: '#000',
+        overflow: 'hidden',
+        cursor: isDragging.current ? 'grabbing' : 'grab',
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerUp}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
+      onTouchEnd={onPointerUp}
       onClick={() => {
-        if (systemState === 'ambient') {
-          setSystemState('user-active')
+        if (stateRef.current.systemState !== 'node-locked') {
+          stateRef.current.systemState = 'user-active'
           scheduleInactivity()
         }
       }}
     >
-      {/* Three.js canvas */}
-      <motion.div
+      <motion.canvas
+        ref={canvasRef}
         animate={{ opacity: globalOpacity }}
-        transition={{ duration: FADE_OUT_MS / 1000, ease: 'easeInOut' }}
-        style={{ position: 'absolute', inset: 0 }}
+        transition={{ duration: FADE_OUT_MS / 1000 }}
+        onClick={handleCanvasClick}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+        }}
+      />
+
+      {/* Canvas now draws labels inside product spheres. Old HTML labels disabled. */}
+      {false &&
+        mounted &&
+        stateRef.current.nodes.map((node, i) => {
+          if (node.productIdx < 0) return null
+
+          return <div key={i} />
+        })}
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5 }}
+        style={{
+          position: 'fixed',
+          bottom: '6%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10,
+          pointerEvents: 'none',
+          textAlign: 'center',
+        }}
       >
-        {!isBlack && (
-          <Canvas
-            camera={{ position: [0, 20, 180], fov: 65, near: 0.5, far: 2000 }}
-            style={{ position: 'absolute', inset: 0 }}
-            gl={{ antialias: true, alpha: false }}
-          >
-            <VistaraScene
-              nodes={nodes} lines={lines}
-              currents={currents} signalWave={signalWave}
-              systemState={systemState}
-              setNodes={setNodes} setLines={setLines}
-              setCurrents={setCurrents} setSignalWave={setSignalWave}
-              globalOpacity={globalOpacity}
-              onNodeActivate={handleNodeActivate}
-              activeNodeIdx={activeNodeIdx}
-              scrollT={scrollT} dragX={dragX} dragY={dragY}
-              onDwellNode={handleDwellNode}
-            />
-          </Canvas>
-        )}
+        <p
+          style={{
+            fontFamily: 'system-ui',
+            fontSize: '9px',
+            letterSpacing: '0.25em',
+            color: 'rgba(255,255,255,0.18)',
+            textTransform: 'uppercase',
+          }}
+        >
+          Scroll to enter the web · Drag to rotate
+        </p>
       </motion.div>
 
-      {/* Peripheral glow — nodes outside frame cast edge light */}
-      <PeripheralEdgeGlow nodes={nodes} activeNodeIdx={activeNodeIdx} />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8 }}
+        style={{
+          position: 'fixed',
+          top: '22px',
+          right: '22px',
+          zIndex: 20,
+          pointerEvents: 'none',
+          textAlign: 'right',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: '11px',
+            letterSpacing: '0.35em',
+            color: 'rgba(255,255,255,0.45)',
+            textTransform: 'uppercase',
+          }}
+        >
+          Vistāra
+        </div>
 
-      {/* Dwell indicator */}
-      <AnimatePresence>
-        {dwellNodeIdx !== null && !openProduct && (
-          <motion.div
-            key={dwellNodeIdx}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            style={{
-              position: 'fixed',
-              bottom: '12%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 20,
-              pointerEvents: 'none',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{
-              fontFamily: 'system-ui',
-              fontSize: '9px',
-              letterSpacing: '0.28em',
-              color: 'rgba(255,255,255,0.25)',
-              textTransform: 'uppercase',
-            }}>
-              Tap to enter · {VISTARA_PRODUCTS[nodes[dwellNodeIdx]?.productIndex]?.name ?? ''}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <div
+          style={{
+            fontFamily: 'system-ui',
+            fontSize: '8px',
+            letterSpacing: '0.2em',
+            color: 'rgba(255,255,255,0.18)',
+            textTransform: 'uppercase',
+            marginTop: '3px',
+          }}
+        >
+          The Manifestations
+        </div>
+      </motion.div>
 
-      {/* Cave hint */}
-      <AnimatePresence>
-        {inCave && !openProduct && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-            style={{
-              position: 'fixed', bottom: '5%', left: '50%',
-              transform: 'translateX(-50%)', zIndex: 20, pointerEvents: 'none',
-            }}
-          >
-            <p style={{ fontFamily: 'system-ui', fontSize: '9px', letterSpacing: '0.22em', color: 'rgba(255,255,255,0.18)', textTransform: 'uppercase' }}>
-              Drag to navigate
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Product glass panel */}
-      <AnimatePresence>
-        {openProduct && (
-          <ProductPanel product={openProduct} onClose={handlePanelClose} />
-        )}
-      </AnimatePresence>
-
-      {/* Back button */}
       {onBack && (
         <motion.button
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
           onClick={onBack}
           style={{
-            position: 'fixed', top: '22px', left: '22px', zIndex: 100,
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '20px', padding: '7px 14px',
-            color: 'rgba(255,255,255,0.3)', fontSize: '10px',
-            letterSpacing: '0.2em', textTransform: 'uppercase',
-            fontFamily: 'system-ui', cursor: 'pointer',
+            position: 'fixed',
+            top: '22px',
+            left: '22px',
+            zIndex: 20,
+            background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '20px',
+            padding: '7px 14px',
+            color: 'rgba(255,255,255,0.3)',
+            fontSize: '10px',
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            fontFamily: 'system-ui',
+            cursor: 'pointer',
           }}
         >
           ← Śūnya
         </motion.button>
       )}
 
-      {/* VISTĀRA wordmark */}
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
-        style={{
-          position: 'fixed', top: '22px', right: '22px', zIndex: 20,
-          pointerEvents: 'none', textAlign: 'right',
-        }}
-      >
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '11px', letterSpacing: '0.35em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>
-          Vistāra
-        </div>
-        <div style={{ fontFamily: 'system-ui', fontSize: '8px', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', marginTop: '3px' }}>
-          The Manifestations
-        </div>
-      </motion.div>
-    </div>
-  )
-}
-
-// ─── Peripheral edge glow ──────────────────────────────────────────────────────
-// Nodes outside the camera frustum cast a faint glow at the nearest screen edge
-
-function PeripheralEdgeGlow({ nodes, activeNodeIdx }: {
-  nodes: WebNode[]; activeNodeIdx: number | null
-}) {
-  // CSS radial gradients at screen edges for off-camera node hints
-  const glowingNodes = nodes.filter(n =>
-    n.productIndex >= 0 && (n.glowIntensity > 0.1 || n.isActive)
-  )
-
-  if (glowingNodes.length === 0) return null
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 5 }}>
-      {/* Subtle edge glows — cycle through positions */}
-      {[
-        { pos: '0 50%', dir: 'to right' },
-        { pos: '100% 50%', dir: 'to left' },
-        { pos: '50% 0', dir: 'to bottom' },
-        { pos: '50% 100%', dir: 'to top' },
-      ].map((edge, i) => (
-        <motion.div
-          key={i}
-          animate={{
-            opacity: [0, 0.04, 0, 0.03, 0],
-          }}
-          transition={{
-            duration: 4 + i * 1.5,
-            repeat: Infinity,
-            delay: i * 1.2,
-            ease: 'easeInOut',
-          }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: `radial-gradient(ellipse 30% 20% at ${edge.pos}, #7b2fff 0%, transparent 100%)`,
-          }}
-        />
-      ))}
+      <AnimatePresence>
+        {openProduct && (
+          <ProductPanel product={openProduct} onClose={handlePanelClose} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
 // ─── Product glass panel ───────────────────────────────────────────────────────
 
-function ProductPanel({ product, onClose }: {
-  product: VistaraProduct; onClose: () => void
+function ProductPanel({
+  product,
+  onClose,
+}: {
+  product: VistaraProduct
+  onClose: () => void
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+      }}
     >
       <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         onClick={onClose}
-        style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.55)',
+          backdropFilter: 'blur(6px)',
+        }}
       />
 
       <motion.div
@@ -871,36 +1523,114 @@ function ProductPanel({ product, onClose }: {
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         style={{
-          position: 'relative', zIndex: 1,
-          width: '100%', maxWidth: '480px',
+          position: 'relative',
+          zIndex: 1,
+          width: '100%',
+          maxWidth: '480px',
           background: 'rgba(255,255,255,0.03)',
           border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '20px', backdropFilter: 'blur(24px)',
+          borderRadius: '20px',
+          backdropFilter: 'blur(24px)',
           padding: '36px',
         }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '24px',
+          }}
+        >
           <div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase', marginBottom: '8px' }}>
+            <h2
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: '22px',
+                letterSpacing: '0.25em',
+                color: 'rgba(255,255,255,0.9)',
+                textTransform: 'uppercase',
+                marginBottom: '8px',
+              }}
+            >
               {product.name}
             </h2>
-            <p style={{ fontFamily: 'system-ui', fontSize: '10px', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
+
+            <p
+              style={{
+                fontFamily: 'system-ui',
+                fontSize: '10px',
+                letterSpacing: '0.2em',
+                color: 'rgba(255,255,255,0.35)',
+                textTransform: 'uppercase',
+              }}
+            >
               {product.tagline}
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', padding: '6px 10px', cursor: 'pointer', fontSize: '12px', fontFamily: 'system-ui' }}>✕</button>
+
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '8px',
+              color: 'rgba(255,255,255,0.4)',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            ✕
+          </button>
         </div>
 
-        <p style={{ fontFamily: 'system-ui', fontSize: '14px', lineHeight: '1.75', color: 'rgba(255,255,255,0.65)', letterSpacing: '0.02em', marginBottom: '28px' }}>
+        <p
+          style={{
+            fontFamily: 'system-ui',
+            fontSize: '14px',
+            lineHeight: '1.75',
+            color: 'rgba(255,255,255,0.65)',
+            letterSpacing: '0.02em',
+            marginBottom: '28px',
+          }}
+        >
           {product.description}
         </p>
 
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'rgba(255,255,255,0.7)', fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'system-ui', cursor: 'pointer' }}>
+          <button
+            style={{
+              flex: 1,
+              padding: '12px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '10px',
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: '10px',
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              fontFamily: 'system-ui',
+              cursor: 'pointer',
+            }}
+          >
             Learn More
           </button>
-          <button style={{ padding: '12px 20px', background: 'rgba(123,47,255,0.18)', border: '1px solid rgba(123,47,255,0.3)', borderRadius: '10px', color: 'rgba(200,160,255,0.9)', fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'system-ui', cursor: 'pointer' }}>
+
+          <button
+            style={{
+              padding: '12px 20px',
+              background: 'rgba(123,47,255,0.18)',
+              border: '1px solid rgba(123,47,255,0.3)',
+              borderRadius: '10px',
+              color: 'rgba(200,160,255,0.9)',
+              fontSize: '10px',
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              fontFamily: 'system-ui',
+              cursor: 'pointer',
+            }}
+          >
             Engage
           </button>
         </div>
