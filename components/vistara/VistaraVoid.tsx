@@ -21,8 +21,8 @@ import {
   BLACK_PAUSE_MS,
   CURRENT_COLORS,
   NODE_RADIUS,
-} from '../lib/config'
-import type { VistaraProduct } from '../lib/config'
+} from '@/lib/config'
+import type { VistaraProduct } from '@/lib/config'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -101,7 +101,7 @@ function hexToRgba(hex: string, alpha: number) {
   const g = (num >> 8) & 255
   const b = num & 255
 
-  return `rgba(${r},${g},${b},${alpha})`
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')'
 }
 
 function makeStars(w: number, h: number, count = 620): Star[] {
@@ -213,13 +213,13 @@ function drawStarVoid(
 
     ctx.beginPath()
     ctx.arc(px, py, star.r * (0.6 + star.z), 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(220,225,255,${alpha})`
+    ctx.fillStyle = 'rgba(220,225,255,' + alpha + ')'
     ctx.fill()
 
     if (star.z > 0.86) {
       ctx.beginPath()
       ctx.arc(px, py, star.r * 4.5, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(125,90,255,${alpha * 0.14})`
+      ctx.fillStyle = 'rgba(125,90,255,' + alpha * 0.14 + ')'
       ctx.fill()
     }
   })
@@ -262,7 +262,7 @@ function drawGlowPolyline(
   ctx.beginPath()
   ctx.moveTo(pts[0].x, pts[0].y)
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-  ctx.strokeStyle = `rgba(235,240,255,${alpha})`
+  ctx.strokeStyle = 'rgba(235,240,255,' + alpha + ')'
   ctx.lineWidth = Math.max(0.42, width * 0.5)
   ctx.lineCap = 'round'
   ctx.shadowBlur = 0
@@ -289,7 +289,7 @@ function drawMicroNodesOnLine(
 
     ctx.beginPath()
     ctx.arc(p.x, p.y, 0.55 + tw * 0.8, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(230,235,255,${a})`
+    ctx.fillStyle = 'rgba(230,235,255,' + a + ')'
     ctx.fill()
   }
 
@@ -316,9 +316,9 @@ function drawProductSphere(
   const auraR = r * (4.8 + glow * 2.3)
   const aura = ctx.createRadialGradient(x, y, 0, x, y, auraR)
 
-  aura.addColorStop(0, `rgba(210,220,255,${0.18 + glow * 0.36})`)
-  aura.addColorStop(0.24, `rgba(130,90,255,${0.11 + glow * 0.25})`)
-  aura.addColorStop(0.7, `rgba(70,40,180,${0.03 + glow * 0.08})`)
+  aura.addColorStop(0, 'rgba(210,220,255,' + (0.18 + glow * 0.36) + ')')
+  aura.addColorStop(0.24, 'rgba(130,90,255,' + (0.11 + glow * 0.25) + ')')
+  aura.addColorStop(0.7, 'rgba(70,40,180,' + (0.03 + glow * 0.08) + ')')
   aura.addColorStop(1, 'rgba(0,0,0,0)')
 
   ctx.beginPath()
@@ -351,7 +351,7 @@ function drawProductSphere(
 
   ctx.beginPath()
   ctx.arc(x, y, r, 0, Math.PI * 2)
-  ctx.strokeStyle = `rgba(225,230,255,${0.3 + glow * 0.48})`
+  ctx.strokeStyle = 'rgba(225,230,255,' + (0.3 + glow * 0.48) + ')'
   ctx.lineWidth = active ? 1.5 : 0.9
   ctx.shadowBlur = active ? 22 : 12
   ctx.shadowColor = 'rgba(170,140,255,0.9)'
@@ -359,7 +359,7 @@ function drawProductSphere(
 
   ctx.beginPath()
   ctx.arc(x - r * 0.28, y - r * 0.34, r * 0.16, 0, Math.PI * 2)
-  ctx.fillStyle = `rgba(255,255,255,${0.14 + glow * 0.38})`
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.14 + glow * 0.38) + ')'
   ctx.fill()
 
   ctx.globalCompositeOperation = 'source-over'
@@ -367,11 +367,11 @@ function drawProductSphere(
   ctx.textBaseline = 'middle'
 
   const fontSize = Math.max(7, Math.min(12, r * 0.24))
-  ctx.font = `${fontSize}px Georgia, serif`
+  ctx.font = fontSize + 'px Georgia, serif'
 
   ctx.fillStyle = active
     ? 'rgba(255,230,245,0.95)'
-    : `rgba(245,245,255,${0.56 + glow * 0.35})`
+    : 'rgba(245,245,255,' + (0.56 + glow * 0.35) + ')'
 
   ctx.shadowBlur = active ? 16 : 8
   ctx.shadowColor = 'rgba(170,130,255,0.9)'
@@ -398,7 +398,7 @@ function buildGraph(w: number, h: number): { nodes: Node[]; lines: WebLine[] } {
 
   productPlacements.forEach((p, i) => {
     nodes.push({
-      id: `product-${i}`,
+      id: 'product-' + i,
       productIdx: i,
       x: w * p.rx + (Math.random() - 0.5) * w * 0.025,
       y: h * p.ry + (Math.random() - 0.5) * h * 0.025,
@@ -415,7 +415,7 @@ function buildGraph(w: number, h: number): { nodes: Node[]; lines: WebLine[] } {
 
   for (let i = 0; i < webCount; i++) {
     nodes.push({
-      id: `web-${i}`,
+      id: 'web-' + i,
       productIdx: -1,
       x: w * (0.02 + Math.random() * 0.96),
       y: h * (0.02 + Math.random() * 0.94),
@@ -435,7 +435,7 @@ function buildGraph(w: number, h: number): { nodes: Node[]; lines: WebLine[] } {
     const u = (i + 0.5) / edgeCountPerSide
 
     nodes.push({
-      id: `edge-top-${i}`,
+      id: 'edge-top-' + i,
       productIdx: -1,
       x: w * u,
       y: -edgeMargin,
@@ -449,7 +449,7 @@ function buildGraph(w: number, h: number): { nodes: Node[]; lines: WebLine[] } {
     })
 
     nodes.push({
-      id: `edge-bottom-${i}`,
+      id: 'edge-bottom-' + i,
       productIdx: -1,
       x: w * u,
       y: h + edgeMargin,
@@ -463,7 +463,7 @@ function buildGraph(w: number, h: number): { nodes: Node[]; lines: WebLine[] } {
     })
 
     nodes.push({
-      id: `edge-left-${i}`,
+      id: 'edge-left-' + i,
       productIdx: -1,
       x: -edgeMargin,
       y: h * u,
@@ -477,7 +477,7 @@ function buildGraph(w: number, h: number): { nodes: Node[]; lines: WebLine[] } {
     })
 
     nodes.push({
-      id: `edge-right-${i}`,
+      id: 'edge-right-' + i,
       productIdx: -1,
       x: w + edgeMargin,
       y: h * u,
@@ -508,7 +508,7 @@ function buildGraph(w: number, h: number): { nodes: Node[]; lines: WebLine[] } {
         : 4 + Math.floor(Math.random() * 4)
 
     dists.slice(0, connectCount).forEach(({ j }) => {
-      const key = `${Math.min(i, j)}-${Math.max(i, j)}`
+      const key = Math.min(i, j) + '-' + Math.max(i, j)
 
       if (seen.has(key)) return
 
@@ -739,14 +739,11 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
 
   const [openProduct, setOpenProduct] = useState<VistaraProduct | null>(null)
   const [globalOpacity, setGlobalOpacity] = useState(1)
-  const [mounted, setMounted] = useState(false)
 
   const isDragging = useRef(false)
   const lastDrag = useRef({ x: 0, y: 0 })
   const scrollRef = useRef(0)
   const touchStartY = useRef(0)
-
-  // ── Inactivity ───────────────────────────────────────────────────────────────
 
   const scheduleInactivity = useCallback(() => {
     const s = stateRef.current
@@ -767,11 +764,13 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
         s.activeNodeIdx = null
         s.systemState = 'ambient'
         s.currents = []
+
         s.nodes.forEach(n => {
           n.isActive = false
           n.isDormant = false
           n.glowIntensity = n.productIdx >= 0 ? 0.28 : 0
         })
+
         s.signalWave = null
 
         setTimeout(() => {
@@ -783,11 +782,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
     }, delay)
   }, [])
 
-  // ── Init canvas ──────────────────────────────────────────────────────────────
-
   useEffect(() => {
-    setMounted(true)
-
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -833,8 +828,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
 
       ctx.globalAlpha = s.globalOpacity
 
-      // ── Neural web lines ────────────────────────────────────────────────────
-
+      // Neural web
       ctx.save()
       ctx.globalCompositeOperation = 'lighter'
 
@@ -844,9 +838,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
 
         const avgDepth = (fromNode.depth + toNode.depth) / 2
         const depthVis = 0.45 + camZ * 0.55
-
-        const dormantPenalty =
-          fromNode.isDormant || toNode.isDormant ? 0.25 : 1
+        const dormantPenalty = fromNode.isDormant || toNode.isDormant ? 0.25 : 1
 
         const activeLine = s.currents.some(curr => {
           for (let i = 0; i < curr.linePath.length - 1; i++) {
@@ -897,8 +889,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
 
       ctx.restore()
 
-      // ── Currents ────────────────────────────────────────────────────────────
-
+      // Currents
       const now = performance.now()
 
       if (
@@ -909,7 +900,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
         const active = s.currents.filter(c => c.active).length
 
         if (active < maxC) {
-          const nc = spawnCurrent(s.nodes, `c-${now}`)
+          const nc = spawnCurrent(s.nodes, 'c-' + now)
 
           if (nc) {
             s.currents.push(nc)
@@ -950,7 +941,6 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
         const avgDepth = (s.nodes[fromIdx].depth + s.nodes[toIdx].depth) / 2
         const offX = camOffX * (1 - avgDepth * 0.5)
         const offY = camOffY * (1 - avgDepth * 0.5)
-
         const pts = line.from === fromIdx ? line.pts : [...line.pts].reverse()
 
         curr.progress += curr.speed * (s.systemState === 'user-active' ? 1.25 : 1)
@@ -997,8 +987,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
         }
       })
 
-      // ── Signal wave ─────────────────────────────────────────────────────────
-
+      // Signal wave
       const wave = s.signalWave
 
       if (wave && now - wave.lastStep > 70) {
@@ -1038,12 +1027,12 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
         }
       }
 
-      // ── Product spheres ─────────────────────────────────────────────────────
-
+      // Product spheres
       s.nodes.forEach((node, i) => {
         if (node.productIdx < 0) return
 
         const product = VISTARA_PRODUCTS[node.productIdx]
+        if (!product) return
 
         const depthScale = 0.55 + node.depth * 0.75
         const offX = camOffX * (1 - node.depth * 0.5)
@@ -1121,13 +1110,9 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
       cancelAnimationFrame(animRef.current)
       window.removeEventListener('resize', resize)
 
-      const s = stateRef.current
-
       if (s.inactivityTimer) clearTimeout(s.inactivityTimer)
     }
   }, [scheduleInactivity])
-
-  // ── Scroll → camera depth ────────────────────────────────────────────────────
 
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
@@ -1145,8 +1130,6 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
 
     return () => window.removeEventListener('wheel', onWheel)
   }, [])
-
-  // ── Touch ───────────────────────────────────────────────────────────────────
 
   const onTouchStart = useCallback((e: ReactTouchEvent) => {
     touchStartY.current = e.touches[0].clientY
@@ -1185,8 +1168,6 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
     [scheduleInactivity],
   )
 
-  // ── Drag → parallax ─────────────────────────────────────────────────────────
-
   const onPointerDown = useCallback(
     (e: ReactPointerEvent) => {
       isDragging.current = true
@@ -1218,41 +1199,37 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
     isDragging.current = false
   }, [])
 
-  // ── Node click ───────────────────────────────────────────────────────────────
+  const lockNode = useCallback((idx: number) => {
+    const s = stateRef.current
 
-  const lockNode = useCallback(
-    (idx: number) => {
-      const s = stateRef.current
+    s.activeNodeIdx = idx
+    s.systemState = 'node-locked'
 
-      s.activeNodeIdx = idx
-      s.systemState = 'node-locked'
+    if (s.inactivityTimer) {
+      clearTimeout(s.inactivityTimer)
+      s.inactivityTimer = null
+    }
 
-      if (s.inactivityTimer) {
-        clearTimeout(s.inactivityTimer)
-        s.inactivityTimer = null
+    s.signalWave = {
+      sourceIdx: idx,
+      reached: new Set([idx]),
+      frontier: [idx],
+      color: CURRENT_COLORS[Math.floor(Math.random() * CURRENT_COLORS.length)],
+      type: 'sleep',
+      lastStep: performance.now(),
+    }
+
+    s.nodes.forEach((n, j) => {
+      n.isActive = j === idx
+
+      if (j !== idx && n.productIdx >= 0) {
+        n.isDormant = true
       }
+    })
 
-      s.signalWave = {
-        sourceIdx: idx,
-        reached: new Set([idx]),
-        frontier: [idx],
-        color: CURRENT_COLORS[Math.floor(Math.random() * CURRENT_COLORS.length)],
-        type: 'sleep',
-        lastStep: performance.now(),
-      }
-
-      s.nodes.forEach((n, j) => {
-        n.isActive = j === idx
-
-        if (j !== idx && n.productIdx >= 0) {
-          n.isDormant = true
-        }
-      })
-
-      setOpenProduct(VISTARA_PRODUCTS[s.nodes[idx].productIdx])
-    },
-    [],
-  )
+    const product = VISTARA_PRODUCTS[s.nodes[idx].productIdx]
+    if (product) setOpenProduct(product)
+  }, [])
 
   const handleCanvasClick = useCallback(
     (e: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -1347,7 +1324,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
       onPointerLeave={onPointerUp}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
-      onTouchEnd={onPointerUp}
+      onTouchEnd={() => onPointerUp()}
       onClick={() => {
         if (stateRef.current.systemState !== 'node-locked') {
           stateRef.current.systemState = 'user-active'
@@ -1367,15 +1344,6 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
           height: '100%',
         }}
       />
-
-      {/* Canvas now draws labels inside product spheres. Old HTML labels disabled. */}
-      {false &&
-        mounted &&
-        stateRef.current.nodes.map((node, i) => {
-          if (node.productIdx < 0) return null
-
-          return <div key={i} />
-        })}
 
       <motion.div
         initial={{ opacity: 0 }}
