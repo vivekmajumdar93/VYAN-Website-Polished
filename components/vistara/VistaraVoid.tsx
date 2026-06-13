@@ -1,4 +1,3 @@
-```tsx
 'use client'
 
 import {
@@ -21,8 +20,8 @@ import {
   BLACK_PAUSE_MS,
   CURRENT_COLORS,
   NODE_RADIUS,
-} from '@/lib/config'
-import type { VistaraProduct } from '@/lib/config'
+} from '@/lib/vistara/config'
+import type { VistaraProduct } from '@/lib/vistara/config'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
