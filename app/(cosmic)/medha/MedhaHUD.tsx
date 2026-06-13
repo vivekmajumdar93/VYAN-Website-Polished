@@ -20,6 +20,8 @@ import {
 import MedhaConsentSlab, {
   hasLocalConsent, type ConsentSnapshot,
 } from './MedhaConsentSlab';
+import { CosmicStream } from '@/components/CosmicStream';
+import { useCosmicStream } from '@/hooks/useCosmicStream';
 import './medha.css';
 
 // ─── Model colours ────────────────────────────────────────────────────────────
@@ -80,6 +82,8 @@ export default function MedhaHUD() {
   // Greeting: appears from node on model selection
   const [greetingText, setGreetingText] = useState<string | null>(null);
   const [greetingMode, setGreetingMode] = useState<CognitiveModeKey>('prajna');
+
+  const { stream, triggerStream, handleStreamComplete } = useCosmicStream();
 
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const sttRef = useRef<STT | null>(null);
@@ -202,6 +206,7 @@ export default function MedhaHUD() {
   const activateModel = useCallback((k: CognitiveModeKey, force = false) => {
     if (k === mode && !force) return;
     setMode(k);
+    triggerStream(k);
 
     // Greeting from node
     if (greetingTimer.current) clearTimeout(greetingTimer.current);
@@ -244,7 +249,7 @@ export default function MedhaHUD() {
         }
       }
     } catch {}
-  }, [mode]);
+  }, [mode, triggerStream]);
 
   // ── Send ──────────────────────────────────────────────────────────────────
   const send = useCallback(async () => {
@@ -348,6 +353,14 @@ export default function MedhaHUD() {
         ['--mode-b' as any]: modeDef.colorB,
       }}
     >
+      {/* ── Cosmic stream — fires on cognitive mode switch ────────────── */}
+      <CosmicStream
+        active={stream.active}
+        color={stream.color}
+        colorSecondary={stream.colorSecondary}
+        onComplete={handleStreamComplete}
+      />
+
       {/* ── Consent gate ─────────────────────────────────────────────── */}
       {consentReady && !consentGranted && (
         <MedhaConsentSlab onGranted={(_snap: ConsentSnapshot) => setConsentGranted(true)} />

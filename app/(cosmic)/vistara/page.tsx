@@ -1,8 +1,8 @@
-// /vistara — the Product sub-void.
-// Expansion is handled by applyRouteState in CosmicCanvas.
-// This page intentionally renders nothing — the canvas IS the experience.
-export const metadata = { title: 'Vistāra — The Unfurling of VYAN' };
+'use client'
+import { useRouter } from 'next/navigation'
+import { VistaraVoid } from '@/components/vistara/VistaraVoid'
 
 export default function VistaraPage() {
-  return null;
+  const router = useRouter()
+  return <VistaraVoid onBack={() => router.push('/shunya')} />
 }

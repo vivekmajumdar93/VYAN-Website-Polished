@@ -113,12 +113,12 @@ export default function CosmicCanvas() {
         initialMode,
         onEnterVoid: () => { router.push('/shunya'); },
         onOrbActivate: (key: string) => {
-          if (key === 'medha') router.push('/medha');
+          if (key === 'medha') router.push('/medha-transition');
           else if (key === 'vistara') router.push('/vistara');
           else router.push(`/shunya/${key}`);
         },
         onEnterVistara: () => { router.push('/vistara'); },
-        onEnterMedha:   () => { router.push('/medha'); },
+        onEnterMedha:   () => { router.push('/medha-transition'); },
       });
       appInstance.start();
       (window as any).__vyan = appInstance;

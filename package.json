@@ -9,8 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "class-variance-authority": "0.7.0",
     "clsx": "2.1.1",
+    "framer-motion": "^11.18.2",
     "gsap": "3.13.0",
     "lucide-react": "0.441.0",
     "mongodb": "^7.2.0",
