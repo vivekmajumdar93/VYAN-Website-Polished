@@ -21,9 +21,10 @@ import {
   CAMERA_ENTRY, CAMERA_ENTRY_LOOK,
   CAMERA_CAVE, CAMERA_CAVE_LOOK,
   SCROLL_DEPTH_PX, NODE_DWELL_MS, NODE_APPROACH_DIST,
-  NODE_RADIUS, NODE_GLOW_RADIUS,
+  NODE_RADIUS,
   INACTIVITY_MIN_MS, INACTIVITY_MAX_MS,
   FADE_OUT_MS, BLACK_PAUSE_MS,
+  CURRENT_COLORS,
 } from '@/lib/vistara/config'
 import {
   buildWebNodes, buildOrganicLine,
@@ -196,7 +197,9 @@ function LinePool({ linesRef, globalOpacityRef }: {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geometry.setDrawRange(0, 0)
-    const material = new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0 })
+    const material = new THREE.LineBasicMaterial({
+      color: '#ffffff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+    })
     const line = new THREE.Line(geometry, material)
     line.visible = false
     line.frustumCulled = false
@@ -252,16 +255,19 @@ function ProductNode({ nodesRef, index, product, onActivate, globalOpacityRef }:
   globalOpacityRef: MutableRefObject<number>
 }) {
   const coreRef = useRef<THREE.Mesh>(null)
-  const glowRef = useRef<THREE.Mesh>(null)
-  const ringRef = useRef<THREE.Mesh>(null)
+  const shellRef = useRef<THREE.Mesh>(null)
+  const ring1Ref = useRef<THREE.Mesh>(null)
+  const ring2Ref = useRef<THREE.Mesh>(null)
   const coreMatRef = useRef<THREE.MeshBasicMaterial>(null)
-  const glowMatRef = useRef<THREE.MeshBasicMaterial>(null)
-  const ringMatRef = useRef<THREE.MeshBasicMaterial>(null)
+  const shellMatRef = useRef<THREE.MeshBasicMaterial>(null)
+  const ring1MatRef = useRef<THREE.MeshBasicMaterial>(null)
+  const ring2MatRef = useRef<THREE.MeshBasicMaterial>(null)
   const pulseMatRef = useRef<THREE.MeshBasicMaterial>(null)
   const labelRef = useRef<HTMLDivElement>(null)
   const t = useRef(0)
 
   const position = nodesRef.current[index].position
+  const accent = CURRENT_COLORS[index % CURRENT_COLORS.length]
 
   useFrame((_, delta) => {
     t.current += delta
@@ -275,28 +281,29 @@ function ProductNode({ nodesRef, index, product, onActivate, globalOpacityRef }:
     const baseGlow = node.isActive ? 1 : Math.max(node.glowIntensity, ambient)
 
     if (coreMatRef.current) coreMatRef.current.opacity = baseGlow * globalOpacity
-    if (glowMatRef.current) {
-      glowMatRef.current.opacity = baseGlow * globalOpacity * 0.6
-      glowMatRef.current.color.set(node.isActive ? '#c026d3' : '#7b2fff')
+    if (shellMatRef.current) shellMatRef.current.opacity = (0.3 + baseGlow * 0.5) * globalOpacity
+    if (ring1MatRef.current) ring1MatRef.current.opacity = (0.25 + baseGlow * 0.45) * globalOpacity
+    if (ring2MatRef.current) ring2MatRef.current.opacity = (0.18 + baseGlow * 0.35) * globalOpacity
+
+    // Slow independent rotation on each ring/shell — every node reads as a
+    // small armillary instrument rather than a static glowing dot.
+    if (ring1Ref.current) {
+      ring1Ref.current.rotation.x += delta * 0.35
+      ring1Ref.current.rotation.y += delta * 0.12
+    }
+    if (ring2Ref.current) {
+      ring2Ref.current.rotation.y += delta * 0.28
+      ring2Ref.current.rotation.z += delta * 0.2
+    }
+    if (shellRef.current) shellRef.current.rotation.y += delta * 0.08
+
+    if (coreRef.current) {
+      const pulse = node.isActive
+        ? 1 + Math.sin(t.current * 2.2) * 0.12
+        : 1 + ambient * Math.sin(t.current * 1.1) * 0.06
+      coreRef.current.scale.setScalar(pulse)
     }
 
-    if (coreRef.current && glowRef.current) {
-      if (node.isActive) {
-        const pulse = 1 + Math.sin(t.current * 2.2) * 0.12
-        coreRef.current.scale.setScalar(pulse)
-        glowRef.current.scale.setScalar(pulse * 2.4)
-        if (ringRef.current) {
-          ringRef.current.rotation.z += delta * 0.6
-          ringRef.current.rotation.x += delta * 0.3
-        }
-      } else {
-        const breathe = 1 + ambient * Math.sin(t.current * 1.1) * 0.06
-        coreRef.current.scale.setScalar(breathe)
-        glowRef.current.scale.setScalar(breathe * 1.9)
-      }
-    }
-
-    if (ringMatRef.current) ringMatRef.current.opacity = node.isActive ? 0.55 * globalOpacity : 0
     if (pulseMatRef.current) {
       pulseMatRef.current.opacity = node.isActive
         ? (0.2 + 0.15 * Math.sin(Date.now() * 0.003)) * globalOpacity
@@ -312,28 +319,34 @@ function ProductNode({ nodesRef, index, product, onActivate, globalOpacityRef }:
 
   return (
     <group position={position}>
-      {/* Core */}
+      {/* Core crystal */}
       <mesh ref={coreRef} onClick={onActivate}>
-        <sphereGeometry args={[NODE_RADIUS, 16, 16]} />
+        <icosahedronGeometry args={[NODE_RADIUS * 0.8, 0]} />
         <meshBasicMaterial ref={coreMatRef} color="#ffffff" transparent opacity={0} />
       </mesh>
 
-      {/* Glow */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[NODE_GLOW_RADIUS, 12, 12]} />
-        <meshBasicMaterial ref={glowMatRef} color="#7b2fff" transparent opacity={0} side={THREE.BackSide} />
+      {/* Faceted wireframe shell */}
+      <mesh ref={shellRef}>
+        <icosahedronGeometry args={[NODE_RADIUS * 1.4, 0]} />
+        <meshBasicMaterial ref={shellMatRef} color={accent} transparent opacity={0} wireframe />
       </mesh>
 
-      {/* Active ring */}
-      <mesh ref={ringRef}>
-        <torusGeometry args={[NODE_RADIUS * 2.2, 0.4, 6, 40]} />
-        <meshBasicMaterial ref={ringMatRef} color="#c026d3" transparent opacity={0} wireframe />
+      {/* Orbital ring 1 — tilted */}
+      <mesh ref={ring1Ref} rotation={[Math.PI / 3, 0, 0]}>
+        <torusGeometry args={[NODE_RADIUS * 2.2, 0.1, 6, 48]} />
+        <meshBasicMaterial ref={ring1MatRef} color={accent} transparent opacity={0} />
+      </mesh>
+
+      {/* Orbital ring 2 — counter-tilted */}
+      <mesh ref={ring2Ref} rotation={[0, 0, Math.PI / 2.4]}>
+        <torusGeometry args={[NODE_RADIUS * 2.8, 0.08, 6, 48]} />
+        <meshBasicMaterial ref={ring2MatRef} color="#ffffff" transparent opacity={0} />
       </mesh>
 
       {/* Outer pulse ring when active */}
       <mesh>
         <torusGeometry args={[NODE_RADIUS * 3.5, 0.2, 6, 40]} />
-        <meshBasicMaterial ref={pulseMatRef} color="#7b2fff" transparent opacity={0} />
+        <meshBasicMaterial ref={pulseMatRef} color={accent} transparent opacity={0} />
       </mesh>
 
       {/* HTML label — projects to screen correctly via drei */}
@@ -483,7 +496,7 @@ function NeuralSystem({
 
     // ── Spawn ambient currents ──────────────────────────────────────────────
     if (systemState === 'ambient' || systemState === 'user-active') {
-      const maxCurrents = systemState === 'user-active' ? 3 : 1
+      const maxCurrents = systemState === 'user-active' ? 4 : 2
       const activeCurrents = currentsRef.current.filter(c => c.progress < 1 || c.pathRemaining.length > 0)
 
       if (activeCurrents.length < maxCurrents && now - lastAmbientSpawn.current > ambientInterval.current) {
@@ -493,8 +506,8 @@ function NeuralSystem({
           currentsRef.current = [...activeCurrents, ...newCurrents]
           lastAmbientSpawn.current = now
           ambientInterval.current = systemState === 'user-active'
-            ? 300 + Math.random() * 500
-            : 600 + Math.random() * 1200
+            ? 200 + Math.random() * 350
+            : 350 + Math.random() * 700
         }
       }
     }
@@ -516,7 +529,7 @@ function NeuralSystem({
         points: pts,
         color: curr.color,
         drawProgress: Math.min(newProgress, 1),
-        opacity: 0.75,
+        opacity: 1,
         fadeAt: newProgress >= 1 ? now + 800 : Infinity,
       })
 
