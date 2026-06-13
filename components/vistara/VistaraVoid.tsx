@@ -12,6 +12,10 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as THREE from 'three'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import {
   VISTARA_PRODUCTS,
   CAMERA_ENTRY, CAMERA_ENTRY_LOOK,
@@ -39,6 +43,139 @@ function getLine(nodes: WebNode[], i: number, j: number): THREE.Vector3[] {
   const key = `${Math.min(i,j)}-${Math.max(i,j)}`
   if (!LINE_CACHE.has(key)) LINE_CACHE.set(key, buildOrganicLine(nodes[i].position, nodes[j].position))
   return LINE_CACHE.get(key)!
+}
+
+// ─── Starfield ──────────────────────────────────────────────────────────────────
+// Dense static field of small glowing points filling the cave. Built once —
+// no per-frame allocation. A slow rotation keeps it from feeling flat.
+
+const STAR_COUNT = 4200
+
+// Soft radial-gradient sprite — round glowing dots instead of hard squares.
+function makeStarTexture(): THREE.Texture {
+  const size = 64
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+  grad.addColorStop(0, 'rgba(255,255,255,1)')
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.6)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, size, size)
+  const texture = new THREE.CanvasTexture(canvas)
+  return texture
+}
+
+function Starfield() {
+  const pointsRef = useRef<THREE.Points>(null)
+  const starTexture = useMemo(() => makeStarTexture(), [])
+
+  const [positions, colors] = useMemo(() => {
+    const positions = new Float32Array(STAR_COUNT * 3)
+    const colors = new Float32Array(STAR_COUNT * 3)
+    for (let i = 0; i < STAR_COUNT; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 1400
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 900
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 1000 - 150
+      const b = 0.35 + Math.random() * 0.65
+      colors[i * 3] = b
+      colors[i * 3 + 1] = b
+      colors[i * 3 + 2] = Math.min(1, b + 0.12)
+    }
+    return [positions, colors]
+  }, [])
+
+  useFrame((_, delta) => {
+    if (pointsRef.current) pointsRef.current.rotation.y += delta * 0.002
+  })
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        map={starTexture}
+        size={2.2}
+        vertexColors
+        transparent
+        opacity={0.85}
+        sizeAttenuation
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  )
+}
+
+// ─── Persistent neural web ──────────────────────────────────────────────────────
+// Every connection in the web is drawn once as a faint static thread, using the
+// same curves the active currents travel along — built once into a single
+// LineSegments geometry (one draw call, never updated).
+
+function PersistentWeb({ nodesRef }: { nodesRef: MutableRefObject<WebNode[]> }) {
+  const positions = useMemo(() => {
+    const ns = nodesRef.current
+    const seen = new Set<string>()
+    const verts: number[] = []
+
+    ns.forEach((node, i) => {
+      node.connections.forEach(j => {
+        const key = `${Math.min(i, j)}-${Math.max(i, j)}`
+        if (seen.has(key)) return
+        seen.add(key)
+
+        const pts = getLine(ns, i, j)
+        for (let p = 0; p < pts.length - 1; p++) {
+          verts.push(pts[p].x, pts[p].y, pts[p].z, pts[p + 1].x, pts[p + 1].y, pts[p + 1].z)
+        }
+      })
+    })
+
+    return new Float32Array(verts)
+  }, [nodesRef])
+
+  return (
+    <lineSegments frustumCulled={false}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <lineBasicMaterial color="#8a7bff" transparent opacity={0.12} />
+    </lineSegments>
+  )
+}
+
+// ─── Bloom layer ──────────────────────────────────────────────────────────────
+// Adds the neon glow on top of nodes/currents/stars. Takes over rendering via
+// a positive useFrame priority (r3f then skips its own render call).
+
+function BloomLayer() {
+  const { gl, scene, camera, size } = useThree()
+
+  const composer = useMemo(() => {
+    const c = new EffectComposer(gl)
+    c.addPass(new RenderPass(scene, camera))
+    const bloom = new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 0.65, 0.5, 0.18)
+    c.addPass(bloom)
+    c.addPass(new OutputPass())
+    return c
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gl, scene, camera])
+
+  useEffect(() => {
+    composer.setSize(size.width, size.height)
+  }, [composer, size])
+
+  useEffect(() => () => composer.dispose(), [composer])
+
+  useFrame(() => {
+    composer.render()
+  }, 1)
+
+  return null
 }
 
 // ─── Persistent line pool ──────────────────────────────────────────────────────
@@ -131,11 +268,15 @@ function ProductNode({ nodesRef, index, product, onActivate, globalOpacityRef }:
 
     const node = nodesRef.current[index]
     const globalOpacity = globalOpacityRef.current
-    const baseGlow = node.isActive ? 1 : node.glowIntensity
+    // Every node carries a steady ambient glow (gently breathing) so the web
+    // reads as a constellation of live nodes, not dark dots that only light
+    // up when a current happens to pass through.
+    const ambient = 0.42 + Math.sin(t.current * 0.6 + index * 1.7) * 0.08
+    const baseGlow = node.isActive ? 1 : Math.max(node.glowIntensity, ambient)
 
-    if (coreMatRef.current) coreMatRef.current.opacity = baseGlow * globalOpacity * 0.9
+    if (coreMatRef.current) coreMatRef.current.opacity = baseGlow * globalOpacity
     if (glowMatRef.current) {
-      glowMatRef.current.opacity = baseGlow * globalOpacity * 0.35
+      glowMatRef.current.opacity = baseGlow * globalOpacity * 0.6
       glowMatRef.current.color.set(node.isActive ? '#c026d3' : '#7b2fff')
     }
 
@@ -149,7 +290,7 @@ function ProductNode({ nodesRef, index, product, onActivate, globalOpacityRef }:
           ringRef.current.rotation.x += delta * 0.3
         }
       } else {
-        const breathe = 1 + node.glowIntensity * Math.sin(t.current * 1.1) * 0.06
+        const breathe = 1 + ambient * Math.sin(t.current * 1.1) * 0.06
         coreRef.current.scale.setScalar(breathe)
         glowRef.current.scale.setScalar(breathe * 1.9)
       }
@@ -163,7 +304,7 @@ function ProductNode({ nodesRef, index, product, onActivate, globalOpacityRef }:
     }
 
     if (labelRef.current) {
-      const labelOpacity = Math.max(node.glowIntensity, node.isActive ? 1 : 0) * globalOpacity
+      const labelOpacity = Math.max(node.glowIntensity, node.isActive ? 1 : 0.45) * globalOpacity
       labelRef.current.style.opacity = String(labelOpacity)
       labelRef.current.style.pointerEvents = node.isActive ? 'none' : 'all'
     }
@@ -524,7 +665,11 @@ function VistaraScene({
         systemStateRef={systemStateRef}
       />
 
+      <Starfield />
+      <PersistentWeb nodesRef={nodesRef} />
+
       <LinePool linesRef={linesRef} globalOpacityRef={globalOpacityRef} />
+      <BloomLayer />
 
       {/* Product nodes */}
       {nodesRef.current.map((node, i) => {
