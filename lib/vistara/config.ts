@@ -93,12 +93,16 @@ export const NODE_GLOW_RADIUS = 12     // glow sphere
 export const CURRENT_SPEED = 160       // units/sec
 export const CURRENT_WAVE_WIDTH = 1.2
 
-// ─── Current colors ────────────────────────────────────────────────────────────
+// ─── Current colors — deep blue → violet spectrum (Lucy-style synapse currents) ──
 export const CURRENT_COLORS = [
-  '#1a1aff', '#7b2fff', '#c026d3',
-  '#00c4cc', '#e8b94f', '#a855f7',
-  '#dc2626', '#2d9e7f',
+  '#1a3bff', '#3b2fff', '#5b21d6',
+  '#6d28d9', '#7b2fff', '#8b2fe0',
+  '#9333ea', '#a855f7',
 ]
+
+// ─── Lucy comet trail — deep blue tail to violet/white-hot head ─────────────────
+export const COMET_TAIL_COLOR = '#0a1a8f'
+export const COMET_HEAD_COLOR = '#c4b5fd'
 
 // ─── Inactivity ────────────────────────────────────────────────────────────────
 export const INACTIVITY_MIN_MS = 40000

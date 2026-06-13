@@ -25,6 +25,7 @@ import {
   INACTIVITY_MIN_MS, INACTIVITY_MAX_MS,
   FADE_OUT_MS, BLACK_PAUSE_MS,
   CURRENT_COLORS,
+  COMET_TAIL_COLOR, COMET_HEAD_COLOR,
 } from '@/lib/vistara/config'
 import {
   buildWebNodes, buildOrganicLine,
@@ -50,7 +51,7 @@ function getLine(nodes: WebNode[], i: number, j: number): THREE.Vector3[] {
 // Dense static field of small glowing points filling the cave. Built once —
 // no per-frame allocation. A slow rotation keeps it from feeling flat.
 
-const STAR_COUNT = 4200
+const STAR_COUNT = 2100
 
 // Soft radial-gradient sprite — round glowing dots instead of hard squares.
 function makeStarTexture(): THREE.Texture {
@@ -144,7 +145,7 @@ function PersistentWeb({ nodesRef }: { nodesRef: MutableRefObject<WebNode[]> }) 
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
-      <lineBasicMaterial color="#8a7bff" transparent opacity={0.12} />
+      <lineBasicMaterial color="#c4ccdc" transparent opacity={0.14} />
     </lineSegments>
   )
 }
@@ -188,23 +189,34 @@ function BloomLayer() {
 const LINE_POINTS = 33
 const MAX_LINE_SLOTS = 18
 
+// Comet trail length, in points — bright violet/white head fading back to
+// deep blue tail, traveling along the static path (Lucy-style synapse pulse).
+const COMET_TRAIL = 14
+
 function LinePool({ linesRef, globalOpacityRef }: {
   linesRef: MutableRefObject<Map<string, LineState>>
   globalOpacityRef: MutableRefObject<number>
 }) {
   const slots = useMemo(() => Array.from({ length: MAX_LINE_SLOTS }, () => {
     const positions = new Float32Array(LINE_POINTS * 3)
+    const colors = new Float32Array(LINE_POINTS * 3)
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     geometry.setDrawRange(0, 0)
     const material = new THREE.LineBasicMaterial({
-      color: '#ffffff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+      vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
     })
     const line = new THREE.Line(geometry, material)
     line.visible = false
     line.frustumCulled = false
-    return { line, geometry, material, positions }
+    return { line, geometry, material, positions, colors }
   }), [])
+
+  const tailColor = useMemo(() => new THREE.Color(COMET_TAIL_COLOR), [])
+  const hotColor = useMemo(() => new THREE.Color(COMET_HEAD_COLOR), [])
+  const headColor = useMemo(() => new THREE.Color(), [])
+  const tmpColor = useMemo(() => new THREE.Color(), [])
 
   useFrame(() => {
     const entries = Array.from(linesRef.current.values())
@@ -219,18 +231,33 @@ function LinePool({ linesRef, globalOpacityRef }: {
         continue
       }
 
-      const count = Math.max(2, Math.min(LINE_POINTS, Math.floor(line.points.length * line.drawProgress)))
+      // Comet head travels along the path with drawProgress; only the
+      // trailing window of points behind it is drawn, gradient from the
+      // deep-blue tail to a hot violet/white head.
+      const total = line.points.length
+      const headIdx = Math.min(total - 1, Math.max(0, Math.floor(line.drawProgress * (total - 1))))
+      const trailStart = Math.max(0, headIdx - COMET_TRAIL)
+      const count = Math.max(2, Math.min(LINE_POINTS, headIdx - trailStart + 1))
+
+      headColor.set(line.color).lerp(hotColor, 0.45)
 
       for (let p = 0; p < count; p++) {
-        const pt = line.points[p]
+        const srcIdx = trailStart + p
+        const pt = line.points[srcIdx]
         slot.positions[p * 3] = pt.x
         slot.positions[p * 3 + 1] = pt.y
         slot.positions[p * 3 + 2] = pt.z
+
+        const t = count > 1 ? p / (count - 1) : 1
+        tmpColor.copy(tailColor).lerp(headColor, t * t)
+        slot.colors[p * 3] = tmpColor.r
+        slot.colors[p * 3 + 1] = tmpColor.g
+        slot.colors[p * 3 + 2] = tmpColor.b
       }
 
       slot.geometry.setDrawRange(0, count)
       slot.geometry.attributes.position.needsUpdate = true
-      slot.material.color.set(line.color)
+      slot.geometry.attributes.color.needsUpdate = true
       slot.material.opacity = line.opacity * globalOpacity
       slot.line.visible = slot.material.opacity > 0.01
     }
@@ -418,9 +445,12 @@ function CameraRig({ scrollRef, dragRef, nodesRef, onDwellNode }: {
     const dragY = dragRef.current.y
     const scrollT = scrollRef.current
 
-    // Smooth drag
-    currentDragX.current += (dragX * 0.006 - currentDragX.current) * 0.07
-    currentDragY.current += (dragY * 0.003 - currentDragY.current) * 0.07
+    // Continuous 3D free-look: drag accumulates into unbounded yaw and
+    // clamped pitch, smoothed toward the target each frame.
+    const targetYaw = dragX * 0.0035
+    const targetPitch = THREE.MathUtils.clamp(dragY * 0.0025, -0.6, 0.6)
+    currentDragX.current += (targetYaw - currentDragX.current) * 0.07
+    currentDragY.current += (targetPitch - currentDragY.current) * 0.07
 
     // Ease scroll
     const eased = scrollT < 0.5
@@ -431,13 +461,19 @@ function CameraRig({ scrollRef, dragRef, nodesRef, onDwellNode }: {
     const basePos = new THREE.Vector3().lerpVectors(CAMERA_ENTRY, CAMERA_CAVE, eased)
     const baseLook = new THREE.Vector3().lerpVectors(CAMERA_ENTRY_LOOK, CAMERA_CAVE_LOOK, eased)
 
-    // Apply drag offset
-    basePos.x += Math.sin(currentDragX.current) * 50
-    basePos.y += Math.sin(currentDragY.current) * 25
-    baseLook.x += Math.sin(currentDragX.current) * 35
-
     camera.position.lerp(basePos, 0.05)
-    camera.lookAt(baseLook)
+
+    // Rotate the look direction freely in 3D — yaw around world up, then
+    // pitch around the resulting local right axis.
+    const lookDir = baseLook.clone().sub(basePos)
+    const dist = lookDir.length()
+    lookDir.normalize()
+    lookDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), currentDragX.current)
+    const right = new THREE.Vector3().crossVectors(lookDir, camera.up).normalize()
+    lookDir.applyAxisAngle(right, currentDragY.current)
+
+    const target = camera.position.clone().add(lookDir.multiplyScalar(dist))
+    camera.lookAt(target)
 
     // Detect which product node is nearest — trigger dwell
     const camZ = camera.position.z
