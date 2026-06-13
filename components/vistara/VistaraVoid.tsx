@@ -1,11 +1,12 @@
 'use client'
 
 import {
-  useRef, useState, useEffect, useCallback,
+  useRef, useState, useEffect, useCallback, useMemo,
 } from 'react'
 import type {
   PointerEvent as ReactPointerEvent,
   TouchEvent as ReactTouchEvent,
+  MutableRefObject,
 } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
@@ -40,109 +41,173 @@ function getLine(nodes: WebNode[], i: number, j: number): THREE.Vector3[] {
   return LINE_CACHE.get(key)!
 }
 
-// ─── Single animated web line ──────────────────────────────────────────────────
+// ─── Persistent line pool ──────────────────────────────────────────────────────
+// All web/current/signal lines are drawn from a fixed pool of pre-allocated
+// THREE.Line objects whose geometry is mutated in place every frame — this
+// avoids allocating new Float32Arrays / bufferGeometries (and the React
+// re-renders that would come with state-driven JSX) at 60fps.
 
-function WebLine({ points, color, drawProgress, opacity }: {
-  points: THREE.Vector3[]; color: string; drawProgress: number; opacity: number
+const LINE_POINTS = 33
+const MAX_LINE_SLOTS = 18
+
+function LinePool({ linesRef, globalOpacityRef }: {
+  linesRef: MutableRefObject<Map<string, LineState>>
+  globalOpacityRef: MutableRefObject<number>
 }) {
-  if (opacity < 0.01 || drawProgress < 0.01) return null
-  const count = Math.max(2, Math.floor(points.length * drawProgress))
-  const sliced = points.slice(0, count)
-  const positions = new Float32Array(sliced.flatMap(p => [p.x, p.y, p.z]))
+  const slots = useMemo(() => Array.from({ length: MAX_LINE_SLOTS }, () => {
+    const positions = new Float32Array(LINE_POINTS * 3)
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setDrawRange(0, 0)
+    const material = new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0 })
+    const line = new THREE.Line(geometry, material)
+    line.visible = false
+    line.frustumCulled = false
+    return { line, geometry, material, positions }
+  }), [])
+
+  useFrame(() => {
+    const entries = Array.from(linesRef.current.values())
+    const globalOpacity = globalOpacityRef.current
+
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i]
+      const line = entries[i]
+
+      if (!line) {
+        if (slot.line.visible) slot.line.visible = false
+        continue
+      }
+
+      const count = Math.max(2, Math.min(LINE_POINTS, Math.floor(line.points.length * line.drawProgress)))
+
+      for (let p = 0; p < count; p++) {
+        const pt = line.points[p]
+        slot.positions[p * 3] = pt.x
+        slot.positions[p * 3 + 1] = pt.y
+        slot.positions[p * 3 + 2] = pt.z
+      }
+
+      slot.geometry.setDrawRange(0, count)
+      slot.geometry.attributes.position.needsUpdate = true
+      slot.material.color.set(line.color)
+      slot.material.opacity = line.opacity * globalOpacity
+      slot.line.visible = slot.material.opacity > 0.01
+    }
+  })
+
   return (
-    <line>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
-      <lineBasicMaterial color={color} transparent opacity={opacity} linewidth={1.5} />
-    </line>
+    <>
+      {slots.map((s, i) => <primitive key={i} object={s.line} />)}
+    </>
   )
 }
 
 // ─── Product node ──────────────────────────────────────────────────────────────
+// Reads live state from nodesRef every frame and mutates its own materials/
+// meshes directly — never re-renders in response to glow/active/dormant changes.
 
-function ProductNode({ node, product, onActivate, globalOpacity }: {
-  node: WebNode; product: VistaraProduct
-  onActivate: () => void; globalOpacity: number
+function ProductNode({ nodesRef, index, product, onActivate, globalOpacityRef }: {
+  nodesRef: MutableRefObject<WebNode[]>
+  index: number
+  product: VistaraProduct
+  onActivate: () => void
+  globalOpacityRef: MutableRefObject<number>
 }) {
   const coreRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
   const ringRef = useRef<THREE.Mesh>(null)
+  const coreMatRef = useRef<THREE.MeshBasicMaterial>(null)
+  const glowMatRef = useRef<THREE.MeshBasicMaterial>(null)
+  const ringMatRef = useRef<THREE.MeshBasicMaterial>(null)
+  const pulseMatRef = useRef<THREE.MeshBasicMaterial>(null)
+  const labelRef = useRef<HTMLDivElement>(null)
   const t = useRef(0)
 
-  const baseGlow = node.isActive ? 1 : node.glowIntensity
-  const coreOpacity = baseGlow * globalOpacity * 0.9
-  const glowOpacity = baseGlow * globalOpacity * 0.35
+  const position = nodesRef.current[index].position
 
   useFrame((_, delta) => {
     t.current += delta
-    if (!coreRef.current || !glowRef.current) return
 
-    if (node.isActive) {
-      const pulse = 1 + Math.sin(t.current * 2.2) * 0.12
-      coreRef.current.scale.setScalar(pulse)
-      glowRef.current.scale.setScalar(pulse * 2.4)
-      if (ringRef.current) {
-        ringRef.current.rotation.z += delta * 0.6
-        ringRef.current.rotation.x += delta * 0.3
+    const node = nodesRef.current[index]
+    const globalOpacity = globalOpacityRef.current
+    const baseGlow = node.isActive ? 1 : node.glowIntensity
+
+    if (coreMatRef.current) coreMatRef.current.opacity = baseGlow * globalOpacity * 0.9
+    if (glowMatRef.current) {
+      glowMatRef.current.opacity = baseGlow * globalOpacity * 0.35
+      glowMatRef.current.color.set(node.isActive ? '#c026d3' : '#7b2fff')
+    }
+
+    if (coreRef.current && glowRef.current) {
+      if (node.isActive) {
+        const pulse = 1 + Math.sin(t.current * 2.2) * 0.12
+        coreRef.current.scale.setScalar(pulse)
+        glowRef.current.scale.setScalar(pulse * 2.4)
+        if (ringRef.current) {
+          ringRef.current.rotation.z += delta * 0.6
+          ringRef.current.rotation.x += delta * 0.3
+        }
+      } else {
+        const breathe = 1 + node.glowIntensity * Math.sin(t.current * 1.1) * 0.06
+        coreRef.current.scale.setScalar(breathe)
+        glowRef.current.scale.setScalar(breathe * 1.9)
       }
-    } else {
-      const breathe = 1 + node.glowIntensity * Math.sin(t.current * 1.1) * 0.06
-      coreRef.current.scale.setScalar(breathe)
-      glowRef.current.scale.setScalar(breathe * 1.9)
+    }
+
+    if (ringMatRef.current) ringMatRef.current.opacity = node.isActive ? 0.55 * globalOpacity : 0
+    if (pulseMatRef.current) {
+      pulseMatRef.current.opacity = node.isActive
+        ? (0.2 + 0.15 * Math.sin(Date.now() * 0.003)) * globalOpacity
+        : 0
+    }
+
+    if (labelRef.current) {
+      const labelOpacity = Math.max(node.glowIntensity, node.isActive ? 1 : 0) * globalOpacity
+      labelRef.current.style.opacity = String(labelOpacity)
+      labelRef.current.style.pointerEvents = node.isActive ? 'none' : 'all'
     }
   })
 
-  if (coreOpacity < 0.02 && !node.isActive) return null
-
   return (
-    <group position={node.position}>
+    <group position={position}>
       {/* Core */}
       <mesh ref={coreRef} onClick={onActivate}>
         <sphereGeometry args={[NODE_RADIUS, 16, 16]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={coreOpacity} />
+        <meshBasicMaterial ref={coreMatRef} color="#ffffff" transparent opacity={0} />
       </mesh>
 
       {/* Glow */}
       <mesh ref={glowRef}>
         <sphereGeometry args={[NODE_GLOW_RADIUS, 12, 12]} />
-        <meshBasicMaterial
-          color={node.isActive ? '#c026d3' : '#7b2fff'}
-          transparent opacity={glowOpacity}
-          side={THREE.BackSide}
-        />
+        <meshBasicMaterial ref={glowMatRef} color="#7b2fff" transparent opacity={0} side={THREE.BackSide} />
       </mesh>
 
       {/* Active ring */}
-      {node.isActive && (
-        <mesh ref={ringRef}>
-          <torusGeometry args={[NODE_RADIUS * 2.2, 0.4, 6, 40]} />
-          <meshBasicMaterial color="#c026d3" transparent opacity={0.55 * globalOpacity} wireframe />
-        </mesh>
-      )}
+      <mesh ref={ringRef}>
+        <torusGeometry args={[NODE_RADIUS * 2.2, 0.4, 6, 40]} />
+        <meshBasicMaterial ref={ringMatRef} color="#c026d3" transparent opacity={0} wireframe />
+      </mesh>
 
       {/* Outer pulse ring when active */}
-      {node.isActive && (
-        <mesh>
-          <torusGeometry args={[NODE_RADIUS * 3.5, 0.2, 6, 40]} />
-          <meshBasicMaterial color="#7b2fff" transparent
-            opacity={(0.2 + 0.15 * Math.sin(Date.now() * 0.003)) * globalOpacity} />
-        </mesh>
-      )}
+      <mesh>
+        <torusGeometry args={[NODE_RADIUS * 3.5, 0.2, 6, 40]} />
+        <meshBasicMaterial ref={pulseMatRef} color="#7b2fff" transparent opacity={0} />
+      </mesh>
 
       {/* HTML label — projects to screen correctly via drei */}
       <Html
         center
         distanceFactor={120}
-        style={{ pointerEvents: node.isActive ? 'none' : 'all' }}
         occlude={false}
       >
         <div
+          ref={labelRef}
           onClick={onActivate}
           style={{
             cursor: 'pointer',
             textAlign: 'center',
-            opacity: Math.max(node.glowIntensity, node.isActive ? 1 : 0) * globalOpacity,
+            opacity: 0,
             transition: 'opacity 0.4s ease',
             userSelect: 'none',
             transform: 'translateY(28px)',
@@ -152,10 +217,9 @@ function ProductNode({ node, product, onActivate, globalOpacity }: {
             fontFamily: 'Georgia, serif',
             fontSize: '11px',
             letterSpacing: '0.25em',
-            color: node.isActive ? 'rgba(255,200,220,0.95)' : 'rgba(255,255,255,0.8)',
+            color: 'rgba(255,255,255,0.8)',
             textTransform: 'uppercase',
             whiteSpace: 'nowrap',
-            textShadow: node.isActive ? '0 0 12px rgba(192,38,211,0.8)' : 'none',
           }}>
             {product.name}
           </div>
@@ -184,9 +248,11 @@ function ProductNode({ node, product, onActivate, globalOpacity }: {
 
 // ─── Camera controller ─────────────────────────────────────────────────────────
 
-function CameraRig({ scrollT, dragX, dragY, nodes, onDwellNode }: {
-  scrollT: number; dragX: number; dragY: number
-  nodes: WebNode[]; onDwellNode: (idx: number | null) => void
+function CameraRig({ scrollRef, dragRef, nodesRef, onDwellNode }: {
+  scrollRef: MutableRefObject<number>
+  dragRef: MutableRefObject<{ x: number; y: number }>
+  nodesRef: MutableRefObject<WebNode[]>
+  onDwellNode: (idx: number | null) => void
 }) {
   const { camera } = useThree()
   const currentDragX = useRef(0)
@@ -194,6 +260,10 @@ function CameraRig({ scrollT, dragX, dragY, nodes, onDwellNode }: {
   const lastDwellIdx = useRef<number | null>(null)
 
   useFrame(() => {
+    const dragX = dragRef.current.x
+    const dragY = dragRef.current.y
+    const scrollT = scrollRef.current
+
     // Smooth drag
     currentDragX.current += (dragX * 0.006 - currentDragX.current) * 0.07
     currentDragY.current += (dragY * 0.003 - currentDragY.current) * 0.07
@@ -217,6 +287,7 @@ function CameraRig({ scrollT, dragX, dragY, nodes, onDwellNode }: {
 
     // Detect which product node is nearest — trigger dwell
     const camZ = camera.position.z
+    const nodes = nodesRef.current
 
     let closestIdx: number | null = null
     let closestDist = Infinity
@@ -247,29 +318,19 @@ function CameraRig({ scrollT, dragX, dragY, nodes, onDwellNode }: {
 }
 
 // ─── Neural system — runs currents, signal waves, node glow ───────────────────
+// Mutates nodesRef/linesRef/currentsRef/signalWaveRef in place every frame.
+// Deliberately does NOT call any React state setters here — that was the
+// source of the 60fps full-tree re-render that caused the freeze/lag.
 
 function NeuralSystem({
-  nodes, setNodes,
-  lines, setLines,
-  currents, setCurrents,
-  signalWave, setSignalWave,
-  systemState,
+  nodesRef, linesRef, currentsRef, signalWaveRef, systemStateRef,
 }: {
-  nodes: WebNode[]
-  setNodes: (fn: (prev: WebNode[]) => WebNode[]) => void
-  lines: Map<string, LineState>
-  setLines: (fn: (prev: Map<string, LineState>) => Map<string, LineState>) => void
-  currents: ActiveCurrent[]
-  setCurrents: (fn: (prev: ActiveCurrent[]) => ActiveCurrent[]) => void
-  signalWave: SignalWave | null
-  setSignalWave: (s: SignalWave | null) => void
-  systemState: SystemState
+  nodesRef: MutableRefObject<WebNode[]>
+  linesRef: MutableRefObject<Map<string, LineState>>
+  currentsRef: MutableRefObject<ActiveCurrent[]>
+  signalWaveRef: MutableRefObject<SignalWave | null>
+  systemStateRef: MutableRefObject<SystemState>
 }) {
-  const nodesRef = useRef(nodes)
-  const linesRef = useRef(lines)
-  useEffect(() => { nodesRef.current = nodes }, [nodes])
-  useEffect(() => { linesRef.current = lines }, [lines])
-
   const lastAmbientSpawn = useRef(0)
   const ambientInterval = useRef(700 + Math.random() * 1100)
   const waveLastStep = useRef(0)
@@ -277,15 +338,18 @@ function NeuralSystem({
   useFrame((_, delta) => {
     const now = performance.now()
     const ns = nodesRef.current
+    const systemState = systemStateRef.current
 
     // ── Spawn ambient currents ──────────────────────────────────────────────
     if (systemState === 'ambient' || systemState === 'user-active') {
       const maxCurrents = systemState === 'user-active' ? 3 : 1
-      const activeCurrents = currents.filter(c => c.progress < 1 || c.pathRemaining.length > 0)
+      const activeCurrents = currentsRef.current.filter(c => c.progress < 1 || c.pathRemaining.length > 0)
+
       if (activeCurrents.length < maxCurrents && now - lastAmbientSpawn.current > ambientInterval.current) {
         const newCurrents = spawnAmbientCurrent(ns)
+
         if (newCurrents.length > 0) {
-          setCurrents(prev => [...prev.filter(c => c.pathRemaining.length > 0 || c.progress < 1), ...newCurrents])
+          currentsRef.current = [...activeCurrents, ...newCurrents]
           lastAmbientSpawn.current = now
           ambientInterval.current = systemState === 'user-active'
             ? 300 + Math.random() * 500
@@ -295,116 +359,109 @@ function NeuralSystem({
     }
 
     // ── Advance currents ────────────────────────────────────────────────────
-    setCurrents(prevCurrents => {
-      const nextCurrents: ActiveCurrent[] = []
-      const newLines = new Map(linesRef.current)
+    const nextCurrents: ActiveCurrent[] = []
 
-      for (const curr of prevCurrents) {
-        const fromNode = ns[curr.fromIdx]
-        const toNode = ns[curr.toIdx]
-        if (!fromNode || !toNode) continue
+    for (const curr of currentsRef.current) {
+      const fromNode = ns[curr.fromIdx]
+      const toNode = ns[curr.toIdx]
+      if (!fromNode || !toNode) continue
 
-        const lineKey = `${Math.min(curr.fromIdx, curr.toIdx)}-${Math.max(curr.fromIdx, curr.toIdx)}`
-        const pts = getLine(ns, curr.fromIdx, curr.toIdx)
-        const dist = fromNode.position.distanceTo(toNode.position)
-        const newProgress = curr.progress + (delta * curr.speed) / Math.max(dist, 1)
+      const lineKey = `${Math.min(curr.fromIdx, curr.toIdx)}-${Math.max(curr.fromIdx, curr.toIdx)}`
+      const pts = getLine(ns, curr.fromIdx, curr.toIdx)
+      const dist = fromNode.position.distanceTo(toNode.position)
+      const newProgress = curr.progress + (delta * curr.speed) / Math.max(dist, 1)
 
-        newLines.set(lineKey, {
-          points: pts,
-          color: curr.color,
-          drawProgress: Math.min(newProgress, 1),
-          opacity: 0.75,
-          fadeAt: newProgress >= 1 ? now + 800 : Infinity,
-        })
-
-        if (newProgress >= 1) {
-          // Reached toIdx — light it up if it's a product node
-          if (toNode.productIndex >= 0 && !toNode.isDormant && !toNode.isActive) {
-            setNodes(prev => prev.map((n, i) =>
-              i === curr.toIdx ? { ...n, glowIntensity: 1 } : n
-            ))
-            setTimeout(() => {
-              setNodes(prev => prev.map((n, i) =>
-                i === curr.toIdx && !n.isActive ? { ...n, glowIntensity: 0 } : n
-              ))
-            }, 1800 + Math.random() * 800)
-          }
-
-          // Move to next segment
-          if (curr.pathRemaining.length > 0) {
-            nextCurrents.push({
-              ...curr,
-              fromIdx: curr.toIdx,
-              toIdx: curr.pathRemaining[0],
-              progress: 0,
-              pathRemaining: curr.pathRemaining.slice(1),
-            })
-          }
-          // else current is done — don't add back
-        } else {
-          nextCurrents.push({ ...curr, progress: newProgress })
-        }
-      }
-
-      // Fade out expired lines
-      const cleanLines = new Map<string, LineState>()
-      newLines.forEach((line, key) => {
-        if (line.fadeAt === Infinity || now < line.fadeAt) {
-          cleanLines.set(key, line)
-        } else {
-          const fadeProgress = (now - line.fadeAt) / 600
-          if (fadeProgress < 1) {
-            cleanLines.set(key, { ...line, opacity: 0.75 * (1 - fadeProgress) })
-          }
-          // else fully faded — drop it
-        }
+      linesRef.current.set(lineKey, {
+        points: pts,
+        color: curr.color,
+        drawProgress: Math.min(newProgress, 1),
+        opacity: 0.75,
+        fadeAt: newProgress >= 1 ? now + 800 : Infinity,
       })
 
-      setLines(() => cleanLines)
-      return nextCurrents
+      if (newProgress >= 1) {
+        // Reached toIdx — light it up if it's a product node
+        if (toNode.productIndex >= 0 && !toNode.isDormant && !toNode.isActive) {
+          toNode.glowIntensity = 1
+
+          setTimeout(() => {
+            const n = nodesRef.current[curr.toIdx]
+            if (n && !n.isActive) n.glowIntensity = 0
+          }, 1800 + Math.random() * 800)
+        }
+
+        // Move to next segment
+        if (curr.pathRemaining.length > 0) {
+          nextCurrents.push({
+            ...curr,
+            fromIdx: curr.toIdx,
+            toIdx: curr.pathRemaining[0],
+            progress: 0,
+            pathRemaining: curr.pathRemaining.slice(1),
+          })
+        }
+        // else current is done — don't add back
+      } else {
+        nextCurrents.push({ ...curr, progress: newProgress })
+      }
+    }
+
+    currentsRef.current = nextCurrents
+
+    // ── Fade out expired lines ──────────────────────────────────────────────
+    linesRef.current.forEach((line, key) => {
+      if (line.fadeAt === Infinity || now < line.fadeAt) return
+
+      const fadeProgress = (now - line.fadeAt) / 600
+
+      if (fadeProgress < 1) {
+        line.opacity = 0.75 * (1 - fadeProgress)
+      } else {
+        linesRef.current.delete(key)
+      }
     })
 
     // ── Signal wave propagation ─────────────────────────────────────────────
-    if (signalWave && now - waveLastStep.current > 80) {
+    const wave = signalWaveRef.current
+
+    if (wave && now - waveLastStep.current > 80) {
       waveLastStep.current = now
       const nextFrontier: number[] = []
 
-      for (const nodeIdx of signalWave.frontier) {
+      for (const nodeIdx of wave.frontier) {
         for (const neighbor of ns[nodeIdx].connections) {
-          if (!signalWave.reachedSet.has(neighbor)) {
-            signalWave.reachedSet.add(neighbor)
+          if (!wave.reachedSet.has(neighbor)) {
+            wave.reachedSet.add(neighbor)
             nextFrontier.push(neighbor)
 
             // Draw signal line
             const lineKey = `${Math.min(nodeIdx, neighbor)}-${Math.max(nodeIdx, neighbor)}`
             const pts = getLine(ns, nodeIdx, neighbor)
-            setLines(prev => new Map(prev).set(lineKey, {
+
+            linesRef.current.set(lineKey, {
               points: pts,
-              color: signalWave.color,
+              color: wave.color,
               drawProgress: 1,
               opacity: 0.8,
               fadeAt: now + 500,
-            }))
+            })
 
             // Apply wave effect to node
-            if (ns[neighbor].productIndex >= 0) {
-              if (signalWave.type === 'sleep') {
-                setNodes(prev => prev.map((n, i) =>
-                  i === neighbor && !n.isActive
-                    ? { ...n, glowIntensity: 0.4, isDormant: true }
-                    : n
-                ))
+            const nb = ns[neighbor]
+            if (nb.productIndex >= 0) {
+              if (wave.type === 'sleep') {
+                if (!nb.isActive) {
+                  nb.glowIntensity = 0.4
+                  nb.isDormant = true
+                }
+
                 setTimeout(() => {
-                  setNodes(prev => prev.map((n, i) =>
-                    i === neighbor ? { ...n, glowIntensity: 0 } : n
-                  ))
+                  const n = nodesRef.current[neighbor]
+                  if (n) n.glowIntensity = 0
                 }, 300 + Math.random() * 200)
               } else {
-                setNodes(prev => prev.map((n, i) =>
-                  i === neighbor
-                    ? { ...n, isDormant: false, glowIntensity: 0.15 }
-                    : n
-                ))
+                nb.isDormant = false
+                nb.glowIntensity = 0.15
               }
             }
           }
@@ -412,9 +469,9 @@ function NeuralSystem({
       }
 
       if (nextFrontier.length === 0) {
-        setSignalWave(null)
+        signalWaveRef.current = null
       } else {
-        setSignalWave({ ...signalWave, frontier: nextFrontier })
+        wave.frontier = nextFrontier
       }
     }
   })
@@ -425,71 +482,62 @@ function NeuralSystem({
 // ─── Main Vistara scene ────────────────────────────────────────────────────────
 
 function VistaraScene({
-  nodes, lines, currents, signalWave, systemState,
-  setNodes, setLines, setCurrents, setSignalWave,
-  globalOpacity, onNodeActivate,
-  scrollT, dragX, dragY, onDwellNode,
+  nodesRef, linesRef, currentsRef, signalWaveRef, systemStateRef,
+  globalOpacityRef, onNodeActivate,
+  scrollRef, dragRef, onDwellNode,
 }: {
-  nodes: WebNode[]; lines: Map<string, LineState>
-  currents: ActiveCurrent[]; signalWave: SignalWave | null
-  systemState: SystemState
-  setNodes: (fn: (prev: WebNode[]) => WebNode[]) => void
-  setLines: (fn: (prev: Map<string, LineState>) => Map<string, LineState>) => void
-  setCurrents: (fn: (prev: ActiveCurrent[]) => ActiveCurrent[]) => void
-  setSignalWave: (s: SignalWave | null) => void
-  globalOpacity: number; onNodeActivate: (idx: number) => void
-  scrollT: number
-  dragX: number; dragY: number; onDwellNode: (idx: number | null) => void
+  nodesRef: MutableRefObject<WebNode[]>
+  linesRef: MutableRefObject<Map<string, LineState>>
+  currentsRef: MutableRefObject<ActiveCurrent[]>
+  signalWaveRef: MutableRefObject<SignalWave | null>
+  systemStateRef: MutableRefObject<SystemState>
+  globalOpacityRef: MutableRefObject<number>
+  onNodeActivate: (idx: number) => void
+  scrollRef: MutableRefObject<number>
+  dragRef: MutableRefObject<{ x: number; y: number }>
+  onDwellNode: (idx: number | null) => void
 }) {
   const handleNodeClick = useCallback((idx: number) => {
-    const wave = createSignalWave(idx, 'sleep')
-    setSignalWave(wave)
-    setNodes(prev => prev.map((n, i) => ({
-      ...n,
-      isActive: i === idx,
-      isDormant: i !== idx && n.productIndex >= 0 ? true : n.isDormant,
-      glowIntensity: i === idx ? 1 : n.glowIntensity,
-    })))
+    signalWaveRef.current = createSignalWave(idx, 'sleep')
+
+    nodesRef.current.forEach((n, i) => {
+      n.isActive = i === idx
+      if (i !== idx && n.productIndex >= 0) n.isDormant = true
+      if (i === idx) n.glowIntensity = 1
+    })
+
     onNodeActivate(idx)
-  }, [setSignalWave, setNodes, onNodeActivate])
+  }, [nodesRef, signalWaveRef, onNodeActivate])
 
   return (
     <>
       <CameraRig
-        scrollT={scrollT} dragX={dragX} dragY={dragY}
-        nodes={nodes} onDwellNode={onDwellNode}
+        scrollRef={scrollRef} dragRef={dragRef}
+        nodesRef={nodesRef} onDwellNode={onDwellNode}
       />
 
       <NeuralSystem
-        nodes={nodes} setNodes={setNodes}
-        lines={lines} setLines={setLines}
-        currents={currents} setCurrents={setCurrents}
-        signalWave={signalWave} setSignalWave={setSignalWave}
-        systemState={systemState}
+        nodesRef={nodesRef}
+        linesRef={linesRef}
+        currentsRef={currentsRef}
+        signalWaveRef={signalWaveRef}
+        systemStateRef={systemStateRef}
       />
 
-      {/* Web lines */}
-      {Array.from(lines.entries()).map(([key, line]) => (
-        <WebLine
-          key={key}
-          points={line.points}
-          color={line.color}
-          drawProgress={line.drawProgress}
-          opacity={line.opacity * globalOpacity}
-        />
-      ))}
+      <LinePool linesRef={linesRef} globalOpacityRef={globalOpacityRef} />
 
       {/* Product nodes */}
-      {nodes.map((node, i) => {
+      {nodesRef.current.map((node, i) => {
         if (node.productIndex < 0) return null
         const product = VISTARA_PRODUCTS[node.productIndex]
         return (
           <ProductNode
             key={i}
-            node={node}
+            nodesRef={nodesRef}
+            index={i}
             product={product}
             onActivate={() => handleNodeClick(i)}
-            globalOpacity={globalOpacity}
+            globalOpacityRef={globalOpacityRef}
           />
         )
       })}
@@ -500,24 +548,27 @@ function VistaraScene({
 // ─── Main export ───────────────────────────────────────────────────────────────
 
 export function VistaraVoid({ onBack }: { onBack?: () => void }) {
-  const [nodes, setNodes] = useState<WebNode[]>(() => buildWebNodes())
-  const [lines, setLines] = useState<Map<string, LineState>>(new Map())
-  const [currents, setCurrents] = useState<ActiveCurrent[]>([])
-  const [signalWave, setSignalWave] = useState<SignalWave | null>(null)
-  const [systemState, setSystemState] = useState<SystemState>('ambient')
-  const [activeNodeIdx, setActiveNodeIdx] = useState<number | null>(null)
+  const nodesRef = useRef<WebNode[]>(buildWebNodes())
+  const linesRef = useRef<Map<string, LineState>>(new Map())
+  const currentsRef = useRef<ActiveCurrent[]>([])
+  const signalWaveRef = useRef<SignalWave | null>(null)
+  const systemStateRef = useRef<SystemState>('ambient')
+  const globalOpacityRef = useRef(1)
+  const activeNodeIdxRef = useRef<number | null>(null)
+  const scrollRef = useRef(0)
+  const dragRef = useRef({ x: 0, y: 0 })
+  const dragAccum = useRef({ x: 0, y: 0 })
+  const inCaveRef = useRef(false)
+
   const [openProduct, setOpenProduct] = useState<VistaraProduct | null>(null)
   const [globalOpacity, setGlobalOpacity] = useState(1)
-  const [scrollT, setScrollT] = useState(0)
-  const [dragX, setDragX] = useState(0)
-  const [dragY, setDragY] = useState(0)
   const [dwellNodeIdx, setDwellNodeIdx] = useState<number | null>(null)
   const [inCave, setInCave] = useState(false)
+  const [isBlack, setIsBlack] = useState(false)
 
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDragging = useRef(false)
   const lastDrag = useRef({ x: 0, y: 0 })
-  const dragAccum = useRef({ x: 0, y: 0 })
   const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dwellActive = useRef(false)
 
@@ -525,15 +576,28 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
   const scheduleInactivity = useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
     const delay = INACTIVITY_MIN_MS + Math.random() * (INACTIVITY_MAX_MS - INACTIVITY_MIN_MS)
+
     inactivityTimer.current = setTimeout(() => {
+      globalOpacityRef.current = 0
       setGlobalOpacity(0)
+
       setTimeout(() => {
-        setActiveNodeIdx(null)
+        activeNodeIdxRef.current = null
         setOpenProduct(null)
-        setNodes(prev => prev.map(n => ({ ...n, isActive: false, isDormant: false, glowIntensity: 0 })))
-        setSystemState('black')
+
+        nodesRef.current.forEach(n => {
+          n.isActive = false
+          n.isDormant = false
+          n.glowIntensity = 0
+        })
+
+        systemStateRef.current = 'black'
+        setIsBlack(true)
+
         setTimeout(() => {
-          setSystemState('ambient')
+          systemStateRef.current = 'ambient'
+          setIsBlack(false)
+          globalOpacityRef.current = 1
           setGlobalOpacity(1)
           scheduleInactivity()
         }, BLACK_PAUSE_MS)
@@ -550,35 +614,42 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      setScrollT(prev => Math.min(Math.max(prev + e.deltaY / SCROLL_DEPTH_PX, 0), 1))
-      // Entering cave
-      setInCave(prev => scrollT > 0.4 ? true : prev)
+      scrollRef.current = Math.min(Math.max(scrollRef.current + e.deltaY / SCROLL_DEPTH_PX, 0), 1)
+
+      if (scrollRef.current > 0.4 && !inCaveRef.current) {
+        inCaveRef.current = true
+        setInCave(true)
+      }
     }
+
     window.addEventListener('wheel', onWheel, { passive: false })
     return () => window.removeEventListener('wheel', onWheel)
-  }, [scrollT])
+  }, [])
 
   // ── Drag ────────────────────────────────────────────────────────────────────
   const onPointerDown = useCallback((e: ReactPointerEvent) => {
     isDragging.current = true
     lastDrag.current = { x: e.clientX, y: e.clientY }
-    setSystemState(s => s === 'ambient' ? 'user-active' : s)
+
+    if (systemStateRef.current === 'ambient') systemStateRef.current = 'user-active'
     scheduleInactivity()
   }, [scheduleInactivity])
 
   const onPointerMove = useCallback((e: ReactPointerEvent) => {
     if (!isDragging.current) return
+
     dragAccum.current.x += e.clientX - lastDrag.current.x
     dragAccum.current.y += e.clientY - lastDrag.current.y
     lastDrag.current = { x: e.clientX, y: e.clientY }
-    setDragX(dragAccum.current.x)
-    setDragY(dragAccum.current.y)
+
+    dragRef.current = { x: dragAccum.current.x, y: dragAccum.current.y }
   }, [])
 
   const onPointerUp = useCallback(() => { isDragging.current = false }, [])
 
   // ── Touch ───────────────────────────────────────────────────────────────────
   const touchStart = useRef({ x: 0, y: 0 })
+
   const onTouchStart = useCallback((e: ReactTouchEvent) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
     isDragging.current = true
@@ -588,13 +659,14 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
 
   const onTouchMove = useCallback((e: ReactTouchEvent) => {
     if (!isDragging.current) return
+
     const dx = e.touches[0].clientX - lastDrag.current.x
     const dy = e.touches[0].clientY - lastDrag.current.y
     dragAccum.current.x += dx
     dragAccum.current.y += dy
     lastDrag.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-    setDragX(dragAccum.current.x)
-    setDragY(dragAccum.current.y)
+
+    dragRef.current = { x: dragAccum.current.x, y: dragAccum.current.y }
   }, [])
 
   const onTouchEnd = useCallback(() => { isDragging.current = false }, [])
@@ -603,6 +675,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
   const handleDwellNode = useCallback((idx: number | null) => {
     if (dwellTimer.current) clearTimeout(dwellTimer.current)
     setDwellNodeIdx(idx)
+
     if (idx !== null && !dwellActive.current) {
       dwellActive.current = true
       // Camera halts here for NODE_DWELL_MS — handled by CameraRig's lerp slowing
@@ -614,27 +687,29 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
 
   // ── Node activation ─────────────────────────────────────────────────────────
   const handleNodeActivate = useCallback((idx: number) => {
-    setActiveNodeIdx(idx)
+    activeNodeIdxRef.current = idx
     setOpenProduct(VISTARA_PRODUCTS[idx])
+
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
-    setSystemState('node-locked')
+    systemStateRef.current = 'node-locked'
     scheduleInactivity()
   }, [scheduleInactivity])
 
   // ── Panel close ─────────────────────────────────────────────────────────────
   const handlePanelClose = useCallback(() => {
     setOpenProduct(null)
-    const wakeWave = createSignalWave(activeNodeIdx ?? 0, 'wake')
-    setSignalWave(wakeWave)
-    setNodes(prev => prev.map(n => ({
-      ...n, isActive: false, isDormant: false,
-    })))
-    setActiveNodeIdx(null)
-    setSystemState('user-active')
-    scheduleInactivity()
-  }, [activeNodeIdx, scheduleInactivity])
 
-  const isBlack = systemState === 'black'
+    signalWaveRef.current = createSignalWave(activeNodeIdxRef.current ?? 0, 'wake')
+
+    nodesRef.current.forEach(n => {
+      n.isActive = false
+      n.isDormant = false
+    })
+
+    activeNodeIdxRef.current = null
+    systemStateRef.current = 'user-active'
+    scheduleInactivity()
+  }, [scheduleInactivity])
 
   return (
     <div
@@ -647,8 +722,8 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onClick={() => {
-        if (systemState === 'ambient') {
-          setSystemState('user-active')
+        if (systemStateRef.current === 'ambient') {
+          systemStateRef.current = 'user-active'
           scheduleInactivity()
         }
       }}
@@ -664,24 +739,25 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
             camera={{ position: [0, 20, 180], fov: 65, near: 0.5, far: 2000 }}
             style={{ position: 'absolute', inset: 0 }}
             gl={{ antialias: true, alpha: false }}
+            dpr={[1, 1.5]}
           >
             <VistaraScene
-              nodes={nodes} lines={lines}
-              currents={currents} signalWave={signalWave}
-              systemState={systemState}
-              setNodes={setNodes} setLines={setLines}
-              setCurrents={setCurrents} setSignalWave={setSignalWave}
-              globalOpacity={globalOpacity}
+              nodesRef={nodesRef}
+              linesRef={linesRef}
+              currentsRef={currentsRef}
+              signalWaveRef={signalWaveRef}
+              systemStateRef={systemStateRef}
+              globalOpacityRef={globalOpacityRef}
               onNodeActivate={handleNodeActivate}
-              scrollT={scrollT} dragX={dragX} dragY={dragY}
+              scrollRef={scrollRef} dragRef={dragRef}
               onDwellNode={handleDwellNode}
             />
           </Canvas>
         )}
       </motion.div>
 
-      {/* Peripheral glow — nodes outside frame cast edge light */}
-      <PeripheralEdgeGlow nodes={nodes} />
+      {/* Peripheral glow — soft edge pulses */}
+      <PeripheralEdgeGlow />
 
       {/* Dwell indicator */}
       <AnimatePresence>
@@ -709,7 +785,7 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
               color: 'rgba(255,255,255,0.25)',
               textTransform: 'uppercase',
             }}>
-              Tap to enter · {VISTARA_PRODUCTS[nodes[dwellNodeIdx]?.productIndex]?.name ?? ''}
+              Tap to enter · {VISTARA_PRODUCTS[nodesRef.current[dwellNodeIdx]?.productIndex]?.name ?? ''}
             </div>
           </motion.div>
         )}
@@ -742,25 +818,24 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
 
       {/* Back button */}
       {onBack && (
-        <motion.button
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}
+        <button
           onClick={onBack}
           style={{
-            position: 'fixed', top: '22px', left: '22px', zIndex: 100,
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '20px', padding: '7px 14px',
-            color: 'rgba(255,255,255,0.3)', fontSize: '10px',
+            position: 'fixed', bottom: '24px', left: '22px', zIndex: 100,
+            background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '20px', padding: '8px 16px',
+            color: 'rgba(255,255,255,0.6)', fontSize: '10px',
             letterSpacing: '0.2em', textTransform: 'uppercase',
             fontFamily: 'system-ui', cursor: 'pointer',
+            backdropFilter: 'blur(4px)',
           }}
         >
           ← Śūnya
-        </motion.button>
+        </button>
       )}
 
       {/* VISTĀRA wordmark */}
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
+      <div
         style={{
           position: 'fixed', top: '22px', right: '22px', zIndex: 20,
           pointerEvents: 'none', textAlign: 'right',
@@ -772,30 +847,22 @@ export function VistaraVoid({ onBack }: { onBack?: () => void }) {
         <div style={{ fontFamily: 'system-ui', fontSize: '8px', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', marginTop: '3px' }}>
           The Manifestations
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }
 
 // ─── Peripheral edge glow ──────────────────────────────────────────────────────
-// Nodes outside the camera frustum cast a faint glow at the nearest screen edge
+// Subtle, ever-present radial glow pulses at the screen edges.
 
-function PeripheralEdgeGlow({ nodes }: { nodes: WebNode[] }) {
-  // CSS radial gradients at screen edges for off-camera node hints
-  const glowingNodes = nodes.filter(n =>
-    n.productIndex >= 0 && (n.glowIntensity > 0.1 || n.isActive)
-  )
-
-  if (glowingNodes.length === 0) return null
-
+function PeripheralEdgeGlow() {
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 5 }}>
-      {/* Subtle edge glows — cycle through positions */}
       {[
-        { pos: '0 50%', dir: 'to right' },
-        { pos: '100% 50%', dir: 'to left' },
-        { pos: '50% 0', dir: 'to bottom' },
-        { pos: '50% 100%', dir: 'to top' },
+        { pos: '0 50%' },
+        { pos: '100% 50%' },
+        { pos: '50% 0' },
+        { pos: '50% 100%' },
       ].map((edge, i) => (
         <motion.div
           key={i}
