@@ -486,10 +486,8 @@ export default function MedhaHUD(){
   const transcriptRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{const el=transcriptRef.current;if(!el)return;el.scrollTop=el.scrollHeight;},[messages,greetingText,busy]);
 
-  // Reveal the record automatically whenever a new exchange begins
-  useEffect(()=>{if(busy||messages.length>0||greetingText)setShowTranscript(true);},[busy,messages.length,greetingText]);
-
   const canSend=composerText.trim().length>0&&!busy;
+  const lastMsg=messages.length>0?messages[messages.length-1]:null;
 
   return(
     <div className="mlv" data-mode={mode} style={{position:'fixed',inset:0,width:'100vw',height:'100vh',background:'#000',overflow:'hidden'}}>
@@ -528,9 +526,33 @@ export default function MedhaHUD(){
         </div>
       </div>
 
+      {/* Latest exchange — a single floating bubble (Medhā's reply, the
+          thinking indicator, or the user's last message — never more than
+          one at once), shown only while the full record panel is closed. */}
+      <AnimatePresence mode="wait">
+        {!showTranscript&&(busy||lastMsg||greetingText)&&(
+          <motion.div key={busy?'thinking':lastMsg?lastMsg.id:greetingText}
+            initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
+            style={{position:'fixed',left:0,right:0,bottom:'118px',zIndex:40,padding:'0 14px',pointerEvents:'none'}}>
+            <div style={{maxWidth:'560px',margin:'0 auto',pointerEvents:'auto',background:'rgba(8,4,20,0.16)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',borderRadius:'16px',padding:'8px 4px'}}>
+              {busy
+                ?<ThinkingBubble fc={fc}/>
+                :lastMsg
+                  ?<Bubble msg={lastMsg} fc={fc} onCopy={copyMsg} isLast onRegenerate={lastMsg.role==='assistant'?regenerate:undefined}/>
+                  :greetingText&&(
+                    <div style={{width:'100%',textAlign:'center',padding:'2px 6px 0'}}>
+                      <div style={{fontSize:'9px',letterSpacing:'0.25em',color:fc,textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'8px'}}>{getMode(greetingMode).name}</div>
+                      <p style={{fontFamily:'Georgia,serif',fontSize:'13px',lineHeight:'1.65',color:'rgba(255,255,255,0.55)',fontStyle:'italic',letterSpacing:'0.02em'}}>{greetingText}</p>
+                    </div>
+                  )
+              }
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Conversation record — a collapsible glass panel, tucked away by default
-          so Medhā stands unobstructed. The watermark pixie (and any new
-          exchange) opens it. */}
+          so Medhā stands unobstructed. The watermark pixie opens it. */}
       <AnimatePresence>
         {showTranscript&&(
           <motion.div key="transcript-panel" initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} exit={{opacity:0,y:18}} transition={{duration:0.45,ease:[0.16,1,0.3,1]}}
