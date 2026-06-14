@@ -342,7 +342,7 @@ export function CosmicStream({
     startRef.current = performance.now()
 
     const draw = (now: number) => {
-      const elapsed = now - startRef.current
+      const elapsed = Math.max(now - startRef.current, 0)
       const globalT = Math.min(elapsed / duration, 1)
 
       ctx.clearRect(0, 0, w, h)

@@ -23,8 +23,7 @@ import { STT, TTS } from '@/lib/medha/voice';
 import { incrementQuota, quotaRemaining, getUser, setUser, quotaLimit, type LocalUser } from '@/lib/quota/quota';
 import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './MedhaConsentSlab';
 import { CosmicStream } from '@/components/CosmicStream';
-import { MedhaLair } from '@/components/MedhaLair';
-import { useCosmicStream, STREAM_COLORS } from '@/hooks/useCosmicStream';
+import { useCosmicStream } from '@/hooks/useCosmicStream';
 import './medha.css';
 
 // ─── Faculty colors ────────────────────────────────────────────────────────────
@@ -44,9 +43,9 @@ const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number
   switching:       {sc:1.040,br:1.06,ro:1.5,dy:14,dd:1,  ao:0.15,ps:1  },
 };
 
-// ─── Roaming ───────────────────────────────────────────────────────────────────
-const RP=[{x:50,y:44},{x:50,y:30},{x:34,y:43},{x:66,y:43},{x:50,y:57},{x:36,y:33},{x:64,y:33}];
-const nxtRoam=(c:{x:number;y:number})=>{const o=RP.filter(p=>p.x!==c.x||p.y!==c.y);return o[Math.floor(Math.random()*o.length)];};
+// ─── Entity position ───────────────────────────────────────────────────────────
+// Fixed — Medhā always sits centered, in the mid-lower void, above the composer.
+const ENTITY_POS = { x: 50, y: 42 };
 
 // ─── Void canvas ───────────────────────────────────────────────────────────────
 function VoidCanvas(){
@@ -126,45 +125,50 @@ function PB({color,active}:{color:string;active:boolean}){
 }
 
 // ─── Entity ────────────────────────────────────────────────────────────────────
-function Entity({es,fc,rp,vis,vsrc}:{es:ES;fc:string;rp:{x:number;y:number};vis:boolean;vsrc?:string}){
+// Fixed in the mid-upper void — always clear of the composer below.
+function Entity({es,fc,vis,vsrc}:{es:ES;fc:string;vis:boolean;vsrc?:string}){
   const vr=useRef<HTMLVideoElement>(null);const cfg=SC[es];
   useEffect(()=>{const v=vr.current;if(!v)return;const play=()=>v.play().catch(()=>{});v.addEventListener('canplay',play);if(v.readyState>=3)play();return()=>v.removeEventListener('canplay',play);},[vsrc]);
+  // Outer wrapper is a plain div: framer-motion rewrites `transform` on any
+  // element it animates (scale/rotate/y etc.), which would clobber the
+  // translate(-50%,-50%) centering below. Keep centering on a non-motion node.
   return(
-    <motion.div animate={{left:`${rp.x}%`,top:`${rp.y}%`,opacity:vis?1:0,scale:vis?1:0.85,filter:vis?'blur(0px)':'blur(12px)'}}
-      transition={{left:{duration:2.8,ease:[0.16,1,0.3,1]},top:{duration:2.8,ease:[0.16,1,0.3,1]},opacity:{duration:1.6},scale:{duration:1.8},filter:{duration:1.6}}}
-      style={{position:'fixed',transform:'translate(-50%,-50%)',zIndex:10,pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{position:'fixed',left:`${ENTITY_POS.x}%`,top:`${ENTITY_POS.y}%`,transform:'translate(-50%,-50%)',zIndex:10,pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center'}}>
       <motion.div animate={{opacity:[cfg.ao*0.5,cfg.ao,cfg.ao*0.5]}} transition={{duration:cfg.ps,repeat:Infinity,ease:'easeInOut'}}
-        style={{position:'absolute',width:'40vmin',height:'12vmin',borderRadius:'50%',background:`radial-gradient(ellipse at center,${fc} 0%,transparent 70%)`,filter:'blur(28px)',top:'56%',zIndex:9}}/>
-      <motion.div
-        animate={{scale:cfg.sc,rotate:cfg.ro>0?[0,cfg.ro,0,-cfg.ro,0]:0,y:[-cfg.dy/2,cfg.dy/2,-cfg.dy/2],filter:`brightness(${cfg.br})`}}
-        transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
-        style={{width:'56vmin',height:'56vmin',position:'relative',zIndex:10}}>
-        {vsrc
-          ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
-          // eslint-disable-next-line @next/next/no-img-element
-          :<img src="/assets/medha-entity.png" alt="MEDHĀ" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
-        }
+        style={{position:'absolute',width:'30vmin',height:'9vmin',borderRadius:'50%',background:`radial-gradient(ellipse at center,${fc} 0%,transparent 70%)`,filter:'blur(28px)',top:'56%',zIndex:9}}/>
+      <motion.div initial={{opacity:0,scale:0.85,filter:'blur(12px)'}} animate={{opacity:vis?1:0,scale:vis?1:0.85,filter:vis?'blur(0px)':'blur(12px)'}}
+        transition={{opacity:{duration:1.6},scale:{duration:1.8},filter:{duration:1.6}}}
+        style={{position:'relative',zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <motion.div
+          animate={{scale:cfg.sc,rotate:cfg.ro>0?[0,cfg.ro,0,-cfg.ro,0]:0,y:[-cfg.dy/2,cfg.dy/2,-cfg.dy/2],filter:`brightness(${cfg.br})`}}
+          transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
+          style={{width:'42vmin',height:'42vmin',position:'relative'}}>
+          {vsrc
+            ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
+            // eslint-disable-next-line @next/next/no-img-element
+            :<img src="/assets/medha-entity.png" alt="MEDHĀ" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
+          }
+        </motion.div>
       </motion.div>
       <AnimatePresence>
         {(es==='responding'||es==='voice-active')&&(
           <motion.div initial={{scale:0.8,opacity:0}} animate={{scale:[1,1.08,1],opacity:[0.06,0.12,0.06]}} exit={{opacity:0}}
             transition={{duration:cfg.ps,repeat:Infinity}}
-            style={{position:'absolute',width:'60vmin',height:'60vmin',borderRadius:'50%',border:`1px solid ${fc}`,zIndex:8}}/>
+            style={{position:'absolute',width:'46vmin',height:'46vmin',borderRadius:'50%',border:`1px solid ${fc}`,zIndex:8}}/>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
 
 // ─── Message bubble ────────────────────────────────────────────────────────────
-function Bubble({msg,rp,fc,onCopy}:{msg:StoredMsg;rp:{x:number;y:number};fc:string;onCopy:(m:StoredMsg)=>void}){
+// Renders inline in the transcript — no floating/roaming position of its own.
+function Bubble({msg,fc,onCopy}:{msg:StoredMsg;fc:string;onCopy:(m:StoredMsg)=>void}){
   const isU=msg.role==='user';
-  const top=rp.y<52?`${rp.y+28}vh`:`${rp.y-26}vh`;
   const mn=isU?'YOU':`MEDHĀ · ${getMode(msg.mode as CognitiveModeKey).name}`;
   return(
-    <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0,left:`${rp.x}%`,top}} exit={{opacity:0,y:-10}}
-      transition={{opacity:{duration:0.4,ease:[0.16,1,0.3,1]},left:{duration:2.8,ease:[0.16,1,0.3,1]},top:{duration:2.8,ease:[0.16,1,0.3,1]}}}
-      style={{position:'fixed',transform:'translateX(-50%)',zIndex:35,width:'min(90vw,420px)',display:'flex',flexDirection:'column',alignItems:isU?'flex-end':'flex-start',gap:'6px'}}>
+    <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
+      style={{width:'100%',display:'flex',flexDirection:'column',alignItems:isU?'flex-end':'flex-start',gap:'6px'}}>
       <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
         {!isU&&<div style={{width:'5px',height:'5px',borderRadius:'50%',background:fc,boxShadow:`0 0 4px ${fc}`}}/>}
         <span style={{fontSize:'9px',letterSpacing:'0.22em',color:isU?'rgba(255,255,255,0.2)':'rgba(255,200,160,0.4)',textTransform:'uppercase',fontFamily:'system-ui'}}>{mn}</span>
@@ -174,6 +178,22 @@ function Bubble({msg,rp,fc,onCopy}:{msg:StoredMsg;rp:{x:number;y:number};fc:stri
         <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'13px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'system-ui',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer'}}>
           {msg.role==='assistant'?<div dangerouslySetInnerHTML={{__html:renderMarkdown(msg.content)}} className="medha-md"/>:msg.content}
         </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Typing indicator ──────────────────────────────────────────────────────────
+function ThinkingBubble({fc}:{fc:string}){
+  return(
+    <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:0.3}}
+      style={{width:'100%',display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'6px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+        <div style={{width:'5px',height:'5px',borderRadius:'50%',background:fc,boxShadow:`0 0 4px ${fc}`}}/>
+        <span style={{fontSize:'9px',letterSpacing:'0.22em',color:'rgba(255,200,160,0.4)',textTransform:'uppercase',fontFamily:'system-ui'}}>MEDHĀ</span>
+      </div>
+      <div style={{display:'flex',alignItems:'flex-start',gap:'8px'}}>
+        <div style={{paddingTop:'10px',flexShrink:0}}><NL color={fc} align="left"/></div>
       </div>
     </motion.div>
   );
@@ -191,7 +211,7 @@ export default function MedhaHUD(){
   const[mode,setMode]=useState<CognitiveModeKey>('prajna');
   const[chatId,setChatId]=useState('');const[messages,setMessages]=useState<StoredMsg[]>([]);
   const[composerText,setComposerText]=useState('');const[busy,setBusy]=useState(false);
-  const[isTyping,setIsTyping]=useState(false);const[showHistory,setShowHistory]=useState(false);
+  const[showHistory,setShowHistory]=useState(false);
   const[showSettings,setShowSettings]=useState(false);const[listening,setListening]=useState(false);
   const[ttsEnabled,setTtsEnabled]=useState(false);const[chats,setChats]=useState<StoredChat[]>([]);
   const[quotaUser,setQuotaUser]=useState<LocalUser|null>(null);const[showQuotaLock,setShowQuotaLock]=useState(false);
@@ -199,15 +219,14 @@ export default function MedhaHUD(){
   const[regName,setRegName]=useState('');const[regEmail,setRegEmail]=useState('');
   const[consentGranted,setConsentGranted]=useState(false);const[consentReady,setConsentReady]=useState(false);
   const[greetingText,setGreetingText]=useState<string|null>(null);const[greetingMode,setGreetingMode]=useState<CognitiveModeKey>('prajna');
-  const[es,setEs]=useState<ES>('dormant');const[rp,setRp]=useState(RP[0]);
-  const[vis,setVis]=useState(true);const[burst,setBurst]=useState(false);const[burstColor,setBurstColor]=useState('#e8e4ff');
+  const[es,setEs]=useState<ES>('dormant');
+  const[burst,setBurst]=useState(false);const[burstColor,setBurstColor]=useState('#e8e4ff');
   const[mounted,setMounted]=useState(false);
   const { stream, triggerStream, handleStreamComplete } = useCosmicStream();
-  const [pixieReact, setPixieReact] = useState(false);
   // Ambient stream timer
   const ambientStreamRef = useRef<ReturnType<typeof setTimeout>|null>(null);
   const sttR=useRef<STT|null>(null);const ttsR=useRef<TTS|null>(null);
-  const gtR=useRef<ReturnType<typeof setTimeout>|null>(null);const roamR=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const gtR=useRef<ReturnType<typeof setTimeout>|null>(null);
   const fileR=useRef<HTMLInputElement>(null);
   const dataR=useRef({chatId:'',messages:[] as StoredMsg[],mode:'prajna' as CognitiveModeKey});
   useEffect(()=>{dataR.current={chatId,messages,mode};},[chatId,messages,mode]);
@@ -268,10 +287,6 @@ export default function MedhaHUD(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[showHistory,showSettings]);
 
-  // Roaming
-  const roam=useCallback(()=>{setVis(false);setTimeout(()=>{setRp(p=>nxtRoam(p));setTimeout(()=>setVis(true),800);},1200);},[]);
-  useEffect(()=>{const s=()=>{roamR.current=setTimeout(()=>{if(!busy)roam();s();},35000+Math.random()*20000);};s();return()=>{if(roamR.current)clearTimeout(roamR.current);};},[busy,roam]);
-
   const back=()=>{try{const v=(window as any).__vyan;v?.worldRef?.cameraRig?.returnToMedhaOrbFull?.();}catch{}router.push('/shunya/medha');};
 
   const actModel=useCallback((k:CognitiveModeKey,force=false)=>{
@@ -294,24 +309,21 @@ export default function MedhaHUD(){
   const send=useCallback(async()=>{
     const tx=composerText.trim();if(!tx||busy)return;
     if(!quotaUser&&!getUser()){if(quotaRemaining('medha')<=0){setShowQuotaLock(true);return;}if(!incrementQuota('medha').ok){setShowQuotaLock(true);return;}}
-    setComposerText('');setIsTyping(false);
+    setComposerText('');
     const um:StoredMsg={id:uid(),role:'user',content:tx,mode,ts:Date.now()};
     setMessages(p=>[...p,um]);setEs('listening');
-    if(Math.random()<0.3)setTimeout(()=>roam(),3000);
     if(isForbiddenQuery(tx)){setTimeout(()=>{setMessages(p=>[...p,{id:uid(),role:'assistant',content:SANDHI_REDIRECT_MARKDOWN,mode,ts:Date.now()}]);setEs('dormant');},280);return;}
     setBusy(true);await new Promise(r=>setTimeout(r,400));setEs('thinking');
     const hist:ChatMessage[]=[...dataR.current.messages,um].slice(-12).map(m=>({role:m.role,content:m.content}));
     try{const full=await chatComplete(mdef,hist);setEs('responding');
       const am:StoredMsg={id:uid(),role:'assistant',content:full||'I lost the signal for a moment. Try again?',mode,ts:Date.now()};
       setMessages(p=>[...p,am]);setEs('dormant');
-      // Intelligence arrives — trigger stream + pixie reaction
+      // Intelligence arrives — trigger stream
       triggerStream(mode);
-      setPixieReact(true);
-      setTimeout(() => setPixieReact(false), 100);
       if(ttsEnabled&&ttsR.current?.isSupported()){const pl=full.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/[*_`#>]/g,'');setEs('voice-active');ttsR.current.speak(pl,{onEnd:()=>setEs('dormant')});}}
     catch{setMessages(p=>[...p,{id:uid(),role:'assistant',content:'Cognition is busy. Give it a breath and try again.',mode,ts:Date.now()}]);setEs('dormant');}
     finally{setBusy(false);}
-  },[composerText,busy,mode,mdef,ttsEnabled,quotaUser,roam,triggerStream]);
+  },[composerText,busy,mode,mdef,ttsEnabled,quotaUser,triggerStream]);
 
   const subReg=useCallback(async()=>{
     if(!regEmail.trim()||regBusy)return;setRegBusy(true);setRegErr('');
@@ -330,10 +342,11 @@ export default function MedhaHUD(){
   const taR=useRef<HTMLTextAreaElement>(null);
   useEffect(()=>{const el=taR.current;if(!el)return;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';},[composerText]);
 
-  const lastU=[...messages].reverse().find(m=>m.role==='user')??null;
-  const lastA=[...messages].reverse().find(m=>m.role==='assistant'&&m.mode===mode)??null;
-  const showMsg=busy?lastU:(lastA??lastU);
   const copyMsg=async(m:StoredMsg)=>{try{await navigator.clipboard.writeText(m.content);}catch{}};
+
+  // Auto-scroll transcript to the latest message / status
+  const transcriptRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{const el=transcriptRef.current;if(!el)return;el.scrollTop=el.scrollHeight;},[messages,greetingText,busy]);
 
   const canSend=composerText.trim().length>0&&!busy;
 
@@ -341,16 +354,15 @@ export default function MedhaHUD(){
     <div className="mlv" data-mode={mode} style={{position:'fixed',inset:0,width:'100vw',height:'100vh',background:'#000',overflow:'hidden'}}>
       {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
       {mounted&&<VoidCanvas/>}
-      {mounted&&<MedhaLair entityX={rp.x/100} entityY={rp.y/100} facultyColor={fc} onReact={pixieReact}/>}
-      <Entity es={es} fc={fc} rp={rp} vis={vis} vsrc="/assets/medha-dormant.mp4"/>
+      <Entity es={es} fc={fc} vis={true} vsrc="/assets/medha-dormant.mp4"/>
       {mounted&&<PB color={burstColor} active={burst}/>}
       {mounted&&stream.active&&(
         <CosmicStream
           active={stream.active}
           color={stream.color}
           colorSecondary={stream.colorSecondary}
-          entityX={rp.x/100}
-          entityY={rp.y/100}
+          entityX={ENTITY_POS.x/100}
+          entityY={ENTITY_POS.y/100}
           duration={3200}
           onComplete={handleStreamComplete}
         />
@@ -373,56 +385,59 @@ export default function MedhaHUD(){
         </div>
       </div>
 
-      {/* Message bubble */}
-      <AnimatePresence mode="wait">
-        {showMsg&&!isTyping&&<Bubble key={showMsg.id} msg={showMsg} rp={rp} fc={fc} onCopy={copyMsg}/>}
-      </AnimatePresence>
+      {/* Transcript + Composer — stable column anchored above the input, never overlapping the Entity */}
+      <div style={{position:'fixed',left:0,right:0,bottom:0,top:'calc(42% + 22vmin)',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none'}}>
+        {/* Transcript — scrollable, bottom-anchored */}
+        <div ref={transcriptRef} style={{flex:1,minHeight:0,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'16px',justifyContent:'flex-end',width:'100%',maxWidth:'560px',margin:'0 auto',padding:'16px 16px 8px',pointerEvents:'auto',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 28px)',maskImage:'linear-gradient(to bottom, transparent, black 28px)'}}>
+          {messages.map(m=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg}/>)}
+          <AnimatePresence>
+            {busy&&<ThinkingBubble key="thinking" fc={fc}/>}
+          </AnimatePresence>
+          <AnimatePresence>
+            {greetingText&&!busy&&(
+              <motion.div key={greetingText} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.5}}
+                style={{width:'100%',textAlign:'center',pointerEvents:'none',padding:'2px 6px 0'}}>
+                <div style={{fontSize:'9px',letterSpacing:'0.25em',color:fc,textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'8px'}}>{getMode(greetingMode).name}</div>
+                <p style={{fontFamily:'Georgia,serif',fontSize:'13px',lineHeight:'1.65',color:'rgba(255,255,255,0.55)',fontStyle:'italic',letterSpacing:'0.02em'}}>{greetingText}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
-      {/* Greeting */}
-      <AnimatePresence>
-        {greetingText&&(
-          <motion.div key={greetingText} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.5}}
-            style={{position:'fixed',bottom:'22%',left:'50%',transform:'translateX(-50%)',zIndex:45,textAlign:'center',pointerEvents:'none',maxWidth:'360px',padding:'0 20px'}}>
-            <div style={{fontSize:'9px',letterSpacing:'0.25em',color:fc,textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'8px'}}>{getMode(greetingMode).name}</div>
-            <p style={{fontFamily:'Georgia,serif',fontSize:'14px',lineHeight:'1.65',color:'rgba(255,255,255,0.6)',fontStyle:'italic',letterSpacing:'0.02em'}}>{greetingText}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Input */}
-      <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:40,padding:'8px 14px 22px'}}>
-        <div style={{maxWidth:'560px',margin:'0 auto'}}>
-          {/* Faculty selector */}
-          <div style={{marginBottom:'8px',position:'relative'}}>
-            <FacultySel mode={mode} onSelect={k=>actModel(k)}/>
-          </div>
-          {/* Composer */}
-          <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
-            <textarea ref={taR} value={composerText}
-              onChange={e=>{setComposerText(e.target.value);setIsTyping(e.target.value.length>0);}}
-              onFocus={()=>setIsTyping(true)} onBlur={()=>{if(!composerText.trim())setIsTyping(false);}}
-              onKeyDown={onKey} placeholder={listening?'Listening…':`Speak to ${mdef.name}…`}
-              rows={1} disabled={busy} maxLength={1000}
-              style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'system-ui',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
-            <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
-              <button onClick={()=>fileR.current?.click()} title="Attach"
-                style={{width:'28px',height:'28px',borderRadius:'50%',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-              </button>
-              <button onClick={()=>{const s=sttR.current;if(!s?.isSupported())return;if(listening){s.stop();setListening(false);setEs('dormant');return;}setListening(true);setEs('voice-listening');s.start({onText:t=>setComposerText(t),onEnd:()=>{setListening(false);setEs('dormant');},onError:()=>{setListening(false);setEs('dormant');}});}}
-                style={{width:'28px',height:'28px',borderRadius:'50%',background:listening?'rgba(220,38,38,0.18)':'rgba(255,255,255,0.04)',border:`1px solid ${listening?'rgba(220,38,38,0.35)':'rgba(255,255,255,0.07)'}`,color:listening?'#f87171':'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {listening?<motion.div animate={{scale:[1,1.3,1]}} transition={{duration:0.8,repeat:Infinity,ease:'easeInOut'}} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#f87171'}}/>
-                  :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>}
-              </button>
-              <button onClick={send} disabled={!canSend}
-                style={{width:'28px',height:'28px',borderRadius:'50%',background:canSend?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.09)',color:canSend?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.18)',cursor:canSend?'pointer':'not-allowed',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-                {busy?<motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} style={{width:'8px',height:'8px',borderRadius:'50%',border:'1px solid rgba(255,255,255,0.5)',borderTopColor:'transparent'}}/>
-                  :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>}
-              </button>
+        {/* Composer */}
+        <div style={{flex:'0 0 auto',padding:'8px 14px 22px',pointerEvents:'auto'}}>
+          <div style={{maxWidth:'560px',margin:'0 auto'}}>
+            {/* Faculty selector */}
+            <div style={{marginBottom:'8px',position:'relative'}}>
+              <FacultySel mode={mode} onSelect={k=>actModel(k)}/>
             </div>
-            <AnimatePresence>{busy&&<motion.div initial={{scaleX:0,opacity:0}} animate={{scaleX:1,opacity:1}} exit={{scaleX:0,opacity:0}} style={{position:'absolute',bottom:0,left:'10px',right:'10px',height:'1px',background:`linear-gradient(90deg,${fc},#7b2fff,${fc})`,transformOrigin:'left',borderRadius:'1px'}}/>}</AnimatePresence>
+            {/* Composer */}
+            <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
+              <textarea ref={taR} value={composerText}
+                onChange={e=>setComposerText(e.target.value)}
+                onKeyDown={onKey} placeholder={listening?'Listening…':`Speak to ${mdef.name}…`}
+                rows={1} disabled={busy} maxLength={1000}
+                style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'system-ui',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
+              <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
+                <button onClick={()=>fileR.current?.click()} title="Attach"
+                  style={{width:'28px',height:'28px',borderRadius:'50%',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+                <button onClick={()=>{const s=sttR.current;if(!s?.isSupported())return;if(listening){s.stop();setListening(false);setEs('dormant');return;}setListening(true);setEs('voice-listening');s.start({onText:t=>setComposerText(t),onEnd:()=>{setListening(false);setEs('dormant');},onError:()=>{setListening(false);setEs('dormant');}});}}
+                  style={{width:'28px',height:'28px',borderRadius:'50%',background:listening?'rgba(220,38,38,0.18)':'rgba(255,255,255,0.04)',border:`1px solid ${listening?'rgba(220,38,38,0.35)':'rgba(255,255,255,0.07)'}`,color:listening?'#f87171':'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {listening?<motion.div animate={{scale:[1,1.3,1]}} transition={{duration:0.8,repeat:Infinity,ease:'easeInOut'}} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#f87171'}}/>
+                    :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>}
+                </button>
+                <button onClick={send} disabled={!canSend}
+                  style={{width:'28px',height:'28px',borderRadius:'50%',background:canSend?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.09)',color:canSend?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.18)',cursor:canSend?'pointer':'not-allowed',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
+                  {busy?<motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} style={{width:'8px',height:'8px',borderRadius:'50%',border:'1px solid rgba(255,255,255,0.5)',borderTopColor:'transparent'}}/>
+                    :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>}
+                </button>
+              </div>
+              <AnimatePresence>{busy&&<motion.div initial={{scaleX:0,opacity:0}} animate={{scaleX:1,opacity:1}} exit={{scaleX:0,opacity:0}} style={{position:'absolute',bottom:0,left:'10px',right:'10px',height:'1px',background:`linear-gradient(90deg,${fc},#7b2fff,${fc})`,transformOrigin:'left',borderRadius:'1px'}}/>}</AnimatePresence>
+            </div>
+            <p style={{textAlign:'center',color:'rgba(255,255,255,0.11)',fontSize:'9px',letterSpacing:'0.16em',fontFamily:'system-ui',textTransform:'uppercase',marginTop:'7px'}}>Enter · Shift+Enter new line</p>
           </div>
-          <p style={{textAlign:'center',color:'rgba(255,255,255,0.11)',fontSize:'9px',letterSpacing:'0.16em',fontFamily:'system-ui',textTransform:'uppercase',marginTop:'7px'}}>Enter · Shift+Enter new line</p>
         </div>
       </div>
 
@@ -524,7 +539,7 @@ export default function MedhaHUD(){
       )}
 
       <input ref={fileR} type="file" accept="image/*,.pdf,.txt,.md,.json,.csv" style={{display:'none'}}
-        onChange={e=>{const f=e.target.files?.[0];if(!f)return;setComposerText(c=>`${c}\n\n[attached: ${f.name} · ${(f.size/1024).toFixed(1)}KB]`);setIsTyping(true);e.target.value='';}}/>
+        onChange={e=>{const f=e.target.files?.[0];if(!f)return;setComposerText(c=>`${c}\n\n[attached: ${f.name} · ${(f.size/1024).toFixed(1)}KB]`);e.target.value='';}}/>
     </div>
   );
 }
