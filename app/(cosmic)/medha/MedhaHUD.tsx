@@ -67,7 +67,7 @@ function VoidCanvas(){
       for(let i=0;i<a/16000;i++)stars.push({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*0.7+0.3,o:Math.random()*0.12+0.04,s:Math.random()*0.0005+0.0002,p:Math.random()*6.28,l:1});
       for(let i=0;i<a/35000;i++)stars.push({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.0+0.6,o:Math.random()*0.16+0.07,s:Math.random()*0.0007+0.0003,p:Math.random()*6.28,l:2});
       const cl=['rgba(26,26,255,','rgba(123,47,255,','rgba(192,38,211,','rgba(20,10,50,'];
-      wisps=[];for(let i=0;i<5;i++)wisps.push({x:Math.random()*c.width,y:Math.random()*c.height,w:c.width*(0.18+Math.random()*0.22),h:c.height*(0.10+Math.random()*0.10),o:Math.random()*0.020+0.005,c:cl[Math.floor(Math.random()*cl.length)],dx:(Math.random()-0.5)*0.012,dy:(Math.random()-0.5)*0.007});
+      wisps=[];for(let i=0;i<3;i++)wisps.push({x:Math.random()*c.width,y:Math.random()*c.height,w:c.width*(0.18+Math.random()*0.22),h:c.height*(0.10+Math.random()*0.10),o:Math.random()*0.009+0.002,c:cl[Math.floor(Math.random()*cl.length)],dx:(Math.random()-0.5)*0.012,dy:(Math.random()-0.5)*0.007});
     };
     const drw=()=>{
       x.clearRect(0,0,c.width,c.height);t++;
@@ -82,7 +82,7 @@ function VoidCanvas(){
       }
       for(const s of stars){
         const op=s.o*(0.6+0.4*Math.sin(t*s.s*60+s.p));
-        if(s.l===2){const g=x.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r*3);g.addColorStop(0,`rgba(255,255,255,${op*0.5})`);g.addColorStop(1,'rgba(255,255,255,0)');x.beginPath();x.arc(s.x,s.y,s.r*3,0,6.28);x.fillStyle=g;x.fill();}
+        if(s.l===2){const g=x.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r*3);g.addColorStop(0,`rgba(255,255,255,${op*0.22})`);g.addColorStop(1,'rgba(255,255,255,0)');x.beginPath();x.arc(s.x,s.y,s.r*3,0,6.28);x.fillStyle=g;x.fill();}
         x.beginPath();x.arc(s.x,s.y,s.r,0,6.28);x.fillStyle=`rgba(255,255,255,${op})`;x.fill();
       }
       id=requestAnimationFrame(drw);
@@ -172,10 +172,34 @@ function NeuralRail({count,color}:{count:number;color:string}){
   );
 }
 
+// ─── Watermark pixie ─────────────────────────────────────────────────────────────
+// A tiny companion who perches over the source video's corner watermark and
+// travels with Medhā wherever she drifts — no cropping needed, and her wings
+// stay whole. She is the record-keeper: a click opens the conversation glass panel.
+function WatermarkPixie({color,onClick}:{color:string;onClick:()=>void}){
+  return(
+    <motion.button onClick={onClick} aria-label="Open conversation record" title="Open conversation record"
+      initial={{opacity:0}} animate={{opacity:1,y:[0,-4,0]}}
+      transition={{opacity:{duration:1.4,delay:1.2},y:{duration:3.6,repeat:Infinity,ease:'easeInOut'}}}
+      style={{position:'absolute',right:'6%',bottom:'10%',width:'9%',height:'9%',minWidth:'20px',minHeight:'20px',maxWidth:'34px',maxHeight:'34px',background:'transparent',border:'none',padding:0,margin:0,cursor:'pointer',pointerEvents:'auto',zIndex:11,display:'flex',alignItems:'center',justifyContent:'center'}}>
+      {/* Glow halo — pulses gently to invite a click */}
+      <motion.div animate={{opacity:[0.3,0.65,0.3],scale:[0.9,1.2,0.9]}} transition={{duration:2.8,repeat:Infinity,ease:'easeInOut'}}
+        style={{position:'absolute',inset:'-70%',borderRadius:'50%',background:`radial-gradient(circle,${color} 0%,transparent 70%)`,filter:'blur(5px)'}}/>
+      {/* Wings — soft fluttering ellipses */}
+      <motion.div animate={{scaleX:[1,0.55,1]}} transition={{duration:0.85,repeat:Infinity,ease:'easeInOut'}}
+        style={{position:'absolute',width:'150%',height:'85%',borderRadius:'50%',border:`1px solid ${color}`,opacity:0.55}}/>
+      <motion.div animate={{scaleY:[1,0.55,1]}} transition={{duration:0.85,repeat:Infinity,ease:'easeInOut',delay:0.12}}
+        style={{position:'absolute',width:'85%',height:'150%',borderRadius:'50%',border:`1px solid ${color}`,opacity:0.4}}/>
+      {/* Core */}
+      <div style={{position:'relative',width:'42%',height:'42%',borderRadius:'50%',background:'rgba(255,255,255,0.95)',boxShadow:`0 0 6px 2px ${color}`}}/>
+    </motion.button>
+  );
+}
+
 // ─── Entity ────────────────────────────────────────────────────────────────────
 // Anchored at the center of the screen — drifts gently in any direction, then returns.
 // May also wander to a nearby resting point (pos), fading out and back in en route.
-function Entity({es,fc,vis,vsrc,pos}:{es:ES;fc:string;vis:boolean;vsrc?:string;pos:{x:number;y:number}}){
+function Entity({es,fc,vis,vsrc,pos,onPixieClick}:{es:ES;fc:string;vis:boolean;vsrc?:string;pos:{x:number;y:number};onPixieClick:()=>void}){
   const vr=useRef<HTMLVideoElement>(null);const cfg=SC[es];
   useEffect(()=>{const v=vr.current;if(!v)return;const play=()=>v.play().catch(()=>{});v.addEventListener('canplay',play);if(v.readyState>=3)play();return()=>v.removeEventListener('canplay',play);},[vsrc]);
   // Outer wrapper animates `left`/`top` only — framer-motion rewrites the
@@ -185,8 +209,8 @@ function Entity({es,fc,vis,vsrc,pos}:{es:ES;fc:string;vis:boolean;vsrc?:string;p
   return(
     <motion.div initial={false} animate={{left:`${pos.x}%`,top:`${pos.y}%`}} transition={{duration:3.2,ease:[0.22,1,0.36,1]}}
       style={{position:'fixed',transform:'translate(-50%,-50%)',zIndex:10,pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center'}}>
-      <motion.div animate={{opacity:[cfg.ao*0.5,cfg.ao,cfg.ao*0.5]}} transition={{duration:cfg.ps,repeat:Infinity,ease:'easeInOut'}}
-        style={{position:'absolute',width:'30vmin',height:'9vmin',borderRadius:'50%',background:`radial-gradient(ellipse at center,${fc} 0%,transparent 70%)`,filter:'blur(28px)',top:'56%',zIndex:9}}/>
+      <motion.div animate={{opacity:[cfg.ao*0.3,cfg.ao*0.6,cfg.ao*0.3]}} transition={{duration:cfg.ps,repeat:Infinity,ease:'easeInOut'}}
+        style={{position:'absolute',width:'22vmin',height:'7vmin',borderRadius:'50%',background:`radial-gradient(ellipse at center,${fc} 0%,transparent 70%)`,filter:'blur(22px)',top:'56%',zIndex:9}}/>
       <motion.div initial={{opacity:0,scale:0.85,filter:'blur(12px)'}} animate={{opacity:vis?1:0,scale:vis?1:0.85,filter:vis?'blur(0px)':'blur(12px)'}}
         transition={{opacity:{duration:1.6},scale:{duration:1.8},filter:{duration:1.6}}}
         style={{position:'relative',zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -195,14 +219,13 @@ function Entity({es,fc,vis,vsrc,pos}:{es:ES;fc:string;vis:boolean;vsrc?:string;p
           transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},x:{duration:cfg.dd*1.6,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
           style={{width:'42vmin',height:'42vmin',position:'relative'}}>
           {vsrc
-            // overflow-hidden crop masks the source video's corner watermark
-            ?<div style={{width:'100%',height:'100%',overflow:'hidden',position:'relative'}}>
-                <video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto"
-                  style={{position:'absolute',width:'120%',height:'120%',left:'-8%',top:'-8%',objectFit:'cover',display:'block'}}/>
-              </div>
+            ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
             // eslint-disable-next-line @next/next/no-img-element
             :<img src="/assets/medha-entity.png" alt="MEDHĀ" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
           }
+          {/* The record-keeper pixie — perches over the source video's corner
+              watermark and travels with Medhā. Click her to open the transcript. */}
+          {vsrc&&<WatermarkPixie color={fc} onClick={onPixieClick}/>}
         </motion.div>
       </motion.div>
       <AnimatePresence>
@@ -273,6 +296,10 @@ export default function MedhaHUD(){
   const[chatId,setChatId]=useState('');const[messages,setMessages]=useState<StoredMsg[]>([]);
   const[composerText,setComposerText]=useState('');const[busy,setBusy]=useState(false);
   const[showHistory,setShowHistory]=useState(false);
+  // The conversation record — tucked away by default so Medhā is unobstructed;
+  // opened by the watermark pixie (the "record keeper"), or automatically
+  // when a new exchange begins.
+  const[showTranscript,setShowTranscript]=useState(false);
   const[showSettings,setShowSettings]=useState(false);const[listening,setListening]=useState(false);
   const[ttsEnabled,setTtsEnabled]=useState(false);const[chats,setChats]=useState<StoredChat[]>([]);
   const[responseStyle,setResponseStyle]=useState<'concise'|'balanced'|'detailed'>('balanced');
@@ -459,6 +486,9 @@ export default function MedhaHUD(){
   const transcriptRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{const el=transcriptRef.current;if(!el)return;el.scrollTop=el.scrollHeight;},[messages,greetingText,busy]);
 
+  // Reveal the record automatically whenever a new exchange begins
+  useEffect(()=>{if(busy||messages.length>0||greetingText)setShowTranscript(true);},[busy,messages.length,greetingText]);
+
   const canSend=composerText.trim().length>0&&!busy;
 
   return(
@@ -466,7 +496,7 @@ export default function MedhaHUD(){
       {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
       {mounted&&<VoidCanvas/>}
       {mounted&&<MedhaLair entityX={entityPos.x/100} entityY={entityPos.y/100} facultyColor={fc} onReact={burst}/>}
-      <Entity es={es} fc={fc} vis={entityVisible} vsrc="/assets/medha-dormant.mp4" pos={entityPos}/>
+      <Entity es={es} fc={fc} vis={entityVisible} vsrc="/assets/medha-dormant.mp4" pos={entityPos} onPixieClick={()=>setShowTranscript(v=>!v)}/>
       {mounted&&<PB color={burstColor} active={burst} ex={entityPos.x/100} ey={entityPos.y/100}/>}
       {mounted&&<NeuralRail count={messages.filter(m=>m.role==='user').length} color={fc}/>}
       {mounted&&stream.active&&(
@@ -498,60 +528,65 @@ export default function MedhaHUD(){
         </div>
       </div>
 
-      {/* Transcript + Composer — fixed band at the bottom with a glass backdrop so
-          messages always stay legible over the entity, however she drifts/travels */}
-      <div style={{position:'fixed',left:0,right:0,bottom:0,top:'56vh',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none',background:'linear-gradient(to bottom, rgba(5,2,15,0), rgba(5,2,15,0.5) 60px, rgba(5,2,15,0.55))',backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)'}}>
-        {/* Transcript — scrollable, bottom-anchored */}
-        <div ref={transcriptRef} style={{flex:1,minHeight:0,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'16px',justifyContent:'flex-end',width:'100%',maxWidth:'560px',margin:'0 auto',padding:'16px 16px 8px',pointerEvents:'auto',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 28px)',maskImage:'linear-gradient(to bottom, transparent, black 28px)'}}>
-          {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={regenerate}/>)}
-          <AnimatePresence>
-            {busy&&<ThinkingBubble key="thinking" fc={fc}/>}
-          </AnimatePresence>
-          <AnimatePresence>
-            {greetingText&&!busy&&(
-              <motion.div key={greetingText} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.5}}
-                style={{width:'100%',textAlign:'center',pointerEvents:'none',padding:'2px 6px 0'}}>
-                <div style={{fontSize:'9px',letterSpacing:'0.25em',color:fc,textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'8px'}}>{getMode(greetingMode).name}</div>
-                <p style={{fontFamily:'Georgia,serif',fontSize:'13px',lineHeight:'1.65',color:'rgba(255,255,255,0.55)',fontStyle:'italic',letterSpacing:'0.02em'}}>{greetingText}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      {/* Conversation record — a collapsible glass panel, tucked away by default
+          so Medhā stands unobstructed. The watermark pixie (and any new
+          exchange) opens it. */}
+      <AnimatePresence>
+        {showTranscript&&(
+          <motion.div key="transcript-panel" initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} exit={{opacity:0,y:18}} transition={{duration:0.45,ease:[0.16,1,0.3,1]}}
+            style={{position:'fixed',left:0,right:0,top:'8vh',bottom:'128px',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none',background:'linear-gradient(to bottom, rgba(8,4,20,0), rgba(8,4,20,0.22) 70px, rgba(8,4,20,0.28))',backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)'}}>
+            <div ref={transcriptRef} style={{flex:1,minHeight:0,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'16px',justifyContent:'flex-end',width:'100%',maxWidth:'560px',margin:'0 auto',padding:'16px 16px 8px',pointerEvents:'auto',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 28px)',maskImage:'linear-gradient(to bottom, transparent, black 28px)'}}>
+              {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={regenerate}/>)}
+              <AnimatePresence>
+                {busy&&<ThinkingBubble key="thinking" fc={fc}/>}
+              </AnimatePresence>
+              <AnimatePresence>
+                {greetingText&&!busy&&(
+                  <motion.div key={greetingText} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.5}}
+                    style={{width:'100%',textAlign:'center',pointerEvents:'none',padding:'2px 6px 0'}}>
+                    <div style={{fontSize:'9px',letterSpacing:'0.25em',color:fc,textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'8px'}}>{getMode(greetingMode).name}</div>
+                    <p style={{fontFamily:'Georgia,serif',fontSize:'13px',lineHeight:'1.65',color:'rgba(255,255,255,0.55)',fontStyle:'italic',letterSpacing:'0.02em'}}>{greetingText}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Composer */}
-        <div style={{flex:'0 0 auto',padding:'8px 14px 22px',pointerEvents:'auto'}}>
-          <div style={{maxWidth:'560px',margin:'0 auto'}}>
-            {/* Faculty selector */}
-            <div style={{marginBottom:'8px',position:'relative'}}>
-              <FacultySel mode={mode} onSelect={k=>actModel(k)}/>
-            </div>
-            {/* Composer */}
-            <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
-              <textarea ref={taR} value={composerText}
-                onChange={e=>setComposerText(e.target.value)}
-                onKeyDown={onKey} placeholder={listening?'Listening…':`Speak to ${mdef.name}…`}
-                rows={1} disabled={busy} maxLength={1000}
-                style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'system-ui',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
-              <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
-                <button onClick={()=>fileR.current?.click()} title="Attach"
-                  style={{width:'28px',height:'28px',borderRadius:'50%',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                </button>
-                <button onClick={()=>{const s=sttR.current;if(!s?.isSupported())return;if(listening){s.stop();setListening(false);setEs('dormant');return;}setListening(true);setEs('voice-listening');s.start({onText:t=>setComposerText(t),onEnd:()=>{setListening(false);setEs('dormant');},onError:()=>{setListening(false);setEs('dormant');}});}}
-                  style={{width:'28px',height:'28px',borderRadius:'50%',background:listening?'rgba(220,38,38,0.18)':'rgba(255,255,255,0.04)',border:`1px solid ${listening?'rgba(220,38,38,0.35)':'rgba(255,255,255,0.07)'}`,color:listening?'#f87171':'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  {listening?<motion.div animate={{scale:[1,1.3,1]}} transition={{duration:0.8,repeat:Infinity,ease:'easeInOut'}} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#f87171'}}/>
-                    :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>}
-                </button>
-                <button onClick={send} disabled={!canSend}
-                  style={{width:'28px',height:'28px',borderRadius:'50%',background:canSend?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.09)',color:canSend?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.18)',cursor:canSend?'pointer':'not-allowed',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-                  {busy?<motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} style={{width:'8px',height:'8px',borderRadius:'50%',border:'1px solid rgba(255,255,255,0.5)',borderTopColor:'transparent'}}/>
-                    :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>}
-                </button>
-              </div>
-              <AnimatePresence>{busy&&<motion.div initial={{scaleX:0,opacity:0}} animate={{scaleX:1,opacity:1}} exit={{scaleX:0,opacity:0}} style={{position:'absolute',bottom:0,left:'10px',right:'10px',height:'1px',background:`linear-gradient(90deg,${fc},#7b2fff,${fc})`,transformOrigin:'left',borderRadius:'1px'}}/>}</AnimatePresence>
-            </div>
-            <p style={{textAlign:'center',color:'rgba(255,255,255,0.11)',fontSize:'9px',letterSpacing:'0.16em',fontFamily:'system-ui',textTransform:'uppercase',marginTop:'7px'}}>Enter · Shift+Enter new line</p>
+      {/* Composer — always visible, slim bar at the bottom */}
+      <div style={{position:'fixed',left:0,right:0,bottom:0,zIndex:42,padding:'8px 14px 22px',pointerEvents:'none',background:'linear-gradient(to top, rgba(5,2,15,0.4), rgba(5,2,15,0) 110px)'}}>
+        <div style={{maxWidth:'560px',margin:'0 auto',pointerEvents:'auto'}}>
+          {/* Faculty selector */}
+          <div style={{marginBottom:'8px',position:'relative'}}>
+            <FacultySel mode={mode} onSelect={k=>actModel(k)}/>
           </div>
+          {/* Composer */}
+          <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
+            <textarea ref={taR} value={composerText}
+              onChange={e=>setComposerText(e.target.value)}
+              onKeyDown={onKey} placeholder={listening?'Listening…':`Speak to ${mdef.name}…`}
+              rows={1} disabled={busy} maxLength={1000}
+              style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'system-ui',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
+            <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
+              <button onClick={()=>fileR.current?.click()} title="Attach"
+                style={{width:'28px',height:'28px',borderRadius:'50%',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <button onClick={()=>{const s=sttR.current;if(!s?.isSupported())return;if(listening){s.stop();setListening(false);setEs('dormant');return;}setListening(true);setEs('voice-listening');s.start({onText:t=>setComposerText(t),onEnd:()=>{setListening(false);setEs('dormant');},onError:()=>{setListening(false);setEs('dormant');}});}}
+                style={{width:'28px',height:'28px',borderRadius:'50%',background:listening?'rgba(220,38,38,0.18)':'rgba(255,255,255,0.04)',border:`1px solid ${listening?'rgba(220,38,38,0.35)':'rgba(255,255,255,0.07)'}`,color:listening?'#f87171':'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {listening?<motion.div animate={{scale:[1,1.3,1]}} transition={{duration:0.8,repeat:Infinity,ease:'easeInOut'}} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#f87171'}}/>
+                  :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>}
+              </button>
+              <button onClick={send} disabled={!canSend}
+                style={{width:'28px',height:'28px',borderRadius:'50%',background:canSend?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.09)',color:canSend?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.18)',cursor:canSend?'pointer':'not-allowed',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
+                {busy?<motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} style={{width:'8px',height:'8px',borderRadius:'50%',border:'1px solid rgba(255,255,255,0.5)',borderTopColor:'transparent'}}/>
+                  :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>}
+              </button>
+            </div>
+            <AnimatePresence>{busy&&<motion.div initial={{scaleX:0,opacity:0}} animate={{scaleX:1,opacity:1}} exit={{scaleX:0,opacity:0}} style={{position:'absolute',bottom:0,left:'10px',right:'10px',height:'1px',background:`linear-gradient(90deg,${fc},#7b2fff,${fc})`,transformOrigin:'left',borderRadius:'1px'}}/>}</AnimatePresence>
+          </div>
+          <p style={{textAlign:'center',color:'rgba(255,255,255,0.11)',fontSize:'9px',letterSpacing:'0.16em',fontFamily:'system-ui',textTransform:'uppercase',marginTop:'7px'}}>Enter · Shift+Enter new line</p>
         </div>
       </div>
 
