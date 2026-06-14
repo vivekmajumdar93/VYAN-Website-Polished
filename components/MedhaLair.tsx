@@ -28,6 +28,21 @@ interface ArchFragment {
   driftX: number; driftY: number
 }
 
+interface CastlePlacement {
+  cx: number      // center x, px
+  baseY: number   // ground line, px
+  scale: number   // depth/size multiplier
+}
+
+interface LightningState {
+  nextFlash: number
+  flashStart: number
+  flashDuration: number
+  bolt: { x: number; y: number }[]
+  near: CastlePlacement
+  far: CastlePlacement
+}
+
 // ─── Draw helpers ──────────────────────────────────────────────────────────────
 
 function drawSpire(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, w: number, opacity: number) {
@@ -214,12 +229,15 @@ function drawPixie(ctx: CanvasRenderingContext2D, p: Pixie, t: number) {
   }
 }
 
-function drawCastleSilhouette(ctx: CanvasRenderingContext2D, w: number, h: number, opacity: number, t: number) {
-  const cx = w * 0.5
-  const baseY = h * 0.82
-  const castleW = w * 0.55
-  const castleH = h * 0.35
+function drawCastleSilhouette(
+  ctx: CanvasRenderingContext2D, w: number, h: number,
+  cx: number, baseY: number, scale: number,
+  opacity: number, t: number
+) {
+  const castleW = w * 0.55 * scale
+  const castleH = h * 0.35 * scale
 
+  if (opacity < 0.005) return
   ctx.save()
   ctx.globalAlpha = opacity
 
@@ -305,6 +323,110 @@ function drawCastleSilhouette(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.restore()
 }
 
+// ─── Lightning ───────────────────────────────────────────────────────────────
+// A violet flash sweeps the void at irregular intervals — the castle (and the
+// path leading to it) is only ever glimpsed in the light it throws.
+
+/** Double-flicker falloff curve: a sharp burst, a dip, a softer second burst. */
+function flashIntensity(elapsed: number, duration: number): number {
+  if (elapsed < 0 || elapsed > duration) return 0
+  const a = Math.exp(-elapsed / 55)
+  const b = 0.55 * Math.exp(-Math.abs(elapsed - duration * 0.45) / 45)
+  return Math.min(Math.max(a, b), 1)
+}
+
+/** A jagged bolt falling from the top of the screen toward a target point. */
+function generateBolt(w: number, targetX: number, targetY: number): { x: number; y: number }[] {
+  const startX = targetX + (Math.random() - 0.5) * w * 0.3
+  const pts: { x: number; y: number }[] = [{ x: startX, y: 0 }]
+  const segs = 7
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs
+    pts.push({
+      x: startX + (targetX - startX) * t + (Math.random() - 0.5) * w * 0.05,
+      y: targetY * t,
+    })
+  }
+  return pts
+}
+
+function drawBolt(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], intensity: number) {
+  if (intensity < 0.02) return
+  ctx.save()
+  ctx.strokeStyle = `rgba(210,190,255,${intensity * 0.85})`
+  ctx.lineWidth = 1.5
+  ctx.shadowColor = 'rgba(180,140,255,0.9)'
+  ctx.shadowBlur = 24
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(pts[0].x, pts[0].y)
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** Full-screen violet wash that brightens with the flash. */
+function drawFlashWash(ctx: CanvasRenderingContext2D, w: number, h: number, intensity: number) {
+  if (intensity < 0.01) return
+  ctx.save()
+  ctx.fillStyle = `rgba(150,120,255,${intensity * 0.16})`
+  ctx.fillRect(0, 0, w, h)
+  ctx.restore()
+}
+
+// ─── Path to the castle ─────────────────────────────────────────────────────────
+// A road of light receding in perspective — wide near Medhā, narrowing into the
+// distance toward the castle gate. Only catches the eye when lightning lifts it
+// out of the dark.
+function drawPathToCastle(
+  ctx: CanvasRenderingContext2D,
+  fromX: number, fromY: number,
+  toX: number, toY: number,
+  nearWidth: number, farWidth: number,
+  opacity: number
+) {
+  if (opacity < 0.005) return
+  const dx = toX - fromX
+  const dy = toY - fromY
+  const len = Math.hypot(dx, dy) || 1
+  const nx = -dy / len
+  const ny = dx / len
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.moveTo(fromX + nx * nearWidth, fromY + ny * nearWidth)
+  ctx.lineTo(toX + nx * farWidth, toY + ny * farWidth)
+  ctx.lineTo(toX - nx * farWidth, toY - ny * farWidth)
+  ctx.lineTo(fromX - nx * nearWidth, fromY - ny * nearWidth)
+  ctx.closePath()
+  const g = ctx.createLinearGradient(fromX, fromY, toX, toY)
+  g.addColorStop(0, `rgba(190,160,255,${opacity})`)
+  g.addColorStop(1, 'rgba(120,90,220,0)')
+  ctx.fillStyle = g
+  ctx.fill()
+
+  // Faint guiding lights along the path's edges
+  for (let i = 1; i < 6; i++) {
+    const t = i / 6
+    const px = fromX + dx * t
+    const py = fromY + dy * t
+    const width = nearWidth + (farWidth - nearWidth) * t
+    ;[-1, 1].forEach(side => {
+      const lx = px + nx * width * side
+      const ly = py + ny * width * side
+      const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 5)
+      glow.addColorStop(0, `rgba(220,200,255,${opacity * 0.9})`)
+      glow.addColorStop(1, 'rgba(160,120,255,0)')
+      ctx.beginPath()
+      ctx.arc(lx, ly, 5, 0, Math.PI * 2)
+      ctx.fillStyle = glow
+      ctx.fill()
+    })
+  }
+  ctx.restore()
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 
 interface MedhaLairProps {
@@ -324,8 +446,38 @@ export function MedhaLair({
   const animRef = useRef<number>(0)
   const pixiesRef = useRef<Pixie[]>([])
   const fragmentsRef = useRef<ArchFragment[]>([])
+  const lightningRef = useRef<LightningState | null>(null)
   const tRef = useRef(0)
   const reactRef = useRef(false)
+
+  // Pick a new resting place for the castle — different distance, depth and
+  // position each time the lightning rolls through.
+  const rollCastlePlacement = useCallback((w: number, h: number): { near: CastlePlacement; far: CastlePlacement } => {
+    return {
+      near: {
+        cx: w * (0.25 + Math.random() * 0.5),
+        baseY: h * (0.78 + Math.random() * 0.08),
+        scale: 0.75 + Math.random() * 0.55,
+      },
+      far: {
+        cx: w * (0.15 + Math.random() * 0.7),
+        baseY: h * (0.62 + Math.random() * 0.08),
+        scale: 0.35 + Math.random() * 0.3,
+      },
+    }
+  }, [])
+
+  const buildLightning = useCallback((w: number, h: number): LightningState => {
+    const { near, far } = rollCastlePlacement(w, h)
+    return {
+      nextFlash: performance.now() + 2500 + Math.random() * 4000,
+      flashStart: -Infinity,
+      flashDuration: 260 + Math.random() * 220,
+      bolt: [],
+      near,
+      far,
+    }
+  }, [rollCastlePlacement])
 
   // Build pixies
   const buildPixies = useCallback((w: number, h: number): Pixie[] => {
@@ -383,6 +535,7 @@ export function MedhaLair({
       canvas.height = window.innerHeight
       pixiesRef.current = buildPixies(canvas.width, canvas.height)
       fragmentsRef.current = buildFragments(canvas.width, canvas.height)
+      lightningRef.current = buildLightning(canvas.width, canvas.height)
     }
 
     resize()
@@ -395,8 +548,37 @@ export function MedhaLair({
 
       ctx.clearRect(0, 0, w, h)
 
-      // ── Layer 1: Castle silhouette (deepest) ──────────────────────────────
-      drawCastleSilhouette(ctx, w, h, 0.85, t)
+      // ── Layer 1: Lightning-lit castle, glimpsed at varying depths ──────────
+      const now = performance.now()
+      const lit = lightningRef.current
+      let flash = 0
+      if (lit) {
+        if (now >= lit.nextFlash) {
+          lit.flashStart = now
+          lit.flashDuration = 260 + Math.random() * 220
+          const placement = rollCastlePlacement(w, h)
+          lit.near = placement.near
+          lit.far = placement.far
+          lit.bolt = generateBolt(w, lit.near.cx, lit.near.baseY * 0.3)
+          lit.nextFlash = now + 5000 + Math.random() * 9000
+        }
+        flash = flashIntensity(now - lit.flashStart, lit.flashDuration)
+
+        // Far castle — distant, hazy, only a ghost of itself even at peak flash
+        drawCastleSilhouette(ctx, w, h, lit.far.cx, lit.far.baseY, lit.far.scale, 0.02 + flash * 0.5, t)
+
+        // The path winding from behind Medhā toward the castle gate
+        const ex = w * entityX
+        const ey = h * entityY
+        drawPathToCastle(ctx, ex, ey + h * 0.05, lit.near.cx, lit.near.baseY, w * 0.05, w * 0.004, 0.02 + flash * 0.4)
+
+        // Near castle — the one Medhā calls home, fully revealed when lit
+        drawCastleSilhouette(ctx, w, h, lit.near.cx, lit.near.baseY, lit.near.scale, 0.03 + flash * 0.85, t)
+
+        // The flash itself — violet wash and bolt
+        drawFlashWash(ctx, w, h, flash)
+        drawBolt(ctx, lit.bolt, flash)
+      }
 
       // ── Layer 2: Arch fragments (mid-deep) ────────────────────────────────
       fragmentsRef.current.forEach(frag => {
@@ -508,7 +690,7 @@ export function MedhaLair({
       cancelAnimationFrame(animRef.current)
       window.removeEventListener('resize', resize)
     }
-  }, [entityX, entityY, buildPixies, buildFragments])
+  }, [entityX, entityY, buildPixies, buildFragments, buildLightning, rollCastlePlacement])
 
   // Pixie reaction trigger
   useEffect(() => {

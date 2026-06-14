@@ -24,6 +24,7 @@ import { incrementQuota, quotaRemaining, getUser, setUser, quotaLimit, type Loca
 import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './MedhaConsentSlab';
 import { CosmicStream } from '@/components/CosmicStream';
 import { useCosmicStream } from '@/hooks/useCosmicStream';
+import { MedhaLair } from '@/components/MedhaLair';
 import './medha.css';
 
 // ─── Faculty colors ────────────────────────────────────────────────────────────
@@ -40,12 +41,14 @@ const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number
   responding:      {sc:1.022,br:1.04,ro:0,  dy:10,dd:2.8,ao:0.10,ps:1.8},
   'voice-listening':{sc:0.995,br:1.01,ro:0, dy:6, dd:6,  ao:0.06,ps:5  },
   'voice-active':  {sc:1.025,br:1.04,ro:0,  dy:8, dd:1.5,ao:0.12,ps:1.2},
-  switching:       {sc:1.040,br:1.06,ro:1.5,dy:14,dd:1,  ao:0.15,ps:1  },
+  // Ethereal "gaining intelligence" bloom — no shake, just a slow luminous swell.
+  switching:       {sc:1.070,br:1.20,ro:0,  dy:5, dd:2.2,ao:0.26,ps:1.6},
 };
 
-// ─── Entity position ───────────────────────────────────────────────────────────
-// Fixed anchor — Medhā's home is the exact center of the screen. Her idle
-// float drifts gently in any direction from this anchor, then returns to it.
+// ─── Entity home position ─────────────────────────────────────────────────────
+// Medhā's home is the exact center of the screen. Her idle float drifts gently
+// in any direction from this anchor; she also occasionally wanders to a nearby
+// resting point (see entityPos state) and returns.
 const ENTITY_POS = { x: 50, y: 50 };
 
 // ─── Void canvas ───────────────────────────────────────────────────────────────
@@ -103,38 +106,85 @@ function NL({color,align}:{color:string;align:'left'|'right'}){
   );
 }
 
-// ─── Particle burst ────────────────────────────────────────────────────────────
-function PB({color,active}:{color:string;active:boolean}){
+// ─── Intelligence bloom ────────────────────────────────────────────────────────
+// Soft stardust drifts inward and converges into a glowing halo around Medhā —
+// an arrival of cognition, not an explosion. Particles spiral gently inward,
+// brighten, and dissolve into a slow bloom-and-fade.
+function PB({color,active,ex=0.5,ey=0.5}:{color:string;active:boolean;ex?:number;ey?:number}){
   const cr=useRef<HTMLCanvasElement>(null);const ar=useRef<number>(0);
   useEffect(()=>{
     if(!active)return;const c=cr.current;if(!c)return;const x=c.getContext('2d');if(!x)return;
     c.width=window.innerWidth;c.height=window.innerHeight;
-    const cx=c.width/2,cy=c.height/2;
-    const ps=Array.from({length:65},(_,i)=>{const a=(Math.PI*2*i)/65+(Math.random()-0.5)*0.4,sp=1.5+Math.random()*3;return{x:cx+(Math.random()-0.5)*80,y:cy+(Math.random()-0.5)*80,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,sz:Math.random()*2.5+0.5};});
-    const st=performance.now();
+    const cx=c.width*ex,cy=c.height*ey;
+    const ps=Array.from({length:48},()=>{
+      const a=Math.random()*Math.PI*2,r0=80+Math.random()*320;
+      return{a,r0,sz:0.6+Math.random()*2.2,ph:Math.random()*Math.PI*2};
+    });
+    const st=performance.now();const dur=2800;
     const drw=(now:number)=>{
-      const l=1-(now-st)/2400;if(l<=0){x.clearRect(0,0,c.width,c.height);return;}
+      const e=Math.min((now-st)/dur,1);
+      if(e>=1){x.clearRect(0,0,c.width,c.height);return;}
       x.clearRect(0,0,c.width,c.height);
-      for(const p of ps){p.x+=p.vx;p.y+=p.vy;p.vy+=0.02;const a=Math.floor(l*200).toString(16).padStart(2,'0');x.beginPath();x.arc(p.x,p.y,p.sz,0,Math.PI*2);x.fillStyle=`${color}${a}`;x.fill();x.beginPath();x.moveTo(p.x,p.y);x.lineTo(p.x-p.vx*3,p.y-p.vy*3);x.strokeStyle=`${color}${Math.floor(l*80).toString(16).padStart(2,'0')}`;x.lineWidth=p.sz*0.4;x.stroke();}
+      // Bloom halo — swells then fades
+      const haloR=24+140*(1-Math.abs(e-0.5)*2);
+      const haloOp=Math.sin(e*Math.PI)*0.35;
+      const g=x.createRadialGradient(cx,cy,0,cx,cy,haloR);
+      g.addColorStop(0,`${color}${Math.floor(haloOp*255).toString(16).padStart(2,'0')}`);
+      g.addColorStop(1,`${color}00`);
+      x.beginPath();x.arc(cx,cy,haloR,0,Math.PI*2);x.fillStyle=g;x.fill();
+      // Stardust spiraling inward
+      const ease=1-Math.pow(1-e,3);
+      for(const p of ps){
+        const r=p.r0*(1-ease);
+        const px=cx+Math.cos(p.a+e*1.4)*r;
+        const py=cy+Math.sin(p.a+e*1.4)*r;
+        const twinkle=0.5+0.5*Math.sin(now*0.01+p.ph);
+        const op=(1-e)*twinkle;
+        x.beginPath();x.arc(px,py,p.sz*(1-e*0.4),0,Math.PI*2);
+        x.fillStyle=`rgba(255,255,255,${op*0.9})`;x.fill();
+      }
       ar.current=requestAnimationFrame(drw);
     };
     ar.current=requestAnimationFrame(drw);
     return()=>cancelAnimationFrame(ar.current);
-  },[active,color]);
+  },[active,color,ex,ey]);
   if(!active)return null;
   return <canvas ref={cr} style={{position:'fixed',inset:0,width:'100%',height:'100%',zIndex:60,pointerEvents:'none'}}/>;
 }
 
+// ─── Neural rail ───────────────────────────────────────────────────────────────
+// A vertical line of dots at the screen's extreme right edge — lights up
+// progressively as the conversation deepens, the newest dot pulsing.
+function NeuralRail({count,color}:{count:number;color:string}){
+  const total=9;const lit=Math.min(count,total);
+  return(
+    <div style={{position:'fixed',right:'8px',top:'50%',transform:'translateY(-50%)',zIndex:45,display:'flex',flexDirection:'column',alignItems:'center',gap:'8px',pointerEvents:'none'}}>
+      {Array.from({length:total}).map((_,i)=>{
+        const isLit=i<lit;const isNewest=i===lit-1;
+        return(
+          <motion.div key={i}
+            animate={isNewest?{opacity:[0.45,1,0.45],scale:[0.85,1.2,0.85]}:{opacity:isLit?0.55:0.10,scale:1}}
+            transition={isNewest?{duration:1.6,repeat:Infinity,ease:'easeInOut'}:{duration:0.6}}
+            style={{width:'3px',height:'3px',borderRadius:'50%',background:isLit?color:'rgba(255,255,255,0.18)',boxShadow:isLit?`0 0 5px ${color}`:'none'}}/>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Entity ────────────────────────────────────────────────────────────────────
 // Anchored at the center of the screen — drifts gently in any direction, then returns.
-function Entity({es,fc,vis,vsrc}:{es:ES;fc:string;vis:boolean;vsrc?:string}){
+// May also wander to a nearby resting point (pos), fading out and back in en route.
+function Entity({es,fc,vis,vsrc,pos}:{es:ES;fc:string;vis:boolean;vsrc?:string;pos:{x:number;y:number}}){
   const vr=useRef<HTMLVideoElement>(null);const cfg=SC[es];
   useEffect(()=>{const v=vr.current;if(!v)return;const play=()=>v.play().catch(()=>{});v.addEventListener('canplay',play);if(v.readyState>=3)play();return()=>v.removeEventListener('canplay',play);},[vsrc]);
-  // Outer wrapper is a plain div: framer-motion rewrites `transform` on any
-  // element it animates (scale/rotate/y etc.), which would clobber the
-  // translate(-50%,-50%) centering below. Keep centering on a non-motion node.
+  // Outer wrapper animates `left`/`top` only — framer-motion rewrites the
+  // `transform` CSS property for x/y/scale/rotate animations, which would
+  // clobber the static translate(-50%,-50%) centering below. left/top are
+  // safe to animate alongside a static transform.
   return(
-    <div style={{position:'fixed',left:`${ENTITY_POS.x}%`,top:`${ENTITY_POS.y}%`,transform:'translate(-50%,-50%)',zIndex:10,pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <motion.div initial={false} animate={{left:`${pos.x}%`,top:`${pos.y}%`}} transition={{duration:3.2,ease:[0.22,1,0.36,1]}}
+      style={{position:'fixed',transform:'translate(-50%,-50%)',zIndex:10,pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center'}}>
       <motion.div animate={{opacity:[cfg.ao*0.5,cfg.ao,cfg.ao*0.5]}} transition={{duration:cfg.ps,repeat:Infinity,ease:'easeInOut'}}
         style={{position:'absolute',width:'30vmin',height:'9vmin',borderRadius:'50%',background:`radial-gradient(ellipse at center,${fc} 0%,transparent 70%)`,filter:'blur(28px)',top:'56%',zIndex:9}}/>
       <motion.div initial={{opacity:0,scale:0.85,filter:'blur(12px)'}} animate={{opacity:vis?1:0,scale:vis?1:0.85,filter:vis?'blur(0px)':'blur(12px)'}}
@@ -145,7 +195,11 @@ function Entity({es,fc,vis,vsrc}:{es:ES;fc:string;vis:boolean;vsrc?:string}){
           transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},x:{duration:cfg.dd*1.6,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
           style={{width:'42vmin',height:'42vmin',position:'relative'}}>
           {vsrc
-            ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
+            // overflow-hidden crop masks the source video's corner watermark
+            ?<div style={{width:'100%',height:'100%',overflow:'hidden',position:'relative'}}>
+                <video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto"
+                  style={{position:'absolute',width:'120%',height:'120%',left:'-8%',top:'-8%',objectFit:'cover',display:'block'}}/>
+              </div>
             // eslint-disable-next-line @next/next/no-img-element
             :<img src="/assets/medha-entity.png" alt="MEDHĀ" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
           }
@@ -158,13 +212,13 @@ function Entity({es,fc,vis,vsrc}:{es:ES;fc:string;vis:boolean;vsrc?:string}){
             style={{position:'absolute',width:'46vmin',height:'46vmin',borderRadius:'50%',border:`1px solid ${fc}`,zIndex:8}}/>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
 
 // ─── Message bubble ────────────────────────────────────────────────────────────
 // Renders inline in the transcript — no floating/roaming position of its own.
-function Bubble({msg,fc,onCopy}:{msg:StoredMsg;fc:string;onCopy:(m:StoredMsg)=>void}){
+function Bubble({msg,fc,onCopy,isLast,onRegenerate}:{msg:StoredMsg;fc:string;onCopy:(m:StoredMsg)=>void;isLast?:boolean;onRegenerate?:()=>void}){
   const isU=msg.role==='user';
   const mn=isU?'YOU':`MEDHĀ · ${getMode(msg.mode as CognitiveModeKey).name}`;
   return(
@@ -180,6 +234,12 @@ function Bubble({msg,fc,onCopy}:{msg:StoredMsg;fc:string;onCopy:(m:StoredMsg)=>v
           {msg.role==='assistant'?<div dangerouslySetInnerHTML={{__html:renderMarkdown(msg.content)}} className="medha-md"/>:msg.content}
         </div>
       </div>
+      {!isU&&isLast&&onRegenerate&&(
+        <button onClick={onRegenerate} style={{marginLeft:'34px',display:'flex',alignItems:'center',gap:'5px',background:'transparent',border:'none',color:'rgba(255,255,255,0.25)',fontSize:'9px',letterSpacing:'0.18em',textTransform:'uppercase',fontFamily:'system-ui',cursor:'pointer',padding:'2px 0'}}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+          Regenerate
+        </button>
+      )}
     </motion.div>
   );
 }
@@ -215,6 +275,7 @@ export default function MedhaHUD(){
   const[showHistory,setShowHistory]=useState(false);
   const[showSettings,setShowSettings]=useState(false);const[listening,setListening]=useState(false);
   const[ttsEnabled,setTtsEnabled]=useState(false);const[chats,setChats]=useState<StoredChat[]>([]);
+  const[responseStyle,setResponseStyle]=useState<'concise'|'balanced'|'detailed'>('balanced');
   const[quotaUser,setQuotaUser]=useState<LocalUser|null>(null);const[showQuotaLock,setShowQuotaLock]=useState(false);
   const[regBusy,setRegBusy]=useState(false);const[regErr,setRegErr]=useState('');
   const[regName,setRegName]=useState('');const[regEmail,setRegEmail]=useState('');
@@ -223,6 +284,10 @@ export default function MedhaHUD(){
   const[es,setEs]=useState<ES>('dormant');
   const[burst,setBurst]=useState(false);const[burstColor,setBurstColor]=useState('#e8e4ff');
   const[mounted,setMounted]=useState(false);
+  // Medhā's wandering — she rests at center, occasionally fades and drifts elsewhere, then returns.
+  const[entityPos,setEntityPos]=useState({x:ENTITY_POS.x,y:ENTITY_POS.y});
+  const[entityVisible,setEntityVisible]=useState(true);
+  const travelRef=useRef<ReturnType<typeof setTimeout>|null>(null);
   const { stream, triggerStream, handleStreamComplete } = useCosmicStream();
   // Ambient stream timer
   const ambientStreamRef = useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -246,6 +311,30 @@ export default function MedhaHUD(){
     scheduleAmbient();
     return () => { if (ambientStreamRef.current) clearTimeout(ambientStreamRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  // Ambient wandering — Medhā occasionally dissolves, drifts to a nearby
+  // point (or returns home), and re-materialises. Always within reach of center.
+  useEffect(()=>{
+    let alive=true;
+    const cycle=()=>{
+      travelRef.current=setTimeout(()=>{
+        if(!alive)return;
+        setEntityVisible(false);
+        setTimeout(()=>{
+          if(!alive)return;
+          const goHome=Math.random()<0.4;
+          setEntityPos(goHome?{x:ENTITY_POS.x,y:ENTITY_POS.y}:{
+            x:Math.min(68,Math.max(32,ENTITY_POS.x+(Math.random()-0.5)*32)),
+            y:Math.min(58,Math.max(38,ENTITY_POS.y+(Math.random()-0.5)*18)),
+          });
+          setEntityVisible(true);
+          cycle();
+        },1800);
+      },28000+Math.random()*32000);
+    };
+    cycle();
+    return()=>{alive=false;if(travelRef.current)clearTimeout(travelRef.current);};
   },[]);
 
   // Init
@@ -307,16 +396,14 @@ export default function MedhaHUD(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[mode]);
 
-  const send=useCallback(async()=>{
-    const tx=composerText.trim();if(!tx||busy)return;
-    if(!quotaUser&&!getUser()){if(quotaRemaining('medha')<=0){setShowQuotaLock(true);return;}if(!incrementQuota('medha').ok){setShowQuotaLock(true);return;}}
-    setComposerText('');
-    const um:StoredMsg={id:uid(),role:'user',content:tx,mode,ts:Date.now()};
-    setMessages(p=>[...p,um]);setEs('listening');
-    if(isForbiddenQuery(tx)){setTimeout(()=>{setMessages(p=>[...p,{id:uid(),role:'assistant',content:SANDHI_REDIRECT_MARKDOWN,mode,ts:Date.now()}]);setEs('dormant');},280);return;}
+  // Shared completion runner — used by both send() and regenerate()
+  const runCompletion=useCallback(async(hist:ChatMessage[])=>{
     setBusy(true);await new Promise(r=>setTimeout(r,400));setEs('thinking');
-    const hist:ChatMessage[]=[...dataR.current.messages,um].slice(-12).map(m=>({role:m.role,content:m.content}));
-    try{const full=await chatComplete(mdef,hist);setEs('responding');
+    const styleSuffix=responseStyle==='concise'?' Keep this response brief — a few sentences at most.'
+      :responseStyle==='detailed'?' Provide a thorough, detailed response with full context.'
+      :'';
+    const effMode=styleSuffix?{...mdef,systemPrompt:mdef.systemPrompt+styleSuffix}:mdef;
+    try{const full=await chatComplete(effMode,hist);setEs('responding');
       const am:StoredMsg={id:uid(),role:'assistant',content:full||'I lost the signal for a moment. Try again?',mode,ts:Date.now()};
       setMessages(p=>[...p,am]);setEs('dormant');
       // Intelligence arrives — trigger stream
@@ -324,7 +411,30 @@ export default function MedhaHUD(){
       if(ttsEnabled&&ttsR.current?.isSupported()){const pl=full.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/[*_`#>]/g,'');setEs('voice-active');ttsR.current.speak(pl,{onEnd:()=>setEs('dormant')});}}
     catch{setMessages(p=>[...p,{id:uid(),role:'assistant',content:'Cognition is busy. Give it a breath and try again.',mode,ts:Date.now()}]);setEs('dormant');}
     finally{setBusy(false);}
-  },[composerText,busy,mode,mdef,ttsEnabled,quotaUser,triggerStream]);
+  },[mode,mdef,ttsEnabled,triggerStream,responseStyle]);
+
+  const send=useCallback(async()=>{
+    const tx=composerText.trim();if(!tx||busy)return;
+    if(!quotaUser&&!getUser()){if(quotaRemaining('medha')<=0){setShowQuotaLock(true);return;}if(!incrementQuota('medha').ok){setShowQuotaLock(true);return;}}
+    setComposerText('');
+    const um:StoredMsg={id:uid(),role:'user',content:tx,mode,ts:Date.now()};
+    setMessages(p=>[...p,um]);setEs('listening');
+    if(isForbiddenQuery(tx)){setTimeout(()=>{setMessages(p=>[...p,{id:uid(),role:'assistant',content:SANDHI_REDIRECT_MARKDOWN,mode,ts:Date.now()}]);setEs('dormant');},280);return;}
+    const hist:ChatMessage[]=[...dataR.current.messages,um].slice(-12).map(m=>({role:m.role,content:m.content}));
+    await runCompletion(hist);
+  },[composerText,busy,mode,quotaUser,runCompletion]);
+
+  // Regenerate — drop the last assistant reply and ask again
+  const regenerate=useCallback(async()=>{
+    if(busy)return;
+    const msgs=dataR.current.messages;
+    const lastUserIdx=msgs.map(m=>m.role).lastIndexOf('user');
+    if(lastUserIdx===-1)return;
+    const trimmed=msgs.slice(0,lastUserIdx+1);
+    setMessages(trimmed);
+    const hist:ChatMessage[]=trimmed.slice(-12).map(m=>({role:m.role,content:m.content}));
+    await runCompletion(hist);
+  },[busy,runCompletion]);
 
   const subReg=useCallback(async()=>{
     if(!regEmail.trim()||regBusy)return;setRegBusy(true);setRegErr('');
@@ -355,15 +465,17 @@ export default function MedhaHUD(){
     <div className="mlv" data-mode={mode} style={{position:'fixed',inset:0,width:'100vw',height:'100vh',background:'#000',overflow:'hidden'}}>
       {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
       {mounted&&<VoidCanvas/>}
-      <Entity es={es} fc={fc} vis={true} vsrc="/assets/medha-dormant.mp4"/>
-      {mounted&&<PB color={burstColor} active={burst}/>}
+      {mounted&&<MedhaLair entityX={entityPos.x/100} entityY={entityPos.y/100} facultyColor={fc} onReact={burst}/>}
+      <Entity es={es} fc={fc} vis={entityVisible} vsrc="/assets/medha-dormant.mp4" pos={entityPos}/>
+      {mounted&&<PB color={burstColor} active={burst} ex={entityPos.x/100} ey={entityPos.y/100}/>}
+      {mounted&&<NeuralRail count={messages.filter(m=>m.role==='user').length} color={fc}/>}
       {mounted&&stream.active&&(
         <CosmicStream
           active={stream.active}
           color={stream.color}
           colorSecondary={stream.colorSecondary}
-          entityX={ENTITY_POS.x/100}
-          entityY={ENTITY_POS.y/100}
+          entityX={entityPos.x/100}
+          entityY={entityPos.y/100}
           duration={3200}
           onComplete={handleStreamComplete}
         />
@@ -386,11 +498,12 @@ export default function MedhaHUD(){
         </div>
       </div>
 
-      {/* Transcript + Composer — stable column anchored above the input, below the centered Entity */}
-      <div style={{position:'fixed',left:0,right:0,bottom:0,top:'calc(50% + 22vmin)',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none'}}>
+      {/* Transcript + Composer — fixed band at the bottom with a glass backdrop so
+          messages always stay legible over the entity, however she drifts/travels */}
+      <div style={{position:'fixed',left:0,right:0,bottom:0,top:'56vh',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none',background:'linear-gradient(to bottom, rgba(5,2,15,0), rgba(5,2,15,0.5) 60px, rgba(5,2,15,0.55))',backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)'}}>
         {/* Transcript — scrollable, bottom-anchored */}
         <div ref={transcriptRef} style={{flex:1,minHeight:0,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'16px',justifyContent:'flex-end',width:'100%',maxWidth:'560px',margin:'0 auto',padding:'16px 16px 8px',pointerEvents:'auto',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 28px)',maskImage:'linear-gradient(to bottom, transparent, black 28px)'}}>
-          {messages.map(m=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg}/>)}
+          {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={regenerate}/>)}
           <AnimatePresence>
             {busy&&<ThinkingBubble key="thinking" fc={fc}/>}
           </AnimatePresence>
@@ -487,14 +600,28 @@ export default function MedhaHUD(){
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:'22px'}}>
               <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Cognitive Mode</div>
-                {COGNITIVE_MODES.map(m=>(
-                  <button key={m.key} onClick={()=>{actModel(m.key);setShowSettings(false);}}
-                    style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'9px 11px',background:mode===m.key?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.02)',border:`1px solid ${mode===m.key?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.04)'}`,borderRadius:'10px',cursor:'pointer',textAlign:'left',marginBottom:'6px'}}>
-                    <div style={{width:'7px',height:'7px',borderRadius:'50%',background:FC[m.key],boxShadow:`0 0 7px ${FC[m.key]}`,flexShrink:0}}/>
-                    <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'system-ui'}}>{m.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'system-ui'}}>{m.englishName}</div></div>
-                  </button>
-                ))}
+                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Active Mode</div>
+                <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 11px',background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',borderRadius:'10px',marginBottom:'8px'}}>
+                  <div style={{width:'7px',height:'7px',borderRadius:'50%',background:fc,boxShadow:`0 0 7px ${fc}`,flexShrink:0}}/>
+                  <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'system-ui'}}>{mdef.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'system-ui'}}>{mdef.englishName}</div></div>
+                </div>
+                <ul style={{margin:0,padding:'0 0 0 16px',display:'flex',flexDirection:'column',gap:'4px'}}>
+                  {mdef.capabilities.map(c=>(
+                    <li key={c} style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',fontFamily:'system-ui',lineHeight:'1.5'}}>{c}</li>
+                  ))}
+                </ul>
+                <div style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontFamily:'system-ui',marginTop:'8px'}}>Switch modes from the selector above the composer.</div>
+              </section>
+              <section>
+                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Response Style</div>
+                <div style={{display:'flex',gap:'6px'}}>
+                  {(['concise','balanced','detailed'] as const).map(s=>(
+                    <button key={s} onClick={()=>setResponseStyle(s)}
+                      style={{flex:1,padding:'8px 6px',background:responseStyle===s?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.02)',border:`1px solid ${responseStyle===s?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.05)'}`,borderRadius:'8px',color:responseStyle===s?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.35)',fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',fontFamily:'system-ui',cursor:'pointer'}}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </section>
               <section>
                 <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Voice</div>

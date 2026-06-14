@@ -16,6 +16,9 @@ interface StreamParticle {
   starSize: number
   twinkleSpeed: number
   twinklePhase: number
+  orbitR: number
+  orbitSpeed: number
+  orbitPhase: number
 }
 
 interface StreamThread {
@@ -139,10 +142,49 @@ function buildStreamPath(
     pts.push(bezier(t, orbitEnd, cp3a, cp3b, exit))
   }
 
-  return pts
+  return applyWobble(pts, w, h)
 }
 
-// ─── Draw 4-point star ─────────────────────────────────────────────────────────
+// ─── Stardust wobble ────────────────────────────────────────────────────────────
+// Bends the bezier path with layered sine drift, perpendicular to its direction
+// of travel — turns the smooth curve into a meandering, swirling trail like a
+// fairy's dust settling through the air, rather than a clean geometric arc.
+function applyWobble(
+  pts: { x: number; y: number }[],
+  w: number,
+  h: number
+): { x: number; y: number }[] {
+  const scale = Math.min(w, h)
+  const amp1 = scale * 0.020
+  const amp2 = scale * 0.010
+  const amp3 = scale * 0.005
+  const freq1 = 2.5 + Math.random() * 2
+  const freq2 = 6 + Math.random() * 3
+  const freq3 = 14 + Math.random() * 6
+  const phase1 = Math.random() * Math.PI * 2
+  const phase2 = Math.random() * Math.PI * 2
+  const phase3 = Math.random() * Math.PI * 2
+
+  return pts.map((p, i) => {
+    if (i === 0 || i === pts.length - 1) return p
+    const prev = pts[i - 1]
+    const next = pts[Math.min(i + 1, pts.length - 1)]
+    const tangent = Math.atan2(next.y - prev.y, next.x - prev.x)
+    const perp = tangent + Math.PI / 2
+    const t = i / (pts.length - 1)
+    const taper = Math.sin(t * Math.PI) // fades to 0 at both ends
+    const wob =
+      (Math.sin(t * Math.PI * 2 * freq1 + phase1) * amp1 +
+        Math.sin(t * Math.PI * 2 * freq2 + phase2) * amp2 +
+        Math.sin(t * Math.PI * 2 * freq3 + phase3) * amp3) *
+      taper
+    return { x: p.x + Math.cos(perp) * wob, y: p.y + Math.sin(perp) * wob }
+  })
+}
+
+// ─── Draw twinkling sparkle ─────────────────────────────────────────────────────
+// A soft mote of stardust — a glowing core with short, feathered rays that
+// fade to nothing. No hard geometric cross-spikes; reads as a twinkle, not a star.
 function drawStar(
   ctx: CanvasRenderingContext2D,
   x: number, y: number,
@@ -155,45 +197,37 @@ function drawStar(
   ctx.translate(x, y)
   ctx.rotate(rotation)
 
-  // Spike rays first (like the images — long thin cross rays)
-  const rayLen = r * 4.5
-  ctx.save()
-  const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, rayLen)
-  grd.addColorStop(0, `rgba(255,255,255,${opacity * 0.9})`)
-  grd.addColorStop(0.3, `${color}${Math.floor(opacity * 150).toString(16).padStart(2, '0')}`)
-  grd.addColorStop(1, `${color}00`)
-
+  // Short feathered rays — gentle glints, not spikes
+  const rayLen = r * 1.6
   for (let i = 0; i < points; i++) {
     const angle = (i / points) * Math.PI * 2
-    ctx.beginPath()
-    ctx.moveTo(0, 0)
     const tipX = Math.cos(angle) * rayLen
     const tipY = Math.sin(angle) * rayLen
-    // Very thin spike
-    const perpX = Math.cos(angle + Math.PI / 2) * r * 0.08
-    const perpY = Math.sin(angle + Math.PI / 2) * r * 0.08
-    ctx.moveTo(perpX, perpY)
+    const grd = ctx.createLinearGradient(0, 0, tipX, tipY)
+    grd.addColorStop(0, `rgba(255,255,255,${opacity * 0.6})`)
+    grd.addColorStop(1, `${color}00`)
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
     ctx.lineTo(tipX, tipY)
-    ctx.lineTo(-perpX, -perpY)
-    ctx.closePath()
-    ctx.fillStyle = grd
-    ctx.fill()
+    ctx.strokeStyle = grd
+    ctx.lineWidth = r * 0.4
+    ctx.lineCap = 'round'
+    ctx.stroke()
   }
-  ctx.restore()
 
-  // Glow core
-  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2.5)
+  // Soft glow core
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2)
   glow.addColorStop(0, `rgba(255,255,255,${opacity})`)
-  glow.addColorStop(0.3, `${color}${Math.floor(opacity * 180).toString(16).padStart(2, '0')}`)
+  glow.addColorStop(0.4, `${color}${Math.floor(opacity * 160).toString(16).padStart(2, '0')}`)
   glow.addColorStop(1, `${color}00`)
   ctx.beginPath()
-  ctx.arc(0, 0, r * 2.5, 0, Math.PI * 2)
+  ctx.arc(0, 0, r * 2, 0, Math.PI * 2)
   ctx.fillStyle = glow
   ctx.fill()
 
   // Bright center dot
   ctx.beginPath()
-  ctx.arc(0, 0, r * 0.5, 0, Math.PI * 2)
+  ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2)
   ctx.fillStyle = `rgba(255,255,255,${opacity})`
   ctx.fill()
 
@@ -286,29 +320,32 @@ export function CosmicStream({
       },
     ]
 
-    // Build particles along path
+    // Build particles along path — denser, smaller, swirling: a stardust trail
     const particles: StreamParticle[] = []
-    const particleCount = 80
+    const particleCount = 140
 
     for (let i = 0; i < particleCount; i++) {
       const t = i / particleCount
       const ptIdx = Math.floor(t * (basePath.length - 1))
       const pt = basePath[ptIdx]
-      const isStar = Math.random() < 0.18
-      const starSize = 2 + Math.random() * 4
+      const isStar = Math.random() < 0.14
+      const starSize = 1.5 + Math.random() * 3
 
       particles.push({
-        x: pt.x + (Math.random() - 0.5) * 30,
-        y: pt.y + (Math.random() - 0.5) * 30,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        size: isStar ? starSize : 1 + Math.random() * 2.5,
+        x: pt.x + (Math.random() - 0.5) * 24,
+        y: pt.y + (Math.random() - 0.5) * 24,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.2,
+        size: isStar ? starSize : 0.6 + Math.random() * 1.8,
         opacity: 0,
         isStar,
         starPoints: Math.random() < 0.5 ? 4 : 6,
         starSize,
         twinkleSpeed: 0.05 + Math.random() * 0.08,
         twinklePhase: Math.random() * Math.PI * 2,
+        orbitR: 2 + Math.random() * 9,
+        orbitSpeed: 0.0015 + Math.random() * 0.003,
+        orbitPhase: Math.random() * Math.PI * 2,
       })
     }
 
@@ -418,14 +455,18 @@ export function CosmicStream({
 
         p.x += p.vx
         p.y += p.vy
+        // Small circular drift around the particle's anchor — the swirl that
+        // turns a straight trail of dots into settling, swirling stardust.
+        const orbX = Math.cos(now * p.orbitSpeed + p.orbitPhase) * p.orbitR
+        const orbY = Math.sin(now * p.orbitSpeed * 1.3 + p.orbitPhase) * p.orbitR
         const twinkle = 0.5 + 0.5 * Math.sin(now * p.twinkleSpeed + p.twinklePhase)
         const pOpacity = envelope * twinkle * 0.7
 
         if (p.isStar) {
-          drawStar(ctx, p.x, p.y, p.size * 0.6, p.starPoints, color, pOpacity * 0.8, now * 0.001)
+          drawStar(ctx, p.x + orbX, p.y + orbY, p.size * 0.6, p.starPoints, color, pOpacity * 0.8, now * 0.001)
         } else {
           ctx.beginPath()
-          ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2)
+          ctx.arc(p.x + orbX, p.y + orbY, p.size * 0.5, 0, Math.PI * 2)
           ctx.fillStyle = `rgba(255,255,255,${pOpacity})`
           ctx.fill()
         }
