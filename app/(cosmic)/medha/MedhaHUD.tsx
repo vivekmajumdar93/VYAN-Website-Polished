@@ -44,8 +44,9 @@ const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number
 };
 
 // ─── Entity position ───────────────────────────────────────────────────────────
-// Fixed — Medhā always sits centered, in the mid-lower void, above the composer.
-const ENTITY_POS = { x: 50, y: 42 };
+// Fixed anchor — Medhā's home is the exact center of the screen. Her idle
+// float drifts gently in any direction from this anchor, then returns to it.
+const ENTITY_POS = { x: 50, y: 50 };
 
 // ─── Void canvas ───────────────────────────────────────────────────────────────
 function VoidCanvas(){
@@ -125,7 +126,7 @@ function PB({color,active}:{color:string;active:boolean}){
 }
 
 // ─── Entity ────────────────────────────────────────────────────────────────────
-// Fixed in the mid-upper void — always clear of the composer below.
+// Anchored at the center of the screen — drifts gently in any direction, then returns.
 function Entity({es,fc,vis,vsrc}:{es:ES;fc:string;vis:boolean;vsrc?:string}){
   const vr=useRef<HTMLVideoElement>(null);const cfg=SC[es];
   useEffect(()=>{const v=vr.current;if(!v)return;const play=()=>v.play().catch(()=>{});v.addEventListener('canplay',play);if(v.readyState>=3)play();return()=>v.removeEventListener('canplay',play);},[vsrc]);
@@ -140,8 +141,8 @@ function Entity({es,fc,vis,vsrc}:{es:ES;fc:string;vis:boolean;vsrc?:string}){
         transition={{opacity:{duration:1.6},scale:{duration:1.8},filter:{duration:1.6}}}
         style={{position:'relative',zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>
         <motion.div
-          animate={{scale:cfg.sc,rotate:cfg.ro>0?[0,cfg.ro,0,-cfg.ro,0]:0,y:[-cfg.dy/2,cfg.dy/2,-cfg.dy/2],filter:`brightness(${cfg.br})`}}
-          transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
+          animate={{scale:cfg.sc,rotate:cfg.ro>0?[0,cfg.ro,0,-cfg.ro,0]:0,x:[0,cfg.dy/2,0,-cfg.dy/2,0],y:[-cfg.dy/2,cfg.dy/2,0,cfg.dy/2,-cfg.dy/2],filter:`brightness(${cfg.br})`}}
+          transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},x:{duration:cfg.dd*1.6,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
           style={{width:'42vmin',height:'42vmin',position:'relative'}}>
           {vsrc
             ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
@@ -385,8 +386,8 @@ export default function MedhaHUD(){
         </div>
       </div>
 
-      {/* Transcript + Composer — stable column anchored above the input, never overlapping the Entity */}
-      <div style={{position:'fixed',left:0,right:0,bottom:0,top:'calc(42% + 22vmin)',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none'}}>
+      {/* Transcript + Composer — stable column anchored above the input, below the centered Entity */}
+      <div style={{position:'fixed',left:0,right:0,bottom:0,top:'calc(50% + 22vmin)',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none'}}>
         {/* Transcript — scrollable, bottom-anchored */}
         <div ref={transcriptRef} style={{flex:1,minHeight:0,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'16px',justifyContent:'flex-end',width:'100%',maxWidth:'560px',margin:'0 auto',padding:'16px 16px 8px',pointerEvents:'auto',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 28px)',maskImage:'linear-gradient(to bottom, transparent, black 28px)'}}>
           {messages.map(m=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg}/>)}
