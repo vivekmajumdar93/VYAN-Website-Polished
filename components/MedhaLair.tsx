@@ -1,439 +1,66 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
+// ─── Pixie ────────────────────────────────────────────────────────────────────
 
 interface Pixie {
   x: number; y: number
-  vx: number; vy: number
-  phase: number; phaseSpeed: number
-  orbitR: number; orbitAngle: number; orbitSpeed: number
-  depth: number       // 0–1, higher = closer
-  size: number
+  orbitCX: number; orbitCY: number
+  orbitRX: number; orbitRY: number
+  orbitAngle: number; orbitSpeed: number
+  size: number; depth: number
+  wingPhase: number; glowPhase: number
+  reacting: boolean; reactTimer: number
+  color: string
+}
+
+function buildPixies(w: number, h: number): Pixie[] {
+  const colors = ['#c4a882', '#e8d5a3', '#b8956a', '#dfc38a', '#ffffff']
+  return Array.from({ length: 12 }, (_, i) => ({
+    x: w * (0.1 + Math.random() * 0.8),
+    y: h * (0.1 + Math.random() * 0.7),
+    orbitCX: w * (0.15 + Math.random() * 0.7),
+    orbitCY: h * (0.15 + Math.random() * 0.6),
+    orbitRX: 40 + Math.random() * 120,
+    orbitRY: 20 + Math.random() * 60,
+    orbitAngle: Math.random() * Math.PI * 2,
+    orbitSpeed: (0.002 + Math.random() * 0.003) * (Math.random() < 0.5 ? 1 : -1),
+    size: 1.2 + Math.random() * 2,
+    depth: 0.3 + Math.random() * 0.7,
+    wingPhase: Math.random() * Math.PI * 2,
+    glowPhase: Math.random() * Math.PI * 2,
+    reacting: false,
+    reactTimer: 0,
+    color: colors[Math.floor(Math.random() * colors.length)],
+  }))
+}
+
+// ─── Layer config ─────────────────────────────────────────────────────────────
+
+interface LairLayer {
+  src: string
+  x: number        // % from left
+  y: number        // % from top
+  w: number        // % of viewport width
+  parallaxX: number  // mouse parallax multiplier
+  parallaxY: number
+  blendMode: string
   opacity: number
-  wingPhase: number
-  reacting: boolean
-  reactTimer: number
-}
-
-interface ArchFragment {
-  x: number; y: number
-  w: number; h: number
-  type: 'arch' | 'spire' | 'column' | 'shard'
-  rotation: number
-  rotSpeed: number
-  depth: number
-  opacity: number
-  driftX: number; driftY: number
-}
-
-interface CastlePlacement {
-  cx: number      // center x, px
-  baseY: number   // ground line, px
-  scale: number   // depth/size multiplier
-}
-
-interface LightningState {
-  nextFlash: number
-  flashStart: number
-  flashDuration: number
-  bolt: { x: number; y: number }[]
-  near: CastlePlacement
-  far: CastlePlacement
-}
-
-// ─── Draw helpers ──────────────────────────────────────────────────────────────
-
-function drawSpire(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, w: number, opacity: number) {
-  ctx.save()
-  ctx.globalAlpha = opacity
-  ctx.beginPath()
-  ctx.moveTo(x, y)
-  ctx.lineTo(x - w / 2, y + h)
-  ctx.lineTo(x + w / 2, y + h)
-  ctx.closePath()
-  const g = ctx.createLinearGradient(x, y, x, y + h)
-  g.addColorStop(0, 'rgba(160,140,255,0.9)')
-  g.addColorStop(0.4, 'rgba(80,60,180,0.5)')
-  g.addColorStop(1, 'rgba(20,10,60,0.0)')
-  ctx.fillStyle = g
-  ctx.fill()
-  ctx.restore()
-}
-
-function drawArch(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, opacity: number) {
-  ctx.save()
-  ctx.globalAlpha = opacity
-  ctx.strokeStyle = 'rgba(140,120,255,0.8)'
-  ctx.lineWidth = 0.8
-  ctx.beginPath()
-  ctx.moveTo(x - w / 2, y + h)
-  ctx.lineTo(x - w / 2, y + h * 0.3)
-  ctx.quadraticCurveTo(x, y, x + w / 2, y + h * 0.3)
-  ctx.lineTo(x + w / 2, y + h)
-  ctx.stroke()
-  ctx.restore()
-}
-
-function drawThrone(ctx: CanvasRenderingContext2D, cx: number, cy: number, scale: number, opacity: number, t: number) {
-  ctx.save()
-  ctx.globalAlpha = opacity
-  ctx.translate(cx, cy)
-
-  const pulse = 1 + Math.sin(t * 0.0008) * 0.015
-  ctx.scale(scale * pulse, scale * pulse)
-
-  // ── Throne base ──────────────────────────────────────────────────────────
-  const baseW = 120, baseH = 18
-  const g0 = ctx.createLinearGradient(-baseW / 2, 0, baseW / 2, 0)
-  g0.addColorStop(0, 'rgba(60,40,160,0.0)')
-  g0.addColorStop(0.3, 'rgba(120,80,255,0.6)')
-  g0.addColorStop(0.7, 'rgba(120,80,255,0.6)')
-  g0.addColorStop(1, 'rgba(60,40,160,0.0)')
-  ctx.fillStyle = g0
-  ctx.fillRect(-baseW / 2, 20, baseW, baseH)
-
-  // ── Seat ─────────────────────────────────────────────────────────────────
-  const seatW = 80, seatH = 12
-  const g1 = ctx.createLinearGradient(-seatW / 2, 0, seatW / 2, 0)
-  g1.addColorStop(0, 'rgba(80,50,200,0.0)')
-  g1.addColorStop(0.3, 'rgba(160,100,255,0.7)')
-  g1.addColorStop(0.7, 'rgba(160,100,255,0.7)')
-  g1.addColorStop(1, 'rgba(80,50,200,0.0)')
-  ctx.fillStyle = g1
-  ctx.fillRect(-seatW / 2, 8, seatW, seatH)
-
-  // ── Back rest — tall central panel ───────────────────────────────────────
-  const backW = 55, backH = 110
-  const g2 = ctx.createLinearGradient(0, -backH, 0, 8)
-  g2.addColorStop(0, 'rgba(200,160,255,0.0)')
-  g2.addColorStop(0.15, 'rgba(180,120,255,0.5)')
-  g2.addColorStop(0.7, 'rgba(100,60,220,0.4)')
-  g2.addColorStop(1, 'rgba(80,40,180,0.0)')
-  ctx.fillStyle = g2
-  ctx.beginPath()
-  ctx.moveTo(-backW / 2, 8)
-  ctx.lineTo(-backW / 2 + 6, -backH * 0.6)
-  ctx.lineTo(-backW / 2 + 2, -backH)
-  ctx.lineTo(backW / 2 - 2, -backH)
-  ctx.lineTo(backW / 2 - 6, -backH * 0.6)
-  ctx.lineTo(backW / 2, 8)
-  ctx.closePath()
-  ctx.fill()
-
-  // ── Finial — top ornament ─────────────────────────────────────────────────
-  const finialGlow = ctx.createRadialGradient(0, -backH, 0, 0, -backH, 28)
-  finialGlow.addColorStop(0, `rgba(220,200,255,${0.7 + 0.3 * Math.sin(t * 0.002)})`)
-  finialGlow.addColorStop(0.4, 'rgba(140,80,255,0.3)')
-  finialGlow.addColorStop(1, 'rgba(80,40,200,0.0)')
-  ctx.beginPath()
-  ctx.arc(0, -backH, 28, 0, Math.PI * 2)
-  ctx.fillStyle = finialGlow
-  ctx.fill()
-
-  // Finial gem
-  ctx.beginPath()
-  ctx.arc(0, -backH, 5, 0, Math.PI * 2)
-  ctx.fillStyle = `rgba(255,240,255,${0.8 + 0.2 * Math.sin(t * 0.003)})`
-  ctx.fill()
-
-  // ── Side pillars ──────────────────────────────────────────────────────────
-  ;[-44, 44].forEach(px => {
-    const pg = ctx.createLinearGradient(px, -80, px, 20)
-    pg.addColorStop(0, 'rgba(160,100,255,0.0)')
-    pg.addColorStop(0.2, 'rgba(120,80,220,0.5)')
-    pg.addColorStop(0.8, 'rgba(80,50,180,0.4)')
-    pg.addColorStop(1, 'rgba(60,30,140,0.0)')
-    ctx.fillStyle = pg
-    ctx.fillRect(px - 4, -80, 8, 100)
-
-    // Pillar top gem
-    const gemGlow = ctx.createRadialGradient(px, -80, 0, px, -80, 14)
-    gemGlow.addColorStop(0, `rgba(200,170,255,${0.5 + 0.3 * Math.sin(t * 0.0025 + px)})`)
-    gemGlow.addColorStop(1, 'rgba(100,60,200,0.0)')
-    ctx.beginPath()
-    ctx.arc(px, -80, 14, 0, Math.PI * 2)
-    ctx.fillStyle = gemGlow
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(px, -80, 3, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(240,220,255,0.9)`
-    ctx.fill()
-  })
-
-  // ── Energy filaments radiating from throne ─────────────────────────────────
-  const filCount = 8
-  for (let i = 0; i < filCount; i++) {
-    const angle = (i / filCount) * Math.PI * 2 + t * 0.0003
-    const len = 60 + Math.sin(t * 0.001 + i) * 15
-    const fx = Math.cos(angle) * len
-    const fy = Math.sin(angle) * len - backH * 0.3
-    const filOpacity = (0.15 + 0.1 * Math.sin(t * 0.002 + i)) * opacity
-    ctx.beginPath()
-    ctx.moveTo(0, -backH * 0.3)
-    ctx.lineTo(fx, fy)
-    ctx.strokeStyle = `rgba(180,140,255,${filOpacity / opacity})`
-    ctx.lineWidth = 0.5
-    ctx.stroke()
-  }
-
-  ctx.restore()
-}
-
-function drawPixie(ctx: CanvasRenderingContext2D, p: Pixie, t: number) {
-  const wingSpan = p.size * (1 + 0.4 * Math.sin(t * 0.012 + p.wingPhase))
-  const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 3)
-  const baseOpacity = p.depth * p.opacity
-  glow.addColorStop(0, `rgba(200,180,255,${baseOpacity * 0.9})`)
-  glow.addColorStop(0.4, `rgba(120,80,255,${baseOpacity * 0.4})`)
-  glow.addColorStop(1, 'rgba(80,40,200,0.0)')
-  ctx.beginPath()
-  ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2)
-  ctx.fillStyle = glow
-  ctx.fill()
-
-  // Core body
-  ctx.beginPath()
-  ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2)
-  ctx.fillStyle = `rgba(240,230,255,${baseOpacity})`
-  ctx.fill()
-
-  // Wings — tiny ellipses
-  ctx.save()
-  ctx.translate(p.x, p.y)
-  ;[[-1, -0.4], [1, -0.4], [-0.8, 0.3], [0.8, 0.3]].forEach(([wx, wy]) => {
-    ctx.beginPath()
-    ctx.ellipse(
-      wx * wingSpan, wy * wingSpan * 0.8,
-      wingSpan * 0.9, wingSpan * 0.4,
-      wx < 0 ? -0.4 : 0.4,
-      0, Math.PI * 2
-    )
-    ctx.strokeStyle = `rgba(200,180,255,${baseOpacity * 0.6})`
-    ctx.lineWidth = 0.5
-    ctx.stroke()
-  })
-  ctx.restore()
-
-  // Trail particles
-  if (p.reacting) {
-    for (let i = 0; i < 3; i++) {
-      const tx = p.x + (Math.random() - 0.5) * 20
-      const ty = p.y + (Math.random() - 0.5) * 20
-      ctx.beginPath()
-      ctx.arc(tx, ty, Math.random() * 1.5, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(200,170,255,${baseOpacity * 0.5})`
-      ctx.fill()
-    }
-  }
-}
-
-function drawCastleSilhouette(
-  ctx: CanvasRenderingContext2D, w: number, h: number,
-  cx: number, baseY: number, scale: number,
-  opacity: number, t: number
-) {
-  const castleW = w * 0.55 * scale
-  const castleH = h * 0.35 * scale
-
-  if (opacity < 0.005) return
-  ctx.save()
-  ctx.globalAlpha = opacity
-
-  // Atmospheric haze behind castle
-  const haze = ctx.createRadialGradient(cx, baseY - castleH * 0.3, 0, cx, baseY - castleH * 0.3, castleW * 0.7)
-  haze.addColorStop(0, 'rgba(60,30,120,0.08)')
-  haze.addColorStop(0.5, 'rgba(40,20,90,0.04)')
-  haze.addColorStop(1, 'rgba(20,10,50,0.0)')
-  ctx.beginPath()
-  ctx.arc(cx, baseY - castleH * 0.3, castleW * 0.7, 0, Math.PI * 2)
-  ctx.fillStyle = haze
-  ctx.fill()
-
-  // Castle body — barely visible silhouette
-  const bodyGrad = ctx.createLinearGradient(cx, baseY - castleH, cx, baseY)
-  bodyGrad.addColorStop(0, 'rgba(30,15,80,0.0)')
-  bodyGrad.addColorStop(0.3, 'rgba(25,12,70,0.12)')
-  bodyGrad.addColorStop(0.7, 'rgba(20,10,60,0.18)')
-  bodyGrad.addColorStop(1, 'rgba(15,8,50,0.0)')
-  ctx.fillStyle = bodyGrad
-  ctx.fillRect(cx - castleW * 0.38, baseY - castleH * 0.7, castleW * 0.76, castleH * 0.7)
-
-  // Main spires — varying heights
-  const spireData = [
-    { ox: 0, h: 1.0, w: 0.7 },
-    { ox: -0.15, h: 0.75, w: 0.5 },
-    { ox: 0.15, h: 0.70, w: 0.5 },
-    { ox: -0.28, h: 0.55, w: 0.4 },
-    { ox: 0.28, h: 0.50, w: 0.4 },
-    { ox: -0.38, h: 0.40, w: 0.3 },
-    { ox: 0.38, h: 0.38, w: 0.3 },
-    { ox: -0.20, h: 0.30, w: 0.25 },
-    { ox: 0.20, h: 0.28, w: 0.25 },
-  ]
-
-  spireData.forEach(sp => {
-    const sx = cx + sp.ox * castleW
-    const sh = castleH * sp.h
-    const sw = castleW * sp.w * 0.08
-    drawSpire(ctx, sx, baseY - castleH * 0.68, sh * 0.9, sw, 0.7)
-  })
-
-  // Battlements along top of main wall
-  for (let i = -8; i <= 8; i++) {
-    const bx = cx + i * castleW * 0.048
-    const by = baseY - castleH * 0.68
-    ctx.fillStyle = 'rgba(30,15,80,0.15)'
-    ctx.fillRect(bx - 3, by - 10, 6, 10)
-  }
-
-  // Windows — tiny glowing points
-  const windowData = [
-    { ox: -0.08, oy: 0.45 }, { ox: 0.08, oy: 0.45 },
-    { ox: -0.16, oy: 0.52 }, { ox: 0, oy: 0.52 }, { ox: 0.16, oy: 0.52 },
-    { ox: -0.24, oy: 0.58 }, { ox: 0.24, oy: 0.58 },
-  ]
-  windowData.forEach(wd => {
-    const wx = cx + wd.ox * castleW
-    const wy = baseY - castleH * (1 - wd.oy)
-    const wGlow = ctx.createRadialGradient(wx, wy, 0, wx, wy, 6)
-    const wFlicker = 0.5 + 0.5 * Math.sin(t * 0.002 + wx * 0.1 + wy * 0.05)
-    wGlow.addColorStop(0, `rgba(200,180,255,${0.3 * wFlicker})`)
-    wGlow.addColorStop(1, 'rgba(100,80,200,0.0)')
-    ctx.beginPath()
-    ctx.arc(wx, wy, 6, 0, Math.PI * 2)
-    ctx.fillStyle = wGlow
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(wx, wy, 1, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(230,220,255,${0.5 * wFlicker})`
-    ctx.fill()
-  })
-
-  // Ground mist
-  const mist = ctx.createLinearGradient(cx - castleW, baseY - 20, cx + castleW, baseY + 40)
-  mist.addColorStop(0, 'rgba(60,30,120,0.0)')
-  mist.addColorStop(0.3, 'rgba(40,20,90,0.06)')
-  mist.addColorStop(0.7, 'rgba(40,20,90,0.06)')
-  mist.addColorStop(1, 'rgba(60,30,120,0.0)')
-  ctx.fillStyle = mist
-  ctx.fillRect(cx - castleW, baseY - 20, castleW * 2, 60)
-
-  ctx.restore()
-}
-
-// ─── Lightning ───────────────────────────────────────────────────────────────
-// A violet flash sweeps the void at irregular intervals — the castle (and the
-// path leading to it) is only ever glimpsed in the light it throws.
-
-/** Double-flicker falloff curve: a sharp burst, a dip, a softer second burst. */
-function flashIntensity(elapsed: number, duration: number): number {
-  if (elapsed < 0 || elapsed > duration) return 0
-  const a = Math.exp(-elapsed / 55)
-  const b = 0.55 * Math.exp(-Math.abs(elapsed - duration * 0.45) / 45)
-  return Math.min(Math.max(a, b), 1)
-}
-
-/** A jagged bolt falling from the top of the screen toward a target point. */
-function generateBolt(w: number, targetX: number, targetY: number): { x: number; y: number }[] {
-  const startX = targetX + (Math.random() - 0.5) * w * 0.3
-  const pts: { x: number; y: number }[] = [{ x: startX, y: 0 }]
-  const segs = 7
-  for (let i = 1; i <= segs; i++) {
-    const t = i / segs
-    pts.push({
-      x: startX + (targetX - startX) * t + (Math.random() - 0.5) * w * 0.05,
-      y: targetY * t,
-    })
-  }
-  return pts
-}
-
-function drawBolt(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], intensity: number) {
-  if (intensity < 0.02) return
-  ctx.save()
-  ctx.strokeStyle = `rgba(210,190,255,${intensity * 0.85})`
-  ctx.lineWidth = 1.5
-  ctx.shadowColor = 'rgba(180,140,255,0.9)'
-  ctx.shadowBlur = 24
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  ctx.beginPath()
-  ctx.moveTo(pts[0].x, pts[0].y)
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-  ctx.stroke()
-  ctx.restore()
-}
-
-/** Full-screen violet wash that brightens with the flash. */
-function drawFlashWash(ctx: CanvasRenderingContext2D, w: number, h: number, intensity: number) {
-  if (intensity < 0.01) return
-  ctx.save()
-  ctx.fillStyle = `rgba(150,120,255,${intensity * 0.16})`
-  ctx.fillRect(0, 0, w, h)
-  ctx.restore()
-}
-
-// ─── Path to the castle ─────────────────────────────────────────────────────────
-// A road of light receding in perspective — wide near Medhā, narrowing into the
-// distance toward the castle gate. Only catches the eye when lightning lifts it
-// out of the dark.
-function drawPathToCastle(
-  ctx: CanvasRenderingContext2D,
-  fromX: number, fromY: number,
-  toX: number, toY: number,
-  nearWidth: number, farWidth: number,
-  opacity: number
-) {
-  if (opacity < 0.005) return
-  const dx = toX - fromX
-  const dy = toY - fromY
-  const len = Math.hypot(dx, dy) || 1
-  const nx = -dy / len
-  const ny = dx / len
-
-  ctx.save()
-  ctx.beginPath()
-  ctx.moveTo(fromX + nx * nearWidth, fromY + ny * nearWidth)
-  ctx.lineTo(toX + nx * farWidth, toY + ny * farWidth)
-  ctx.lineTo(toX - nx * farWidth, toY - ny * farWidth)
-  ctx.lineTo(fromX - nx * nearWidth, fromY - ny * nearWidth)
-  ctx.closePath()
-  const g = ctx.createLinearGradient(fromX, fromY, toX, toY)
-  g.addColorStop(0, `rgba(190,160,255,${opacity})`)
-  g.addColorStop(1, 'rgba(120,90,220,0)')
-  ctx.fillStyle = g
-  ctx.fill()
-
-  // Faint guiding lights along the path's edges
-  for (let i = 1; i < 6; i++) {
-    const t = i / 6
-    const px = fromX + dx * t
-    const py = fromY + dy * t
-    const width = nearWidth + (farWidth - nearWidth) * t
-    ;[-1, 1].forEach(side => {
-      const lx = px + nx * width * side
-      const ly = py + ny * width * side
-      const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 5)
-      glow.addColorStop(0, `rgba(220,200,255,${opacity * 0.9})`)
-      glow.addColorStop(1, 'rgba(160,120,255,0)')
-      ctx.beginPath()
-      ctx.arc(lx, ly, 5, 0, Math.PI * 2)
-      ctx.fillStyle = glow
-      ctx.fill()
-    })
-  }
-  ctx.restore()
+  floatAmp: number   // floating animation amplitude px
+  floatSpeed: number
+  floatPhase: number
+  zIndex: number
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
 interface MedhaLairProps {
-  entityX?: number    // 0–1
-  entityY?: number    // 0–1
+  entityX?: number
+  entityY?: number
   facultyColor?: string
-  onReact?: boolean   // trigger pixie reaction
+  onReact?: boolean
 }
 
 export function MedhaLair({
@@ -445,85 +72,103 @@ export function MedhaLair({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
   const pixiesRef = useRef<Pixie[]>([])
-  const fragmentsRef = useRef<ArchFragment[]>([])
-  const lightningRef = useRef<LightningState | null>(null)
+  const mouseRef = useRef({ x: 0, y: 0, smoothX: 0, smoothY: 0 })
   const tRef = useRef(0)
-  const reactRef = useRef(false)
+  const imagesRef = useRef<Map<string, HTMLImageElement>>(new Map())
+  const [imagesLoaded, setImagesLoaded] = useState(false)
 
-  // Pick a new resting place for the castle — different distance, depth and
-  // position each time the lightning rolls through.
-  const rollCastlePlacement = useCallback((w: number, h: number): { near: CastlePlacement; far: CastlePlacement } => {
-    return {
-      near: {
-        cx: w * (0.25 + Math.random() * 0.5),
-        baseY: h * (0.78 + Math.random() * 0.08),
-        scale: 0.75 + Math.random() * 0.55,
-      },
-      far: {
-        cx: w * (0.15 + Math.random() * 0.7),
-        baseY: h * (0.62 + Math.random() * 0.08),
-        scale: 0.35 + Math.random() * 0.3,
-      },
-    }
-  }, [])
+  // Layer definitions — each image as a composited layer
+  const LAYERS: LairLayer[] = [
+    // Layer 0 — Deepest: two floating castles + purple nebula
+    {
+      src: '/assets/D5B90A6C-2556-4780-9904-121FA590EC00.png',
+      x: 0, y: 0, w: 100,
+      parallaxX: 0.006, parallaxY: 0.004,
+      blendMode: 'screen',
+      opacity: 0.55,
+      floatAmp: 2, floatSpeed: 0.0003, floatPhase: 0,
+      zIndex: 1,
+    },
+    // Layer 1 — Deep: castle with gold orb circle
+    {
+      src: '/assets/3ADEFC69-A670-49AD-9938-75EE09A18F9C.png',
+      x: 15, y: 5, w: 55,
+      parallaxX: 0.012, parallaxY: 0.008,
+      blendMode: 'screen',
+      opacity: 0.70,
+      floatAmp: 4, floatSpeed: 0.0004, floatPhase: 0.8,
+      zIndex: 2,
+    },
+    // Layer 2 — Mid-deep: castle with diamond base + gold ring
+    {
+      src: '/assets/88BE0E29-F269-4321-88A5-3AAAD30CE5AA.png',
+      x: 22, y: 8, w: 50,
+      parallaxX: 0.016, parallaxY: 0.010,
+      blendMode: 'screen',
+      opacity: 0.75,
+      floatAmp: 5, floatSpeed: 0.0005, floatPhase: 1.6,
+      zIndex: 3,
+    },
+    // Layer 3 — Mid: castle with large purple ring
+    {
+      src: '/assets/892C5B1F-93CA-43EB-8C78-310BA8C5E527.png',
+      x: 5, y: 10, w: 60,
+      parallaxX: 0.022, parallaxY: 0.014,
+      blendMode: 'screen',
+      opacity: 0.72,
+      floatAmp: 4, floatSpeed: 0.0004, floatPhase: 2.4,
+      zIndex: 4,
+    },
+    // Layer 4 — Foreground left: gazebo + platform + purple arcs
+    {
+      src: '/assets/07B0E72C-79FA-4998-AFAC-DF75CDD4B15C.png',
+      x: -10, y: 18, w: 60,
+      parallaxX: 0.030, parallaxY: 0.018,
+      blendMode: 'screen',
+      opacity: 0.85,
+      floatAmp: 3, floatSpeed: 0.0004, floatPhase: 3.2,
+      zIndex: 5,
+    },
+    // Layer 5 — Foreground right: arch + purple tree
+    {
+      src: '/assets/C788C6AD-194E-4EC4-8906-E4D27F21E57E.png',
+      x: 28, y: 0, w: 72,
+      parallaxX: 0.040, parallaxY: 0.025,
+      blendMode: 'screen',
+      opacity: 0.90,
+      floatAmp: 3, floatSpeed: 0.0005, floatPhase: 4.1,
+      zIndex: 6,
+    },
+  ]
 
-  const buildLightning = useCallback((w: number, h: number): LightningState => {
-    const { near, far } = rollCastlePlacement(w, h)
-    return {
-      nextFlash: performance.now() + 2500 + Math.random() * 4000,
-      flashStart: -Infinity,
-      flashDuration: 260 + Math.random() * 220,
-      bolt: [],
-      near,
-      far,
-    }
-  }, [rollCastlePlacement])
-
-  // Build pixies
-  const buildPixies = useCallback((w: number, h: number): Pixie[] => {
-    const count = 10
-    return Array.from({ length: count }, (_, i) => {
-      const depth = 0.2 + Math.random() * 0.7
-      const angle = (i / count) * Math.PI * 2
-      const orbitR = 80 + Math.random() * 180
-      return {
-        x: w * (0.2 + Math.random() * 0.6),
-        y: h * (0.15 + Math.random() * 0.65),
-        vx: (Math.random() - 0.5) * 0.15,
-        vy: (Math.random() - 0.5) * 0.15,
-        phase: Math.random() * Math.PI * 2,
-        phaseSpeed: 0.003 + Math.random() * 0.004,
-        orbitR,
-        orbitAngle: angle,
-        orbitSpeed: (0.0003 + Math.random() * 0.0004) * (Math.random() < 0.5 ? 1 : -1),
-        depth,
-        size: 1.5 + depth * 2.5,
-        opacity: 0.3 + depth * 0.5,
-        wingPhase: Math.random() * Math.PI * 2,
-        reacting: false,
-        reactTimer: 0,
+  // Preload images
+  useEffect(() => {
+    let loaded = 0
+    const total = LAYERS.length
+    LAYERS.forEach(layer => {
+      if (imagesRef.current.has(layer.src)) { loaded++; if (loaded === total) setImagesLoaded(true); return }
+      const img = new Image()
+      img.src = layer.src
+      img.onload = () => {
+        imagesRef.current.set(layer.src, img)
+        loaded++
+        if (loaded === total) setImagesLoaded(true)
       }
+      img.onerror = () => { loaded++; if (loaded === total) setImagesLoaded(true) }
     })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mouse tracking
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      mouseRef.current.x = (e.clientX / window.innerWidth - 0.5) * 2
+      mouseRef.current.y = (e.clientY / window.innerHeight - 0.5) * 2
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
   }, [])
 
-  // Build arch fragments
-  const buildFragments = useCallback((w: number, h: number): ArchFragment[] => {
-    const types: ArchFragment['type'][] = ['arch', 'spire', 'column', 'shard']
-    return Array.from({ length: 14 }, (_, i) => ({
-      x: w * (0.05 + Math.random() * 0.9),
-      y: h * (0.1 + Math.random() * 0.75),
-      w: 20 + Math.random() * 60,
-      h: 30 + Math.random() * 80,
-      type: types[Math.floor(Math.random() * types.length)],
-      rotation: (Math.random() - 0.5) * 0.3,
-      rotSpeed: (Math.random() - 0.5) * 0.0001,
-      depth: 0.05 + Math.random() * 0.35,
-      opacity: 0.03 + Math.random() * 0.08,
-      driftX: (Math.random() - 0.5) * 0.02,
-      driftY: (Math.random() - 0.5) * 0.01,
-    }))
-  }, [])
-
+  // Main canvas draw loop
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -534,188 +179,183 @@ export function MedhaLair({
       canvas.width = window.innerWidth
       canvas.height = window.innerHeight
       pixiesRef.current = buildPixies(canvas.width, canvas.height)
-      fragmentsRef.current = buildFragments(canvas.width, canvas.height)
-      lightningRef.current = buildLightning(canvas.width, canvas.height)
     }
-
     resize()
     window.addEventListener('resize', resize)
 
     const draw = () => {
-      const w = canvas.width
-      const h = canvas.height
-      const t = tRef.current++
+      const w = canvas.width, h = canvas.height
+      const t = ++tRef.current
+
+      // Smooth mouse
+      const m = mouseRef.current
+      m.smoothX += (m.x - m.smoothX) * 0.04
+      m.smoothY += (m.y - m.smoothY) * 0.04
 
       ctx.clearRect(0, 0, w, h)
 
-      // ── Layer 1: Lightning-lit castle, glimpsed at varying depths ──────────
-      const now = performance.now()
-      const lit = lightningRef.current
-      let flash = 0
-      if (lit) {
-        if (now >= lit.nextFlash) {
-          lit.flashStart = now
-          lit.flashDuration = 260 + Math.random() * 220
-          const placement = rollCastlePlacement(w, h)
-          lit.near = placement.near
-          lit.far = placement.far
-          lit.bolt = generateBolt(w, lit.near.cx, lit.near.baseY * 0.3)
-          lit.nextFlash = now + 5000 + Math.random() * 9000
-        }
-        flash = flashIntensity(now - lit.flashStart, lit.flashDuration)
+      // ── Draw image layers ────────────────────────────────────────────────
+      LAYERS.forEach(layer => {
+        const img = imagesRef.current.get(layer.src)
+        if (!img) return
 
-        // Far castle — distant, hazy, only a ghost of itself even at peak flash
-        drawCastleSilhouette(ctx, w, h, lit.far.cx, lit.far.baseY, lit.far.scale, 0.02 + flash * 0.5, t)
+        // Float animation
+        const floatY = Math.sin(t * layer.floatSpeed + layer.floatPhase) * layer.floatAmp
+        const floatX = Math.cos(t * layer.floatSpeed * 0.7 + layer.floatPhase) * layer.floatAmp * 0.4
 
-        // The path winding from behind Medhā toward the castle gate
-        const ex = w * entityX
-        const ey = h * entityY
-        drawPathToCastle(ctx, ex, ey + h * 0.05, lit.near.cx, lit.near.baseY, w * 0.05, w * 0.004, 0.02 + flash * 0.4)
+        // Parallax offset from mouse
+        const px = m.smoothX * w * layer.parallaxX
+        const py = m.smoothY * h * layer.parallaxY
 
-        // Near castle — the one Medhā calls home, fully revealed when lit
-        drawCastleSilhouette(ctx, w, h, lit.near.cx, lit.near.baseY, lit.near.scale, 0.03 + flash * 0.85, t)
-
-        // The flash itself — violet wash and bolt
-        drawFlashWash(ctx, w, h, flash)
-        drawBolt(ctx, lit.bolt, flash)
-      }
-
-      // ── Layer 2: Arch fragments (mid-deep) ────────────────────────────────
-      fragmentsRef.current.forEach(frag => {
-        frag.x += frag.driftX
-        frag.y += frag.driftY
-        frag.rotation += frag.rotSpeed
-        // Wrap
-        if (frag.x < -80) frag.x = w + 80
-        if (frag.x > w + 80) frag.x = -80
-        if (frag.y < -80) frag.y = h + 80
-        if (frag.y > h + 80) frag.y = -80
+        // Position & size
+        const layerW = w * layer.w / 100
+        const aspect = img.naturalHeight / img.naturalWidth
+        const layerH = layerW * aspect
+        const layerX = w * layer.x / 100 + px + floatX
+        const layerY = h * layer.y / 100 + py + floatY
 
         ctx.save()
-        ctx.translate(frag.x, frag.y)
-        ctx.rotate(frag.rotation)
-        const depthScale = 0.3 + frag.depth * 0.7
-        ctx.scale(depthScale, depthScale)
-
-        if (frag.type === 'arch') {
-          drawArch(ctx, 0, 0, frag.w, frag.h, frag.opacity)
-        } else if (frag.type === 'spire') {
-          drawSpire(ctx, 0, 0, frag.h, frag.w * 0.25, frag.opacity)
-        } else if (frag.type === 'column') {
-          const cg = ctx.createLinearGradient(0, -frag.h / 2, 0, frag.h / 2)
-          cg.addColorStop(0, `rgba(120,90,220,0)`)
-          cg.addColorStop(0.3, `rgba(100,70,200,${frag.opacity * 3})`)
-          cg.addColorStop(0.7, `rgba(80,50,180,${frag.opacity * 3})`)
-          cg.addColorStop(1, `rgba(60,40,160,0)`)
-          ctx.fillStyle = cg
-          ctx.fillRect(-frag.w * 0.08, -frag.h / 2, frag.w * 0.16, frag.h)
-        } else {
-          // Shard
-          ctx.beginPath()
-          ctx.moveTo(0, -frag.h / 2)
-          ctx.lineTo(frag.w * 0.15, frag.h * 0.2)
-          ctx.lineTo(-frag.w * 0.1, frag.h / 2)
-          ctx.lineTo(-frag.w * 0.2, frag.h * 0.1)
-          ctx.closePath()
-          ctx.fillStyle = `rgba(100,70,200,${frag.opacity * 2})`
-          ctx.fill()
-          ctx.strokeStyle = `rgba(160,130,255,${frag.opacity * 3})`
-          ctx.lineWidth = 0.5
-          ctx.stroke()
-        }
+        ctx.globalAlpha = layer.opacity
+        ctx.globalCompositeOperation = layer.blendMode as GlobalCompositeOperation
+        ctx.drawImage(img, layerX, layerY, layerW, layerH)
         ctx.restore()
       })
 
-      // ── Layer 3: Throne (mid distance, behind entity) ─────────────────────
-      const throneX = w * entityX
-      const throneY = h * entityY + h * 0.08  // slightly below and behind entity
-      const throneScale = 0.28
-      const throneOpacity = 0.18 + 0.04 * Math.sin(t * 0.008)
-      drawThrone(ctx, throneX, throneY, throneScale, throneOpacity, t)
-
-      // ── Layer 4: Pixies ───────────────────────────────────────────────────
+      // ── Atmospheric glow behind entity position ──────────────────────────
       const ex = w * entityX
       const ey = h * entityY
-
-      pixiesRef.current.forEach((p, i) => {
-        // Orbit motion — each pixie has its own orbit center offset from entity
-        p.orbitAngle += p.orbitSpeed
-        const orbitCenterX = ex + Math.cos(i * 1.3) * 60
-        const orbitCenterY = ey + Math.sin(i * 1.1) * 40
-
-        const targetX = orbitCenterX + Math.cos(p.orbitAngle) * p.orbitR
-        const targetY = orbitCenterY + Math.sin(p.orbitAngle) * p.orbitR * 0.5
-
-        // React — flutter toward entity
-        if (p.reacting) {
-          p.reactTimer--
-          const toEx = ex - p.x
-          const toEy = ey - p.y
-          const dist = Math.sqrt(toEx ** 2 + toEy ** 2)
-          if (dist > 40) {
-            p.x += (toEx / dist) * 2.5
-            p.y += (toEy / dist) * 2.5
-          }
-          if (p.reactTimer <= 0) p.reacting = false
-        } else {
-          // Drift toward orbit position
-          p.x += (targetX - p.x) * 0.008
-          p.y += (targetY - p.y) * 0.008
-          // Small organic drift
-          p.x += Math.sin(t * p.phaseSpeed + p.phase) * 0.3
-          p.y += Math.cos(t * p.phaseSpeed * 0.7 + p.phase) * 0.2
-        }
-
-        drawPixie(ctx, p, t)
-      })
-
-      // ── Layer 5: Aurora atmosphere behind throne ──────────────────────────
-      const auroraOpacity = 0.025 + 0.01 * Math.sin(t * 0.004)
-      const aurora = ctx.createRadialGradient(throneX, throneY - 40, 0, throneX, throneY - 40, w * 0.22)
-      aurora.addColorStop(0, `rgba(80,40,180,${auroraOpacity * 2})`)
-      aurora.addColorStop(0.3, `rgba(60,30,150,${auroraOpacity})`)
-      aurora.addColorStop(0.7, `rgba(40,20,120,${auroraOpacity * 0.4})`)
-      aurora.addColorStop(1, 'rgba(20,10,80,0.0)')
+      const auroraPulse = 0.025 + 0.008 * Math.sin(t * 0.004)
+      const aurora = ctx.createRadialGradient(ex, ey + 40, 0, ex, ey + 40, w * 0.25)
+      aurora.addColorStop(0, `rgba(100,60,180,${auroraPulse * 1.5})`)
+      aurora.addColorStop(0.4, `rgba(60,30,120,${auroraPulse})`)
+      aurora.addColorStop(1, 'rgba(20,10,60,0)')
       ctx.beginPath()
-      ctx.arc(throneX, throneY - 40, w * 0.22, 0, Math.PI * 2)
+      ctx.arc(ex, ey + 40, w * 0.25, 0, Math.PI * 2)
       ctx.fillStyle = aurora
       ctx.fill()
+
+      // ── Ground mist ──────────────────────────────────────────────────────
+      const mistY = h * 0.72
+      const mist = ctx.createLinearGradient(0, mistY, 0, h)
+      mist.addColorStop(0, 'rgba(40,20,80,0)')
+      mist.addColorStop(0.4, 'rgba(30,15,60,0.06)')
+      mist.addColorStop(1, 'rgba(20,10,50,0.12)')
+      ctx.fillStyle = mist
+      ctx.fillRect(0, mistY, w, h - mistY)
+
+      // ── Pixies ───────────────────────────────────────────────────────────
+      pixiesRef.current.forEach((p, i) => {
+        p.orbitAngle += p.orbitSpeed
+        const tx = p.orbitCX + Math.cos(p.orbitAngle) * p.orbitRX
+        const ty = p.orbitCY + Math.sin(p.orbitAngle) * p.orbitRY
+
+        if (p.reacting) {
+          p.reactTimer--
+          const toEx = ex - p.x, toEy = ey - p.y
+          const d = Math.sqrt(toEx**2 + toEy**2)
+          if (d > 50) { p.x += toEx/d * 2.8; p.y += toEy/d * 2.8 }
+          if (p.reactTimer <= 0) p.reacting = false
+        } else {
+          p.x += (tx - p.x) * 0.007
+          p.y += (ty - p.y) * 0.007
+          p.x += Math.sin(t * 0.008 + p.glowPhase) * 0.25
+          p.y += Math.cos(t * 0.006 + p.glowPhase) * 0.18
+        }
+
+        const glow = 0.4 + 0.35 * Math.sin(t * 0.012 + p.glowPhase)
+        const wingSpan = p.size * (1.2 + 0.5 * Math.sin(t * 0.018 + p.wingPhase))
+        const baseOp = p.depth * glow
+
+        // Glow halo
+        const halo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 4)
+        halo.addColorStop(0, `rgba(212,180,100,${baseOp * 0.9})`)
+        halo.addColorStop(0.4, `rgba(160,120,60,${baseOp * 0.35})`)
+        halo.addColorStop(1, 'rgba(100,70,30,0)')
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.size * 4, 0, Math.PI * 2)
+        ctx.fillStyle = halo
+        ctx.fill()
+
+        // Core
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(255,245,220,${baseOp})`
+        ctx.fill()
+
+        // Wings — 4 tiny ellipses
+        ctx.save()
+        ctx.translate(p.x, p.y)
+        ;[[-1,-0.5],[1,-0.5],[-0.8,0.4],[0.8,0.4]].forEach(([wx,wy]) => {
+          ctx.beginPath()
+          ctx.ellipse(wx*wingSpan, wy*wingSpan*0.7, wingSpan*0.85, wingSpan*0.35,
+            wx < 0 ? -0.35 : 0.35, 0, Math.PI*2)
+          ctx.strokeStyle = `rgba(212,180,100,${baseOp * 0.5})`
+          ctx.lineWidth = 0.5
+          ctx.stroke()
+        })
+        ctx.restore()
+
+        // React sparkle trail
+        if (p.reacting) {
+          for (let j = 0; j < 3; j++) {
+            ctx.beginPath()
+            ctx.arc(p.x+(Math.random()-0.5)*16, p.y+(Math.random()-0.5)*16, Math.random()*1.2, 0, Math.PI*2)
+            ctx.fillStyle = `rgba(212,180,100,${baseOp*0.6})`
+            ctx.fill()
+          }
+        }
+      })
+
+      // ── Floating dust particles ───────────────────────────────────────────
+      // Pre-seeded so they don't jump frame to frame
+      ctx.save()
+      for (let i = 0; i < 60; i++) {
+        // Deterministic per-particle position using sin/cos of index
+        const px = w * (0.1 + 0.8 * ((Math.sin(i * 2.39) + 1) / 2))
+        const py = h * (0.05 + 0.85 * ((Math.cos(i * 1.61) + 1) / 2))
+        const drift = Math.sin(t * 0.003 + i * 0.8) * 8
+        const op = (0.15 + 0.12 * Math.sin(t * 0.005 + i * 1.1)) * 0.7
+        ctx.beginPath()
+        ctx.arc(px + drift, py + drift * 0.4, 0.5 + (i % 3) * 0.4, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(212,180,100,${op})`
+        ctx.fill()
+      }
+      ctx.restore()
 
       animRef.current = requestAnimationFrame(draw)
     }
 
     animRef.current = requestAnimationFrame(draw)
-
     return () => {
       cancelAnimationFrame(animRef.current)
       window.removeEventListener('resize', resize)
     }
-  }, [entityX, entityY, buildPixies, buildFragments, buildLightning, rollCastlePlacement])
+  }, [imagesLoaded, entityX, entityY]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pixie reaction trigger
+  // Pixie reaction
   useEffect(() => {
     if (!onReact) return
-    const pixies = pixiesRef.current
-    // 3–4 random pixies react
     const count = 3 + Math.floor(Math.random() * 2)
-    const shuffled = [...pixies].sort(() => Math.random() - 0.5).slice(0, count)
-    shuffled.forEach(p => {
-      p.reacting = true
-      p.reactTimer = 80 + Math.floor(Math.random() * 40)
-    })
+    const shuffled = [...pixiesRef.current].sort(() => Math.random() - 0.5).slice(0, count)
+    shuffled.forEach(p => { p.reacting = true; p.reactTimer = 90 + Math.floor(Math.random() * 50) })
   }, [onReact])
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 5,           // behind entity (z:10), above void canvas (z:0)
-        pointerEvents: 'none',
-      }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: 'fixed', inset: 0,
+          width: '100%', height: '100%',
+          zIndex: 5,
+          pointerEvents: 'none',
+        }}
+      />
+      {/* Vignette — darkens edges to focus on center */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 6, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 80% 80% at 50% 50%, transparent 40%, rgba(0,0,0,0.65) 100%)',
+      }} />
+    </>
   )
 }
