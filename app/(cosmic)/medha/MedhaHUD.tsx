@@ -219,7 +219,7 @@ function Entity({es,fc,vis,vsrc,pos,onPixieClick}:{es:ES;fc:string;vis:boolean;v
           transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},x:{duration:cfg.dd*1.6,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
           style={{width:'42vmin',height:'42vmin',position:'relative'}}>
           {vsrc
-            ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
+            ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',mixBlendMode:'screen',background:'transparent'}}/>
             // eslint-disable-next-line @next/next/no-img-element
             :<img src="/assets/medha-entity.png" alt="MEDHĀ" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
           }

@@ -82,60 +82,60 @@ export function MedhaLair({
     // Layer 0 — Deepest: two floating castles + purple nebula
     {
       src: '/assets/D5B90A6C-2556-4780-9904-121FA590EC00.png',
-      x: 0, y: 0, w: 100,
+      x: 0, y: 10, w: 100,
       parallaxX: 0.006, parallaxY: 0.004,
       blendMode: 'screen',
-      opacity: 0.55,
+      opacity: 0.18,
       floatAmp: 2, floatSpeed: 0.0003, floatPhase: 0,
       zIndex: 1,
     },
     // Layer 1 — Deep: castle with gold orb circle
     {
       src: '/assets/3ADEFC69-A670-49AD-9938-75EE09A18F9C.png',
-      x: 15, y: 5, w: 55,
+      x: 20, y: 15, w: 35,
       parallaxX: 0.012, parallaxY: 0.008,
       blendMode: 'screen',
-      opacity: 0.70,
+      opacity: 0.22,
       floatAmp: 4, floatSpeed: 0.0004, floatPhase: 0.8,
       zIndex: 2,
     },
     // Layer 2 — Mid-deep: castle with diamond base + gold ring
     {
       src: '/assets/88BE0E29-F269-4321-88A5-3AAAD30CE5AA.png',
-      x: 22, y: 8, w: 50,
+      x: 25, y: 12, w: 30,
       parallaxX: 0.016, parallaxY: 0.010,
       blendMode: 'screen',
-      opacity: 0.75,
+      opacity: 0.20,
       floatAmp: 5, floatSpeed: 0.0005, floatPhase: 1.6,
       zIndex: 3,
     },
     // Layer 3 — Mid: castle with large purple ring
     {
       src: '/assets/892C5B1F-93CA-43EB-8C78-310BA8C5E527.png',
-      x: 5, y: 10, w: 60,
+      x: 5, y: 10, w: 40,
       parallaxX: 0.022, parallaxY: 0.014,
       blendMode: 'screen',
-      opacity: 0.72,
+      opacity: 0.18,
       floatAmp: 4, floatSpeed: 0.0004, floatPhase: 2.4,
       zIndex: 4,
     },
     // Layer 4 — Foreground left: gazebo + platform + purple arcs
     {
       src: '/assets/07B0E72C-79FA-4998-AFAC-DF75CDD4B15C.png',
-      x: -10, y: 18, w: 60,
+      x: -5, y: 22, w: 38,
       parallaxX: 0.030, parallaxY: 0.018,
       blendMode: 'screen',
-      opacity: 0.85,
+      opacity: 0.25,
       floatAmp: 3, floatSpeed: 0.0004, floatPhase: 3.2,
       zIndex: 5,
     },
     // Layer 5 — Foreground right: arch + purple tree
     {
       src: '/assets/C788C6AD-194E-4EC4-8906-E4D27F21E57E.png',
-      x: 28, y: 0, w: 72,
+      x: 30, y: 0, w: 45,
       parallaxX: 0.040, parallaxY: 0.025,
       blendMode: 'screen',
-      opacity: 0.90,
+      opacity: 0.28,
       floatAmp: 3, floatSpeed: 0.0005, floatPhase: 4.1,
       zIndex: 6,
     },
@@ -226,7 +226,7 @@ export function MedhaLair({
       const ey = h * entityY
       const auroraPulse = 0.025 + 0.008 * Math.sin(t * 0.004)
       const aurora = ctx.createRadialGradient(ex, ey + 40, 0, ex, ey + 40, w * 0.25)
-      aurora.addColorStop(0, `rgba(100,60,180,${auroraPulse * 1.5})`)
+      aurora.addColorStop(0, `rgba(100,60,180,${auroraPulse * 0.5})`)
       aurora.addColorStop(0.4, `rgba(60,30,120,${auroraPulse})`)
       aurora.addColorStop(1, 'rgba(20,10,60,0)')
       ctx.beginPath()
