@@ -49,7 +49,7 @@ const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number
 // Medhā's home is the exact center of the screen. Her idle float drifts gently
 // in any direction from this anchor; she also occasionally wanders to a nearby
 // resting point (see entityPos state) and returns.
-const ENTITY_POS = { x: 50, y: 50 };
+const ENTITY_POS = { x: 50, y: 36 };
 
 // ─── Void canvas ───────────────────────────────────────────────────────────────
 function VoidCanvas(){
@@ -217,7 +217,7 @@ function Entity({es,fc,vis,vsrc,pos,onPixieClick}:{es:ES;fc:string;vis:boolean;v
         <motion.div
           animate={{scale:cfg.sc,rotate:cfg.ro>0?[0,cfg.ro,0,-cfg.ro,0]:0,x:[0,cfg.dy/2,0,-cfg.dy/2,0],y:[-cfg.dy/2,cfg.dy/2,0,cfg.dy/2,-cfg.dy/2],filter:`brightness(${cfg.br})`}}
           transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},x:{duration:cfg.dd*1.6,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
-          style={{width:'42vmin',height:'42vmin',position:'relative'}}>
+          style={{width:'72vmin',height:'72vmin',position:'relative'}}>
           {vsrc
             ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',mixBlendMode:'screen',background:'transparent'}}/>
             // eslint-disable-next-line @next/next/no-img-element
@@ -253,7 +253,7 @@ function Bubble({msg,fc,onCopy,isLast,onRegenerate}:{msg:StoredMsg;fc:string;onC
       </div>
       <div style={{display:'flex',alignItems:'flex-start',gap:'8px',flexDirection:isU?'row-reverse':'row'}}>
         <div style={{paddingTop:'10px',flexShrink:0}}><NL color={isU?'rgba(255,255,255,0.3)':fc} align={isU?'right':'left'}/></div>
-        <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'13px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'system-ui',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer'}}>
+        <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'12px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'system-ui',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer'}}>
           {msg.role==='assistant'?<div dangerouslySetInnerHTML={{__html:renderMarkdown(msg.content)}} className="medha-md"/>:msg.content}
         </div>
       </div>
@@ -538,7 +538,7 @@ export default function MedhaHUD(){
               {busy
                 ?<ThinkingBubble fc={fc}/>
                 :lastMsg
-                  ?<Bubble msg={lastMsg} fc={fc} onCopy={copyMsg} isLast onRegenerate={lastMsg.role==='assistant'?regenerate:undefined}/>
+                  ?<Bubble msg={lastMsg} fc={fc} onCopy={copyMsg} isLast onRegenerate={lastMsg.role==='assistant'&&messages.length>1&&!busy?regenerate:undefined}/>
                   :greetingText&&(
                     <div style={{width:'100%',textAlign:'center',padding:'2px 6px 0'}}>
                       <div style={{fontSize:'9px',letterSpacing:'0.25em',color:fc,textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'8px'}}>{getMode(greetingMode).name}</div>
@@ -558,7 +558,7 @@ export default function MedhaHUD(){
           <motion.div key="transcript-panel" initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} exit={{opacity:0,y:18}} transition={{duration:0.45,ease:[0.16,1,0.3,1]}}
             style={{position:'fixed',left:0,right:0,top:'8vh',bottom:'128px',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none',background:'linear-gradient(to bottom, rgba(8,4,20,0), rgba(8,4,20,0.22) 70px, rgba(8,4,20,0.28))',backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)'}}>
             <div ref={transcriptRef} style={{flex:1,minHeight:0,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'16px',justifyContent:'flex-end',width:'100%',maxWidth:'560px',margin:'0 auto',padding:'16px 16px 8px',pointerEvents:'auto',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 28px)',maskImage:'linear-gradient(to bottom, transparent, black 28px)'}}>
-              {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={regenerate}/>)}
+              {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={messages.length>1&&!busy?regenerate:undefined}/>)}
               <AnimatePresence>
                 {busy&&<ThinkingBubble key="thinking" fc={fc}/>}
               </AnimatePresence>
