@@ -341,7 +341,7 @@ export function MedhaLair({
           position: 'fixed', inset: 0,
           width: '100%', height: '100%',
           objectFit: 'cover',
-          objectPosition: 'center',
+          objectPosition: 'right center',
           zIndex: 3,
           pointerEvents: 'none',
         }}
@@ -421,6 +421,7 @@ export function MedhaLair({
             // Screen blend removes black background from entity video
             mixBlendMode: 'screen',
             filter: 'brightness(1.8) contrast(1.1)',
+            clipPath: 'inset(0 0 9% 0)',
           }}
         />
       </div>
