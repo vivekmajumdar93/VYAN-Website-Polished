@@ -49,7 +49,7 @@ const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number
 // Medhā's home is the exact center of the screen. Her idle float drifts gently
 // in any direction from this anchor; she also occasionally wanders to a nearby
 // resting point (see entityPos state) and returns.
-const ENTITY_POS = { x: 50, y: 36 };
+const ENTITY_POS = { x: 25, y: 38 };
 
 // ─── Void canvas ───────────────────────────────────────────────────────────────
 function VoidCanvas(){
@@ -352,8 +352,8 @@ export default function MedhaHUD(){
           if(!alive)return;
           const goHome=Math.random()<0.4;
           setEntityPos(goHome?{x:ENTITY_POS.x,y:ENTITY_POS.y}:{
-            x:Math.min(68,Math.max(32,ENTITY_POS.x+(Math.random()-0.5)*32)),
-            y:Math.min(58,Math.max(38,ENTITY_POS.y+(Math.random()-0.5)*18)),
+            x:Math.min(40,Math.max(15,ENTITY_POS.x+(Math.random()-0.5)*22)),
+            y:Math.min(56,Math.max(24,ENTITY_POS.y+(Math.random()-0.5)*24)),
           });
           setEntityVisible(true);
           cycle();
@@ -493,8 +493,16 @@ export default function MedhaHUD(){
     <div className="mlv" data-mode={mode} style={{position:'fixed',inset:0,width:'100vw',height:'100vh',background:'#000',overflow:'hidden'}}>
       {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
       {mounted&&<VoidCanvas/>}
-      {mounted&&<MedhaLair entityX={entityPos.x/100} entityY={entityPos.y/100} facultyColor={fc} onReact={burst}/>}
-      <Entity es={es} fc={fc} vis={entityVisible} vsrc="/assets/medha-dormant.mp4" pos={entityPos} onPixieClick={()=>setShowTranscript(v=>!v)}/>
+      {mounted&&(
+        <MedhaLair
+          entityVideoSrc="/assets/medha-dormant.mp4"
+          lairVideoSrc="/assets/medha-lair.mp4"
+          facultyColor={fc}
+          onReact={burst}
+          roamPos={entityVisible ? entityPos : undefined}
+          entityVisible={entityVisible}
+        />
+      )}
       {mounted&&<PB color={burstColor} active={burst} ex={entityPos.x/100} ey={entityPos.y/100}/>}
       {mounted&&<NeuralRail count={messages.filter(m=>m.role==='user').length} color={fc}/>}
       {mounted&&stream.active&&(

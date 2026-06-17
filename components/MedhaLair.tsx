@@ -1,7 +1,34 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
+// ─── Layout constants ─────────────────────────────────────────────────────────
+// Measured from video frames:
+// Medhā in video occupies left 0–42% of frame, drifts to max 42%
+// Gazebo/arch occupies right 50–100%
+// Safe mask: covers 0–45% (our entity lives here), gradient 45–52%, clear 52–100%
+
+const MASK_SOLID_END = 0.45      // left 45% fully covered
+const MASK_GRADIENT_END = 0.52   // gradient fade ends at 52%
+
+// Roam positions — constrained to LEFT side only (0–45% of screen)
+// Entity must never cross into gazebo territory
+const ROAM_POSITIONS = [
+  { x: 22, y: 38 },   // upper left center
+  { x: 18, y: 28 },   // upper left
+  { x: 32, y: 35 },   // center left
+  { x: 15, y: 48 },   // mid left
+  { x: 28, y: 25 },   // high left
+  { x: 38, y: 40 },   // rightmost safe position
+  { x: 20, y: 55 },   // lower left
+]
+
+function nextRoam(cur: { x: number; y: number }) {
+  const others = ROAM_POSITIONS.filter(p => p.x !== cur.x || p.y !== cur.y)
+  return others[Math.floor(Math.random() * others.length)]
+}
+
+// ─── Pixie — small ambient creature ───────────────────────────────────────────
 interface Pixie {
   x: number; y: number
   orbitCX: number; orbitCY: number
@@ -13,16 +40,17 @@ interface Pixie {
 }
 
 function buildPixies(w: number, h: number): Pixie[] {
-  return Array.from({ length: 10 }, (_, i) => ({
-    x: w * (0.1 + Math.random() * 0.8),
-    y: h * (0.1 + Math.random() * 0.7),
-    orbitCX: w * (0.15 + Math.random() * 0.7),
-    orbitCY: h * (0.15 + Math.random() * 0.6),
-    orbitRX: 30 + Math.random() * 100,
-    orbitRY: 15 + Math.random() * 50,
+  // Pixies constrained to left 50% of screen
+  return Array.from({ length: 8 }, (_, i) => ({
+    x: w * (0.05 + Math.random() * 0.40),
+    y: h * (0.10 + Math.random() * 0.70),
+    orbitCX: w * (0.08 + Math.random() * 0.36),
+    orbitCY: h * (0.15 + Math.random() * 0.60),
+    orbitRX: 20 + Math.random() * 60,
+    orbitRY: 10 + Math.random() * 30,
     orbitAngle: Math.random() * Math.PI * 2,
     orbitSpeed: (0.002 + Math.random() * 0.003) * (Math.random() < 0.5 ? 1 : -1),
-    size: 1.0 + Math.random() * 1.8,
+    size: 1.0 + Math.random() * 1.5,
     depth: 0.3 + Math.random() * 0.7,
     wingPhase: Math.random() * Math.PI * 2,
     glowPhase: Math.random() * Math.PI * 2,
@@ -31,142 +59,111 @@ function buildPixies(w: number, h: number): Pixie[] {
   }))
 }
 
-// ─── Layer definition ──────────────────────────────────────────────────────────
-// Position is % of viewport. Measured from target composition (Image 1).
-// parallaxX/Y: how much this layer shifts on mouse move (deeper = less shift)
-interface Layer {
-  src: string
-  // Placement — % of viewport
-  left: number    // % from left edge
-  top: number     // % from top edge
-  width: number   // % of viewport width
-  // Animation
-  parallaxX: number
-  parallaxY: number
-  floatAmp: number
-  floatSpeed: number
-  floatPhase: number
-  opacity: number
-  blendMode: GlobalCompositeOperation
+// ─── Entity size — device responsive ─────────────────────────────────────────
+function getEntitySize(): string {
+  // Uses vmin so it scales with the smaller dimension
+  // Mobile portrait: smaller, tablet: medium, desktop: larger
+  if (typeof window === 'undefined') return '52vmin'
+  const w = window.innerWidth
+  if (w < 480) return '68vmin'        // mobile portrait — larger relative
+  if (w < 768) return '58vmin'        // mobile landscape / small tablet
+  if (w < 1024) return '52vmin'       // tablet
+  if (w < 1440) return '46vmin'       // desktop
+  return '42vmin'                     // large desktop
 }
 
-// Exact placements matching Image 1 composition
-const LAYERS: Layer[] = [
-  // ── Deepest bg: multiple distant castles (Image_3 equivalent)
-  // Full screen, very faint, slowest parallax
-  {
-    src: '/assets/D5B90A6C-2556-4780-9904-121FA590EC00.png',
-    left: 0, top: 0, width: 100,
-    parallaxX: 0.005, parallaxY: 0.003,
-    floatAmp: 1.5, floatSpeed: 0.0003, floatPhase: 0,
-    opacity: 0.18,
-    blendMode: 'screen',
-  },
-  // ── Large floating castle — center, upper-mid
-  // Image 1: castle sits at ~x:35-65%, y:15-55%
-  {
-    src: '/assets/3ADEFC69-A670-49AD-9938-75EE09A18F9C.png',
-    left: 28, top: 8, width: 42,
-    parallaxX: 0.010, parallaxY: 0.007,
-    floatAmp: 4, floatSpeed: 0.0004, floatPhase: 0.8,
-    opacity: 0.55,
-    blendMode: 'screen',
-  },
-  // ── Castle with diamond base — center, slightly behind main castle
-  {
-    src: '/assets/88BE0E29-F269-4321-88A5-3AAAD30CE5AA.png',
-    left: 32, top: 12, width: 36,
-    parallaxX: 0.013, parallaxY: 0.009,
-    floatAmp: 3, floatSpeed: 0.0005, floatPhase: 1.6,
-    opacity: 0.45,
-    blendMode: 'screen',
-  },
-  // ── Castle with large purple ring — overlapping center
-  {
-    src: '/assets/892C5B1F-93CA-43EB-8C78-310BA8C5E527.png',
-    left: 22, top: 5, width: 48,
-    parallaxX: 0.008, parallaxY: 0.005,
-    floatAmp: 3, floatSpeed: 0.0003, floatPhase: 2.4,
-    opacity: 0.35,
-    blendMode: 'screen',
-  },
-  // ── Gazebo + platform — bottom LEFT
-  // Image 1: left edge, bottom ~y:45-100%, x:0-30%
-  {
-    src: '/assets/07B0E72C-79FA-4998-AFAC-DF75CDD4B15C.png',
-    left: -8, top: 38, width: 42,
-    parallaxX: 0.022, parallaxY: 0.014,
-    floatAmp: 2, floatSpeed: 0.0004, floatPhase: 3.2,
-    opacity: 0.70,
-    blendMode: 'screen',
-  },
-  // ── Arch + tree — RIGHT SIDE
-  // Image 1: right edge x:60-100%, y:10-100%
-  {
-    src: '/assets/C788C6AD-194E-4EC4-8906-E4D27F21E57E.png',
-    left: 55, top: 5, width: 48,
-    parallaxX: 0.030, parallaxY: 0.018,
-    floatAmp: 2.5, floatSpeed: 0.0005, floatPhase: 4.1,
-    opacity: 0.75,
-    blendMode: 'screen',
-  },
-]
-
+// ─── Props ────────────────────────────────────────────────────────────────────
 interface MedhaLairProps {
-  entityX?: number
-  entityY?: number
+  entityVideoSrc?: string
+  lairVideoSrc?: string
+  entityState?: string
   facultyColor?: string
   onReact?: boolean
+  roamPos?: { x: number; y: number }
+  entityVisible?: boolean
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export function MedhaLair({
-  entityX = 0.5,
-  entityY = 0.36,
+  entityVideoSrc = '/assets/medha-dormant.mp4',
+  lairVideoSrc = '/assets/medha-lair.mp4',
+  entityState = 'dormant',
+  facultyColor = '#7b2fff',
   onReact = false,
+  roamPos,
+  entityVisible = true,
 }: MedhaLairProps) {
+  const lairVideoRef = useRef<HTMLVideoElement>(null)
+  const entityVideoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
   const pixiesRef = useRef<Pixie[]>([])
-  const mouseRef = useRef({ x: 0, y: 0, smoothX: 0, smoothY: 0 })
   const tRef = useRef(0)
-  const imagesRef = useRef<Map<string, HTMLImageElement>>(new Map())
-  const [loaded, setLoaded] = useState(false)
+  const [entitySize, setEntitySize] = useState('52vmin')
+  const [mounted, setMounted] = useState(false)
 
-  // Preload all images
+  // Internal roam state if not controlled externally
+  const [internalRoam, setInternalRoam] = useState(ROAM_POSITIONS[0])
+  const [internalVisible, setInternalVisible] = useState(true)
+  const roamTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const activeRoam = roamPos ?? internalRoam
+  const activeVisible = entityVisible && internalVisible
+
+  // ── Init ────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    let done = 0
-    const total = LAYERS.length
-    LAYERS.forEach(layer => {
-      const img = new Image()
-      img.src = layer.src
-      img.onload = () => {
-        imagesRef.current.set(layer.src, img)
-        done++
-        if (done === total) setLoaded(true)
-      }
-      img.onerror = () => { done++; if (done === total) setLoaded(true) }
-    })
+    setMounted(true)
+    setEntitySize(getEntitySize())
+
+    const onResize = () => setEntitySize(getEntitySize())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  // Mouse tracking
+  // ── Play lair video on loop ─────────────────────────────────────────────────
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      mouseRef.current.x = (e.clientX / window.innerWidth - 0.5) * 2
-      mouseRef.current.y = (e.clientY / window.innerHeight - 0.5) * 2
-    }
-    const onTouch = (e: TouchEvent) => {
-      mouseRef.current.x = (e.touches[0].clientX / window.innerWidth - 0.5) * 2
-      mouseRef.current.y = (e.touches[0].clientY / window.innerHeight - 0.5) * 2
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('touchmove', onTouch, { passive: true })
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('touchmove', onTouch)
-    }
-  }, [])
+    const v = lairVideoRef.current
+    if (!v) return
+    v.loop = true
+    v.muted = true
+    v.playsInline = true
+    const play = () => v.play().catch(() => {})
+    v.addEventListener('canplay', play)
+    if (v.readyState >= 3) play()
+    return () => v.removeEventListener('canplay', play)
+  }, [lairVideoSrc])
 
-  // Main draw loop
+  // ── Play entity video on loop ───────────────────────────────────────────────
+  useEffect(() => {
+    const v = entityVideoRef.current
+    if (!v) return
+    v.loop = true
+    v.muted = true
+    v.playsInline = true
+    const play = () => v.play().catch(() => {})
+    v.addEventListener('canplay', play)
+    if (v.readyState >= 3) play()
+    return () => v.removeEventListener('canplay', play)
+  }, [entityVideoSrc])
+
+  // ── Internal roam schedule (if not externally controlled) ──────────────────
+  useEffect(() => {
+    if (roamPos) return // externally controlled
+    const schedule = () => {
+      roamTimer.current = setTimeout(() => {
+        setInternalVisible(false)
+        setTimeout(() => {
+          setInternalRoam(prev => nextRoam(prev))
+          setTimeout(() => setInternalVisible(true), 600)
+        }, 800)
+        schedule()
+      }, 30000 + Math.random() * 20000)
+    }
+    schedule()
+    return () => { if (roamTimer.current) clearTimeout(roamTimer.current) }
+  }, [roamPos])
+
+  // ── Canvas — pixies + dust + aurora ────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -185,64 +182,25 @@ export function MedhaLair({
       const w = canvas.width
       const h = canvas.height
       const t = ++tRef.current
-      const m = mouseRef.current
-
-      // Smooth mouse
-      m.smoothX += (m.x - m.smoothX) * 0.04
-      m.smoothY += (m.y - m.smoothY) * 0.04
 
       ctx.clearRect(0, 0, w, h)
 
-      // ── Draw image layers ────────────────────────────────────────────────
-      LAYERS.forEach(layer => {
-        const img = imagesRef.current.get(layer.src)
-        if (!img || !img.complete) return
+      // Entity position in pixels
+      const ex = w * activeRoam.x / 100
+      const ey = h * activeRoam.y / 100
 
-        // Float
-        const fy = Math.sin(t * layer.floatSpeed + layer.floatPhase) * layer.floatAmp
-        const fx = Math.cos(t * layer.floatSpeed * 0.7 + layer.floatPhase) * layer.floatAmp * 0.3
-
-        // Parallax from mouse
-        const px = m.smoothX * w * layer.parallaxX
-        const py = m.smoothY * h * layer.parallaxY
-
-        // Calculate pixel dimensions
-        const lw = w * layer.width / 100
-        const aspect = img.naturalHeight / img.naturalWidth
-        const lh = lw * aspect
-        const lx = w * layer.left / 100 + px + fx
-        const ly = h * layer.top / 100 + py + fy
-
-        ctx.save()
-        ctx.globalAlpha = layer.opacity
-        ctx.globalCompositeOperation = layer.blendMode
-        ctx.drawImage(img, lx, ly, lw, lh)
-        ctx.restore()
-      })
-
-      // ── Subtle aurora behind entity ──────────────────────────────────────
-      const ex = w * entityX
-      const ey = h * entityY
-      const ap = 0.015 + 0.005 * Math.sin(t * 0.004)
-      const aurora = ctx.createRadialGradient(ex, ey + 60, 0, ex, ey + 60, w * 0.18)
+      // ── Aurora behind entity (left side only) ──────────────────────────
+      const ap = 0.018 + 0.008 * Math.sin(t * 0.004)
+      const aurora = ctx.createRadialGradient(ex, ey + 30, 0, ex, ey + 30, w * 0.14)
       aurora.addColorStop(0, `rgba(80,40,160,${ap * 2})`)
       aurora.addColorStop(0.5, `rgba(50,20,120,${ap})`)
       aurora.addColorStop(1, 'rgba(20,10,60,0)')
       ctx.beginPath()
-      ctx.arc(ex, ey + 60, w * 0.18, 0, Math.PI * 2)
+      ctx.arc(ex, ey + 30, w * 0.14, 0, Math.PI * 2)
       ctx.fillStyle = aurora
       ctx.fill()
 
-      // ── Ground mist ──────────────────────────────────────────────────────
-      const mistY = h * 0.75
-      const mist = ctx.createLinearGradient(0, mistY, 0, h)
-      mist.addColorStop(0, 'rgba(20,10,50,0)')
-      mist.addColorStop(0.5, 'rgba(15,8,40,0.08)')
-      mist.addColorStop(1, 'rgba(10,5,30,0.15)')
-      ctx.fillStyle = mist
-      ctx.fillRect(0, mistY, w, h - mistY)
-
-      // ── Pixies ───────────────────────────────────────────────────────────
+      // ── Pixies ──────────────────────────────────────────────────────────
       pixiesRef.current.forEach(p => {
         p.orbitAngle += p.orbitSpeed
         const tx = p.orbitCX + Math.cos(p.orbitAngle) * p.orbitRX
@@ -252,22 +210,21 @@ export function MedhaLair({
           p.reactTimer--
           const dx = ex - p.x, dy = ey - p.y
           const d = Math.sqrt(dx*dx + dy*dy)
-          if (d > 50) { p.x += dx/d*2.5; p.y += dy/d*2.5 }
+          if (d > 40) { p.x += dx/d*2.2; p.y += dy/d*2.2 }
           if (p.reactTimer <= 0) p.reacting = false
         } else {
           p.x += (tx - p.x) * 0.007
           p.y += (ty - p.y) * 0.007
-          p.x += Math.sin(t * 0.008 + p.glowPhase) * 0.2
-          p.y += Math.cos(t * 0.006 + p.glowPhase) * 0.15
+          // Keep pixies on left side
+          if (p.x > w * 0.50) p.x = w * 0.50
         }
 
-        const glow = 0.35 + 0.30 * Math.sin(t * 0.012 + p.glowPhase)
+        const glow = 0.30 + 0.28 * Math.sin(t * 0.012 + p.glowPhase)
         const wingSpan = p.size * (1.2 + 0.5 * Math.sin(t * 0.018 + p.wingPhase))
         const op = p.depth * glow
 
-        // Glow halo
         const halo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 3.5)
-        halo.addColorStop(0, `rgba(212,180,100,${op * 0.85})`)
+        halo.addColorStop(0, `rgba(212,180,100,${op * 0.8})`)
         halo.addColorStop(0.4, `rgba(160,120,60,${op * 0.3})`)
         halo.addColorStop(1, 'rgba(100,70,30,0)')
         ctx.beginPath()
@@ -275,34 +232,32 @@ export function MedhaLair({
         ctx.fillStyle = halo
         ctx.fill()
 
-        // Core
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2)
         ctx.fillStyle = `rgba(255,245,220,${op})`
         ctx.fill()
 
-        // Wings
         ctx.save()
         ctx.translate(p.x, p.y)
         ;[[-1,-0.5],[1,-0.5],[-0.7,0.35],[0.7,0.35]].forEach(([wx,wy]) => {
           ctx.beginPath()
           ctx.ellipse(wx*wingSpan, wy*wingSpan*0.7, wingSpan*0.8, wingSpan*0.3,
             wx < 0 ? -0.3 : 0.3, 0, Math.PI*2)
-          ctx.strokeStyle = `rgba(212,180,100,${op * 0.45})`
-          ctx.lineWidth = 0.5
+          ctx.strokeStyle = `rgba(212,180,100,${op * 0.4})`
+          ctx.lineWidth = 0.4
           ctx.stroke()
         })
         ctx.restore()
       })
 
-      // ── Floating dust ────────────────────────────────────────────────────
-      for (let i = 0; i < 40; i++) {
-        const dpx = w * (0.1 + 0.8 * ((Math.sin(i * 2.39) + 1) / 2))
-        const dpy = h * (0.05 + 0.85 * ((Math.cos(i * 1.61) + 1) / 2))
-        const drift = Math.sin(t * 0.003 + i * 0.8) * 6
-        const op = (0.08 + 0.07 * Math.sin(t * 0.005 + i * 1.1))
+      // ── Floating dust (left side) ───────────────────────────────────────
+      for (let i = 0; i < 30; i++) {
+        const dpx = w * 0.45 * ((Math.sin(i * 2.39) + 1) / 2)
+        const dpy = h * (0.05 + 0.88 * ((Math.cos(i * 1.61) + 1) / 2))
+        const drift = Math.sin(t * 0.003 + i * 0.8) * 5
+        const op = 0.06 + 0.05 * Math.sin(t * 0.005 + i * 1.1)
         ctx.beginPath()
-        ctx.arc(dpx + drift, dpy + drift * 0.3, 0.4 + (i % 3) * 0.35, 0, Math.PI * 2)
+        ctx.arc(dpx + drift, dpy + drift * 0.3, 0.4 + (i % 3) * 0.3, 0, Math.PI * 2)
         ctx.fillStyle = `rgba(212,180,100,${op})`
         ctx.fill()
       }
@@ -315,31 +270,118 @@ export function MedhaLair({
       cancelAnimationFrame(animRef.current)
       window.removeEventListener('resize', resize)
     }
-  }, [loaded, entityX, entityY])
+  }, [activeRoam.x, activeRoam.y])
 
-  // Pixie reaction
+  // ── Pixie reaction ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!onReact) return
-    const count = 3 + Math.floor(Math.random() * 2)
-    ;[...pixiesRef.current].sort(() => Math.random() - 0.5)
+    const count = 2 + Math.floor(Math.random() * 2)
+    ;[...pixiesRef.current]
+      .sort(() => Math.random() - 0.5)
       .slice(0, count)
-      .forEach(p => { p.reacting = true; p.reactTimer = 80 + Math.floor(Math.random() * 40) })
+      .forEach(p => { p.reacting = true; p.reactTimer = 70 + Math.floor(Math.random() * 40) })
   }, [onReact])
+
+  if (!mounted) return null
 
   return (
     <>
+      {/* ── Layer 1: Lair background video ─────────────────────────────── */}
+      <video
+        ref={lairVideoRef}
+        src={lairVideoSrc}
+        autoPlay loop muted playsInline preload="auto"
+        style={{
+          position: 'fixed', inset: 0,
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center',
+          zIndex: 3,
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* ── Layer 2: Dark mask — hides Medhā in video (left 0–45%) ─────── */}
+      {/* Gradient: left solid black → fade → transparent at 52% */}
+      <div
+        style={{
+          position: 'fixed', inset: 0,
+          zIndex: 4,
+          pointerEvents: 'none',
+          background: `linear-gradient(
+            to right,
+            rgba(0,0,0,1) 0%,
+            rgba(0,0,0,1) ${MASK_SOLID_END * 100}%,
+            rgba(0,0,0,0.85) ${(MASK_SOLID_END + 0.02) * 100}%,
+            rgba(0,0,0,0.5) ${(MASK_SOLID_END + 0.04) * 100}%,
+            rgba(0,0,0,0.15) ${(MASK_GRADIENT_END - 0.01) * 100}%,
+            rgba(0,0,0,0) ${MASK_GRADIENT_END * 100}%,
+            rgba(0,0,0,0) 100%
+          )`,
+        }}
+      />
+
+      {/* ── Layer 3: Canvas — aurora, pixies, dust (left side only) ────── */}
       <canvas
         ref={canvasRef}
         style={{
           position: 'fixed', inset: 0,
           width: '100%', height: '100%',
-          zIndex: 5, pointerEvents: 'none',
+          zIndex: 5,
+          pointerEvents: 'none',
         }}
       />
-      {/* Edge vignette — darkens corners, focuses center on Medhā */}
+
+      {/* ── Layer 4: Entity video — positioned on left side ─────────────── */}
+      <div
+        style={{
+          position: 'fixed',
+          // Position follows roam — but clamped to left safe zone
+          left: `${Math.min(activeRoam.x, 42)}%`,
+          top: `${activeRoam.y}%`,
+          transform: 'translate(-50%, -50%)',
+          zIndex: 6,
+          pointerEvents: 'none',
+          width: entitySize,
+          height: entitySize,
+          opacity: activeVisible ? 1 : 0,
+          filter: activeVisible ? 'blur(0px)' : 'blur(12px)',
+          transition: 'left 2.8s cubic-bezier(0.16,1,0.3,1), top 2.8s cubic-bezier(0.16,1,0.3,1), opacity 1.6s ease, filter 1.6s ease',
+          willChange: 'transform, opacity',
+        }}
+      >
+        {/* Aura beneath entity */}
+        <div style={{
+          position: 'absolute',
+          bottom: '-8%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '70%',
+          height: '15%',
+          background: `radial-gradient(ellipse at center, ${facultyColor}30 0%, transparent 70%)`,
+          filter: 'blur(12px)',
+          zIndex: -1,
+        }} />
+
+        <video
+          ref={entityVideoRef}
+          src={entityVideoSrc}
+          autoPlay loop muted playsInline preload="auto"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            display: 'block',
+            // Screen blend removes black background from entity video
+            mixBlendMode: 'screen',
+          }}
+        />
+      </div>
+
+      {/* ── Edge vignette — darkens screen edges ─────────────────────────── */}
       <div style={{
-        position: 'fixed', inset: 0, zIndex: 6, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 70% 70% at 50% 42%, transparent 35%, rgba(0,0,0,0.75) 100%)',
+        position: 'fixed', inset: 0, zIndex: 7, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 85% 85% at 62% 50%, transparent 30%, rgba(0,0,0,0.55) 100%)',
       }} />
     </>
   )
