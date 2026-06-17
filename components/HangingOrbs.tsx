@@ -12,12 +12,15 @@ export const FACULTIES = [
   { key: 'sanchara', name: 'Sañcāra',  desc: 'Transmission & relay',     color: '#e8b94f' },
 ]
 
-// ─── Hanging orb positions ─────────────────────────────────────────────────────
+// ─── Pendant positions — invisible hotspots over video orbs ───────────────────
 const HANGINGS = [
-  { id: 'settings', top: 28, right: 14, size: 18, label: '⚙', swingAmp: 3,  swingSpeed: 0.0018 },
-  { id: 'faculty',  top: 42, right: 8,  size: 14, label: '◈', swingAmp: 5,  swingSpeed: 0.0024 },
-  { id: 'back',     top: 58, right: 18, size: 11, label: '↩', swingAmp: 4,  swingSpeed: 0.0020 },
+  { id: 'back',     top: 18, right: 26, size: 16, label: '↩', swingAmp: 2,   swingSpeed: 0.0018, title: 'Śūnya' },
+  { id: 'faculty',  top: 38, right: 28, size: 14, label: '◈', swingAmp: 3,   swingSpeed: 0.0022, title: 'Faculty' },
+  { id: 'settings', top: 52, right: 18, size: 12, label: '⚙', swingAmp: 2.5, swingSpeed: 0.0020, title: 'Settings' },
 ]
+
+// Staggered pendant delays: back=0s, faculty=1s, settings=2s
+const PENDANT_DELAYS = ['0s', '1s', '2s']
 
 // ─── Faculty floater button ────────────────────────────────────────────────────
 interface FacultyButtonProps {
@@ -29,9 +32,9 @@ interface FacultyButtonProps {
 function FacultyButton({ faculty, index, onSelect }: FacultyButtonProps) {
   const startX = 15 + Math.random() * 60
   const startY = 20 + Math.random() * 55
-  const floatDX = (Math.random() - 0.5) * 12
-  const floatDY = (Math.random() - 0.5) * 8
-  const duration = 4 + Math.random() * 3
+  const floatDX = (Math.random() - 0.5) * 6
+  const floatDY = (Math.random() - 0.5) * 4
+  const duration = 8 + Math.random() * 6
 
   return (
     <motion.button
@@ -43,8 +46,8 @@ function FacultyButton({ faculty, index, onSelect }: FacultyButtonProps) {
       }}
       exit={{ opacity: 0, scale: 0 }}
       transition={{
-        opacity: { duration: 0.4, delay: index * 0.08 },
-        scale: { duration: 0.4, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] },
+        opacity: { duration: 0.4, delay: index * 0.35 },
+        scale: { duration: 0.4, delay: index * 0.35, ease: [0.16, 1, 0.3, 1] },
         x: { duration, repeat: Infinity, ease: 'easeInOut', delay: index * 0.3 },
         y: { duration: duration * 0.8, repeat: Infinity, ease: 'easeInOut', delay: index * 0.2 },
       }}
@@ -104,6 +107,7 @@ export function HangingOrbs({
   const [swingAngles, setSwingAngles] = useState(HANGINGS.map(() => 0))
   const [showFaculty, setShowFaculty] = useState(false)
   const [swingin, setSwingin] = useState<number | null>(null)
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const tRef = useRef(0)
   const rafRef = useRef<number>(0)
 
@@ -141,6 +145,15 @@ export function HangingOrbs({
 
   return (
     <>
+      <style>{`
+        @keyframes pendantPulse {
+          0%   { box-shadow: 0 0 0px rgba(255,200,80,0); }
+          50%  { box-shadow: 0 0 22px rgba(255,200,80,0.55), 0 0 40px rgba(255,160,40,0.25); }
+          100% { box-shadow: 0 0 0px rgba(255,200,80,0); }
+        }
+      `}</style>
+
+      {/* Transparent hotspot divs — overlay over video orbs */}
       {HANGINGS.map((h, i) => (
         <div
           key={h.id}
@@ -156,30 +169,44 @@ export function HangingOrbs({
             transform: `rotate(${swingAngles[i]}deg)`,
             cursor: 'pointer',
           }}
+          onMouseEnter={() => setHoveredIdx(i)}
+          onMouseLeave={() => setHoveredIdx(null)}
           onClick={() => handleHangingTap(h.id, i)}
         >
           <div style={{
-            width: '1px',
-            height: `${h.size * 2.5}px`,
-            background: `linear-gradient(to bottom, rgba(212,180,80,0.6), rgba(212,180,80,0.2))`,
-          }} />
-          <div style={{
-            width: `${h.size}px`,
-            height: `${h.size}px`,
+            width: `${h.size * 3}px`,
+            height: `${h.size * 3}px`,
             borderRadius: '50%',
-            background: 'radial-gradient(circle at 35% 30%, rgba(255,220,120,0.9), rgba(180,120,40,0.6))',
-            border: '1px solid rgba(255,210,80,0.5)',
-            boxShadow: `0 0 ${h.size}px rgba(255,180,60,0.4), 0 0 ${h.size * 2}px rgba(255,160,40,0.15)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: `${h.size * 0.45}px`,
-            color: 'rgba(255,240,180,0.9)',
+            background: 'transparent',
+            border: 'none',
+            animation: `pendantPulse 3s ease-in-out ${PENDANT_DELAYS[i]} infinite`,
+            boxShadow: hoveredIdx === i ? '0 0 18px rgba(255,200,80,0.35)' : undefined,
+            position: 'relative',
             transition: 'box-shadow 0.2s',
           }}>
-            {h.label}
+            {/* Hover label */}
+            <div style={{
+              position: 'absolute',
+              bottom: '-18px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              fontSize: '8px',
+              letterSpacing: '0.2em',
+              color: 'rgba(255,200,80,0.7)',
+              whiteSpace: 'nowrap',
+              fontFamily: 'system-ui',
+              textTransform: 'uppercase',
+              pointerEvents: 'none',
+              opacity: hoveredIdx === i ? 1 : 0,
+              transition: 'opacity 0.2s',
+            }}>
+              {h.title}
+            </div>
           </div>
         </div>
       ))}
 
+      {/* Faculty floaters */}
       <AnimatePresence>
         {showFaculty && (
           <>

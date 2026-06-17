@@ -248,14 +248,9 @@ function Entity({es,fc,vis,vsrc,pos,onPixieClick}:{es:ES;fc:string;vis:boolean;v
 // Renders inline in the transcript — no floating/roaming position of its own.
 function Bubble({msg,fc,onCopy,isLast,onRegenerate}:{msg:StoredMsg;fc:string;onCopy:(m:StoredMsg)=>void;isLast?:boolean;onRegenerate?:()=>void}){
   const isU=msg.role==='user';
-  const mn=isU?'YOU':`MEDHĀ · ${getMode(msg.mode as CognitiveModeKey).name}`;
   return(
     <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
       style={{width:'100%',display:'flex',flexDirection:'column',alignItems:isU?'flex-end':'flex-start',gap:'6px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-        {!isU&&<div style={{width:'5px',height:'5px',borderRadius:'50%',background:fc,boxShadow:`0 0 4px ${fc}`}}/>}
-        <span style={{fontSize:'9px',letterSpacing:'0.22em',color:isU?'rgba(255,255,255,0.2)':'rgba(255,200,160,0.4)',textTransform:'uppercase',fontFamily:'system-ui'}}>{mn}</span>
-      </div>
       <div style={{display:'flex',alignItems:'flex-start',gap:'8px',flexDirection:isU?'row-reverse':'row'}}>
         <div style={{paddingTop:'10px',flexShrink:0}}><NL color={isU?'rgba(255,255,255,0.3)':fc} align={isU?'right':'left'}/></div>
         <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'12px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'system-ui',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer'}}>
@@ -546,7 +541,7 @@ export default function MedhaHUD(){
         <div style={{textAlign:'center'}}>
           <div style={{fontFamily:'Georgia,serif',fontSize:'12px',letterSpacing:'0.35em',color:'rgba(255,255,255,0.7)',textTransform:'uppercase'}}>MEDHĀ</div>
           <div style={{fontSize:'9px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.25)',fontFamily:'system-ui',marginTop:'2px',textTransform:'uppercase'}}>
-            {es.toUpperCase()}<span style={{color:fc,marginLeft:'6px'}}>· {mdef.name}</span>
+            {es.toUpperCase()}
           </div>
         </div>
         <div style={{display:'flex',gap:'6px'}}>
@@ -562,8 +557,8 @@ export default function MedhaHUD(){
         {!showTranscript&&(busy||lastMsg||greetingText)&&(
           <motion.div key={busy?'thinking':lastMsg?lastMsg.id:greetingText}
             initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
-            style={{position:'fixed',left:0,right:0,bottom:'118px',zIndex:40,padding:'0 14px',pointerEvents:'none'}}>
-            <div style={{maxWidth:'560px',margin:'0 auto',pointerEvents:'auto',background:'rgba(8,4,20,0.16)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',borderRadius:'16px',padding:'8px 4px'}}>
+            style={{position:'fixed',left:0,right:'auto',maxWidth:'min(52vw,520px)',bottom:'118px',zIndex:40,padding:'0 14px',pointerEvents:'none'}}>
+            <div style={{maxWidth:'min(44vw,380px)',margin:'0',pointerEvents:'auto',background:'rgba(8,4,20,0.16)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',borderRadius:'16px',padding:'8px 4px'}}>
               {busy
                 ?<ThinkingBubble fc={fc}/>
                 :lastMsg
