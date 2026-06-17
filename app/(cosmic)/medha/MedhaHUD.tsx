@@ -25,6 +25,11 @@ import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './Medha
 import { CosmicStream } from '@/components/CosmicStream';
 import { useCosmicStream } from '@/hooks/useCosmicStream';
 import { MedhaLair } from '@/components/MedhaLair';
+import { StardustRain } from '@/components/StardustRain';
+import { HangingOrbs } from '@/components/HangingOrbs';
+import { DialogueBubble } from '@/components/DialogueBubble';
+import { NeuralStrip } from '@/components/NeuralStrip';
+import { ChatHistoryModal } from '@/components/ChatHistoryModal';
 import './medha.css';
 
 // ─── Faculty colors ────────────────────────────────────────────────────────────
@@ -295,7 +300,11 @@ export default function MedhaHUD(){
   const[mode,setMode]=useState<CognitiveModeKey>('prajna');
   const[chatId,setChatId]=useState('');const[messages,setMessages]=useState<StoredMsg[]>([]);
   const[composerText,setComposerText]=useState('');const[busy,setBusy]=useState(false);
-  const[showHistory,setShowHistory]=useState(false);
+  const [stardustActive, setStardustActive] = useState(false);
+  const [stardustColor, setStardustColor] = useState('#7b2fff');
+  const [showChatHistory, setShowChatHistory] = useState(false);
+  const [showDialogue, setShowDialogue] = useState(false);
+  const [dialogueMsg, setDialogueMsg] = useState<{content:string;role:'user'|'assistant';mode:string}|null>(null);
   // The conversation record — tucked away by default so Medhā is unobstructed;
   // opened by the watermark pixie (the "record keeper"), or automatically
   // when a new exchange begins.
@@ -399,10 +408,10 @@ export default function MedhaHUD(){
     upsertChat({id:chatId,title:t?t.slice(0,36):'New Conversation',messages,createdAt:messages[0]?.ts??Date.now(),lastInteractionAt:Date.now(),topic:t});
     setChats(listChats());},[chatId,messages]);
 
-  useEffect(()=>{const k=(e:KeyboardEvent)=>{if(e.key==='Escape'){if(showHistory||showSettings){setShowHistory(false);setShowSettings(false);return;}back();}};
+  useEffect(()=>{const k=(e:KeyboardEvent)=>{if(e.key==='Escape'){if(showChatHistory||showSettings){setShowChatHistory(false);setShowSettings(false);return;}back();}};
     window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[showHistory,showSettings]);
+  },[showChatHistory,showSettings]);
 
   const back=()=>{try{const v=(window as any).__vyan;v?.worldRef?.cameraRig?.returnToMedhaOrbFull?.();}catch{}router.push('/shunya/medha');};
 
@@ -423,6 +432,12 @@ export default function MedhaHUD(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[mode]);
 
+  const handleFacultyFromOrb = useCallback((key: string, color: string) => {
+    actModel(key as CognitiveModeKey);
+    setStardustColor(color);
+    setStardustActive(true);
+  }, [actModel]);
+
   // Shared completion runner — used by both send() and regenerate()
   const runCompletion=useCallback(async(hist:ChatMessage[])=>{
     setBusy(true);await new Promise(r=>setTimeout(r,400));setEs('thinking');
@@ -432,7 +447,10 @@ export default function MedhaHUD(){
     const effMode=styleSuffix?{...mdef,systemPrompt:mdef.systemPrompt+styleSuffix}:mdef;
     try{const full=await chatComplete(effMode,hist);setEs('responding');
       const am:StoredMsg={id:uid(),role:'assistant',content:full||'I lost the signal for a moment. Try again?',mode,ts:Date.now()};
-      setMessages(p=>[...p,am]);setEs('dormant');
+      setMessages(p=>[...p,am]);
+      setDialogueMsg({ content: am.content, role: 'assistant', mode });
+      setShowDialogue(true);
+      setEs('dormant');
       // Intelligence arrives — trigger stream
       triggerStream(mode);
       if(ttsEnabled&&ttsR.current?.isSupported()){const pl=full.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/[*_`#>]/g,'');setEs('voice-active');ttsR.current.speak(pl,{onEnd:()=>setEs('dormant')});}}
@@ -445,7 +463,10 @@ export default function MedhaHUD(){
     if(!quotaUser&&!getUser()){if(quotaRemaining('medha')<=0){setShowQuotaLock(true);return;}if(!incrementQuota('medha').ok){setShowQuotaLock(true);return;}}
     setComposerText('');
     const um:StoredMsg={id:uid(),role:'user',content:tx,mode,ts:Date.now()};
-    setMessages(p=>[...p,um]);setEs('listening');
+    setMessages(p=>[...p,um]);
+    setDialogueMsg({ content: tx, role: 'user', mode });
+    setShowDialogue(true);
+    setEs('listening');
     if(isForbiddenQuery(tx)){setTimeout(()=>{setMessages(p=>[...p,{id:uid(),role:'assistant',content:SANDHI_REDIRECT_MARKDOWN,mode,ts:Date.now()}]);setEs('dormant');},280);return;}
     const hist:ChatMessage[]=[...dataR.current.messages,um].slice(-12).map(m=>({role:m.role,content:m.content}));
     await runCompletion(hist);
@@ -474,7 +495,7 @@ export default function MedhaHUD(){
 
   const newChat=()=>{const prev=chats[0];const id=newChatId();setChatId(id);setCurrentChatId(id);
     const g:StoredMsg={id:uid(),role:'assistant',content:prev?contGreet(prev.topic):GREET_NEW,mode,ts:Date.now()};
-    setMessages([g]);setShowHistory(false);};
+    setMessages([g]);};
 
   const onKey=(e:React.KeyboardEvent<HTMLTextAreaElement>)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
   const taR=useRef<HTMLTextAreaElement>(null);
@@ -529,7 +550,7 @@ export default function MedhaHUD(){
           </div>
         </div>
         <div style={{display:'flex',gap:'6px'}}>
-          <button onClick={()=>setShowHistory(v=>!v)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',color:'rgba(255,255,255,0.3)',fontSize:'10px',letterSpacing:'0.18em',textTransform:'uppercase',padding:'5px 9px',cursor:'pointer',fontFamily:'system-ui'}}>⟲</button>
+          <button onClick={()=>setShowChatHistory(true)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',color:'rgba(255,255,255,0.3)',fontSize:'10px',letterSpacing:'0.18em',textTransform:'uppercase',padding:'5px 9px',cursor:'pointer',fontFamily:'system-ui'}}>⟲</button>
           <button onClick={()=>setShowSettings(true)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',color:'rgba(255,255,255,0.35)',fontSize:'13px',padding:'4px 9px',cursor:'pointer'}}>⚙</button>
         </div>
       </div>
@@ -585,8 +606,15 @@ export default function MedhaHUD(){
       </AnimatePresence>
 
       {/* Composer — always visible, slim bar at the bottom */}
-      <div style={{position:'fixed',left:0,right:0,bottom:0,zIndex:42,padding:'8px 14px 22px',pointerEvents:'none',background:'linear-gradient(to top, rgba(5,2,15,0.4), rgba(5,2,15,0) 110px)'}}>
-        <div style={{maxWidth:'560px',margin:'0 auto',pointerEvents:'auto'}}>
+      <div style={{position:'fixed',left:0,right:'auto',width:'min(52vw, 520px)',bottom:0,zIndex:42,padding:'8px 14px 22px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(5,2,15,0.4), rgba(5,2,15,0) 110px)'}}>
+        <div style={{maxWidth:'min(48vw, 480px)',margin:'0',pointerEvents:'auto'}}>
+          <NeuralStrip
+            messages={messages}
+            facultyColor={fc}
+            onEditMessage={(id, content) => {
+              setMessages(prev => prev.map(m => m.id === id ? { ...m, content } : m));
+            }}
+          />
           {/* Faculty selector */}
           <div style={{marginBottom:'8px',position:'relative'}}>
             <FacultySel mode={mode} onSelect={k=>actModel(k)}/>
@@ -619,39 +647,6 @@ export default function MedhaHUD(){
           <p style={{textAlign:'center',color:'rgba(255,255,255,0.11)',fontSize:'9px',letterSpacing:'0.16em',fontFamily:'system-ui',textTransform:'uppercase',marginTop:'7px'}}>Enter · Shift+Enter new line</p>
         </div>
       </div>
-
-      {/* History modal */}
-      <AnimatePresence>
-        {showHistory&&(
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-            style={{position:'fixed',inset:0,zIndex:150,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}
-            onClick={e=>{if(e.target===e.currentTarget)setShowHistory(false);}}>
-            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={e=>e.stopPropagation()} style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(4px)'}}/>
-            <motion.div initial={{opacity:0,scale:0.94}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.94}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}} onClick={e=>e.stopPropagation()}
-              style={{position:'relative',zIndex:1,width:'100%',maxWidth:'480px',maxHeight:'75vh',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',backdropFilter:'blur(20px)',display:'flex',flexDirection:'column'}}>
-              <div style={{padding:'22px 22px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-                <div style={{fontFamily:'Georgia,serif',fontSize:'13px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.8)',textTransform:'uppercase'}}>Conversation Threads</div>
-                <button onClick={()=>setShowHistory(false)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',color:'rgba(255,255,255,0.4)',padding:'5px 9px',cursor:'pointer',fontSize:'11px'}}>✕</button>
-              </div>
-              <div style={{flex:1,overflowY:'auto',padding:'10px 14px',scrollbarWidth:'none'}}>
-                {chats.length===0&&<p style={{color:'rgba(255,255,255,0.25)',fontFamily:'system-ui',fontSize:'13px',textAlign:'center',padding:'20px 0'}}>No conversations yet.</p>}
-                {chats.map(c=>(
-                  <div key={c.id} style={{display:'flex',gap:'8px',marginBottom:'7px',padding:'11px',background:c.id===chatId?'rgba(255,255,255,0.06)':'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.06)',borderRadius:'11px'}}>
-                    <button onClick={()=>{const ch=getChat(c.id);if(!ch)return;setChatId(ch.id);setCurrentChatId(ch.id);setMessages(ch.messages);setShowHistory(false);}} style={{flex:1,background:'transparent',border:'none',cursor:'pointer',textAlign:'left'}}>
-                      <div style={{fontSize:'13px',color:'rgba(255,255,255,0.75)',fontFamily:'system-ui',marginBottom:'3px'}}>{c.title||'Untitled'}</div>
-                      <div style={{fontSize:'10px',color:'rgba(255,255,255,0.25)',fontFamily:'system-ui'}}>{new Date(c.lastInteractionAt).toLocaleString()} · {c.messages.length} msgs</div>
-                    </button>
-                    <button onClick={()=>{deleteChat(c.id);setChats(listChats());if(c.id===chatId)newChat();}} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.2)',cursor:'pointer',fontSize:'12px',padding:'0 4px'}}>✕</button>
-                  </div>
-                ))}
-              </div>
-              <div style={{padding:'14px 22px',borderTop:'1px solid rgba(255,255,255,0.05)'}}>
-                <button onClick={newChat} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:'10px',color:'rgba(255,255,255,0.7)',fontSize:'11px',letterSpacing:'0.2em',textTransform:'uppercase',fontFamily:'system-ui',cursor:'pointer'}}>+ New Conversation</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Settings */}
       <AnimatePresence>
@@ -730,6 +725,67 @@ export default function MedhaHUD(){
           </div>
         </div>
       )}
+
+      {/* Stardust rain on faculty switch */}
+      {mounted && (
+        <StardustRain
+          active={stardustActive}
+          color={stardustColor}
+          onComplete={() => setStardustActive(false)}
+        />
+      )}
+
+      {/* Hanging orbs on gazebo */}
+      <HangingOrbs
+        onSettingsOpen={() => setShowSettings(true)}
+        onFacultySelect={handleFacultyFromOrb}
+        onBack={back}
+        activeFaculty={mode}
+      />
+
+      {/* Dialogue bubble following Medhā */}
+      {dialogueMsg && (
+        <DialogueBubble
+          message={dialogueMsg.content}
+          role={dialogueMsg.role}
+          facultyName={getMode(mode).name}
+          facultyColor={fc}
+          roamPos={entityPos}
+          visible={showDialogue && !busy}
+        />
+      )}
+
+      {/* Clickable overlay over entity zone */}
+      <div
+        onClick={() => setShowChatHistory(true)}
+        style={{
+          position: 'fixed', left: 0, top: 0,
+          width: '45%', height: '85%',
+          zIndex: 9, cursor: 'pointer',
+          background: 'transparent',
+        }}
+      />
+
+      {/* Chat history modal */}
+      <ChatHistoryModal
+        visible={showChatHistory}
+        chats={chats}
+        activeChatId={chatId}
+        onSelectChat={(id) => {
+          const ch = getChat(id);
+          if (!ch) return;
+          setChatId(ch.id);
+          setCurrentChatId(ch.id);
+          setMessages(ch.messages);
+        }}
+        onDeleteChat={(id) => {
+          deleteChat(id);
+          setChats(listChats());
+          if (id === chatId) newChat();
+        }}
+        onNewChat={newChat}
+        onClose={() => setShowChatHistory(false)}
+      />
 
       <input ref={fileR} type="file" accept="image/*,.pdf,.txt,.md,.json,.csv" style={{display:'none'}}
         onChange={e=>{const f=e.target.files?.[0];if(!f)return;setComposerText(c=>`${c}\n\n[attached: ${f.name} · ${(f.size/1024).toFixed(1)}KB]`);e.target.value='';}}/>
