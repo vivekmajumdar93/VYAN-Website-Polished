@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // ─── Faculty data ──────────────────────────────────────────────────────────────
@@ -14,13 +14,17 @@ export const FACULTIES = [
 
 // ─── Pendant positions — invisible hotspots over video orbs ───────────────────
 const HANGINGS = [
-  { id: 'back',     top: 18, right: 26, size: 16, label: '↩', swingAmp: 2,   swingSpeed: 0.0018, title: 'Śūnya' },
-  { id: 'faculty',  top: 38, right: 28, size: 14, label: '◈', swingAmp: 3,   swingSpeed: 0.0022, title: 'Faculty' },
-  { id: 'settings', top: 52, right: 18, size: 12, label: '⚙', swingAmp: 2.5, swingSpeed: 0.0020, title: 'Settings' },
+  { id: 'back',     top: 18, right: 26, size: 16, title: 'Śūnya' },
+  { id: 'faculty',  top: 38, right: 28, size: 14, title: 'Faculty' },
+  { id: 'settings', top: 52, right: 18, size: 12, title: 'Settings' },
 ]
 
-// Staggered pendant delays: back=0s, faculty=1s, settings=2s
-const PENDANT_DELAYS = ['0s', '1s', '2s']
+// CSS animation strings — swing + glow pulse, staggered per pendant
+const PENDANT_ANIMATIONS = [
+  'pendantSwing 4s ease-in-out 0s infinite, pendantPulse 3s ease-in-out 0s infinite',
+  'pendantSwing 5s ease-in-out 0.8s infinite, pendantPulse 3s ease-in-out 1s infinite',
+  'pendantSwing 4.5s ease-in-out 1.6s infinite, pendantPulse 3s ease-in-out 2s infinite',
+]
 
 // ─── Faculty floater button ────────────────────────────────────────────────────
 interface FacultyButtonProps {
@@ -104,35 +108,10 @@ interface HangingOrbsProps {
 export function HangingOrbs({
   onSettingsOpen, onFacultySelect, onBack, activeFaculty,
 }: HangingOrbsProps) {
-  const [swingAngles, setSwingAngles] = useState(HANGINGS.map(() => 0))
   const [showFaculty, setShowFaculty] = useState(false)
-  const [swingin, setSwingin] = useState<number | null>(null)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
-  const tRef = useRef(0)
-  const rafRef = useRef<number>(0)
 
-  useEffect(() => {
-    const animate = () => {
-      tRef.current++
-      setSwingAngles(prev => prev.map((angle, i) => {
-        const h = HANGINGS[i]
-        const ambient = Math.sin(tRef.current * h.swingSpeed + i * 1.2) * h.swingAmp
-        if (swingin === i) {
-          const decay = Math.sin(tRef.current * 0.08) * 12 * Math.exp(-tRef.current * 0.002)
-          return ambient + decay
-        }
-        return ambient
-      }))
-      rafRef.current = requestAnimationFrame(animate)
-    }
-    rafRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [swingin])
-
-  const handleHangingTap = useCallback((id: string, idx: number) => {
-    setSwingin(idx)
-    setTimeout(() => setSwingin(null), 2000)
-
+  const handleHangingTap = useCallback((id: string) => {
     if (id === 'settings') onSettingsOpen()
     if (id === 'faculty') setShowFaculty(v => !v)
     if (id === 'back') onBack()
@@ -151,6 +130,11 @@ export function HangingOrbs({
           50%  { box-shadow: 0 0 22px rgba(255,200,80,0.55), 0 0 40px rgba(255,160,40,0.25); }
           100% { box-shadow: 0 0 0px rgba(255,200,80,0); }
         }
+        @keyframes pendantSwing {
+          0%   { transform: rotate(-2deg); }
+          50%  { transform: rotate(2deg); }
+          100% { transform: rotate(-2deg); }
+        }
       `}</style>
 
       {/* Transparent hotspot divs — overlay over video orbs */}
@@ -166,12 +150,12 @@ export function HangingOrbs({
             flexDirection: 'column',
             alignItems: 'center',
             transformOrigin: 'top center',
-            transform: `rotate(${swingAngles[i]}deg)`,
+            animation: PENDANT_ANIMATIONS[i],
             cursor: 'pointer',
           }}
           onMouseEnter={() => setHoveredIdx(i)}
           onMouseLeave={() => setHoveredIdx(null)}
-          onClick={() => handleHangingTap(h.id, i)}
+          onClick={() => handleHangingTap(h.id)}
         >
           <div style={{
             width: `${h.size * 3}px`,
@@ -179,7 +163,6 @@ export function HangingOrbs({
             borderRadius: '50%',
             background: 'transparent',
             border: 'none',
-            animation: `pendantPulse 3s ease-in-out ${PENDANT_DELAYS[i]} infinite`,
             boxShadow: hoveredIdx === i ? '0 0 18px rgba(255,200,80,0.35)' : undefined,
             position: 'relative',
             transition: 'box-shadow 0.2s',

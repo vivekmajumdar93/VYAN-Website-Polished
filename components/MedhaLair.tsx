@@ -332,13 +332,6 @@ export function MedhaLair({
 
   return (
     <>
-      <style>{`
-        @keyframes medhaAuraPulse {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50%       { opacity: 1.0; transform: scale(1.08); }
-        }
-      `}</style>
-
       {/* ── Layer 1: Lair background video ─────────────────────────────── */}
       <video
         ref={lairVideoRef}
@@ -403,34 +396,6 @@ export function MedhaLair({
           willChange: 'transform, opacity',
         }}
       >
-        {/* Golden body aura — behind entity, breathes */}
-        <div style={{
-          position: 'absolute',
-          inset: '-20%',
-          borderRadius: '50%',
-          background: 'radial-gradient(ellipse at 50% 60%, rgba(212,160,40,0.22) 0%, rgba(180,120,30,0.10) 35%, rgba(140,90,20,0.04) 60%, transparent 75%)',
-          filter: 'blur(18px)',
-          animation: 'medhaAuraPulse 4s ease-in-out infinite',
-          zIndex: -1,
-          pointerEvents: 'none',
-        }} />
-
-        {/* Ground glow — warm amber beneath feet */}
-        <div style={{
-          position: 'absolute',
-          bottom: '-5%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '80%',
-          height: '25%',
-          background: 'radial-gradient(ellipse at center, rgba(212,140,30,0.30) 0%, rgba(180,100,20,0.12) 50%, transparent 75%)',
-          filter: 'blur(14px)',
-          animation: 'medhaAuraPulse 4s ease-in-out 2s infinite',
-          borderRadius: '50%',
-          pointerEvents: 'none',
-          zIndex: -1,
-        }} />
-
         {/* Faculty colour aura beneath entity */}
         <div style={{
           position: 'absolute',
@@ -455,7 +420,7 @@ export function MedhaLair({
             display: 'block',
             // Screen blend removes black background from entity video
             mixBlendMode: 'screen',
-            filter: 'brightness(1.8) contrast(1.1)',
+            filter: 'brightness(2.2) saturate(1.8) contrast(1.15)',
             clipPath: 'inset(0 0 9% 0)',
           }}
         />
