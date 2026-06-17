@@ -99,6 +99,8 @@ export function MedhaLair({
   const animRef = useRef<number>(0)
   const pixiesRef = useRef<Pixie[]>([])
   const tRef = useRef(0)
+  const lairDirRef = useRef<1 | -1>(1)
+  const lairScrubRef = useRef<number>(0)
   const [entitySize, setEntitySize] = useState('52vmin')
   const [mounted, setMounted] = useState(false)
 
@@ -120,17 +122,61 @@ export function MedhaLair({
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  // ── Play lair video on loop ─────────────────────────────────────────────────
+  // ── Reverse loop system for lair video ─────────────────────────────────────
+  // Plays forward at slow speed, then reverses back — seamless boomerang
+  // No visible loop cut. The gazebo breathes forward and back continuously.
+  const lairDirectionRef = useRef<1 | -1>(1)   // 1 = forward, -1 = reverse
+  const lairRafRef = useRef<number>(0)
+  const LAIR_SPEED = 0.18   // very slow — frames per animation frame (lower = slower)
+  const TRANSITION_BUFFER = 0.08  // seconds before end/start to begin reversing
+
   useEffect(() => {
     const v = lairVideoRef.current
     if (!v) return
-    v.loop = true
     v.muted = true
     v.playsInline = true
-    const play = () => v.play().catch(() => {})
-    v.addEventListener('canplay', play)
-    if (v.readyState >= 3) play()
-    return () => v.removeEventListener('canplay', play)
+    v.preload = 'auto'
+
+    const startScrub = () => {
+      // Don't use native play — we manually scrub currentTime
+      v.pause()
+      v.currentTime = 0
+      lairDirRef.current = 1
+
+      const scrub = () => {
+        if (!v.duration || isNaN(v.duration)) {
+          lairScrubRef.current = requestAnimationFrame(scrub)
+          return
+        }
+
+        const dir = lairDirRef.current
+        const next = v.currentTime + dir * LAIR_SPEED * (1/60)
+
+        if (dir === 1 && next >= v.duration - TRANSITION_BUFFER) {
+          // Approaching end — start reversing
+          lairDirRef.current = -1
+          v.currentTime = v.duration - TRANSITION_BUFFER
+        } else if (dir === -1 && next <= TRANSITION_BUFFER) {
+          // Approaching start — start going forward
+          lairDirRef.current = 1
+          v.currentTime = TRANSITION_BUFFER
+        } else {
+          v.currentTime = Math.max(0, Math.min(next, v.duration))
+        }
+
+        lairScrubRef.current = requestAnimationFrame(scrub)
+      }
+
+      lairScrubRef.current = requestAnimationFrame(scrub)
+    }
+
+    v.addEventListener('loadedmetadata', startScrub)
+    if (v.readyState >= 1) startScrub()
+
+    return () => {
+      v.removeEventListener('loadedmetadata', startScrub)
+      cancelAnimationFrame(lairScrubRef.current)
+    }
   }, [lairVideoSrc])
 
   // ── Play entity video on loop ───────────────────────────────────────────────
@@ -224,8 +270,8 @@ export function MedhaLair({
         const op = p.depth * glow
 
         const halo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 3.5)
-        halo.addColorStop(0, `rgba(212,180,100,${op * 0.8})`)
-        halo.addColorStop(0.4, `rgba(160,120,60,${op * 0.3})`)
+        halo.addColorStop(0, `rgba(212,180,100,${op * 1.4})`)
+        halo.addColorStop(0.4, `rgba(160,120,60,${op * 0.6})`)
         halo.addColorStop(1, 'rgba(100,70,30,0)')
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.size * 3.5, 0, Math.PI * 2)
@@ -234,7 +280,7 @@ export function MedhaLair({
 
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(255,245,220,${op})`
+        ctx.fillStyle = `rgba(255,250,230,${op * 1.5})`
         ctx.fill()
 
         ctx.save()
@@ -243,7 +289,7 @@ export function MedhaLair({
           ctx.beginPath()
           ctx.ellipse(wx*wingSpan, wy*wingSpan*0.7, wingSpan*0.8, wingSpan*0.3,
             wx < 0 ? -0.3 : 0.3, 0, Math.PI*2)
-          ctx.strokeStyle = `rgba(212,180,100,${op * 0.4})`
+          ctx.strokeStyle = `rgba(220,190,120,${op * 0.7})`
           ctx.lineWidth = 0.4
           ctx.stroke()
         })
@@ -290,7 +336,7 @@ export function MedhaLair({
       <video
         ref={lairVideoRef}
         src={lairVideoSrc}
-        autoPlay loop muted playsInline preload="auto"
+        muted playsInline preload="auto"
         style={{
           position: 'fixed', inset: 0,
           width: '100%', height: '100%',
@@ -345,7 +391,7 @@ export function MedhaLair({
           width: entitySize,
           height: entitySize,
           opacity: activeVisible ? 1 : 0,
-          filter: activeVisible ? 'blur(0px)' : 'blur(12px)',
+          filter: activeVisible ? 'blur(0px) brightness(1.8)' : 'blur(12px)',
           transition: 'left 2.8s cubic-bezier(0.16,1,0.3,1), top 2.8s cubic-bezier(0.16,1,0.3,1), opacity 1.6s ease, filter 1.6s ease',
           willChange: 'transform, opacity',
         }}
@@ -374,6 +420,7 @@ export function MedhaLair({
             display: 'block',
             // Screen blend removes black background from entity video
             mixBlendMode: 'screen',
+            filter: 'brightness(1.8) contrast(1.1)',
           }}
         />
       </div>
