@@ -27,7 +27,7 @@ import { useCosmicStream } from '@/hooks/useCosmicStream';
 import { MedhaLair } from '@/components/MedhaLair';
 import { StardustRain } from '@/components/StardustRain';
 import { HangingOrbs } from '@/components/HangingOrbs';
-import { DialogueBubble } from '@/components/DialogueBubble';
+import { FloatingText } from '@/components/FloatingText';
 import { NeuralStrip } from '@/components/NeuralStrip';
 import { ChatHistoryModal } from '@/components/ChatHistoryModal';
 import './medha.css';
@@ -298,12 +298,10 @@ export default function MedhaHUD(){
   const [stardustActive, setStardustActive] = useState(false);
   const [stardustColor, setStardustColor] = useState('#7b2fff');
   const [showChatHistory, setShowChatHistory] = useState(false);
-  const [showDialogue, setShowDialogue] = useState(false);
-  const [dialogueMsg, setDialogueMsg] = useState<{content:string;role:'user'|'assistant';mode:string}|null>(null);
-  // The conversation record — tucked away by default so Medhā is unobstructed;
-  // opened by the watermark pixie (the "record keeper"), or automatically
-  // when a new exchange begins.
-  const[showTranscript,setShowTranscript]=useState(false);
+  const [floatingText, setFloatingText] = useState('');
+  const [floatingRole, setFloatingRole] = useState<'assistant'|'user'>('assistant');
+  const [floatingVisible, setFloatingVisible] = useState(false);
+  const [userColor, setUserColor] = useState('#d4a853');
   const[showSettings,setShowSettings]=useState(false);const[listening,setListening]=useState(false);
   const[ttsEnabled,setTtsEnabled]=useState(false);const[chats,setChats]=useState<StoredChat[]>([]);
   const[responseStyle,setResponseStyle]=useState<'concise'|'balanced'|'detailed'>('balanced');
@@ -324,7 +322,7 @@ export default function MedhaHUD(){
   const ambientStreamRef = useRef<ReturnType<typeof setTimeout>|null>(null);
   const sttR=useRef<STT|null>(null);const ttsR=useRef<TTS|null>(null);
   const gtR=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const dialogueTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const floatingTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null);
   const fileR=useRef<HTMLInputElement>(null);
   const dataR=useRef({chatId:'',messages:[] as StoredMsg[],mode:'prajna' as CognitiveModeKey});
   useEffect(()=>{dataR.current={chatId,messages,mode};},[chatId,messages,mode]);
@@ -371,6 +369,8 @@ export default function MedhaHUD(){
 
   // Init
   useEffect(()=>{
+    const savedColor = typeof window !== 'undefined' ? localStorage.getItem('medha_user_color') : null;
+    if (savedColor) setUserColor(savedColor);
     setConsentGranted(hasLocalConsent());setConsentReady(true);setQuotaUser(getUser());
     sttR.current=new STT();ttsR.current=new TTS();
     const rail=document.querySelector('.neural-depth') as HTMLElement|null;
@@ -434,6 +434,14 @@ export default function MedhaHUD(){
     setStardustActive(true);
   }, [actModel]);
 
+  const showFloating = useCallback((text: string, role: 'assistant'|'user') => {
+    if (floatingTimerRef.current) clearTimeout(floatingTimerRef.current);
+    setFloatingText(text);
+    setFloatingRole(role);
+    setFloatingVisible(true);
+    floatingTimerRef.current = setTimeout(() => setFloatingVisible(false), 8000);
+  }, []);
+
   // Shared completion runner — used by both send() and regenerate()
   const runCompletion=useCallback(async(hist:ChatMessage[])=>{
     setBusy(true);await new Promise(r=>setTimeout(r,400));setEs('thinking');
@@ -444,17 +452,14 @@ export default function MedhaHUD(){
     try{const full=await chatComplete(effMode,hist);setEs('responding');
       const am:StoredMsg={id:uid(),role:'assistant',content:full||'I lost the signal for a moment. Try again?',mode,ts:Date.now()};
       setMessages(p=>[...p,am]);
-      setDialogueMsg({ content: am.content, role: 'assistant', mode });
-      if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-      setShowDialogue(true);
-      dialogueTimerRef.current = setTimeout(() => setShowDialogue(false), 8000);
+      showFloating(am.content, 'assistant');
       setEs('dormant');
       // Intelligence arrives — trigger stream
       triggerStream(mode);
       if(ttsEnabled&&ttsR.current?.isSupported()){const pl=full.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/[*_`#>]/g,'');setEs('voice-active');ttsR.current.speak(pl,{onEnd:()=>setEs('dormant')});}}
     catch{setMessages(p=>[...p,{id:uid(),role:'assistant',content:'Cognition is busy. Give it a breath and try again.',mode,ts:Date.now()}]);setEs('dormant');}
     finally{setBusy(false);}
-  },[mode,mdef,ttsEnabled,triggerStream,responseStyle]);
+  },[mode,mdef,ttsEnabled,triggerStream,responseStyle,showFloating]);
 
   const send=useCallback(async()=>{
     const tx=composerText.trim();if(!tx||busy)return;
@@ -462,15 +467,12 @@ export default function MedhaHUD(){
     setComposerText('');
     const um:StoredMsg={id:uid(),role:'user',content:tx,mode,ts:Date.now()};
     setMessages(p=>[...p,um]);
-    setDialogueMsg({ content: tx, role: 'user', mode });
-    if (dialogueTimerRef.current) clearTimeout(dialogueTimerRef.current);
-    setShowDialogue(true);
-    dialogueTimerRef.current = setTimeout(() => setShowDialogue(false), 8000);
+    showFloating(tx, 'user');
     setEs('listening');
     if(isForbiddenQuery(tx)){setTimeout(()=>{setMessages(p=>[...p,{id:uid(),role:'assistant',content:SANDHI_REDIRECT_MARKDOWN,mode,ts:Date.now()}]);setEs('dormant');},280);return;}
     const hist:ChatMessage[]=[...dataR.current.messages,um].slice(-12).map(m=>({role:m.role,content:m.content}));
     await runCompletion(hist);
-  },[composerText,busy,mode,quotaUser,runCompletion]);
+  },[composerText,busy,mode,quotaUser,runCompletion,showFloating]);
 
   // Regenerate — drop the last assistant reply and ask again
   const regenerate=useCallback(async()=>{
@@ -553,31 +555,6 @@ export default function MedhaHUD(){
           <button onClick={()=>setShowSettings(true)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',color:'rgba(255,255,255,0.35)',fontSize:'13px',padding:'4px 9px',cursor:'pointer'}}>⚙</button>
         </div>
       </div>
-
-      {/* Conversation record — a collapsible glass panel, tucked away by default
-          so Medhā stands unobstructed. The watermark pixie opens it. */}
-      <AnimatePresence>
-        {showTranscript&&(
-          <motion.div key="transcript-panel" initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} exit={{opacity:0,y:18}} transition={{duration:0.45,ease:[0.16,1,0.3,1]}}
-            style={{position:'fixed',left:0,right:0,top:'8vh',bottom:'128px',zIndex:40,display:'flex',flexDirection:'column',pointerEvents:'none',background:'linear-gradient(to bottom, rgba(8,4,20,0), rgba(8,4,20,0.22) 70px, rgba(8,4,20,0.28))',backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)'}}>
-            <div ref={transcriptRef} style={{flex:1,minHeight:0,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'16px',justifyContent:'flex-end',width:'100%',maxWidth:'560px',margin:'0 auto',padding:'16px 16px 8px',pointerEvents:'auto',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 28px)',maskImage:'linear-gradient(to bottom, transparent, black 28px)'}}>
-              {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={messages.length>1&&!busy?regenerate:undefined}/>)}
-              <AnimatePresence>
-                {busy&&<ThinkingBubble key="thinking" fc={fc}/>}
-              </AnimatePresence>
-              <AnimatePresence>
-                {greetingText&&!busy&&(
-                  <motion.div key={greetingText} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.5}}
-                    style={{width:'100%',textAlign:'center',pointerEvents:'none',padding:'2px 6px 0'}}>
-                    <div style={{fontSize:'9px',letterSpacing:'0.25em',color:fc,textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'8px'}}>{getMode(greetingMode).name}</div>
-                    <p style={{fontFamily:'Georgia,serif',fontSize:'13px',lineHeight:'1.65',color:'rgba(255,255,255,0.55)',fontStyle:'italic',letterSpacing:'0.02em'}}>{greetingText}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Composer — always visible, slim bar at the bottom */}
       <div style={{position:'fixed',left:0,right:'auto',width:'min(52vw, 520px)',bottom:0,zIndex:42,padding:'8px 14px 22px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(5,2,15,0.4), rgba(5,2,15,0) 110px)'}}>
@@ -668,6 +645,15 @@ export default function MedhaHUD(){
                 </div>
               </section>
               <section>
+                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Your Text Color</div>
+                <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                  {['#d4a853','#ffffff','#e8c4ff','#a8d8ea','#f0c4a0','#c8f0c8'].map(c=>(
+                    <button key={c} onClick={()=>{setUserColor(c);localStorage.setItem('medha_user_color',c);}}
+                      style={{width:'24px',height:'24px',borderRadius:'50%',background:c,border:userColor===c?'2px solid #fff':'2px solid transparent',cursor:'pointer',padding:0,outline:'none',boxShadow:userColor===c?`0 0 6px ${c}`:'none',transition:'all 0.2s'}}/>
+                  ))}
+                </div>
+              </section>
+              <section>
                 <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>History</div>
                 <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)',fontFamily:'system-ui',marginBottom:'10px'}}>{chats.length} conversation{chats.length!==1?'s':''} stored</div>
                 <button onClick={()=>{if(!confirm('Erase ALL conversations?'))return;chats.forEach(c=>deleteChat(c.id));setChats([]);newChat();}}
@@ -717,17 +703,15 @@ export default function MedhaHUD(){
         activeFaculty={mode}
       />
 
-      {/* Dialogue bubble following Medhā */}
-      {dialogueMsg && (
-        <DialogueBubble
-          message={dialogueMsg.content}
-          role={dialogueMsg.role}
-          facultyName={getMode(mode).name}
-          facultyColor={fc}
-          roamPos={entityPos}
-          visible={showDialogue && !busy && !showSettings && !showChatHistory}
-        />
-      )}
+      {/* Floating text following Medhā — auto-dismisses after 8s */}
+      <FloatingText
+        text={floatingText}
+        role={floatingRole}
+        facultyColor={fc}
+        roamPos={entityPos}
+        visible={floatingVisible && !showSettings && !showChatHistory}
+        userColor={userColor}
+      />
 
       {/* Clickable overlay over entity zone */}
       <div

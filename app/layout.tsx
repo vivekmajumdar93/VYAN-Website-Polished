@@ -29,6 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* Preload the logo so the loader has it instantly */}
         <link rel="preload" as="image" href="/logo.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet" />
       </head>
       <body className={inter.className}>
         {children}

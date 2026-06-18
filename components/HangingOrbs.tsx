@@ -72,24 +72,32 @@ function FacultyButton({ faculty, index, onSelect }: FacultyButtonProps) {
         boxShadow: `0 0 24px ${faculty.color}25, inset 0 0 20px ${faculty.color}10`,
       }}
     >
+      {/* Color dot */}
       <div style={{
         width: '8px', height: '8px', borderRadius: '50%',
         background: faculty.color,
+        backgroundColor: faculty.color,
         boxShadow: `0 0 8px ${faculty.color}`,
         marginBottom: '2px',
       }} />
+      {/* Faculty name */}
       <div style={{
         fontFamily: 'Georgia, serif', fontSize: '11px',
         letterSpacing: '0.1em', color: faculty.color,
         textTransform: 'uppercase',
+        background: 'none',
+        backgroundColor: 'transparent',
       }}>
         {faculty.name}
       </div>
+      {/* Faculty description */}
       <div style={{
         fontFamily: 'system-ui', fontSize: '8px',
         letterSpacing: '0.08em', color: 'rgba(255,255,255,0.4)',
         textAlign: 'center', padding: '0 6px',
         lineHeight: 1.3,
+        background: 'none',
+        backgroundColor: 'transparent',
       }}>
         {faculty.desc}
       </div>
@@ -137,7 +145,7 @@ export function HangingOrbs({
         }
       `}</style>
 
-      {/* Transparent hotspot divs — overlay over video orbs */}
+      {/* Pendant hotspot divs — position:fixed so they anchor to viewport, not a container */}
       {HANGINGS.map((h, i) => (
         <div
           key={h.id}
@@ -152,16 +160,20 @@ export function HangingOrbs({
             transformOrigin: 'top center',
             animation: PENDANT_ANIMATIONS[i],
             cursor: 'pointer',
+            background: 'none',
+            backgroundColor: 'transparent',
           }}
           onMouseEnter={() => setHoveredIdx(i)}
           onMouseLeave={() => setHoveredIdx(null)}
           onClick={() => handleHangingTap(h.id)}
         >
+          {/* Invisible orb hitzone */}
           <div style={{
             width: `${h.size * 3}px`,
             height: `${h.size * 3}px`,
             borderRadius: '50%',
-            background: 'transparent',
+            background: 'none',
+            backgroundColor: 'transparent',
             border: 'none',
             boxShadow: hoveredIdx === i ? '0 0 18px rgba(255,200,80,0.35)' : undefined,
             position: 'relative',
@@ -182,6 +194,8 @@ export function HangingOrbs({
               pointerEvents: 'none',
               opacity: hoveredIdx === i ? 1 : 0,
               transition: 'opacity 0.2s',
+              background: 'none',
+              backgroundColor: 'transparent',
             }}>
               {h.title}
             </div>
@@ -196,7 +210,7 @@ export function HangingOrbs({
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setShowFaculty(false)}
-              style={{ position: 'fixed', inset: 0, zIndex: 79 }}
+              style={{ position: 'fixed', inset: 0, zIndex: 79, background: 'none', backgroundColor: 'transparent' }}
             />
             {FACULTIES.map((f, i) => (
               <FacultyButton key={f.key} faculty={f} index={i} onSelect={handleFacultySelect} />

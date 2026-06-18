@@ -35,6 +35,29 @@ async function callEmergent(messages: Msg[], key: string): Promise<string | null
   }
 }
 
+async function callGeminiDirect(messages: Msg[]): Promise<string | null> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  try {
+    const sys = messages.find(m => m.role === 'system')?.content ?? '';
+    const turns = messages.filter(m => m.role !== 'system');
+    const fullPrompt = (sys ? sys + '\n\n' : '') + turns.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] }),
+      }
+    );
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim?.() || null;
+  } catch {
+    return null;
+  }
+}
+
 async function callPollinations(messages: Msg[]): Promise<string | null> {
   try {
     const lastUser = [...messages].reverse().find(m => m.role === 'user')?.content || '';
@@ -79,7 +102,11 @@ export async function POST(req: NextRequest) {
     if (text) return NextResponse.json({ text, source: 'emergent' });
   }
 
-  // Fallback: Pollinations.
+  // Fallback 1: Gemini direct.
+  const geminiText = await callGeminiDirect(messages);
+  if (geminiText) return NextResponse.json({ text: geminiText, source: 'gemini' });
+
+  // Fallback 2: Pollinations.
   const text = await callPollinations(messages);
   if (text) return NextResponse.json({ text, source: 'pollinations' });
 
