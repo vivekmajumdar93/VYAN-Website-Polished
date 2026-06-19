@@ -24,10 +24,6 @@ export function StardustRain({ active, color, onComplete }: StardustRainProps) {
     const w = canvas.width
     const h = canvas.height
 
-    // Burst origin: center-left where Medhā lives
-    const originX = w * 0.25
-    const originY = h * 0.42
-
     interface Mote {
       x: number; y: number
       vx: number; vy: number
@@ -36,37 +32,37 @@ export function StardustRain({ active, color, onComplete }: StardustRainProps) {
       size: number
       isSpark: boolean
       opacity: number
-      decay: number
+      // dissolve starts when mote passes dissolveY threshold
+      dissolveY: number
       twinkleSpeed: number; twinklePhase: number
     }
 
-    const count = 360
-    const motes: Mote[] = Array.from({ length: count }, (_, i) => {
-      // Radial burst — spread in all directions
-      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.8
-      const speed = 1.2 + Math.random() * 4.5
-      const isSpark = Math.random() < 0.09
+    const count = 280
+    const motes: Mote[] = Array.from({ length: count }, () => {
+      const isSpark = Math.random() < 0.10
+      // Stagger start Y above the screen so they don't all appear at once
       return {
-        x: originX,
-        y: originY,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 1.5, // slight upward bias
-        gravity: 0.022 + Math.random() * 0.018,
-        orbitR: 2 + Math.random() * 8,
-        orbitSpeed: 0.06 + Math.random() * 0.09,
+        x: Math.random() * w,
+        y: -(20 + Math.random() * 120),   // above viewport
+        vx: (Math.random() - 0.5) * 1.2,  // gentle horizontal drift
+        vy: 0.6 + Math.random() * 1.8,     // falling downward
+        gravity: 0.008 + Math.random() * 0.01,
+        orbitR: 2 + Math.random() * 7,
+        orbitSpeed: 0.05 + Math.random() * 0.08,
         orbitPhase: Math.random() * Math.PI * 2,
         orbitTilt: Math.random() * Math.PI,
-        size: isSpark ? 1.6 + Math.random() * 2.0 : 0.5 + Math.random() * 1.8,
+        size: isSpark ? 1.4 + Math.random() * 1.8 : 0.5 + Math.random() * 1.6,
         isSpark,
-        opacity: 0.7 + Math.random() * 0.3,
-        decay: 0.008 + Math.random() * 0.012,
-        twinkleSpeed: 0.05 + Math.random() * 0.1,
+        opacity: 0.75 + Math.random() * 0.25,
+        // each mote starts dissolving at a random height (45-75% down screen)
+        dissolveY: h * (0.45 + Math.random() * 0.30),
+        twinkleSpeed: 0.04 + Math.random() * 0.09,
         twinklePhase: Math.random() * Math.PI * 2,
       }
     })
 
     const start = performance.now()
-    const duration = 2600
+    const duration = 2800
 
     const draw = (now: number) => {
       ctx.clearRect(0, 0, w, h)
@@ -77,39 +73,46 @@ export function StardustRain({ active, color, onComplete }: StardustRainProps) {
         return
       }
 
-      // Global fade out in last 30%
-      const gFade = elapsed > duration * 0.7
-        ? 1 - (elapsed - duration * 0.7) / (duration * 0.3)
+      // Global fade-out in last 25%
+      const gFade = elapsed > duration * 0.75
+        ? 1 - (elapsed - duration * 0.75) / (duration * 0.25)
         : 1
 
       let anyAlive = false
       for (const m of motes) {
-        // Gravity
+        // Physics
         m.vy += m.gravity
-        // Orbital swirl around the moving particle
+        m.x += m.vx
+        m.y += m.vy
+
+        // Skip if still above screen
+        if (m.y < 0) { anyAlive = true; continue }
+
+        // Dissolve once past the mote's individual dissolve threshold
+        let dissolveAlpha = 1
+        if (m.y > m.dissolveY) {
+          const dissolveRange = h * 0.20  // dissolve over next 20% of screen height
+          dissolveAlpha = Math.max(0, 1 - (m.y - m.dissolveY) / dissolveRange)
+        }
+
+        if (dissolveAlpha <= 0) continue
+        anyAlive = true
+
+        // Orbital swirl around the mote (adds fairy-dust flutter)
         const oa = now * m.orbitSpeed + m.orbitPhase
         const orbX = Math.cos(oa) * m.orbitR * Math.cos(m.orbitTilt) - Math.sin(oa) * m.orbitR * 0.5 * Math.sin(m.orbitTilt)
         const orbY = Math.cos(oa) * m.orbitR * Math.sin(m.orbitTilt) + Math.sin(oa) * m.orbitR * 0.5 * Math.cos(m.orbitTilt)
 
-        m.x += m.vx
-        m.y += m.vy
-        m.vx *= 0.985  // air resistance
-        m.opacity -= m.decay
-
-        if (m.opacity <= 0 || m.y > h + 20) continue
-        anyAlive = true
-
         const twinkle = 0.5 + 0.5 * Math.abs(Math.sin(now * m.twinkleSpeed + m.twinklePhase))
-        const op = m.opacity * gFade * twinkle
+        const op = m.opacity * gFade * dissolveAlpha * twinkle
 
         const px = m.x + orbX
         const py = m.y + orbY
 
         if (m.isSpark) {
-          // Soft 4-ray sparkle
           ctx.save()
           ctx.translate(px, py)
-          ctx.rotate(now * 0.003 + m.orbitPhase)
+          ctx.rotate(now * 0.002 + m.orbitPhase)
           for (let r = 0; r < 4; r++) {
             const ang = (r / 4) * Math.PI * 2
             const rl = m.size * 5
@@ -129,7 +132,6 @@ export function StardustRain({ active, color, onComplete }: StardustRainProps) {
           ctx.fillStyle = cg; ctx.fill()
           ctx.restore()
         } else {
-          // Glowing mote
           const gr = ctx.createRadialGradient(px, py, 0, px, py, m.size * 3.5)
           gr.addColorStop(0, `rgba(255,255,255,${op * 0.9})`)
           gr.addColorStop(0.4, `${color}${Math.floor(op * 0.6 * 255).toString(16).padStart(2, '0')}`)

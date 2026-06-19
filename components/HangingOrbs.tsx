@@ -26,16 +26,25 @@ const PENDANT_ANIMATIONS = [
   'pendantSwing 4.5s ease-in-out 1.6s infinite, pendantPulse 3s ease-in-out 2s infinite',
 ]
 
+// Offsets (in viewport %) from entity centre — places buttons in a ring around Medhā
+const FACULTY_OFFSETS = [
+  { dx: -18, dy: -22 },  // upper-left
+  { dx:  16, dy: -20 },  // upper-right
+  { dx:  26, dy:   2 },  // right
+  { dx:  14, dy:  20 },  // lower-right
+  { dx: -16, dy:  20 },  // lower-left
+]
+
 // ─── Faculty floater button ────────────────────────────────────────────────────
 interface FacultyButtonProps {
   faculty: typeof FACULTIES[0]
   index: number
+  posX: number  // viewport % left
+  posY: number  // viewport % top
   onSelect: (key: string, color: string) => void
 }
 
-function FacultyButton({ faculty, index, onSelect }: FacultyButtonProps) {
-  const startX = 15 + Math.random() * 60
-  const startY = 20 + Math.random() * 55
+function FacultyButton({ faculty, index, posX, posY, onSelect }: FacultyButtonProps) {
   const floatDX = (Math.random() - 0.5) * 6
   const floatDY = (Math.random() - 0.5) * 4
   const duration = 8 + Math.random() * 6
@@ -58,8 +67,8 @@ function FacultyButton({ faculty, index, onSelect }: FacultyButtonProps) {
       onClick={() => onSelect(faculty.key, faculty.color)}
       style={{
         position: 'fixed',
-        left: `${startX}%`,
-        top: `${startY}%`,
+        left: `${Math.max(2, Math.min(90, posX))}%`,
+        top: `${Math.max(5, Math.min(88, posY))}%`,
         width: '88px', height: '88px',
         borderRadius: '50%',
         background: `radial-gradient(circle at 35% 35%, ${faculty.color}28, ${faculty.color}10)`,
@@ -111,10 +120,11 @@ interface HangingOrbsProps {
   onFacultySelect: (key: string, color: string) => void
   onBack: () => void
   activeFaculty: string
+  entityPos?: { x: number; y: number }  // entity centre in viewport %
 }
 
 export function HangingOrbs({
-  onSettingsOpen, onFacultySelect, onBack, activeFaculty,
+  onSettingsOpen, onFacultySelect, onBack, activeFaculty, entityPos,
 }: HangingOrbsProps) {
   const [showFaculty, setShowFaculty] = useState(false)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
@@ -212,9 +222,21 @@ export function HangingOrbs({
               onClick={() => setShowFaculty(false)}
               style={{ position: 'fixed', inset: 0, zIndex: 79, background: 'none', backgroundColor: 'transparent' }}
             />
-            {FACULTIES.map((f, i) => (
-              <FacultyButton key={f.key} faculty={f} index={i} onSelect={handleFacultySelect} />
-            ))}
+            {FACULTIES.map((f, i) => {
+              const ex = entityPos?.x ?? 25
+              const ey = entityPos?.y ?? 38
+              const off = FACULTY_OFFSETS[i] ?? { dx: 0, dy: 0 }
+              return (
+                <FacultyButton
+                  key={f.key}
+                  faculty={f}
+                  index={i}
+                  posX={ex + off.dx}
+                  posY={ey + off.dy}
+                  onSelect={handleFacultySelect}
+                />
+              )
+            })}
           </>
         )}
       </AnimatePresence>

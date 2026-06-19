@@ -705,6 +705,7 @@ export default function MedhaHUD(){
         onFacultySelect={handleFacultyFromOrb}
         onBack={back}
         activeFaculty={mode}
+        entityPos={entityPos}
       />
 
       {/* Floating text following Medhā — auto-dismisses after 8s */}
