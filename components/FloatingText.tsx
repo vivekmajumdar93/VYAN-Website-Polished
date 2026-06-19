@@ -12,15 +12,23 @@ interface FloatingTextProps {
   userColor?: string
 }
 
-// Renders inline Markdown: **bold**, *italic*, _italic_, bullet lines (*/-)
+// Renders inline Markdown: **bold**, *italic*, _italic_, bullet lines (*/-), strips pipes/tables
 function renderMarkdown(raw: string, color: string): React.ReactNode[] {
   const lines = raw.split('\n')
   const output: React.ReactNode[] = []
 
   lines.forEach((line, li) => {
+    // Skip pure table-separator lines (e.g. |---|---|)
+    if (/^\|[\s\-|]+\|$/.test(line.trim())) return
+
+    // Strip surrounding pipe characters used in table-style output (| text |)
+    let stripped = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').trim()
+    // Also collapse internal pipes into " — " for table cells
+    stripped = stripped.replace(/\s*\|\s*/g, ' — ')
+
     // Strip heading markers (## Heading → plain text)
-    const headingMatch = line.match(/^#{1,6}\s+(.+)$/)
-    const cleanLine = headingMatch ? headingMatch[1] : line
+    const headingMatch = stripped.match(/^#{1,6}\s+(.+)$/)
+    const cleanLine = headingMatch ? headingMatch[1] : stripped
 
     // Bullet line: starts with `* ` or `- ` or `• `
     const bulletMatch = cleanLine.match(/^[\*\-•]\s+(.+)$/)
@@ -119,11 +127,11 @@ export function FloatingText({
           }}>
             {isAssistant ? (
               <p style={{
-                fontFamily: "'Cinzel Decorative', 'Cormorant Garamond', Georgia, serif",
-                fontSize: 'clamp(12px, 1.3vw, 16px)',
-                fontWeight: 300,
-                lineHeight: 1.78,
-                letterSpacing: '0.03em',
+                fontFamily: "'Cormorant Garamond', 'Cormorant', Georgia, serif",
+                fontSize: 'clamp(13px, 1.4vw, 17px)',
+                fontWeight: 400,
+                lineHeight: 1.82,
+                letterSpacing: '0.04em',
                 margin: 0,
                 color: facultyColor,
                 textShadow: `0 0 18px ${facultyColor}90, 0 0 40px ${facultyColor}40`,
