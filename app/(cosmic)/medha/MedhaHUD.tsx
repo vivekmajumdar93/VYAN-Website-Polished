@@ -538,7 +538,7 @@ export default function MedhaHUD(){
           colorSecondary={stream.colorSecondary}
           entityX={entityPos.x/100}
           entityY={entityPos.y/100}
-          duration={3200}
+          duration={5000}
           onComplete={handleStreamComplete}
         />
       )}

@@ -286,7 +286,7 @@ export function CosmicStream({
   return (
     <canvas ref={canvasRef} style={{
       position: 'fixed', inset: 0, width: '100%', height: '100%',
-      zIndex: 20, pointerEvents: 'none',
+      zIndex: 45, pointerEvents: 'none',
     }} />
   )
 }
