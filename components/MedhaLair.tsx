@@ -81,6 +81,7 @@ interface MedhaLairProps {
   onReact?: boolean
   roamPos?: { x: number; y: number }
   entityVisible?: boolean
+  excited?: boolean
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ export function MedhaLair({
   onReact = false,
   roamPos,
   entityVisible = true,
+  excited = false,
 }: MedhaLairProps) {
   const lairVideoRef = useRef<HTMLVideoElement>(null)
   const entityVideoRef = useRef<HTMLVideoElement>(null)
@@ -318,6 +320,13 @@ export function MedhaLair({
     }
   }, [activeRoam.x, activeRoam.y])
 
+  // ── Excited wing-flip: speed up video + boost brightness ───────────────────
+  useEffect(() => {
+    const v = entityVideoRef.current
+    if (!v) return
+    v.playbackRate = excited ? 3.5 : 1.0
+  }, [excited])
+
   // ── Pixie reaction ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!onReact) return
@@ -391,8 +400,12 @@ export function MedhaLair({
           width: entitySize,
           height: entitySize,
           opacity: activeVisible ? 1 : 0,
-          filter: activeVisible ? 'blur(0px) brightness(1.8)' : 'blur(12px)',
-          transition: 'left 2.8s cubic-bezier(0.16,1,0.3,1), top 2.8s cubic-bezier(0.16,1,0.3,1), opacity 1.6s ease, filter 1.6s ease',
+          filter: excited
+            ? `blur(0px) brightness(4.2) saturate(2.4) drop-shadow(0 0 28px ${facultyColor})`
+            : activeVisible ? 'blur(0px) brightness(1.8)' : 'blur(12px)',
+          transition: excited
+            ? 'filter 0.08s ease, opacity 0.1s ease'
+            : 'left 2.8s cubic-bezier(0.16,1,0.3,1), top 2.8s cubic-bezier(0.16,1,0.3,1), opacity 1.6s ease, filter 1.6s ease',
           willChange: 'transform, opacity',
         }}
       >
