@@ -441,7 +441,7 @@ export default function MedhaHUD(){
     setFloatingText(text);
     setFloatingRole(role);
     setFloatingVisible(true);
-    floatingTimerRef.current = setTimeout(() => setFloatingVisible(false), 8000);
+    floatingTimerRef.current = setTimeout(() => setFloatingVisible(false), 120000);
   }, []);
 
   // Shared completion runner — used by both send() and regenerate()
