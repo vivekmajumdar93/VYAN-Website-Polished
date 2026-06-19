@@ -12,9 +12,10 @@ interface NeuralStripProps {
   messages: NeuralMsg[]
   facultyColor: string
   onEditMessage: (id: string, content: string) => void
+  onOpenTranscript?: () => void
 }
 
-export function NeuralStrip({ messages, facultyColor, onEditMessage }: NeuralStripProps) {
+export function NeuralStrip({ messages, facultyColor, onEditMessage, onOpenTranscript }: NeuralStripProps) {
   const [hovered, setHovered] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
@@ -26,7 +27,8 @@ export function NeuralStrip({ messages, facultyColor, onEditMessage }: NeuralStr
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setEditingId(null) }}
-      style={{ marginBottom: '8px' }}
+      onClick={!hovered ? onOpenTranscript : undefined}
+      style={{ marginBottom: '8px', cursor: !hovered ? 'pointer' : 'default' }}
     >
       {!hovered && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>

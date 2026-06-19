@@ -59,14 +59,15 @@ function buildPath(w: number, h: number, ex: number, ey: number): { x: number; y
   return pts
 }
 
-// ─── Particle ─────────────────────────────────────────────────────────────────
+// ─── Particle tiers ───────────────────────────────────────────────────────────
+// 0 = background dust, 1 = mid-ground spark, 2 = foreground pixie, 3 = queen pixie
 
 interface Particle {
   anchorX: number; anchorY: number
   driftX: number; driftY: number; dvx: number; dvy: number
   orbitRx: number; orbitRy: number
   orbitSpeed: number; orbitPhase: number; orbitTilt: number
-  size: number; isSpark: boolean; color: string
+  size: number; tier: number; color: string
   twinkleSpeed: number; twinklePhase: number
   pathT: number
 }
@@ -105,32 +106,52 @@ export function CosmicStream({
 
     const path = buildPath(w, h, entityX, entityY)
     const N = path.length
-    const palette = [color, secondary, '#ffffff', '#ffffff', color]
+    const palette = [color, secondary, '#ffffff', '#ffffff', color, secondary, '#ffe0ff']
 
-    // 560 fairy-dust particles distributed along the path
-    const particles: Particle[] = Array.from({ length: 560 }, (_, i) => {
-      const pathT = i / 560
-      const ptIdx = Math.min(Math.floor(pathT * N), N - 1)
-      const pt = path[ptIdx]
-      const isSpark = Math.random() < 0.07
-      return {
-        anchorX: pt.x, anchorY: pt.y,
-        driftX: 0, driftY: 0,
-        dvx: (Math.random() - 0.5) * 0.016,
-        dvy: (Math.random() - 0.5) * 0.016,
-        orbitRx: 3 + Math.random() * 14,
-        orbitRy: 2 + Math.random() * 8,
-        orbitSpeed: 0.0008 + Math.random() * 0.0025,
-        orbitPhase: Math.random() * Math.PI * 2,
-        orbitTilt: Math.random() * Math.PI,
-        size: isSpark ? 1.4 + Math.random() * 1.8 : 0.4 + Math.random() * 1.4,
-        isSpark,
-        color: palette[Math.floor(Math.random() * palette.length)],
-        twinkleSpeed: 0.04 + Math.random() * 0.09,
-        twinklePhase: Math.random() * Math.PI * 2,
-        pathT,
+    // ── Particle count by tier ──
+    // Tier 0: background dust   — 520 particles, tiny, dim
+    // Tier 1: mid sparks        — 260 particles, medium, bright
+    // Tier 2: foreground pixies —  80 particles, large, vivid
+    // Tier 3: queen pixies      —  18 particles, massive, dazzling
+    const TIER_COUNT = [520, 260, 80, 18]
+    const TOTAL = TIER_COUNT.reduce((a, b) => a + b, 0)
+
+    const particles: Particle[] = []
+    let idx = 0
+    for (let tier = 0; tier < 4; tier++) {
+      for (let j = 0; j < TIER_COUNT[tier]; j++) {
+        const pathT = idx / TOTAL
+        const ptIdx = Math.min(Math.floor(pathT * N), N - 1)
+        const pt = path[ptIdx]
+
+        // Size, orbit radius, speed grow with tier (closer to camera = bigger, faster)
+        const sizeBase = tier === 0 ? 0.3 + Math.random() * 1.0
+          : tier === 1 ? 1.2 + Math.random() * 1.8
+          : tier === 2 ? 2.6 + Math.random() * 2.8
+          : 5.0 + Math.random() * 4.0
+
+        const orbitMult = tier === 0 ? 1 : tier === 1 ? 1.6 : tier === 2 ? 2.8 : 4.5
+
+        particles.push({
+          anchorX: pt.x, anchorY: pt.y,
+          driftX: 0, driftY: 0,
+          dvx: (Math.random() - 0.5) * 0.012,
+          dvy: (Math.random() - 0.5) * 0.012,
+          orbitRx: (3 + Math.random() * 14) * orbitMult,
+          orbitRy: (2 + Math.random() * 8) * orbitMult,
+          orbitSpeed: (0.0005 + Math.random() * 0.002) * (1 + tier * 0.4),
+          orbitPhase: Math.random() * Math.PI * 2,
+          orbitTilt: Math.random() * Math.PI,
+          size: sizeBase,
+          tier,
+          color: palette[Math.floor(Math.random() * palette.length)],
+          twinkleSpeed: 0.04 + Math.random() * 0.09 * (1 + tier * 0.3),
+          twinklePhase: Math.random() * Math.PI * 2,
+          pathT,
+        })
+        idx++
       }
-    })
+    }
 
     const startTime = performance.now()
 
@@ -148,61 +169,82 @@ export function CosmicStream({
       const lead = Math.min(globalT * 1.7, 1)
       const trail = Math.max(globalT * 1.7 - 0.55, 0)
 
-      for (const p of particles) {
-        if (p.pathT > lead || p.pathT < trail) continue
+      // Render back-to-front: tier 0 first, queens last
+      for (let tier = 0; tier < 4; tier++) {
+        for (const p of particles) {
+          if (p.tier !== tier) continue
+          if (p.pathT > lead || p.pathT < trail) continue
 
-        p.driftX += p.dvx
-        p.driftY += p.dvy
+          p.driftX += p.dvx
+          p.driftY += p.dvy
 
-        // Elliptical orbit around anchor
-        const oa = now * p.orbitSpeed + p.orbitPhase
-        const lx = Math.cos(oa) * p.orbitRx
-        const ly = Math.sin(oa) * p.orbitRy
-        const ct = Math.cos(p.orbitTilt); const st = Math.sin(p.orbitTilt)
-        const px = p.anchorX + lx * ct - ly * st + p.driftX
-        const py = p.anchorY + lx * st + ly * ct + p.driftY
+          const oa = now * p.orbitSpeed + p.orbitPhase
+          const lx = Math.cos(oa) * p.orbitRx
+          const ly = Math.sin(oa) * p.orbitRy
+          const ct = Math.cos(p.orbitTilt); const st = Math.sin(p.orbitTilt)
+          const px = p.anchorX + lx * ct - ly * st + p.driftX
+          const py = p.anchorY + lx * st + ly * ct + p.driftY
 
-        const twinkle = 0.45 + 0.55 * Math.abs(Math.sin(now * p.twinkleSpeed + p.twinklePhase))
-        const op = envelope * twinkle
+          const twinkle = 0.45 + 0.55 * Math.abs(Math.sin(now * p.twinkleSpeed + p.twinklePhase))
 
-        if (p.isSpark) {
-          // Soft feathered cross-sparkle — 4 fading rays
-          ctx.save()
-          ctx.translate(px, py)
-          ctx.rotate(now * 0.0007 + p.orbitPhase)
-          for (let r = 0; r < 4; r++) {
-            const ang = (r / 4) * Math.PI * 2
-            const rl = p.size * 5.5
-            const grd = ctx.createLinearGradient(0, 0, Math.cos(ang) * rl, Math.sin(ang) * rl)
-            grd.addColorStop(0, `rgba(255,255,255,${op * 0.9})`)
-            grd.addColorStop(0.6, `${color}${Math.floor(op * 0.35 * 255).toString(16).padStart(2, '0')}`)
-            grd.addColorStop(1, `${color}00`)
-            ctx.beginPath()
-            ctx.moveTo(0, 0)
-            ctx.lineTo(Math.cos(ang) * rl, Math.sin(ang) * rl)
-            ctx.strokeStyle = grd
-            ctx.lineWidth = p.size * 0.45
-            ctx.lineCap = 'round'
-            ctx.stroke()
+          // Opacity scales up with tier for that "close to camera" pop
+          const tierOpacity = tier === 0 ? 0.55 : tier === 1 ? 0.80 : tier === 2 ? 0.95 : 1.0
+          const op = envelope * twinkle * tierOpacity
+
+          if (tier >= 1) {
+            // Sparks, pixies, queens — soft feathered cross-sparkle
+            const rayCount = tier === 3 ? 6 : 4  // queens get a 6-ray starburst
+            const rayLen = p.size * (tier === 2 ? 6.5 : tier === 3 ? 9.0 : 5.5)
+
+            ctx.save()
+            ctx.translate(px, py)
+            ctx.rotate(now * (0.0004 + tier * 0.0003) + p.orbitPhase)
+            for (let r = 0; r < rayCount; r++) {
+              const ang = (r / rayCount) * Math.PI * 2
+              const rl = rayLen
+              const grd = ctx.createLinearGradient(0, 0, Math.cos(ang) * rl, Math.sin(ang) * rl)
+              grd.addColorStop(0, `rgba(255,255,255,${op * (tier >= 2 ? 1.0 : 0.9)})`)
+              grd.addColorStop(0.45, `${color}${Math.floor(op * 0.4 * 255).toString(16).padStart(2, '0')}`)
+              grd.addColorStop(1, `${color}00`)
+              ctx.beginPath()
+              ctx.moveTo(0, 0)
+              ctx.lineTo(Math.cos(ang) * rl, Math.sin(ang) * rl)
+              ctx.strokeStyle = grd
+              ctx.lineWidth = p.size * (tier === 3 ? 0.7 : 0.45)
+              ctx.lineCap = 'round'
+              ctx.stroke()
+            }
+            // Radiant core glow
+            const coreR = p.size * (tier === 3 ? 4.0 : tier === 2 ? 3.2 : 2.8)
+            const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR)
+            cg.addColorStop(0, `rgba(255,255,255,${op})`)
+            cg.addColorStop(0.3, `rgba(255,255,255,${op * 0.7})`)
+            cg.addColorStop(0.6, `${color}${Math.floor(op * 0.65 * 255).toString(16).padStart(2, '0')}`)
+            cg.addColorStop(1, `${color}00`)
+            ctx.beginPath(); ctx.arc(0, 0, coreR, 0, Math.PI * 2)
+            ctx.fillStyle = cg; ctx.fill()
+
+            // Extra wide soft halo for queens and foreground pixies
+            if (tier >= 2) {
+              const haloR = p.size * (tier === 3 ? 14 : 9)
+              const hg = ctx.createRadialGradient(0, 0, 0, 0, 0, haloR)
+              hg.addColorStop(0, `${color}${Math.floor(op * 0.18 * 255).toString(16).padStart(2, '0')}`)
+              hg.addColorStop(1, `${color}00`)
+              ctx.beginPath(); ctx.arc(0, 0, haloR, 0, Math.PI * 2)
+              ctx.fillStyle = hg; ctx.fill()
+            }
+            ctx.restore()
+          } else {
+            // Tier 0: tiny glowing motes
+            const gr = ctx.createRadialGradient(px, py, 0, px, py, p.size * 3.5)
+            gr.addColorStop(0, `rgba(255,255,255,${op * 0.95})`)
+            gr.addColorStop(0.35, `${color}${Math.floor(op * 0.55 * 255).toString(16).padStart(2, '0')}`)
+            gr.addColorStop(1, `${color}00`)
+            ctx.beginPath(); ctx.arc(px, py, p.size * 3.5, 0, Math.PI * 2)
+            ctx.fillStyle = gr; ctx.fill()
+            ctx.beginPath(); ctx.arc(px, py, p.size * 0.45, 0, Math.PI * 2)
+            ctx.fillStyle = `rgba(255,255,255,${op})`; ctx.fill()
           }
-          const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size * 2.8)
-          cg.addColorStop(0, `rgba(255,255,255,${op})`)
-          cg.addColorStop(0.4, `${color}${Math.floor(op * 0.7 * 255).toString(16).padStart(2, '0')}`)
-          cg.addColorStop(1, `${color}00`)
-          ctx.beginPath(); ctx.arc(0, 0, p.size * 2.8, 0, Math.PI * 2)
-          ctx.fillStyle = cg; ctx.fill()
-          ctx.restore()
-        } else {
-          // Tiny glowing mote with soft halo
-          const gr = ctx.createRadialGradient(px, py, 0, px, py, p.size * 3.5)
-          gr.addColorStop(0, `rgba(255,255,255,${op * 0.95})`)
-          gr.addColorStop(0.35, `${color}${Math.floor(op * 0.55 * 255).toString(16).padStart(2, '0')}`)
-          gr.addColorStop(1, `${color}00`)
-          ctx.beginPath(); ctx.arc(px, py, p.size * 3.5, 0, Math.PI * 2)
-          ctx.fillStyle = gr; ctx.fill()
-          // Bright centre pixel
-          ctx.beginPath(); ctx.arc(px, py, p.size * 0.45, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(255,255,255,${op})`; ctx.fill()
         }
       }
 
@@ -210,11 +252,12 @@ export function CosmicStream({
       if (lead < 1) {
         const lidx = Math.min(Math.floor(lead * N), N - 1)
         const lp = path[lidx]
-        const lr = ctx.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, 40)
-        lr.addColorStop(0, `rgba(255,255,255,${0.9 * envelope})`)
-        lr.addColorStop(0.3, `${color}${Math.floor(0.6 * envelope * 255).toString(16).padStart(2, '0')}`)
+        const lr = ctx.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, 52)
+        lr.addColorStop(0, `rgba(255,255,255,${0.95 * envelope})`)
+        lr.addColorStop(0.25, `rgba(255,255,255,${0.5 * envelope})`)
+        lr.addColorStop(0.5, `${color}${Math.floor(0.55 * envelope * 255).toString(16).padStart(2, '0')}`)
         lr.addColorStop(1, `${color}00`)
-        ctx.beginPath(); ctx.arc(lp.x, lp.y, 40, 0, Math.PI * 2)
+        ctx.beginPath(); ctx.arc(lp.x, lp.y, 52, 0, Math.PI * 2)
         ctx.fillStyle = lr; ctx.fill()
       }
 

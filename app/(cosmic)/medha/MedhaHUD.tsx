@@ -569,6 +569,7 @@ export default function MedhaHUD(){
             onEditMessage={(id, content) => {
               setMessages(prev => prev.map(m => m.id === id ? { ...m, content } : m));
             }}
+            onOpenTranscript={() => setShowTranscript(v => !v)}
           />
           {/* Faculty selector */}
           <div style={{marginBottom:'8px',position:'relative'}}>
@@ -718,9 +719,9 @@ export default function MedhaHUD(){
         userColor={userColor}
       />
 
-      {/* Clickable overlay over entity zone — opens conversation transcript */}
+      {/* Clickable overlay over entity zone — re-shows last floating message */}
       <div
-        onClick={() => setShowTranscript(v => !v)}
+        onClick={() => setFloatingVisible(v => !v)}
         style={{
           position: 'fixed', left: 0, top: 0,
           width: '45%', height: '85%',
