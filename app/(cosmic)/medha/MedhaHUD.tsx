@@ -298,6 +298,7 @@ export default function MedhaHUD(){
   const [stardustActive, setStardustActive] = useState(false);
   const [stardustColor, setStardustColor] = useState('#7b2fff');
   const [showChatHistory, setShowChatHistory] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [floatingText, setFloatingText] = useState('');
   const [floatingRole, setFloatingRole] = useState<'assistant'|'user'>('assistant');
   const [floatingVisible, setFloatingVisible] = useState(false);
@@ -323,6 +324,7 @@ export default function MedhaHUD(){
   const sttR=useRef<STT|null>(null);const ttsR=useRef<TTS|null>(null);
   const gtR=useRef<ReturnType<typeof setTimeout>|null>(null);
   const floatingTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const transcriptRef=useRef<HTMLDivElement>(null);
   const fileR=useRef<HTMLInputElement>(null);
   const dataR=useRef({chatId:'',messages:[] as StoredMsg[],mode:'prajna' as CognitiveModeKey});
   useEffect(()=>{dataR.current={chatId,messages,mode};},[chatId,messages,mode]);
@@ -457,7 +459,7 @@ export default function MedhaHUD(){
       // Intelligence arrives — trigger stream
       triggerStream(mode);
       if(ttsEnabled&&ttsR.current?.isSupported()){const pl=full.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/[*_`#>]/g,'');setEs('voice-active');ttsR.current.speak(pl,{onEnd:()=>setEs('dormant')});}}
-    catch{setMessages(p=>[...p,{id:uid(),role:'assistant',content:'Cognition is busy. Give it a breath and try again.',mode,ts:Date.now()}]);setEs('dormant');}
+    catch{const errMsg='Cognition is momentarily out of reach — try again in a breath.';setMessages(p=>[...p,{id:uid(),role:'assistant',content:errMsg,mode,ts:Date.now()}]);showFloating(errMsg,'assistant');setEs('dormant');}
     finally{setBusy(false);}
   },[mode,mdef,ttsEnabled,triggerStream,responseStyle,showFloating]);
 
@@ -505,9 +507,11 @@ export default function MedhaHUD(){
 
   const copyMsg=async(m:StoredMsg)=>{try{await navigator.clipboard.writeText(m.content);}catch{}};
 
-  // Auto-scroll transcript to the latest message / status
-  const transcriptRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{const el=transcriptRef.current;if(!el)return;el.scrollTop=el.scrollHeight;},[messages,greetingText,busy]);
+  // Stable stardust complete callback — won't cause StardustRain to re-trigger
+  const handleStardustComplete=useCallback(()=>setStardustActive(false),[]);
+
+  // Auto-scroll transcript when it's open
+  useEffect(()=>{if(!showTranscript)return;const el=transcriptRef.current;if(!el)return;el.scrollTop=el.scrollHeight;},[messages,busy,showTranscript]);
 
   const canSend=composerText.trim().length>0&&!busy;
 
@@ -568,7 +572,7 @@ export default function MedhaHUD(){
           />
           {/* Faculty selector */}
           <div style={{marginBottom:'8px',position:'relative'}}>
-            <FacultySel mode={mode} onSelect={k=>actModel(k)}/>
+            <FacultySel mode={mode} onSelect={k=>{actModel(k);setStardustColor(FC[k]);setStardustActive(true);}}/>
           </div>
           {/* Composer */}
           <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
@@ -691,7 +695,7 @@ export default function MedhaHUD(){
         <StardustRain
           active={stardustActive}
           color={stardustColor}
-          onComplete={() => setStardustActive(false)}
+          onComplete={handleStardustComplete}
         />
       )}
 
@@ -713,9 +717,9 @@ export default function MedhaHUD(){
         userColor={userColor}
       />
 
-      {/* Clickable overlay over entity zone */}
+      {/* Clickable overlay over entity zone — opens conversation transcript */}
       <div
-        onClick={() => setShowChatHistory(true)}
+        onClick={() => setShowTranscript(v => !v)}
         style={{
           position: 'fixed', left: 0, top: 0,
           width: '45%', height: '85%',
@@ -723,6 +727,32 @@ export default function MedhaHUD(){
           background: 'transparent',
         }}
       />
+
+      {/* Conversation transcript — appears only on clicking Medhā */}
+      <AnimatePresence>
+        {showTranscript && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={()=>setShowTranscript(false)}
+              style={{position:'fixed',inset:0,zIndex:38,background:'rgba(0,0,0,0.35)',backdropFilter:'blur(4px)'}}/>
+            <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} exit={{opacity:0,y:16}}
+              transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
+              style={{position:'fixed',left:'50%',transform:'translateX(-50%)',top:'10vh',bottom:'130px',
+                width:'min(560px,90vw)',zIndex:39,display:'flex',flexDirection:'column',
+                background:'rgba(4,2,14,0.88)',border:'1px solid rgba(255,255,255,0.07)',
+                borderRadius:'18px',backdropFilter:'blur(18px)',overflow:'hidden'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+                <div style={{fontSize:'10px',letterSpacing:'0.28em',color:'rgba(255,255,255,0.4)',fontFamily:'system-ui',textTransform:'uppercase'}}>Conversation</div>
+                <button onClick={()=>setShowTranscript(false)} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.3)',cursor:'pointer',fontSize:'14px',padding:'2px 6px'}}>✕</button>
+              </div>
+              <div ref={transcriptRef} style={{flex:1,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'14px',padding:'14px 16px',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 24px)',maskImage:'linear-gradient(to bottom, transparent, black 24px)'}}>
+                {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={messages.length>1&&!busy?regenerate:undefined}/>)}
+                <AnimatePresence>{busy&&<ThinkingBubble key="thinking" fc={fc}/>}</AnimatePresence>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Chat history modal */}
       <ChatHistoryModal

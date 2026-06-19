@@ -17,7 +17,7 @@ export type StreamCallbacks = {
 
 const POLLINATIONS_BASE = 'https://text.pollinations.ai';
 const MAX_PROMPT_CHARS = 1200;        // keep total URL well under server limits
-const MAX_SYSTEM_CHARS = 320;          // very short to avoid bloat
+const MAX_SYSTEM_CHARS = 680;          // enough for identity prefix + faculty tone
 
 function trim(s: string, n: number): string {
   if (s.length <= n) return s;

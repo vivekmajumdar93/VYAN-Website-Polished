@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface FloatingTextProps {
@@ -25,28 +26,37 @@ export function FloatingText({
   const isAssistant = role === 'assistant'
   const gradient = FACULTY_GRADIENTS[facultyColor] ?? `linear-gradient(135deg, ${facultyColor}, #ffffff)`
 
-  // Float to the right of entity, same vertical level
-  const textLeft = `${Math.min(roamPos.x + 16, 58)}%`
-  const textTop = `${roamPos.y - 12}%`
+  // Assistant: floats to the right of Medhā's entity position
+  // User: fixed anchor above the composer input box (bottom-left)
+  const style: React.CSSProperties = isAssistant
+    ? {
+        position: 'fixed',
+        left: `${Math.min(roamPos.x + 16, 58)}%`,
+        top: `${roamPos.y - 12}%`,
+        maxWidth: 'min(38vw, 340px)',
+        zIndex: 35,
+        pointerEvents: 'none',
+        transition: 'left 2.8s cubic-bezier(0.16,1,0.3,1), top 2.8s cubic-bezier(0.16,1,0.3,1)',
+      }
+    : {
+        position: 'fixed',
+        left: '14px',
+        bottom: '148px',   // sits just above the composer bar
+        maxWidth: 'min(44vw, 400px)',
+        zIndex: 35,
+        pointerEvents: 'none',
+      }
 
   return (
     <AnimatePresence>
       {visible && text && (
         <motion.div
           key={text.slice(0, 30)}
-          initial={{ opacity: 0, y: 12, filter: 'blur(8px)' }}
+          initial={{ opacity: 0, y: isAssistant ? 12 : -8, filter: 'blur(8px)' }}
           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
+          exit={{ opacity: 0, y: isAssistant ? -8 : 8, filter: 'blur(6px)' }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          style={{
-            position: 'fixed',
-            left: textLeft,
-            top: textTop,
-            maxWidth: 'min(38vw, 340px)',
-            zIndex: 35,
-            pointerEvents: 'none',
-            transition: 'left 2.8s cubic-bezier(0.16,1,0.3,1), top 2.8s cubic-bezier(0.16,1,0.3,1)',
-          }}
+          style={style}
         >
           {isAssistant ? (
             <p style={{
