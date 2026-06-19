@@ -421,7 +421,9 @@ export function MedhaLair({
             // Screen blend removes black background from entity video
             mixBlendMode: 'screen',
             filter: 'brightness(2.2) saturate(1.8) contrast(1.15)',
-            clipPath: 'inset(0 0 9% 0)',
+            // Radial mask fades all edges — hides any baked-in corner watermarks
+            WebkitMaskImage: 'radial-gradient(ellipse 88% 84% at 50% 46%, black 58%, transparent 100%)',
+            maskImage: 'radial-gradient(ellipse 88% 84% at 50% 46%, black 58%, transparent 100%)',
           }}
         />
       </div>

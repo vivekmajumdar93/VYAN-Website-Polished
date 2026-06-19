@@ -28,7 +28,7 @@ import { MedhaLair } from '@/components/MedhaLair';
 import { StardustRain } from '@/components/StardustRain';
 import { HangingOrbs } from '@/components/HangingOrbs';
 import { FloatingText } from '@/components/FloatingText';
-import { NeuralStrip } from '@/components/NeuralStrip';
+import { VerticalChatRail } from '@/components/VerticalChatRail';
 import { ChatHistoryModal } from '@/components/ChatHistoryModal';
 import './medha.css';
 
@@ -157,92 +157,6 @@ function PB({color,active,ex=0.5,ey=0.5}:{color:string;active:boolean;ex?:number
   return <canvas ref={cr} style={{position:'fixed',inset:0,width:'100%',height:'100%',zIndex:60,pointerEvents:'none'}}/>;
 }
 
-// ─── Neural rail ───────────────────────────────────────────────────────────────
-// A vertical line of dots at the screen's extreme right edge — lights up
-// progressively as the conversation deepens, the newest dot pulsing.
-function NeuralRail({count,color}:{count:number;color:string}){
-  const total=9;const lit=Math.min(count,total);
-  return(
-    <div style={{position:'fixed',right:'8px',top:'50%',transform:'translateY(-50%)',zIndex:45,display:'flex',flexDirection:'column',alignItems:'center',gap:'8px',pointerEvents:'none'}}>
-      {Array.from({length:total}).map((_,i)=>{
-        const isLit=i<lit;const isNewest=i===lit-1;
-        return(
-          <motion.div key={i}
-            animate={isNewest?{opacity:[0.45,1,0.45],scale:[0.85,1.2,0.85]}:{opacity:isLit?0.55:0.10,scale:1}}
-            transition={isNewest?{duration:1.6,repeat:Infinity,ease:'easeInOut'}:{duration:0.6}}
-            style={{width:'3px',height:'3px',borderRadius:'50%',background:isLit?color:'rgba(255,255,255,0.18)',boxShadow:isLit?`0 0 5px ${color}`:'none'}}/>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Watermark pixie ─────────────────────────────────────────────────────────────
-// A tiny companion who perches over the source video's corner watermark and
-// travels with Medhā wherever she drifts — no cropping needed, and her wings
-// stay whole. She is the record-keeper: a click opens the conversation glass panel.
-function WatermarkPixie({color,onClick}:{color:string;onClick:()=>void}){
-  return(
-    <motion.button onClick={onClick} aria-label="Open conversation record" title="Open conversation record"
-      initial={{opacity:0}} animate={{opacity:1,y:[0,-4,0]}}
-      transition={{opacity:{duration:1.4,delay:1.2},y:{duration:3.6,repeat:Infinity,ease:'easeInOut'}}}
-      style={{position:'absolute',right:'6%',bottom:'10%',width:'9%',height:'9%',minWidth:'20px',minHeight:'20px',maxWidth:'34px',maxHeight:'34px',background:'transparent',border:'none',padding:0,margin:0,cursor:'pointer',pointerEvents:'auto',zIndex:11,display:'flex',alignItems:'center',justifyContent:'center'}}>
-      {/* Glow halo — pulses gently to invite a click */}
-      <motion.div animate={{opacity:[0.3,0.65,0.3],scale:[0.9,1.2,0.9]}} transition={{duration:2.8,repeat:Infinity,ease:'easeInOut'}}
-        style={{position:'absolute',inset:'-70%',borderRadius:'50%',background:`radial-gradient(circle,${color} 0%,transparent 70%)`,filter:'blur(5px)'}}/>
-      {/* Wings — soft fluttering ellipses */}
-      <motion.div animate={{scaleX:[1,0.55,1]}} transition={{duration:0.85,repeat:Infinity,ease:'easeInOut'}}
-        style={{position:'absolute',width:'150%',height:'85%',borderRadius:'50%',border:`1px solid ${color}`,opacity:0.55}}/>
-      <motion.div animate={{scaleY:[1,0.55,1]}} transition={{duration:0.85,repeat:Infinity,ease:'easeInOut',delay:0.12}}
-        style={{position:'absolute',width:'85%',height:'150%',borderRadius:'50%',border:`1px solid ${color}`,opacity:0.4}}/>
-      {/* Core */}
-      <div style={{position:'relative',width:'42%',height:'42%',borderRadius:'50%',background:'rgba(255,255,255,0.95)',boxShadow:`0 0 6px 2px ${color}`}}/>
-    </motion.button>
-  );
-}
-
-// ─── Entity ────────────────────────────────────────────────────────────────────
-// Anchored at the center of the screen — drifts gently in any direction, then returns.
-// May also wander to a nearby resting point (pos), fading out and back in en route.
-function Entity({es,fc,vis,vsrc,pos,onPixieClick}:{es:ES;fc:string;vis:boolean;vsrc?:string;pos:{x:number;y:number};onPixieClick:()=>void}){
-  const vr=useRef<HTMLVideoElement>(null);const cfg=SC[es];
-  useEffect(()=>{const v=vr.current;if(!v)return;const play=()=>v.play().catch(()=>{});v.addEventListener('canplay',play);if(v.readyState>=3)play();return()=>v.removeEventListener('canplay',play);},[vsrc]);
-  // Outer wrapper animates `left`/`top` only — framer-motion rewrites the
-  // `transform` CSS property for x/y/scale/rotate animations, which would
-  // clobber the static translate(-50%,-50%) centering below. left/top are
-  // safe to animate alongside a static transform.
-  return(
-    <motion.div initial={false} animate={{left:`${pos.x}%`,top:`${pos.y}%`}} transition={{duration:3.2,ease:[0.22,1,0.36,1]}}
-      style={{position:'fixed',transform:'translate(-50%,-50%)',zIndex:10,pointerEvents:'none',display:'flex',alignItems:'center',justifyContent:'center'}}>
-      <motion.div animate={{opacity:[cfg.ao*0.3,cfg.ao*0.6,cfg.ao*0.3]}} transition={{duration:cfg.ps,repeat:Infinity,ease:'easeInOut'}}
-        style={{position:'absolute',width:'22vmin',height:'7vmin',borderRadius:'50%',background:`radial-gradient(ellipse at center,${fc} 0%,transparent 70%)`,filter:'blur(22px)',top:'56%',zIndex:9}}/>
-      <motion.div initial={{opacity:0,scale:0.85,filter:'blur(12px)'}} animate={{opacity:vis?1:0,scale:vis?1:0.85,filter:vis?'blur(0px)':'blur(12px)'}}
-        transition={{opacity:{duration:1.6},scale:{duration:1.8},filter:{duration:1.6}}}
-        style={{position:'relative',zIndex:10,display:'flex',alignItems:'center',justifyContent:'center'}}>
-        <motion.div
-          animate={{scale:cfg.sc,rotate:cfg.ro>0?[0,cfg.ro,0,-cfg.ro,0]:0,x:[0,cfg.dy/2,0,-cfg.dy/2,0],y:[-cfg.dy/2,cfg.dy/2,0,cfg.dy/2,-cfg.dy/2],filter:`brightness(${cfg.br})`}}
-          transition={{scale:{duration:1.2,ease:[0.16,1,0.3,1]},rotate:{duration:cfg.dd*2,repeat:Infinity,ease:'easeInOut'},x:{duration:cfg.dd*1.6,repeat:Infinity,ease:'easeInOut'},y:{duration:cfg.dd,repeat:Infinity,ease:'easeInOut'},filter:{duration:1.0}}}
-          style={{width:'72vmin',height:'72vmin',position:'relative'}}>
-          {vsrc
-            ?<video ref={vr} src={vsrc} autoPlay loop muted playsInline preload="auto" style={{width:'100%',height:'100%',objectFit:'contain',display:'block',mixBlendMode:'screen',background:'transparent'}}/>
-            // eslint-disable-next-line @next/next/no-img-element
-            :<img src="/assets/medha-entity.png" alt="MEDHĀ" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
-          }
-          {/* The record-keeper pixie — perches over the source video's corner
-              watermark and travels with Medhā. Click her to open the transcript. */}
-          {vsrc&&<WatermarkPixie color={fc} onClick={onPixieClick}/>}
-        </motion.div>
-      </motion.div>
-      <AnimatePresence>
-        {(es==='responding'||es==='voice-active')&&(
-          <motion.div initial={{scale:0.8,opacity:0}} animate={{scale:[1,1.08,1],opacity:[0.06,0.12,0.06]}} exit={{opacity:0}}
-            transition={{duration:cfg.ps,repeat:Infinity}}
-            style={{position:'absolute',width:'46vmin',height:'46vmin',borderRadius:'50%',border:`1px solid ${fc}`,zIndex:8}}/>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
 
 // ─── Message bubble ────────────────────────────────────────────────────────────
 // Renders inline in the transcript — no floating/roaming position of its own.
@@ -530,7 +444,7 @@ export default function MedhaHUD(){
         />
       )}
       {mounted&&<PB color={burstColor} active={burst} ex={entityPos.x/100} ey={entityPos.y/100}/>}
-      {mounted&&<NeuralRail count={messages.filter(m=>m.role==='user').length} color={fc}/>}
+      {mounted&&<VerticalChatRail messages={messages} facultyColor={fc} onOpenTranscript={()=>setShowTranscript(v=>!v)}/>}
       {mounted&&stream.active&&(
         <CosmicStream
           active={stream.active}
@@ -563,14 +477,6 @@ export default function MedhaHUD(){
       {/* Composer — always visible, slim bar at the bottom */}
       <div style={{position:'fixed',left:0,right:'auto',width:'min(52vw, 520px)',bottom:0,zIndex:42,padding:'8px 14px 22px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(5,2,15,0.4), rgba(5,2,15,0) 110px)'}}>
         <div style={{maxWidth:'min(48vw, 480px)',margin:'0',pointerEvents:'auto'}}>
-          <NeuralStrip
-            messages={messages}
-            facultyColor={fc}
-            onEditMessage={(id, content) => {
-              setMessages(prev => prev.map(m => m.id === id ? { ...m, content } : m));
-            }}
-            onOpenTranscript={() => setShowTranscript(v => !v)}
-          />
           {/* Faculty selector */}
           <div style={{marginBottom:'8px',position:'relative'}}>
             <FacultySel mode={mode} onSelect={k=>{actModel(k);setStardustColor(FC[k]);setStardustActive(true);}}/>
