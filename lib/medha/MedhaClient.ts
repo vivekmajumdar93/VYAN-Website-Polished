@@ -82,22 +82,31 @@ async function fetchPollinations(
   history: ChatMessage[],
   signal?: AbortSignal,
 ): Promise<string> {
-  const userPrompt = buildUserPrompt(history);
-  if (!userPrompt) throw new Error('Empty prompt');
+  // POST to Pollinations' OpenAI-compatible endpoint — full history, no URL limits
+  const messages = [
+    { role: 'system', content: trim(mode.systemPrompt, MAX_SYSTEM_CHARS) },
+    ...history.filter(m => m.role !== 'system'),
+  ];
 
-  const params = new URLSearchParams({
-    model: mode.pollinationsModel,
-    system: trim(mode.systemPrompt, MAX_SYSTEM_CHARS),
-    seed: String(Math.floor(Math.random() * 1e9)),
+  const res = await fetch(`${POLLINATIONS_BASE}/openai`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({
+      model: 'openai',
+      messages,
+      max_tokens: 700,
+      temperature: 0.85,
+      seed: Math.floor(Math.random() * 1e9),
+    }),
   });
 
-  const url = `${POLLINATIONS_BASE}/${encodeURIComponent(userPrompt)}?${params.toString()}`;
-  const res = await fetch(url, { signal });
-  const text = await res.text();
+  const data = await res.json().catch(() => ({}));
+  const text: string = data?.choices?.[0]?.message?.content?.trim?.() ?? '';
   if (!res.ok || isPollinationsError(text)) {
     throw new Error('Pollinations transient error');
   }
-  return text.trim();
+  return text;
 }
 
 /** One-shot completion with single retry on transient failure.

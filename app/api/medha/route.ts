@@ -1,10 +1,11 @@
 // Server-side LLM proxy for Medhā chat.
-// Priority: Gemini Direct → Emergent → Pollinations (last resort).
+// Priority: Gemini Direct → Emergent → Pollinations (last resort, free, no key).
 // The Gemini key is server-side only — never exposed to the client.
 
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 45; // Vercel function max — give Pollinations time
 
 type Msg = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -69,20 +70,27 @@ async function callEmergent(messages: Msg[]): Promise<string | null> {
 }
 
 async function callPollinations(messages: Msg[]): Promise<string | null> {
+  // Uses Pollinations' OpenAI-compatible POST endpoint — free, no key, full history
   try {
-    const lastUser = [...messages].reverse().find(m => m.role === 'user')?.content || '';
-    if (!lastUser) return null;
-    const sys = messages.find(m => m.role === 'system')?.content || '';
-    const params = new URLSearchParams({
-      model: 'openai',
-      system: sys.slice(0, 300),
-      seed: String(Math.floor(Math.random() * 1e9)),
-    });
-    const url = `https://text.pollinations.ai/${encodeURIComponent(lastUser.slice(0, 1200))}?${params.toString()}`;
-    const res = await withTimeout(fetch(url), 12000);
-    const text = await res.text();
-    if (!res.ok || !text || text.includes('"error"')) return null;
-    return text.trim();
+    const res = await withTimeout(
+      fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'openai',
+          messages: messages.map(m => ({ role: m.role, content: m.content })),
+          max_tokens: 700,
+          temperature: 0.85,
+          seed: Math.floor(Math.random() * 1e9),
+        }),
+      }),
+      18000,
+    );
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const text = data?.choices?.[0]?.message?.content?.trim?.() ?? null;
+    if (!text || text.includes('"error"')) return null;
+    return text;
   } catch {
     return null;
   }
