@@ -12,229 +12,250 @@ export const FACULTIES = [
   { key: 'sanchara', name: 'Sañcāra',  desc: 'Transmission & relay',     color: '#e8b94f' },
 ]
 
-// ─── Pendant positions — invisible hotspots over video orbs ───────────────────
-const HANGINGS = [
-  { id: 'back',     top: 18, right: 26, size: 16, title: 'Śūnya' },
-  { id: 'faculty',  top: 38, right: 28, size: 14, title: 'Faculty' },
-  { id: 'settings', top: 52, right: 18, size: 12, title: 'Settings' },
-]
+// 5 equally-spaced angles around entity: top, upper-right, lower-right, lower-left, upper-left
+const RING_ANGLES_DEG = [-90, -18, 54, 126, 198]
 
-// CSS animation strings — swing + glow pulse, staggered per pendant
-const PENDANT_ANIMATIONS = [
-  'pendantSwing 4s ease-in-out 0s infinite, pendantPulse 3s ease-in-out 0s infinite',
-  'pendantSwing 5s ease-in-out 0.8s infinite, pendantPulse 3s ease-in-out 1s infinite',
-  'pendantSwing 4.5s ease-in-out 1.6s infinite, pendantPulse 3s ease-in-out 2s infinite',
-]
-
-// Offsets (in viewport %) from entity centre — places buttons in a ring around Medhā
-const FACULTY_OFFSETS = [
-  { dx: -18, dy: -22 },  // upper-left
-  { dx:  16, dy: -20 },  // upper-right
-  { dx:  26, dy:   2 },  // right
-  { dx:  14, dy:  20 },  // lower-right
-  { dx: -16, dy:  20 },  // lower-left
-]
-
-// ─── Faculty floater button ────────────────────────────────────────────────────
-interface FacultyButtonProps {
-  faculty: typeof FACULTIES[0]
-  index: number
-  posX: number  // viewport % left
-  posY: number  // viewport % top
-  onSelect: (key: string, color: string) => void
+function clampVal(min: number, max: number, val: number) {
+  return Math.max(min, Math.min(max, val))
 }
 
-function FacultyButton({ faculty, index, posX, posY, onSelect }: FacultyButtonProps) {
-  const floatDX = (Math.random() - 0.5) * 6
-  const floatDY = (Math.random() - 0.5) * 4
-  const duration = 8 + Math.random() * 6
-
-  return (
-    <motion.button
-      initial={{ opacity: 0, scale: 0, x: '-50%', y: '-50%' }}
-      animate={{
-        opacity: 1, scale: 1,
-        x: ['-50%', `calc(-50% + ${floatDX}px)`, '-50%'],
-        y: ['-50%', `calc(-50% + ${floatDY}px)`, '-50%'],
-      }}
-      exit={{ opacity: 0, scale: 0 }}
-      transition={{
-        opacity: { duration: 0.4, delay: index * 0.35 },
-        scale: { duration: 0.4, delay: index * 0.35, ease: [0.16, 1, 0.3, 1] },
-        x: { duration, repeat: Infinity, ease: 'easeInOut', delay: index * 0.3 },
-        y: { duration: duration * 0.8, repeat: Infinity, ease: 'easeInOut', delay: index * 0.2 },
-      }}
-      onClick={() => onSelect(faculty.key, faculty.color)}
-      style={{
-        position: 'fixed',
-        left: `${Math.max(2, Math.min(90, posX))}%`,
-        top: `${Math.max(5, Math.min(88, posY))}%`,
-        width: '88px', height: '88px',
-        borderRadius: '50%',
-        background: `radial-gradient(circle at 35% 35%, ${faculty.color}28, ${faculty.color}10)`,
-        border: `1px solid ${faculty.color}50`,
-        backdropFilter: 'blur(12px)',
-        cursor: 'pointer',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: '4px', zIndex: 80,
-        boxShadow: `0 0 24px ${faculty.color}25, inset 0 0 20px ${faculty.color}10`,
-      }}
-    >
-      {/* Color dot */}
-      <div style={{
-        width: '8px', height: '8px', borderRadius: '50%',
-        background: faculty.color,
-        backgroundColor: faculty.color,
-        boxShadow: `0 0 8px ${faculty.color}`,
-        marginBottom: '2px',
-      }} />
-      {/* Faculty name */}
-      <div style={{
-        fontFamily: 'Georgia, serif', fontSize: '11px',
-        letterSpacing: '0.1em', color: faculty.color,
-        textTransform: 'uppercase',
-        background: 'none',
-        backgroundColor: 'transparent',
-      }}>
-        {faculty.name}
-      </div>
-      {/* Faculty description */}
-      <div style={{
-        fontFamily: 'system-ui', fontSize: '8px',
-        letterSpacing: '0.08em', color: 'rgba(255,255,255,0.4)',
-        textAlign: 'center', padding: '0 6px',
-        lineHeight: 1.3,
-        background: 'none',
-        backgroundColor: 'transparent',
-      }}>
-        {faculty.desc}
-      </div>
-    </motion.button>
-  )
+function getFacultyPos(index: number, entityPos: { x: number; y: number }) {
+  const rad = (RING_ANGLES_DEG[index] * Math.PI) / 180
+  const rx = 23   // % of viewport width
+  const ry = 20   // % of viewport height
+  return {
+    x: clampVal(6, 88, entityPos.x + rx * Math.cos(rad)),
+    y: clampVal(6, 82, entityPos.y + ry * Math.sin(rad)),
+  }
 }
 
-// ─── Main hanging orbs component ──────────────────────────────────────────────
+// ─── Main component ────────────────────────────────────────────────────────────
 interface HangingOrbsProps {
   onSettingsOpen: () => void
   onFacultySelect: (key: string, color: string) => void
   onBack: () => void
   activeFaculty: string
-  entityPos?: { x: number; y: number }  // entity centre in viewport %
+  entityPos?: { x: number; y: number }
+  onFacultyOpenChange?: (open: boolean) => void
 }
 
 export function HangingOrbs({
-  onSettingsOpen, onFacultySelect, onBack, activeFaculty, entityPos,
+  onSettingsOpen, onFacultySelect, onBack, activeFaculty,
+  entityPos = { x: 50, y: 42 },
+  onFacultyOpenChange,
 }: HangingOrbsProps) {
   const [showFaculty, setShowFaculty] = useState(false)
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
 
-  const handleHangingTap = useCallback((id: string) => {
-    if (id === 'settings') onSettingsOpen()
-    if (id === 'faculty') setShowFaculty(v => !v)
-    if (id === 'back') onBack()
-  }, [onSettingsOpen, onBack])
+  const toggleFaculty = useCallback(() => {
+    setShowFaculty(v => {
+      const next = !v
+      onFacultyOpenChange?.(next)
+      return next
+    })
+  }, [onFacultyOpenChange])
 
   const handleFacultySelect = useCallback((key: string, color: string) => {
     setShowFaculty(false)
+    onFacultyOpenChange?.(false)
     onFacultySelect(key, color)
-  }, [onFacultySelect])
+  }, [onFacultySelect, onFacultyOpenChange])
+
+  const closeFaculty = useCallback(() => {
+    setShowFaculty(false)
+    onFacultyOpenChange?.(false)
+  }, [onFacultyOpenChange])
 
   return (
     <>
-      <style>{`
-        @keyframes pendantPulse {
-          0%   { box-shadow: 0 0 0px rgba(255,200,80,0); }
-          50%  { box-shadow: 0 0 22px rgba(255,200,80,0.55), 0 0 40px rgba(255,160,40,0.25); }
-          100% { box-shadow: 0 0 0px rgba(255,200,80,0); }
-        }
-        @keyframes pendantSwing {
-          0%   { transform: rotate(-2deg); }
-          50%  { transform: rotate(2deg); }
-          100% { transform: rotate(-2deg); }
-        }
-      `}</style>
-
-      {/* Pendant hotspot divs — position:fixed so they anchor to viewport, not a container */}
-      {HANGINGS.map((h, i) => (
-        <div
-          key={h.id}
-          style={{
-            position: 'fixed',
-            right: `${h.right}%`,
-            top: `${h.top}%`,
-            zIndex: 15,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            transformOrigin: 'top center',
-            animation: PENDANT_ANIMATIONS[i],
-            cursor: 'pointer',
-            background: 'none',
-            backgroundColor: 'transparent',
-          }}
-          onMouseEnter={() => setHoveredIdx(i)}
-          onMouseLeave={() => setHoveredIdx(null)}
-          onClick={() => handleHangingTap(h.id)}
+      {/* ── Three nav buttons — fade out when faculty ring opens ───────────── */}
+      {/* Outer wrapper handles shared opacity + pointer-events */}
+      <motion.div
+        animate={{ opacity: showFaculty ? 0 : 1 }}
+        transition={{ duration: 0.3 }}
+        style={{ pointerEvents: showFaculty ? 'none' : 'auto' }}
+      >
+        {/* Back — pill / elongated capsule, gold */}
+        <motion.div
+          animate={{ y: [0, -7, 0] }}
+          transition={{ duration: 4.6, repeat: Infinity, ease: 'easeInOut', delay: 0 }}
+          style={{ position: 'fixed', left: 'clamp(14px, 3.5vw, 28px)', top: 'clamp(14px, 3.5vh, 26px)', zIndex: 70 }}
         >
-          {/* Invisible orb hitzone */}
-          <div style={{
-            width: `${h.size * 3}px`,
-            height: `${h.size * 3}px`,
-            borderRadius: '50%',
-            background: 'none',
-            backgroundColor: 'transparent',
-            border: 'none',
-            boxShadow: hoveredIdx === i ? '0 0 18px rgba(255,200,80,0.35)' : undefined,
-            position: 'relative',
-            transition: 'box-shadow 0.2s',
-          }}>
-            {/* Hover label */}
-            <div style={{
-              position: 'absolute',
-              bottom: '-18px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              fontSize: '8px',
-              letterSpacing: '0.2em',
-              color: 'rgba(255,200,80,0.7)',
+          <button
+            onClick={onBack}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '7px',
+              background: 'linear-gradient(135deg, rgba(232,175,52,0.18) 0%, rgba(200,130,28,0.10) 100%)',
+              border: '1px solid rgba(232,175,52,0.42)',
+              borderRadius: '100px',
+              padding: '9px 20px 9px 14px',
+              color: '#e8b036',
+              fontSize: '11px', letterSpacing: '0.22em', textTransform: 'uppercase',
+              fontFamily: 'system-ui', cursor: 'pointer',
+              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+              boxShadow: '0 0 22px rgba(232,175,52,0.16), inset 0 0 14px rgba(232,175,52,0.06)',
               whiteSpace: 'nowrap',
-              fontFamily: 'system-ui',
-              textTransform: 'uppercase',
-              pointerEvents: 'none',
-              opacity: hoveredIdx === i ? 1 : 0,
-              transition: 'opacity 0.2s',
-              background: 'none',
-              backgroundColor: 'transparent',
-            }}>
-              {h.title}
-            </div>
-          </div>
-        </div>
-      ))}
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
+            </svg>
+            Śūnya
+          </button>
+        </motion.div>
 
-      {/* Faculty floaters */}
+        {/* Faculty toggle — diamond / rhombus, amber-gold */}
+        <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ duration: 5.3, repeat: Infinity, ease: 'easeInOut', delay: 1.1 }}
+          style={{
+            position: 'fixed', left: '50%', top: 'clamp(10px, 2.5vh, 20px)',
+            transform: 'translateX(-50%)', zIndex: 70,
+          }}
+        >
+          <button
+            onClick={toggleFaculty}
+            aria-label="Faculty selector"
+            style={{
+              width: '58px', height: '58px',
+              background: 'transparent', border: 'none',
+              cursor: 'pointer', padding: 0, position: 'relative',
+            }}
+          >
+            {/* Diamond shape — rotated square */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(135deg, rgba(220,148,38,0.22) 0%, rgba(172,104,14,0.12) 100%)',
+              border: '1px solid rgba(220,148,38,0.48)',
+              transform: 'rotate(45deg) scale(0.78)',
+              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+              boxShadow: '0 0 30px rgba(220,148,38,0.22), inset 0 0 18px rgba(220,148,38,0.08)',
+              borderRadius: '5px',
+            }}/>
+            {/* Icon — centered, counter-rotated */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '19px', color: '#dc9424',
+              textShadow: '0 0 14px rgba(220,148,38,0.70)',
+            }}>
+              ✦
+            </div>
+          </button>
+        </motion.div>
+
+        {/* Settings — circle, warm copper-gold */}
+        <motion.div
+          animate={{ y: [0, -5, 0] }}
+          transition={{ duration: 3.9, repeat: Infinity, ease: 'easeInOut', delay: 2.3 }}
+          style={{ position: 'fixed', right: 'clamp(14px, 3.5vw, 28px)', top: 'clamp(18px, 4.5vh, 34px)', zIndex: 70 }}
+        >
+          <button
+            onClick={onSettingsOpen}
+            style={{
+              width: '46px', height: '46px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(200,118,26,0.24) 0%, rgba(154,82,8,0.13) 100%)',
+              border: '1px solid rgba(200,118,26,0.44)',
+              color: '#c87818',
+              fontSize: '20px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+              boxShadow: '0 0 20px rgba(200,118,26,0.20), inset 0 0 13px rgba(200,118,26,0.07)',
+            }}
+          >
+            ⚙
+          </button>
+        </motion.div>
+      </motion.div>
+
+      {/* ── Faculty ring ──────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showFaculty && (
           <>
+            {/* Backdrop — click to close */}
             <motion.div
+              key="faculty-backdrop"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setShowFaculty(false)}
-              style={{ position: 'fixed', inset: 0, zIndex: 79, background: 'none', backgroundColor: 'transparent' }}
+              transition={{ duration: 0.25 }}
+              onClick={closeFaculty}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 79,
+                background: 'rgba(0,0,0,0.30)',
+                backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
+              }}
             />
+
+            {/* Faculty buttons — staggered one-by-one around entity */}
             {FACULTIES.map((f, i) => {
-              const ex = entityPos?.x ?? 25
-              const ey = entityPos?.y ?? 38
-              const off = FACULTY_OFFSETS[i] ?? { dx: 0, dy: 0 }
+              const pos = getFacultyPos(i, entityPos)
+              const isActive = activeFaculty === f.key
               return (
-                <FacultyButton
+                <motion.div
                   key={f.key}
-                  faculty={f}
-                  index={i}
-                  posX={ex + off.dx}
-                  posY={ey + off.dy}
-                  onSelect={handleFacultySelect}
-                />
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{
+                    opacity: 0, scale: 0,
+                    transition: { duration: 0.22, delay: (FACULTIES.length - 1 - i) * 0.06, ease: 'easeIn' },
+                  }}
+                  transition={{ duration: 0.48, delay: i * 0.13, ease: [0.16, 1, 0.3, 1] }}
+                  style={{
+                    position: 'fixed',
+                    left: `${pos.x}%`,
+                    top: `${pos.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 82,
+                  }}
+                >
+                  {/* Inner float animation */}
+                  <motion.div
+                    animate={{ y: [0, -8, 0] }}
+                    transition={{ duration: 3.4 + i * 0.65, repeat: Infinity, ease: 'easeInOut', delay: i * 0.45 }}
+                  >
+                    <button
+                      onClick={() => handleFacultySelect(f.key, f.color)}
+                      style={{
+                        width: '82px', height: '82px',
+                        borderRadius: '50%',
+                        background: `radial-gradient(circle at 35% 32%, ${f.color}32 0%, ${f.color}0e 100%)`,
+                        border: `1px solid ${f.color}${isActive ? 'aa' : '55'}`,
+                        backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+                        cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        gap: '5px', padding: 0,
+                        boxShadow: isActive
+                          ? `0 0 32px ${f.color}45, 0 0 60px ${f.color}18, inset 0 0 24px ${f.color}14`
+                          : `0 0 22px ${f.color}22, inset 0 0 18px ${f.color}0a`,
+                        outline: isActive ? `2px solid ${f.color}70` : 'none',
+                        outlineOffset: '4px',
+                        transition: 'box-shadow 0.3s, outline 0.3s',
+                      }}
+                    >
+                      <div style={{
+                        width: '8px', height: '8px', borderRadius: '50%',
+                        background: f.color,
+                        boxShadow: `0 0 9px ${f.color}, 0 0 18px ${f.color}80`,
+                      }}/>
+                      <div style={{
+                        fontFamily: "'Cormorant Garamond', Georgia, serif",
+                        fontSize: '11px', letterSpacing: '0.09em',
+                        color: f.color, textAlign: 'center',
+                        textShadow: `0 0 10px ${f.color}90`,
+                      }}>
+                        {f.name}
+                      </div>
+                      <div style={{
+                        fontFamily: 'system-ui', fontSize: '7.5px',
+                        color: 'rgba(255,255,255,0.38)',
+                        textAlign: 'center', padding: '0 7px',
+                        lineHeight: 1.35, letterSpacing: '0.04em',
+                      }}>
+                        {f.desc}
+                      </div>
+                    </button>
+                  </motion.div>
+                </motion.div>
               )
             })}
           </>

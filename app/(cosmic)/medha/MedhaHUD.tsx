@@ -442,25 +442,20 @@ export default function MedhaHUD(){
         />
       )}
 
-      {/* Header */}
-      <div style={{position:'fixed',top:0,left:0,right:0,zIndex:50,padding:'16px 18px',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-        <button onClick={back} style={{display:'flex',alignItems:'center',gap:'6px',background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'5px 12px',cursor:'pointer',color:'rgba(255,255,255,0.35)',fontSize:'10px',letterSpacing:'0.2em',textTransform:'uppercase',fontFamily:'system-ui'}}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Śūnya
-        </button>
-        <div style={{textAlign:'center'}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'12px',letterSpacing:'0.35em',color:'rgba(255,255,255,0.7)',textTransform:'uppercase'}}>MEDHĀ</div>
-          <div style={{fontSize:'9px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.25)',fontFamily:'system-ui',marginTop:'2px',textTransform:'uppercase'}}>
+      {/* Header — title + history only; Back/Settings/Faculty float via HangingOrbs */}
+      <div style={{position:'fixed',top:0,left:0,right:0,zIndex:50,padding:'16px 18px',display:'flex',justifyContent:'center',alignItems:'flex-start',pointerEvents:'none'}}>
+        <div style={{textAlign:'center',pointerEvents:'auto'}}>
+          <div style={{fontFamily:'Georgia,serif',fontSize:'12px',letterSpacing:'0.35em',color:'rgba(255,255,255,0.55)',textTransform:'uppercase'}}>MEDHĀ</div>
+          <div style={{fontSize:'9px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.20)',fontFamily:'system-ui',marginTop:'2px',textTransform:'uppercase'}}>
             {es.toUpperCase()}
           </div>
         </div>
-        <div style={{display:'flex',gap:'6px'}}>
-          <button onClick={()=>setShowChatHistory(true)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',color:'rgba(255,255,255,0.3)',fontSize:'10px',letterSpacing:'0.18em',textTransform:'uppercase',padding:'5px 9px',cursor:'pointer',fontFamily:'system-ui'}}>⟲</button>
-          <button onClick={()=>setShowSettings(true)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',color:'rgba(255,255,255,0.35)',fontSize:'13px',padding:'4px 9px',cursor:'pointer'}}>⚙</button>
-        </div>
+        {/* Chat history — anchored top-right, still accessible */}
+        <button onClick={()=>setShowChatHistory(true)} style={{position:'fixed',top:'14px',right:'clamp(68px,16vw,90px)',background:'transparent',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',color:'rgba(255,255,255,0.28)',fontSize:'10px',letterSpacing:'0.18em',textTransform:'uppercase',padding:'5px 9px',cursor:'pointer',fontFamily:'system-ui',zIndex:50}}>⟲</button>
       </div>
 
-      {/* Composer — bottom-right; covers watermark on the Hailuo video */}
-      <div style={{position:'fixed',right:0,left:'auto',width:'clamp(280px,55vw,520px)',bottom:0,zIndex:42,padding:'8px 14px 22px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(5,2,15,0.55), rgba(5,2,15,0) 120px)'}}>
+      {/* Composer — bottom-right; darker gradient fully covers Hailuo watermark */}
+      <div style={{position:'fixed',right:0,left:'auto',width:'clamp(300px,62vw,560px)',bottom:0,zIndex:42,padding:'8px 14px 10px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(3,1,10,0.97) 0px, rgba(3,1,10,0.90) 18px, rgba(3,1,10,0.60) 55px, rgba(3,1,10,0.18) 100px, transparent 148px)'}}>
         <div style={{maxWidth:'clamp(260px,50vw,480px)',margin:'0 0 0 auto',pointerEvents:'auto'}}>
           {/* Faculty selector */}
           <div style={{marginBottom:'8px',position:'relative'}}>
@@ -591,7 +586,7 @@ export default function MedhaHUD(){
         />
       )}
 
-      {/* Hanging orbs on gazebo */}
+      {/* Floating nav buttons + faculty ring */}
       <HangingOrbs
         onSettingsOpen={() => setShowSettings(true)}
         onFacultySelect={handleFacultyFromOrb}
