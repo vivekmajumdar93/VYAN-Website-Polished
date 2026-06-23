@@ -72,20 +72,22 @@ export function FloatingText({
 }: FloatingTextProps) {
   const isAssistant = role === 'assistant'
 
+  // Assistant: upper-right — sits in the starfield above the arch, clear of butterfly
+  // User: lower-left — above the rail dots, clear of the bottom-right composer
   const outerStyle: React.CSSProperties = isAssistant
     ? {
         position: 'fixed',
-        left: '52%',
-        top: '35%',
-        width: 'min(34vw, 320px)',
+        right: 'clamp(12px, 3vw, 28px)',
+        top: 'clamp(72px, 10vh, 110px)',
+        width: 'clamp(200px, 32vw, 340px)',
         zIndex: 35,
         pointerEvents: 'none',
       }
     : {
         position: 'fixed',
-        left: '14px',
-        bottom: '152px',
-        width: 'min(44vw, 400px)',
+        left: 'clamp(38px, 5vw, 52px)',
+        bottom: 'clamp(140px, 18vh, 180px)',
+        width: 'clamp(200px, 36vw, 380px)',
         zIndex: 35,
         pointerEvents: 'none',
       }

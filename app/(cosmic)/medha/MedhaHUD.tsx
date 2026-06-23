@@ -50,11 +50,9 @@ const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number
   switching:       {sc:1.070,br:1.20,ro:0,  dy:5, dd:2.2,ao:0.26,ps:1.6},
 };
 
-// ─── Entity home position ─────────────────────────────────────────────────────
-// Medhā's home is the exact center of the screen. Her idle float drifts gently
-// in any direction from this anchor; she also occasionally wanders to a nearby
-// resting point (see entityPos state) and returns.
-const ENTITY_POS = { x: 25, y: 38 };
+// ─── Entity anchor ────────────────────────────────────────────────────────────
+// The butterfly in medha-entity.mp4 sits at the visual centre of the frame.
+const ENTITY_POS = { x: 50, y: 42 };
 
 // ─── Void canvas ───────────────────────────────────────────────────────────────
 function VoidCanvas(){
@@ -461,9 +459,9 @@ export default function MedhaHUD(){
         </div>
       </div>
 
-      {/* Composer — always visible, slim bar at the bottom */}
-      <div style={{position:'fixed',left:0,right:'auto',width:'min(52vw, 520px)',bottom:0,zIndex:42,padding:'8px 14px 22px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(5,2,15,0.4), rgba(5,2,15,0) 110px)'}}>
-        <div style={{maxWidth:'min(48vw, 480px)',margin:'0',pointerEvents:'auto'}}>
+      {/* Composer — bottom-right; covers watermark on the Hailuo video */}
+      <div style={{position:'fixed',right:0,left:'auto',width:'clamp(280px,55vw,520px)',bottom:0,zIndex:42,padding:'8px 14px 22px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(5,2,15,0.55), rgba(5,2,15,0) 120px)'}}>
+        <div style={{maxWidth:'clamp(260px,50vw,480px)',margin:'0 0 0 auto',pointerEvents:'auto'}}>
           {/* Faculty selector */}
           <div style={{marginBottom:'8px',position:'relative'}}>
             <FacultySel mode={mode} onSelect={k=>{actModel(k);setStardustColor(FC[k]);setStardustActive(true);}}/>
@@ -678,7 +676,7 @@ function FacultySel({mode,onSelect}:{mode:CognitiveModeKey;onSelect:(k:Cognitive
       <AnimatePresence>
         {open&&(
           <motion.div initial={{opacity:0,y:-8,scale:0.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-8,scale:0.96}} transition={{duration:0.18}}
-            style={{position:'absolute',bottom:'100%',left:0,marginBottom:'8px',background:'rgba(0,0,0,0.97)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'14px',padding:'6px',minWidth:'220px',zIndex:100,backdropFilter:'blur(20px)'}}>
+            style={{position:'absolute',bottom:'100%',right:0,marginBottom:'8px',background:'rgba(0,0,0,0.97)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'14px',padding:'6px',minWidth:'220px',zIndex:100,backdropFilter:'blur(20px)'}}>
             {COGNITIVE_MODES.map(m=>(
               <button key={m.key} onClick={()=>{onSelect(m.key);setOpen(false);}}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'9px 11px',background:mode===m.key?'rgba(255,255,255,0.05)':'transparent',border:'none',borderRadius:'9px',cursor:'pointer',textAlign:'left'}}>
