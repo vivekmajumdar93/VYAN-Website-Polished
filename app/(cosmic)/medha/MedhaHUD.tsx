@@ -429,6 +429,29 @@ export default function MedhaHUD(){
       {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
       {mounted&&<VoidCanvas/>}
       {mounted&&<MedhaLair lairVideoSrc="/assets/medha-lair.mp4"/>}
+
+      {/* Entity — Hailuo-generated Medhā, blended over the lair scene */}
+      {mounted&&(
+        <video
+          key="medha-entity"
+          src="/assets/medha-entity.mp4"
+          autoPlay loop muted playsInline preload="auto"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'clamp(260px, 52vmin, 480px)',
+            height: 'clamp(260px, 52vmin, 480px)',
+            objectFit: 'contain',
+            zIndex: 6,
+            pointerEvents: 'none',
+            mixBlendMode: 'screen',
+            filter: `brightness(1.9) saturate(1.6) drop-shadow(0 0 22px ${fc}80)`,
+          }}
+        />
+      )}
+
       {mounted&&<PB color={burstColor} active={burst} ex={ENTITY_POS.x/100} ey={ENTITY_POS.y/100}/>}
       {mounted&&<VerticalChatRail messages={messages} facultyColor={fc} onOpenTranscript={()=>setShowTranscript(v=>!v)} onEditMessage={editMessage} onRegenerate={regenerateFrom}/>}
       {mounted&&stream.active&&(

@@ -18,8 +18,11 @@ export function MedhaLair({ lairVideoSrc = '/assets/medha-lair.mp4' }: { lairVid
     v.preload    = 'auto'
 
     const startScrub = () => {
-      v.pause()
-      v.currentTime  = 0
+      // Prime the decoder — browsers won't render frames without an initial play() call
+      v.play().catch(() => {}).finally(() => {
+        v.pause()
+        v.currentTime = 0
+      })
       dirRef.current = 1
 
       const scrub = () => {
