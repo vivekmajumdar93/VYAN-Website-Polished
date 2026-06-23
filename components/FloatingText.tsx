@@ -7,7 +7,6 @@ interface FloatingTextProps {
   text: string
   role: 'assistant' | 'user'
   facultyColor: string
-  roamPos: { x: number; y: number }
   visible: boolean
   userColor?: string
 }
@@ -18,24 +17,18 @@ function renderMarkdown(raw: string, color: string): React.ReactNode[] {
   const output: React.ReactNode[] = []
 
   lines.forEach((line, li) => {
-    // Skip pure table-separator lines (e.g. |---|---|)
     if (/^\|[\s\-|]+\|$/.test(line.trim())) return
 
-    // Strip surrounding pipe characters used in table-style output (| text |)
     let stripped = line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').trim()
-    // Also collapse internal pipes into " — " for table cells
     stripped = stripped.replace(/\s*\|\s*/g, ' — ')
 
-    // Strip heading markers (## Heading → plain text)
     const headingMatch = stripped.match(/^#{1,6}\s+(.+)$/)
     const cleanLine = headingMatch ? headingMatch[1] : stripped
 
-    // Bullet line: starts with `* ` or `- ` or `• `
     const bulletMatch = cleanLine.match(/^[\*\-•]\s+(.+)$/)
     const content = bulletMatch ? bulletMatch[1] : cleanLine
     const prefix = bulletMatch ? '• ' : ''
 
-    // Inline: split on **bold** and *italic*
     const inlineNodes: React.ReactNode[] = []
     const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|_(.+?)_)/g
     let cursor = 0
@@ -44,14 +37,12 @@ function renderMarkdown(raw: string, color: string): React.ReactNode[] {
     while ((m = regex.exec(content)) !== null) {
       if (m.index > cursor) inlineNodes.push(content.slice(cursor, m.index))
       if (m[2]) {
-        // **bold**
         inlineNodes.push(
           <strong key={`${li}-b-${ki}`} style={{ fontWeight: 700, color }}>
             {m[2]}
           </strong>
         )
       } else {
-        // *italic* or _italic_
         const inner = m[3] ?? m[4]
         inlineNodes.push(
           <em key={`${li}-i-${ki}`} style={{ fontStyle: 'italic' }}>
@@ -77,19 +68,18 @@ function renderMarkdown(raw: string, color: string): React.ReactNode[] {
 }
 
 export function FloatingText({
-  text, role, facultyColor, roamPos, visible, userColor = '#d4a853',
+  text, role, facultyColor, visible, userColor = '#d4a853',
 }: FloatingTextProps) {
   const isAssistant = role === 'assistant'
 
   const outerStyle: React.CSSProperties = isAssistant
     ? {
         position: 'fixed',
-        left: `${Math.min(roamPos.x + 15, 56)}%`,
-        top: `${Math.max(roamPos.y - 14, 8)}%`,
+        left: '52%',
+        top: '35%',
         width: 'min(34vw, 320px)',
         zIndex: 35,
         pointerEvents: 'none',
-        transition: 'left 2.8s cubic-bezier(0.16,1,0.3,1), top 2.8s cubic-bezier(0.16,1,0.3,1)',
       }
     : {
         position: 'fixed',

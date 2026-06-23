@@ -217,8 +217,6 @@ export default function MedhaHUD(){
   const [floatingRole, setFloatingRole] = useState<'assistant'|'user'>('assistant');
   const [floatingVisible, setFloatingVisible] = useState(false);
   const [userColor, setUserColor] = useState('#d4a853');
-  const [entityExcited, setEntityExcited] = useState(false);
-  const [showConvList, setShowConvList]   = useState(false);
   const[showSettings,setShowSettings]=useState(false);const[listening,setListening]=useState(false);
   const[ttsEnabled,setTtsEnabled]=useState(false);const[chats,setChats]=useState<StoredChat[]>([]);
   const[responseStyle,setResponseStyle]=useState<'concise'|'balanced'|'detailed'>('balanced');
@@ -230,10 +228,6 @@ export default function MedhaHUD(){
   const[es,setEs]=useState<ES>('dormant');
   const[burst,setBurst]=useState(false);const[burstColor,setBurstColor]=useState('#e8e4ff');
   const[mounted,setMounted]=useState(false);
-  // Medhā's wandering — she rests at center, occasionally fades and drifts elsewhere, then returns.
-  const[entityPos,setEntityPos]=useState({x:ENTITY_POS.x,y:ENTITY_POS.y});
-  const[entityVisible,setEntityVisible]=useState(true);
-  const travelRef=useRef<ReturnType<typeof setTimeout>|null>(null);
   const { stream, triggerStream, handleStreamComplete } = useCosmicStream();
   // Ambient stream timer
   const ambientStreamRef = useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -259,30 +253,6 @@ export default function MedhaHUD(){
     scheduleAmbient();
     return () => { if (ambientStreamRef.current) clearTimeout(ambientStreamRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-
-  // Ambient wandering — Medhā occasionally dissolves, drifts to a nearby
-  // point (or returns home), and re-materialises. Always within reach of center.
-  useEffect(()=>{
-    let alive=true;
-    const cycle=()=>{
-      travelRef.current=setTimeout(()=>{
-        if(!alive)return;
-        setEntityVisible(false);
-        setTimeout(()=>{
-          if(!alive)return;
-          const goHome=Math.random()<0.4;
-          setEntityPos(goHome?{x:ENTITY_POS.x,y:ENTITY_POS.y}:{
-            x:Math.min(40,Math.max(15,ENTITY_POS.x+(Math.random()-0.5)*22)),
-            y:Math.min(56,Math.max(24,ENTITY_POS.y+(Math.random()-0.5)*24)),
-          });
-          setEntityVisible(true);
-          cycle();
-        },1800);
-      },28000+Math.random()*32000);
-    };
-    cycle();
-    return()=>{alive=false;if(travelRef.current)clearTimeout(travelRef.current);};
   },[]);
 
   // Init
@@ -458,26 +428,16 @@ export default function MedhaHUD(){
     <div className="mlv" data-mode={mode} style={{position:'fixed',inset:0,width:'100vw',height:'100vh',background:'#000',overflow:'hidden'}}>
       {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
       {mounted&&<VoidCanvas/>}
-      {mounted&&(
-        <MedhaLair
-          entityVideoSrc="/assets/medha-dormant.mp4"
-          lairVideoSrc="/assets/medha-lair.mp4"
-          facultyColor={fc}
-          onReact={burst}
-          roamPos={entityVisible ? entityPos : undefined}
-          entityVisible={entityVisible}
-          excited={entityExcited}
-        />
-      )}
-      {mounted&&<PB color={burstColor} active={burst} ex={entityPos.x/100} ey={entityPos.y/100}/>}
+      {mounted&&<MedhaLair lairVideoSrc="/assets/medha-lair.mp4"/>}
+      {mounted&&<PB color={burstColor} active={burst} ex={ENTITY_POS.x/100} ey={ENTITY_POS.y/100}/>}
       {mounted&&<VerticalChatRail messages={messages} facultyColor={fc} onOpenTranscript={()=>setShowTranscript(v=>!v)} onEditMessage={editMessage} onRegenerate={regenerateFrom}/>}
       {mounted&&stream.active&&(
         <CosmicStream
           active={stream.active}
           color={stream.color}
           colorSecondary={stream.colorSecondary}
-          entityX={entityPos.x/100}
-          entityY={entityPos.y/100}
+          entityX={ENTITY_POS.x/100}
+          entityY={ENTITY_POS.y/100}
           duration={5000}
           onComplete={handleStreamComplete}
         />
@@ -638,7 +598,7 @@ export default function MedhaHUD(){
         onFacultySelect={handleFacultyFromOrb}
         onBack={back}
         activeFaculty={mode}
-        entityPos={entityPos}
+        entityPos={ENTITY_POS}
       />
 
       {/* Floating text following Medhā — auto-dismisses after 8s */}
@@ -646,25 +606,10 @@ export default function MedhaHUD(){
         text={floatingText}
         role={floatingRole}
         facultyColor={fc}
-        roamPos={entityPos}
         visible={floatingVisible && !showSettings && !showChatHistory}
         userColor={userColor}
       />
 
-      {/* Clickable overlay over entity zone — triggers wing flip + conversation list */}
-      <div
-        onClick={() => {
-          setEntityExcited(true);
-          setTimeout(() => setEntityExcited(false), 1500);
-          setShowConvList(true);
-        }}
-        style={{
-          position: 'fixed', left: 0, top: 0,
-          width: '45%', height: '85%',
-          zIndex: 9, cursor: 'pointer',
-          background: 'transparent',
-        }}
-      />
 
       {/* Conversation transcript — appears only on clicking Medhā */}
       <AnimatePresence>
@@ -686,82 +631,6 @@ export default function MedhaHUD(){
               <div ref={transcriptRef} style={{flex:1,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'14px',padding:'14px 16px',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 24px)',maskImage:'linear-gradient(to bottom, transparent, black 24px)'}}>
                 {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={messages.length>1&&!busy?regenerate:undefined}/>)}
                 <AnimatePresence>{busy&&<ThinkingBubble key="thinking" fc={fc}/>}</AnimatePresence>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Conversation list — opens when Medhā is clicked */}
-      <AnimatePresence>
-        {showConvList&&(
-          <>
-            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-              onClick={()=>setShowConvList(false)}
-              style={{position:'fixed',inset:0,zIndex:70,background:'rgba(0,0,0,0.45)',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)'}}/>
-            <motion.div
-              initial={{opacity:0,scale:0.94,y:18}}
-              animate={{opacity:1,scale:1,y:0}}
-              exit={{opacity:0,scale:0.94,y:18}}
-              transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
-              style={{
-                position:'fixed',left:'50%',top:'50%',
-                transform:'translate(-50%,-50%)',
-                width:'min(460px,88vw)',maxHeight:'68vh',
-                zIndex:71,display:'flex',flexDirection:'column',
-                background:'rgba(4,2,14,0.92)',
-                border:`1px solid ${fc}30`,
-                borderRadius:'20px',
-                backdropFilter:'blur(24px)',WebkitBackdropFilter:'blur(24px)',
-                overflow:'hidden',
-                boxShadow:`0 0 60px ${fc}15, 0 0 120px ${fc}08`,
-              }}
-            >
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 18px',borderBottom:`1px solid ${fc}18`}}>
-                <div style={{fontSize:'9px',letterSpacing:'0.30em',color:`${fc}90`,fontFamily:'system-ui',textTransform:'uppercase'}}>
-                  Conversations
-                </div>
-                <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-                  <button onClick={()=>{newChat();setShowConvList(false);}}
-                    style={{background:`${fc}14`,border:`1px solid ${fc}35`,borderRadius:'8px',color:fc,fontSize:'8px',letterSpacing:'0.18em',textTransform:'uppercase',padding:'5px 11px',cursor:'pointer',fontFamily:'system-ui'}}>
-                    New
-                  </button>
-                  <button onClick={()=>setShowConvList(false)}
-                    style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.28)',cursor:'pointer',fontSize:'13px',padding:'2px 6px',lineHeight:1}}>
-                    ✕
-                  </button>
-                </div>
-              </div>
-              <div style={{flex:1,overflowY:'auto',scrollbarWidth:'none',padding:'10px 12px'}}>
-                {chats.length===0?(
-                  <div style={{textAlign:'center',color:'rgba(255,255,255,0.2)',fontSize:'12px',fontFamily:'system-ui',padding:'28px'}}>
-                    No conversations yet
-                  </div>
-                ):chats.map(chat=>(
-                  <button key={chat.id}
-                    onClick={()=>{
-                      const ch=getChat(chat.id);
-                      if(!ch)return;
-                      setChatId(ch.id);setCurrentChatId(ch.id);setMessages(ch.messages);
-                      setShowConvList(false);setShowTranscript(true);
-                    }}
-                    style={{
-                      width:'100%',display:'flex',flexDirection:'column',gap:'3px',
-                      padding:'11px 14px',
-                      background:chat.id===chatId?`${fc}10`:'transparent',
-                      border:`1px solid ${chat.id===chatId?fc+'28':'transparent'}`,
-                      borderRadius:'10px',cursor:'pointer',textAlign:'left',
-                      marginBottom:'4px',
-                    }}
-                  >
-                    <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',fontFamily:'system-ui',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                      {chat.title||'New Conversation'}
-                    </div>
-                    <div style={{fontSize:'9px',color:'rgba(255,255,255,0.28)',fontFamily:'system-ui'}}>
-                      {new Date(chat.lastInteractionAt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
-                    </div>
-                  </button>
-                ))}
               </div>
             </motion.div>
           </>
