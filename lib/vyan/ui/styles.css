@@ -305,29 +305,70 @@ max-width: 560px;
 }
 .glass-close {
 position: absolute;
-top: 18px;
-right: 18px;
+top: 16px;
+right: 16px;
 margin-top: 0;
 z-index: 6;
 pointer-events: auto;
-border: 1px solid rgba(210, 173, 255, 0.22);
-background: rgba(7, 7, 14, 0.78);
-backdrop-filter: blur(10px);
-color: rgba(248, 243, 255, 0.92);
-padding: 9px 14px;
-border-radius: 999px;
-letter-spacing: 0.24em;
-font-size: 10px;
-text-transform: uppercase;
+border: none;
+background: none;
 cursor: pointer;
-box-shadow: 0 6px 22px rgba(0,0,0,0.35);
-transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+width: 36px; height: 36px;
+border-radius: 50%;
+display: flex; align-items: center; justify-content: center; padding: 0;
+filter: drop-shadow(0 0 6px rgba(180,140,255,0.5));
+transition: filter 0.25s ease, transform 0.2s ease;
+animation: glass-close-pulse 3.2s ease-in-out infinite;
 }
 .glass-close:hover {
-background: rgba(20, 14, 30, 0.92);
-border-color: rgba(255, 90, 130, 0.45);
-transform: scale(1.04);
+filter: drop-shadow(0 0 16px rgba(200,160,255,0.9));
+animation: none; transform: scale(1.08);
 }
+@keyframes glass-close-pulse {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(180,140,255,0.35)); }
+  50%       { filter: drop-shadow(0 0 12px rgba(180,140,255,0.65)); }
+}
+
+/* ── Glass panel border trace ─────────────────────────────────────── */
+@keyframes vyan-trace-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.glass-border-trace {
+  position: absolute;
+  inset: 0;
+  border-radius: 26px;
+  pointer-events: none;
+  z-index: 13;
+  padding: 1.5px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+.glass-border-trace::before {
+  content: '';
+  position: absolute; top: 50%; left: 50%;
+  width: 200%; height: 200%;
+  background: conic-gradient(from 0deg at 50% 50%,
+    transparent 55%, rgba(180,140,255,0.85) 73%,
+    rgba(255,255,255,0.5) 77%, rgba(180,140,255,0.85) 81%, transparent 95%);
+  animation: vyan-trace-spin 6s linear infinite;
+}
+
+/* ── Tooltip for glass-close ──────────────────────────────────────── */
+.glass-close[data-label] { position: absolute; }
+.glass-close[data-label]::after {
+  content: attr(data-label);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: rgba(8,5,18,0.92); border: 1px solid rgba(157,89,255,0.28);
+  color: rgba(210,185,255,0.92); font-size: 9px; letter-spacing: 0.2em;
+  text-transform: uppercase; font-family: system-ui, sans-serif;
+  padding: 4px 9px; border-radius: 6px; white-space: nowrap;
+  pointer-events: none; opacity: 0; transition: opacity 0.22s ease;
+  backdrop-filter: blur(8px); z-index: 20;
+}
+.glass-close[data-label]:hover::after { opacity: 1; }
 .intro-cover {
 position: fixed;
 inset: 0;

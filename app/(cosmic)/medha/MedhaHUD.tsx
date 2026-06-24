@@ -452,7 +452,7 @@ export default function MedhaHUD(){
           </div>
         </div>
         {/* Chat history — anchored top-right, still accessible */}
-        <button onClick={()=>setShowChatHistory(true)} className="vyan-icon-btn" style={{position:'fixed',top:'14px',right:'clamp(68px,16vw,90px)',zIndex:50}}>
+        <button onClick={()=>setShowChatHistory(true)} className="vyan-icon-btn" data-label="History" style={{position:'fixed',top:'14px',right:'clamp(68px,16vw,90px)',zIndex:50}}>
           <RefreshIcon size={22} />
         </button>
       </div>
@@ -472,19 +472,20 @@ export default function MedhaHUD(){
               rows={1} disabled={busy} maxLength={1000}
               style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'system-ui',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
             <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
-              <button onClick={()=>fileR.current?.click()} title="Attach" className="vyan-icon-btn">
+              <button onClick={()=>fileR.current?.click()} data-label="Attach" className="vyan-icon-btn">
                 <AttachIcon size={22} />
               </button>
               <button
                 onClick={()=>{const s=sttR.current;if(!s?.isSupported())return;if(listening){s.stop();setListening(false);setEs('dormant');return;}setListening(true);setEs('voice-listening');s.start({onText:t=>setComposerText(t),onEnd:()=>{setListening(false);setEs('dormant');},onError:()=>{setListening(false);setEs('dormant');}});}}
                 className="vyan-icon-btn"
+                data-label="Voice"
                 style={{background:listening?'rgba(220,38,38,0.18)':undefined,border:listening?'1px solid rgba(220,38,38,0.35)':undefined}}
               >
                 {listening
                   ? <motion.div animate={{scale:[1,1.3,1]}} transition={{duration:0.8,repeat:Infinity,ease:'easeInOut'}} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#f87171'}}/>
                   : <SpeakIcon size={22} />}
               </button>
-              <button onClick={send} disabled={!canSend} className="vyan-icon-btn" style={{opacity:canSend?1:0.3,cursor:canSend?'pointer':'not-allowed'}}>
+              <button onClick={send} disabled={!canSend} data-label="Send" className="vyan-icon-btn" style={{opacity:canSend?1:0.3,cursor:canSend?'pointer':'not-allowed'}}>
                 {busy
                   ? <motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} style={{width:'8px',height:'8px',borderRadius:'50%',border:'1px solid rgba(255,255,255,0.5)',borderTopColor:'transparent'}}/>
                   : <SendIcon size={22} />}
@@ -502,6 +503,7 @@ export default function MedhaHUD(){
           <><motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setShowSettings(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:190,backdropFilter:'blur(4px)'}}/>
           <motion.div initial={{opacity:0,x:'100%'}} animate={{opacity:1,x:0}} exit={{opacity:0,x:'100%'}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
             style={{position:'fixed',top:0,right:0,bottom:0,width:'min(360px,100vw)',zIndex:200,background:'rgba(0,0,0,0.96)',borderLeft:'1px solid rgba(255,255,255,0.06)',backdropFilter:'blur(20px)',overflowY:'auto',padding:'24px',scrollbarWidth:'none'}}>
+            <span className="vyan-trace-border" style={{'--trace-color':'#9d59ff'} as React.CSSProperties}/>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'26px'}}>
               <div style={{fontFamily:'Georgia,serif',fontSize:'13px',letterSpacing:'0.3em',color:'rgba(255,255,255,0.8)',textTransform:'uppercase'}}>Settings</div>
               <button
@@ -509,6 +511,7 @@ export default function MedhaHUD(){
                 onMouseLeave={()=>setSettingsCloseHovered(false)}
                 onClick={()=>setShowSettings(false)}
                 className="vyan-icon-btn"
+                data-label="Close"
               >
                 <CloseIcon size={22} isHovered={settingsCloseHovered} />
               </button>

@@ -296,6 +296,9 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
         className={`vpd-slab ${closing ? 'is-closing' : ''}`}
         style={{ ['--accent' as any]: spec.accent, width: 480, height: 580 }}
       >
+        {/* Border trace */}
+        <span className="vyan-trace-border" style={{'--trace-color': spec.accent} as React.CSSProperties} aria-hidden="true" />
+
         {/* Filament */}
         <svg className="vpd-anchor-filament" aria-hidden="true">
           <defs>
@@ -319,6 +322,7 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
             onMouseLeave={() => setCloseHov(false)}
             onClick={handleClose}
             aria-label="close"
+            data-label="Close"
           >
             <CloseIcon size={24} isHovered={closeHov} />
           </button>

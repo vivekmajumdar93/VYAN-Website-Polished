@@ -785,24 +785,93 @@
 .medha-md a.md-mail, .medha-md a.md-link { color: var(--mode-a); text-decoration: none; border-bottom: 1px dashed; }
 .medha-md a.md-mail:hover, .medha-md a.md-link:hover { color: #fff; border-color: #fff; }
 
-/* ── VYAN icon button — hover glow lift ─────────────────────────────── */
+/* ── VYAN icon button — hover glow + persistent ambient pulse ────────── */
+@keyframes vyan-icon-pulse {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(157, 89, 255, 0.35)); }
+  50%       { filter: drop-shadow(0 0 12px rgba(157, 89, 255, 0.65)); }
+}
+
 .vyan-icon-btn {
   background: none;
   border: none;
   cursor: pointer;
   padding: 6px;
   border-radius: 50%;
-  transition: filter 0.25s ease, transform 0.25s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  animation: vyan-icon-pulse 3.2s ease-in-out infinite;
+  transition: transform 0.25s ease;
 }
 .vyan-icon-btn:hover {
-  filter: drop-shadow(0 0 14px rgba(157, 89, 255, 0.8));
+  filter: drop-shadow(0 0 18px rgba(157, 89, 255, 0.9)) !important;
+  animation: none;
   transform: scale(1.08);
 }
 .vyan-icon-btn:active {
   transform: scale(0.96);
+}
+
+/* ── Tooltip via data-label ─────────────────────────────────────────── */
+[data-label] {
+  position: relative;
+}
+[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8, 5, 18, 0.92);
+  border: 1px solid rgba(157, 89, 255, 0.28);
+  color: rgba(210, 185, 255, 0.92);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-family: system-ui, sans-serif;
+  padding: 4px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  backdrop-filter: blur(8px);
+  z-index: 200;
+}
+[data-label]:hover::after {
+  opacity: 1;
+}
+
+/* ── Border trace animation (shared keyframe) ─────────────────────── */
+@keyframes vyan-trace-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.vyan-trace-border {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  padding: 1.5px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+.vyan-trace-border::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(from 0deg at 50% 50%,
+    transparent 55%, var(--trace-color, #9d59ff) 73%,
+    rgba(255, 255, 255, 0.55) 77%, var(--trace-color, #9d59ff) 81%, transparent 95%);
+  animation: vyan-trace-spin 5s linear infinite;
 }
 
 /* ── Canvas orb fills viewport behind UI ───────────────────────────── */

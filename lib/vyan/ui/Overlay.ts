@@ -131,7 +131,7 @@ this.gatewayHint.className = 'gateway-hint';
         <div class="gateway-info-panel__foot">
           <span>esc to close</span><span>press <em>i</em> to summon again</span>
         </div>
-        <button type="button" class="gateway-info-panel__x" aria-label="close">✕</button>
+        <button type="button" class="gateway-info-panel__x" aria-label="close" data-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block"><circle cx="12" cy="12" r="9.5" stroke="rgba(200,160,255,0.4)" stroke-width="1"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5" stroke="rgba(225,205,255,0.82)" stroke-width="1.5" stroke-linecap="round"/><line x1="15.5" y1="8.5" x2="8.5" y2="15.5" stroke="rgba(225,205,255,0.82)" stroke-width="1.5" stroke-linecap="round"/></svg></button>
       </div>
     `;
     this.gatewayInfoPanel = gatewayPanel;
@@ -176,7 +176,13 @@ this.panelSubtitle.className = 'glass-subtitle';
 this.panelBody.className = 'glass-body';
 this.panelClose.className = 'glass-close';
 this.panelClose.type = 'button';
-this.panelClose.textContent = 'CLOSE';
+this.panelClose.setAttribute('data-label', 'Close');
+this.panelClose.setAttribute('aria-label', 'Close panel');
+this.panelClose.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block">
+  <circle cx="12" cy="12" r="9.5" stroke="rgba(200,160,255,0.45)" stroke-width="1"/>
+  <line x1="8.5" y1="8.5" x2="15.5" y2="15.5" stroke="rgba(225,205,255,0.88)" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="15.5" y1="8.5" x2="8.5" y2="15.5" stroke="rgba(225,205,255,0.88)" stroke-width="1.5" stroke-linecap="round"/>
+</svg>`;
 this.panelClose.addEventListener('pointerdown', (e) => {
 e.stopPropagation();
 this.callbacks?.onClosePanel();
@@ -203,6 +209,10 @@ const inner = this.panel.querySelector('.glass-panel-inner') as HTMLElement;
 inner.appendChild(this.panelTitle);
 inner.appendChild(this.panelSubtitle);
 inner.appendChild(this.panelBody);
+// Trace border — sibling of inner, animates a traversing light along the card edge
+const traceBorder = document.createElement('span');
+traceBorder.className = 'glass-border-trace';
+this.panel.appendChild(traceBorder);
 // Close lives OUTSIDE the scrollable inner so it stays anchored top-right
 // even when the user scrolls long-form content.
 this.panel.appendChild(this.panelClose);
