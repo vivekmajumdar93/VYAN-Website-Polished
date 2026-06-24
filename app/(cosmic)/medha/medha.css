@@ -785,6 +785,26 @@
 .medha-md a.md-mail, .medha-md a.md-link { color: var(--mode-a); text-decoration: none; border-bottom: 1px dashed; }
 .medha-md a.md-mail:hover, .medha-md a.md-link:hover { color: #fff; border-color: #fff; }
 
+/* ── VYAN icon button — hover glow lift ─────────────────────────────── */
+.vyan-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: filter 0.25s ease, transform 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vyan-icon-btn:hover {
+  filter: drop-shadow(0 0 14px rgba(157, 89, 255, 0.8));
+  transform: scale(1.08);
+}
+.vyan-icon-btn:active {
+  transform: scale(0.96);
+}
+
 /* ── Canvas orb fills viewport behind UI ───────────────────────────── */
 .mlv-canvas-orb {
   position: fixed; inset: 0; width: 100%; height: 100%;

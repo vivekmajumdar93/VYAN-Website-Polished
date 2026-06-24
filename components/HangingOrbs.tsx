@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { BackIcon, FacultyIcon, SettingsIcon, CloseIcon } from '@/components/icons/VyanIcons'
 
 // ─── Faculty data ──────────────────────────────────────────────────────────────
 export const FACULTIES = [
@@ -61,6 +62,31 @@ const ORB_DRIFT = [
   { x: [0,  12, -6,  9,  0], xDur: 13, xPause: 2,  y: [0, -10,  1, -7,  0], yDur:  9, yPause: 4 },
 ]
 
+// ─── Faculty close button ──────────────────────────────────────────────────────
+function FacultyCloseButton({ onClose }: { onClose: () => void }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <motion.button
+      key="faculty-close"
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
+      transition={{ duration: 0.2 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onClose}
+      style={{
+        position: 'fixed', top: 12, right: 12, zIndex: 83,
+        background: 'none', border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '6px', borderRadius: '50%',
+      }}
+    >
+      <CloseIcon size={22} isHovered={hovered} />
+    </motion.button>
+  )
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 interface HangingOrbsProps {
   onSettingsOpen: () => void
@@ -119,23 +145,21 @@ export function HangingOrbs({
           <button
             onClick={onBack}
             style={{
-              display: 'flex', alignItems: 'center', gap: '7px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'linear-gradient(135deg, rgba(232,175,52,0.18) 0%, rgba(200,130,28,0.10) 100%)',
               border: '1px solid rgba(232,175,52,0.42)',
               borderRadius: '100px',
-              padding: '9px 20px 9px 14px',
-              color: '#e8b036',
-              fontSize: '11px', letterSpacing: '0.22em', textTransform: 'uppercase',
-              fontFamily: 'system-ui', cursor: 'pointer',
+              padding: '7px 12px',
+              cursor: 'pointer',
               backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
               boxShadow: '0 0 22px rgba(232,175,52,0.16), inset 0 0 14px rgba(232,175,52,0.06)',
-              whiteSpace: 'nowrap',
+              filter: 'drop-shadow(0 0 8px rgba(157,89,255,0.5))',
+              transition: 'filter 0.3s ease',
             }}
+            onMouseEnter={e => (e.currentTarget.style.filter = 'drop-shadow(0 0 18px rgba(157,89,255,0.9))')}
+            onMouseLeave={e => (e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(157,89,255,0.5))')}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
-            </svg>
-            Śūnya
+            <BackIcon size={24} />
           </button>
         </motion.div>
 
@@ -156,7 +180,12 @@ export function HangingOrbs({
               width: '58px', height: '58px',
               background: 'transparent', border: 'none',
               cursor: 'pointer', padding: 0, position: 'relative',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              filter: 'drop-shadow(0 0 8px rgba(157,89,255,0.5))',
+              transition: 'filter 0.3s ease',
             }}
+            onMouseEnter={e => (e.currentTarget.style.filter = 'drop-shadow(0 0 18px rgba(157,89,255,0.9))')}
+            onMouseLeave={e => (e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(157,89,255,0.5))')}
           >
             <div style={{
               position: 'absolute', inset: 0,
@@ -167,14 +196,7 @@ export function HangingOrbs({
               boxShadow: '0 0 30px rgba(220,148,38,0.22), inset 0 0 18px rgba(220,148,38,0.08)',
               borderRadius: '5px',
             }}/>
-            <div style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '19px', color: '#dc9424',
-              textShadow: '0 0 14px rgba(220,148,38,0.70)',
-            }}>
-              ✦
-            </div>
+            <FacultyIcon size={24} />
           </button>
         </motion.div>
 
@@ -191,14 +213,17 @@ export function HangingOrbs({
               borderRadius: '50%',
               background: 'linear-gradient(135deg, rgba(200,118,26,0.24) 0%, rgba(154,82,8,0.13) 100%)',
               border: '1px solid rgba(200,118,26,0.44)',
-              color: '#c87818',
-              fontSize: '20px', cursor: 'pointer',
+              cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
               boxShadow: '0 0 20px rgba(200,118,26,0.20), inset 0 0 13px rgba(200,118,26,0.07)',
+              filter: 'drop-shadow(0 0 8px rgba(157,89,255,0.5))',
+              transition: 'filter 0.3s ease',
             }}
+            onMouseEnter={e => (e.currentTarget.style.filter = 'drop-shadow(0 0 18px rgba(157,89,255,0.9))')}
+            onMouseLeave={e => (e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(157,89,255,0.5))')}
           >
-            ⚙
+            <SettingsIcon size={24} />
           </button>
         </motion.div>
       </motion.div>
@@ -218,6 +243,7 @@ export function HangingOrbs({
                 backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
               }}
             />
+            <FacultyCloseButton onClose={closeFaculty} />
 
             {FACULTIES.map((f, i) => {
               const pos = getFacultyPos(i, entityPos)

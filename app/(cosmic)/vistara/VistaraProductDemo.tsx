@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { CloseIcon } from '@/components/icons/VyanIcons';
 import './vistara-demo.css';
 
 // ============================================================
@@ -119,6 +120,7 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
   const [running, setRunning] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
+  const [closeHov, setCloseHov] = useState(false);
 
   const slabRef = useRef<HTMLDivElement | null>(null);
 
@@ -310,7 +312,16 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
           <div className="vpd-domain">{spec.domain}</div>
           <h2 className="vpd-title">{spec.name}</h2>
           <p className="vpd-tagline">{spec.tagline}</p>
-          <button type="button" className="vpd-close" onClick={handleClose} aria-label="close">✕</button>
+          <button
+            type="button"
+            className="vpd-close"
+            onMouseEnter={() => setCloseHov(true)}
+            onMouseLeave={() => setCloseHov(false)}
+            onClick={handleClose}
+            aria-label="close"
+          >
+            <CloseIcon size={24} isHovered={closeHov} />
+          </button>
         </header>
 
         <div className="vpd-body">

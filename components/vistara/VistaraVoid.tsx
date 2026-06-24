@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GATEWAYS, assetPath, type Gateway } from '@/lib/vistara/gateways'
+import { BackIcon, CloseIcon } from '@/components/icons/VyanIcons'
 
 // ─── Vortex background — image made alive with canvas overlay ─────────────────
 
@@ -590,14 +591,12 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           onClick={onBack}
           style={{
             position: 'fixed', top: '22px', left: '22px', zIndex: 30,
-            background: 'transparent', border: '1px solid rgba(212,180,80,0.2)',
-            borderRadius: '20px', padding: '7px 14px',
-            color: 'rgba(212,180,80,0.4)', fontSize: '10px',
-            letterSpacing: '0.2em', textTransform: 'uppercase',
-            fontFamily: 'system-ui', cursor: 'pointer',
+            background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 8, color: '#9B59FF',
           }}
         >
-          ← Śūnya
+          <BackIcon size={28} />
+          <span style={{ fontFamily: 'Cinzel', fontSize: 11, letterSpacing: '0.2em', opacity: 0.7 }}>ŚŪNYA MAṆḌALA</span>
         </motion.button>
       )}
 
@@ -633,6 +632,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 function GatewayPanel({ gateway, onClose, onEnter }: {
   gateway: Gateway; onClose: () => void; onEnter: () => void
 }) {
+  const [closeHov, setCloseHov] = useState(false)
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -661,7 +661,14 @@ function GatewayPanel({ gateway, onClose, onEnter }: {
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '24px', letterSpacing: '0.18em', color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', marginBottom: '6px', textShadow: `0 0 30px ${gateway.color}35` }}>{gateway.name}</h2>
             <p style={{ fontFamily: 'system-ui', fontSize: '10px', letterSpacing: '0.15em', color: `${gateway.color}70`, textTransform: 'uppercase' }}>{gateway.tagline}</p>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', padding: '6px 10px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
+          <button
+            onMouseEnter={() => setCloseHov(true)}
+            onMouseLeave={() => setCloseHov(false)}
+            onClick={onClose}
+            style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', zIndex: 10 }}
+          >
+            <CloseIcon size={24} isHovered={closeHov} />
+          </button>
         </div>
         <p style={{ fontFamily: 'system-ui', fontSize: '14px', lineHeight: '1.75', color: 'rgba(255,255,255,0.58)', letterSpacing: '0.02em', marginBottom: '30px' }}>{gateway.description}</p>
         <div style={{ display: 'flex', gap: '12px' }}>

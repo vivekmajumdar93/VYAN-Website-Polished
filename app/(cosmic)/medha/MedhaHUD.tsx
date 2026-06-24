@@ -28,6 +28,7 @@ import { MedhaLair } from '@/components/MedhaLair';
 import { StardustRain } from '@/components/StardustRain';
 import { HangingOrbs } from '@/components/HangingOrbs';
 import { FloatingText } from '@/components/FloatingText';
+import { CloseIcon, SendIcon, AttachIcon, SpeakIcon, RefreshIcon } from '@/components/icons/VyanIcons';
 import { VerticalChatRail } from '@/components/VerticalChatRail';
 import { ChatHistoryModal } from '@/components/ChatHistoryModal';
 import './medha.css';
@@ -215,7 +216,7 @@ export default function MedhaHUD(){
   const [floatingRole, setFloatingRole] = useState<'assistant'|'user'>('assistant');
   const [floatingVisible, setFloatingVisible] = useState(false);
   const [userColor, setUserColor] = useState('#d4a853');
-  const[showSettings,setShowSettings]=useState(false);const[listening,setListening]=useState(false);
+  const[showSettings,setShowSettings]=useState(false);const[settingsCloseHovered,setSettingsCloseHovered]=useState(false);const[listening,setListening]=useState(false);
   const[ttsEnabled,setTtsEnabled]=useState(false);const[chats,setChats]=useState<StoredChat[]>([]);
   const[responseStyle,setResponseStyle]=useState<'concise'|'balanced'|'detailed'>('balanced');
   const[quotaUser,setQuotaUser]=useState<LocalUser|null>(null);const[showQuotaLock,setShowQuotaLock]=useState(false);
@@ -451,7 +452,9 @@ export default function MedhaHUD(){
           </div>
         </div>
         {/* Chat history — anchored top-right, still accessible */}
-        <button onClick={()=>setShowChatHistory(true)} style={{position:'fixed',top:'14px',right:'clamp(68px,16vw,90px)',background:'transparent',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'8px',color:'rgba(255,255,255,0.28)',fontSize:'10px',letterSpacing:'0.18em',textTransform:'uppercase',padding:'5px 9px',cursor:'pointer',fontFamily:'system-ui',zIndex:50}}>⟲</button>
+        <button onClick={()=>setShowChatHistory(true)} className="vyan-icon-btn" style={{position:'fixed',top:'14px',right:'clamp(68px,16vw,90px)',zIndex:50}}>
+          <RefreshIcon size={22} />
+        </button>
       </div>
 
       {/* Composer — bottom-right; darker gradient fully covers Hailuo watermark */}
@@ -469,19 +472,22 @@ export default function MedhaHUD(){
               rows={1} disabled={busy} maxLength={1000}
               style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'system-ui',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
             <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
-              <button onClick={()=>fileR.current?.click()} title="Attach"
-                style={{width:'28px',height:'28px',borderRadius:'50%',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <button onClick={()=>fileR.current?.click()} title="Attach" className="vyan-icon-btn">
+                <AttachIcon size={22} />
               </button>
-              <button onClick={()=>{const s=sttR.current;if(!s?.isSupported())return;if(listening){s.stop();setListening(false);setEs('dormant');return;}setListening(true);setEs('voice-listening');s.start({onText:t=>setComposerText(t),onEnd:()=>{setListening(false);setEs('dormant');},onError:()=>{setListening(false);setEs('dormant');}});}}
-                style={{width:'28px',height:'28px',borderRadius:'50%',background:listening?'rgba(220,38,38,0.18)':'rgba(255,255,255,0.04)',border:`1px solid ${listening?'rgba(220,38,38,0.35)':'rgba(255,255,255,0.07)'}`,color:listening?'#f87171':'rgba(255,255,255,0.3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {listening?<motion.div animate={{scale:[1,1.3,1]}} transition={{duration:0.8,repeat:Infinity,ease:'easeInOut'}} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#f87171'}}/>
-                  :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>}
+              <button
+                onClick={()=>{const s=sttR.current;if(!s?.isSupported())return;if(listening){s.stop();setListening(false);setEs('dormant');return;}setListening(true);setEs('voice-listening');s.start({onText:t=>setComposerText(t),onEnd:()=>{setListening(false);setEs('dormant');},onError:()=>{setListening(false);setEs('dormant');}});}}
+                className="vyan-icon-btn"
+                style={{background:listening?'rgba(220,38,38,0.18)':undefined,border:listening?'1px solid rgba(220,38,38,0.35)':undefined}}
+              >
+                {listening
+                  ? <motion.div animate={{scale:[1,1.3,1]}} transition={{duration:0.8,repeat:Infinity,ease:'easeInOut'}} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#f87171'}}/>
+                  : <SpeakIcon size={22} />}
               </button>
-              <button onClick={send} disabled={!canSend}
-                style={{width:'28px',height:'28px',borderRadius:'50%',background:canSend?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.09)',color:canSend?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.18)',cursor:canSend?'pointer':'not-allowed',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s'}}>
-                {busy?<motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} style={{width:'8px',height:'8px',borderRadius:'50%',border:'1px solid rgba(255,255,255,0.5)',borderTopColor:'transparent'}}/>
-                  :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>}
+              <button onClick={send} disabled={!canSend} className="vyan-icon-btn" style={{opacity:canSend?1:0.3,cursor:canSend?'pointer':'not-allowed'}}>
+                {busy
+                  ? <motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} style={{width:'8px',height:'8px',borderRadius:'50%',border:'1px solid rgba(255,255,255,0.5)',borderTopColor:'transparent'}}/>
+                  : <SendIcon size={22} />}
               </button>
             </div>
             <AnimatePresence>{busy&&<motion.div initial={{scaleX:0,opacity:0}} animate={{scaleX:1,opacity:1}} exit={{scaleX:0,opacity:0}} style={{position:'absolute',bottom:0,left:'10px',right:'10px',height:'1px',background:`linear-gradient(90deg,${fc},#7b2fff,${fc})`,transformOrigin:'left',borderRadius:'1px'}}/>}</AnimatePresence>
@@ -498,7 +504,14 @@ export default function MedhaHUD(){
             style={{position:'fixed',top:0,right:0,bottom:0,width:'min(360px,100vw)',zIndex:200,background:'rgba(0,0,0,0.96)',borderLeft:'1px solid rgba(255,255,255,0.06)',backdropFilter:'blur(20px)',overflowY:'auto',padding:'24px',scrollbarWidth:'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'26px'}}>
               <div style={{fontFamily:'Georgia,serif',fontSize:'13px',letterSpacing:'0.3em',color:'rgba(255,255,255,0.8)',textTransform:'uppercase'}}>Settings</div>
-              <button onClick={()=>setShowSettings(false)} style={{background:'transparent',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'8px',color:'rgba(255,255,255,0.4)',padding:'6px 10px',cursor:'pointer',fontSize:'12px'}}>✕</button>
+              <button
+                onMouseEnter={()=>setSettingsCloseHovered(true)}
+                onMouseLeave={()=>setSettingsCloseHovered(false)}
+                onClick={()=>setShowSettings(false)}
+                className="vyan-icon-btn"
+              >
+                <CloseIcon size={22} isHovered={settingsCloseHovered} />
+              </button>
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:'22px'}}>
               <section>
