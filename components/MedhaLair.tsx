@@ -309,11 +309,23 @@ export function MedhaLair() {
     v.playsInline = true
     v.preload    = 'auto'
 
-    // Mobile path: autoPlay + loop — hardware decoder can't handle rapid seeks
+    // Fade in once the first frame is ready — regardless of device
+    const showVideo = () => { v.style.opacity = '1' }
+    v.addEventListener('canplay', showVideo, { once: true })
+    // If already buffered (cached), reveal immediately
+    if (v.readyState >= 3) showVideo()
+
+    // Mobile path: autoPlay + loop — hardware decoder can't handle rapid seeks.
+    // Call load() first so Chrome on Android actually starts fetching
+    // (mobile browsers often ignore preload="auto" to save battery).
     if (isMobileHardwareDecoder()) {
       v.loop = true
+      v.load()
       v.play().catch(() => {})
-      return () => { v.pause() }
+      return () => {
+        v.removeEventListener('canplay', showVideo)
+        v.pause()
+      }
     }
 
     // Desktop path: RAF currentTime scrubbing for slow reverse-loop
@@ -348,6 +360,7 @@ export function MedhaLair() {
     if (v.readyState >= 1) startScrub()
 
     return () => {
+      v.removeEventListener('canplay', showVideo)
       v.removeEventListener('loadedmetadata', startScrub)
       cancelAnimationFrame(rafRef.current)
     }
@@ -370,10 +383,10 @@ export function MedhaLair() {
           objectPosition: 'center center',
           zIndex: 3,
           pointerEvents: 'none',
+          opacity: 0,
+          transition: 'opacity 1.2s ease',
         }}
       />
-      {/* Note: loop/autoPlay are set imperatively in useEffect based on device type.
-          Desktop uses RAF scrubbing (no loop attr); mobile uses autoPlay + loop. */}
       <SkyLightning />
     </>
   )

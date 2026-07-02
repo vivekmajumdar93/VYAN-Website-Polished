@@ -468,7 +468,7 @@ export default function MedhaHUD(){
           <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
             <textarea ref={taR} value={composerText}
               onChange={e=>setComposerText(e.target.value)}
-              onKeyDown={onKey} placeholder={listening?'Listening…':`Speak to ${mdef.name}…`}
+              onKeyDown={onKey} placeholder={listening?'Listening…':'Speak to Medhā…'}
               rows={1} disabled={busy} maxLength={1000}
               style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'system-ui',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
             <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
