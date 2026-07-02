@@ -460,10 +460,6 @@ export default function MedhaHUD(){
       {/* Composer — bottom-right; darker gradient fully covers Hailuo watermark */}
       <div style={{position:'fixed',right:0,left:'auto',width:'clamp(300px,62vw,560px)',bottom:0,zIndex:42,padding:'8px 14px 10px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(3,1,10,0.97) 0px, rgba(3,1,10,0.90) 18px, rgba(3,1,10,0.60) 55px, rgba(3,1,10,0.18) 100px, transparent 148px)'}}>
         <div style={{maxWidth:'clamp(260px,50vw,480px)',margin:'0 0 0 auto',pointerEvents:'auto'}}>
-          {/* Faculty selector */}
-          <div style={{marginBottom:'8px',position:'relative'}}>
-            <FacultySel mode={mode} onSelect={k=>{actModel(k);setStardustColor(FC[k]);setStardustActive(true);}}/>
-          </div>
           {/* Composer */}
           <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
             <textarea ref={taR} value={composerText}
@@ -670,34 +666,6 @@ export default function MedhaHUD(){
 
       <input ref={fileR} type="file" accept="image/*,.pdf,.txt,.md,.json,.csv" style={{display:'none'}}
         onChange={e=>{const f=e.target.files?.[0];if(!f)return;setComposerText(c=>`${c}\n\n[attached: ${f.name} · ${(f.size/1024).toFixed(1)}KB]`);e.target.value='';}}/>
-    </div>
-  );
-}
-
-// ─── Faculty selector ──────────────────────────────────────────────────────────
-function FacultySel({mode,onSelect}:{mode:CognitiveModeKey;onSelect:(k:CognitiveModeKey)=>void}){
-  const[open,setOpen]=useState(false);const cur=getMode(mode);const color=FC[mode];
-  return(
-    <div style={{position:'relative'}}>
-      <button onClick={()=>setOpen(!open)} style={{display:'flex',alignItems:'center',gap:'7px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'5px 11px',cursor:'pointer'}}>
-        <div style={{width:'6px',height:'6px',borderRadius:'50%',background:color,boxShadow:`0 0 6px ${color}`}}/>
-        <span style={{fontSize:'11px',letterSpacing:'0.15em',color:'rgba(255,255,255,0.6)',fontFamily:'system-ui',textTransform:'uppercase'}}>{cur.name}</span>
-        <span style={{fontSize:'9px',color:'rgba(255,255,255,0.25)'}}>▾</span>
-      </button>
-      <AnimatePresence>
-        {open&&(
-          <motion.div initial={{opacity:0,y:-8,scale:0.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-8,scale:0.96}} transition={{duration:0.18}}
-            style={{position:'absolute',bottom:'100%',right:0,marginBottom:'8px',background:'rgba(0,0,0,0.97)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'14px',padding:'6px',minWidth:'220px',zIndex:100,backdropFilter:'blur(20px)'}}>
-            {COGNITIVE_MODES.map(m=>(
-              <button key={m.key} onClick={()=>{onSelect(m.key);setOpen(false);}}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'9px 11px',background:mode===m.key?'rgba(255,255,255,0.05)':'transparent',border:'none',borderRadius:'9px',cursor:'pointer',textAlign:'left'}}>
-                <div style={{width:'7px',height:'7px',borderRadius:'50%',background:FC[m.key],boxShadow:`0 0 7px ${FC[m.key]}`,flexShrink:0}}/>
-                <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'system-ui'}}>{m.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'system-ui'}}>{m.englishName}</div></div>
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
