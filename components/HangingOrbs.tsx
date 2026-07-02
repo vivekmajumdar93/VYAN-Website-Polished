@@ -31,25 +31,25 @@ function getFacultyPos(index: number, entityPos: { x: number; y: number }) {
 
 // ─── Drift profiles ─────────────────────────────────────────────────────────────
 // Per-axis keyframes + timing. x and y run on different periods → Lissajous-like roam.
-// repeatDelay creates organic pauses so motion is intermittent, not constant.
-// Larger amplitude = feels closer; combined with mismatched periods = depth illusion.
+// Faculty and Settings drift very slowly across the top half of the frame,
+// staying clear of the MEDHĀ title at top-center and Back icon at top-left.
 
 // Nav buttons — 3 distinct depth layers
 const NAV_DRIFT = [
-  // Back pill — closest (largest amplitude, slowest)
+  // Back pill — subtle micro-drift only (stays anchored top-left)
   {
-    x: [0, 19, -7, 14, -9, 0] as number[], xDur: 15, xPause: 5,
-    y: [0, -10, 3,  -8, -14, 0] as number[], yDur: 10, yPause: 3,
+    x: [0, 4, -3, 5, -2, 0] as number[], xDur: 18, xPause: 8,
+    y: [0, -3, 2, -4, 1, 0] as number[], yDur: 14, yPause: 6,
   },
-  // Faculty diamond — middle depth
+  // Faculty diamond — slow atmospheric roam across left-center of top half
   {
-    x: [0, -11, 3, 13, -5, 0] as number[], xDur: 19, xPause: 4,
-    y: [0, -15, 1, -9,   5, 0] as number[], yDur: 12, yPause: 6,
+    x: [0, 90, -55, 80, -40, 60, 0] as number[], xDur: 58, xPause: 0,
+    y: [0, 60, -30, 70, -40, 50, 0] as number[], yDur: 45, yPause: 0,
   },
-  // Settings circle — furthest (smallest amplitude, quickest)
+  // Settings circle — slow atmospheric roam across right-center of top half
   {
-    x: [0,  7, -4,  8,  0] as number[], xDur: 10, xPause: 7,
-    y: [0, -6,  1, -8,  0] as number[], yDur:  7, yPause: 4,
+    x: [0, -80, 55, -70, 40, -50, 0] as number[], xDur: 52, xPause: 0,
+    y: [0, 65, -35, 75, -45, 55, 0] as number[], yDur: 41, yPause: 0,
   },
 ]
 
@@ -136,7 +136,7 @@ export function HangingOrbs({
         transition={{ duration: 0.3 }}
         style={{ pointerEvents: showFaculty ? 'none' : 'auto' }}
       >
-        {/* Back — pill / capsule, deep gold, depth 0 (closest) */}
+        {/* Back — transparent icon, anchored top-left */}
         <motion.div
           animate={{ x: NAV_DRIFT[0].x, y: NAV_DRIFT[0].y }}
           transition={{ x: driftTx(NAV_DRIFT[0].xDur, NAV_DRIFT[0].xPause), y: driftTx(NAV_DRIFT[0].yDur, NAV_DRIFT[0].yPause) }}
@@ -144,15 +144,11 @@ export function HangingOrbs({
         >
           <button
             onClick={onBack}
+            data-label="Śūnya"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(232,175,52,0.18) 0%, rgba(200,130,28,0.10) 100%)',
-              border: '1px solid rgba(232,175,52,0.42)',
-              borderRadius: '100px',
-              padding: '7px 12px',
+              background: 'none', border: 'none', padding: '6px',
               cursor: 'pointer',
-              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-              boxShadow: '0 0 22px rgba(232,175,52,0.16), inset 0 0 14px rgba(232,175,52,0.06)',
               filter: 'drop-shadow(0 0 8px rgba(157,89,255,0.5))',
               transition: 'filter 0.3s ease',
             }}
@@ -163,23 +159,19 @@ export function HangingOrbs({
           </button>
         </motion.div>
 
-        {/* Faculty toggle — diamond, amber-gold, depth 1 (middle) */}
-        {/* marginLeft centers the 58px button without a CSS transform (keeps Framer Motion's x/y clean) */}
+        {/* Faculty toggle — transparent icon, roams slowly across top-left zone */}
         <motion.div
           animate={{ x: NAV_DRIFT[1].x, y: NAV_DRIFT[1].y }}
           transition={{ x: driftTx(NAV_DRIFT[1].xDur, NAV_DRIFT[1].xPause), y: driftTx(NAV_DRIFT[1].yDur, NAV_DRIFT[1].yPause) }}
-          style={{
-            position: 'fixed', left: '50%', marginLeft: '-29px',
-            top: 'clamp(10px, 2.5vh, 20px)', zIndex: 70,
-          }}
+          style={{ position: 'fixed', left: '22%', top: '25%', zIndex: 70 }}
         >
           <button
             onClick={toggleFaculty}
             aria-label="Faculty selector"
+            data-label="Faculty"
             style={{
-              width: '58px', height: '58px',
-              background: 'transparent', border: 'none',
-              cursor: 'pointer', padding: 0, position: 'relative',
+              background: 'none', border: 'none',
+              cursor: 'pointer', padding: '6px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               filter: 'drop-shadow(0 0 8px rgba(157,89,255,0.5))',
               transition: 'filter 0.3s ease',
@@ -187,36 +179,23 @@ export function HangingOrbs({
             onMouseEnter={e => (e.currentTarget.style.filter = 'drop-shadow(0 0 18px rgba(157,89,255,0.9))')}
             onMouseLeave={e => (e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(157,89,255,0.5))')}
           >
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(135deg, rgba(220,148,38,0.22) 0%, rgba(172,104,14,0.12) 100%)',
-              border: '1px solid rgba(220,148,38,0.48)',
-              transform: 'rotate(45deg) scale(0.78)',
-              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-              boxShadow: '0 0 30px rgba(220,148,38,0.22), inset 0 0 18px rgba(220,148,38,0.08)',
-              borderRadius: '5px',
-            }}/>
             <FacultyIcon size={24} />
           </button>
         </motion.div>
 
-        {/* Settings — circle, copper-gold, depth 2 (furthest) */}
+        {/* Settings — transparent icon, roams slowly across right-center of top half */}
         <motion.div
           animate={{ x: NAV_DRIFT[2].x, y: NAV_DRIFT[2].y }}
           transition={{ x: driftTx(NAV_DRIFT[2].xDur, NAV_DRIFT[2].xPause), y: driftTx(NAV_DRIFT[2].yDur, NAV_DRIFT[2].yPause) }}
-          style={{ position: 'fixed', right: 'clamp(14px, 3.5vw, 28px)', top: 'clamp(18px, 4.5vh, 34px)', zIndex: 70 }}
+          style={{ position: 'fixed', right: '20%', top: '28%', zIndex: 70 }}
         >
           <button
             onClick={onSettingsOpen}
+            data-label="Settings"
             style={{
-              width: '46px', height: '46px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(200,118,26,0.24) 0%, rgba(154,82,8,0.13) 100%)',
-              border: '1px solid rgba(200,118,26,0.44)',
-              cursor: 'pointer',
+              background: 'none', border: 'none',
+              cursor: 'pointer', padding: '6px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-              boxShadow: '0 0 20px rgba(200,118,26,0.20), inset 0 0 13px rgba(200,118,26,0.07)',
               filter: 'drop-shadow(0 0 8px rgba(157,89,255,0.5))',
               transition: 'filter 0.3s ease',
             }}

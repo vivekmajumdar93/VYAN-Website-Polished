@@ -514,6 +514,24 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000', overflow: 'hidden' }}>
+      <style>{`
+        @keyframes vyan-trace-spin {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to   { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        [data-label] { position: relative; }
+        [data-label]::after {
+          content: attr(data-label);
+          position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+          background: rgba(8,5,18,0.92); border: 1px solid rgba(157,89,255,0.28);
+          color: rgba(210,185,255,0.92); font-size: 9px; letter-spacing: 0.2em;
+          text-transform: uppercase; font-family: system-ui, sans-serif;
+          padding: 4px 9px; border-radius: 6px; white-space: nowrap;
+          pointer-events: none; opacity: 0; transition: opacity 0.22s ease;
+          backdrop-filter: blur(8px); z-index: 300;
+        }
+        [data-label]:hover::after { opacity: 1; }
+      `}</style>
 
       {/* Layer 1+2: Vortex image + live canvas overlay */}
       <VortexBackground />
@@ -589,11 +607,15 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         <motion.button
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}
           onClick={onBack}
+          data-label="Śūnya Maṇḍala"
           style={{
             position: 'fixed', top: '22px', left: '22px', zIndex: 30,
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 8, color: '#9B59FF',
+            filter: 'drop-shadow(0 0 8px rgba(155,89,255,0.5))',
+            transition: 'filter 0.25s ease',
           }}
+          whileHover={{ filter: 'drop-shadow(0 0 18px rgba(155,89,255,0.9))' } as any}
         >
           <BackIcon size={28} />
           <span style={{ fontFamily: 'Cinzel', fontSize: 11, letterSpacing: '0.2em', opacity: 0.7 }}>ŚŪNYA MAṆḌALA</span>
@@ -654,6 +676,25 @@ function GatewayPanel({ gateway, onClose, onEnter }: {
           boxShadow: `0 0 60px ${gateway.color}12`,
         }}
       >
+        {/* Traversing border trace */}
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute', inset: 0, borderRadius: '20px', pointerEvents: 'none',
+            zIndex: 0, padding: '1.5px',
+            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+            WebkitMaskComposite: 'xor',
+            mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+            maskComposite: 'exclude' as any,
+          }}
+        >
+          <span style={{
+            display: 'block', position: 'absolute', top: '50%', left: '50%',
+            width: '200%', height: '200%',
+            background: `conic-gradient(from 0deg at 50% 50%, transparent 55%, ${gateway.color}cc 73%, rgba(255,255,255,0.55) 77%, ${gateway.color}cc 81%, transparent 95%)`,
+            animation: 'vyan-trace-spin 5s linear infinite',
+          }} />
+        </span>
         <div style={{ position: 'absolute', top: 0, left: '12%', right: '12%', height: '1px', background: `linear-gradient(90deg, transparent, ${gateway.color}55, transparent)` }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '22px' }}>
           <div>
@@ -665,7 +706,13 @@ function GatewayPanel({ gateway, onClose, onEnter }: {
             onMouseEnter={() => setCloseHov(true)}
             onMouseLeave={() => setCloseHov(false)}
             onClick={onClose}
-            style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', zIndex: 10 }}
+            data-label="Close"
+            style={{
+              position: 'absolute', top: 16, right: 16, background: 'none', border: 'none',
+              cursor: 'pointer', zIndex: 10, padding: '4px',
+              filter: `drop-shadow(0 0 6px ${gateway.color}80)`,
+              transition: 'filter 0.25s ease',
+            }}
           >
             <CloseIcon size={24} isHovered={closeHov} />
           </button>
