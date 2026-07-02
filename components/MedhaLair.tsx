@@ -2,11 +2,21 @@
 
 // medha-lair.mp4 (gazebo) is retained in /public/assets but not rendered.
 // medha-entity.mp4 is the sole video — RAF reverse-looped for seamless slow motion.
+// On Android/mobile hardware decoders can't keep up with rapid currentTime seeks,
+// so we detect mobile and fall back to autoPlay + loop at native speed instead.
 
 import { useEffect, useRef } from 'react'
 
 const SPEED             = 0.35   // video-seconds advanced per real-second (< 1 = slow-mo)
 const TRANSITION_BUFFER = 0.10   // flip direction this many video-seconds before end/start
+
+// Android hardware decoders (MediaCodec) have ~80-200ms seek latency, making
+// RAF-driven currentTime scrubbing produce a frozen/static frame on mobile.
+function isMobileHardwareDecoder(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  return /Android|iPhone|iPad|iPod/i.test(ua)
+}
 
 // ─── Sky lightning ─────────────────────────────────────────────────────────────
 // Realistic sky bolts: recursive midpoint-displacement, random angle/size/intensity,
@@ -295,10 +305,18 @@ export function MedhaLair() {
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    v.muted       = true
-    v.playsInline  = true
-    v.preload     = 'auto'
+    v.muted      = true
+    v.playsInline = true
+    v.preload    = 'auto'
 
+    // Mobile path: autoPlay + loop — hardware decoder can't handle rapid seeks
+    if (isMobileHardwareDecoder()) {
+      v.loop = true
+      v.play().catch(() => {})
+      return () => { v.pause() }
+    }
+
+    // Desktop path: RAF currentTime scrubbing for slow reverse-loop
     const startScrub = () => {
       // Prime the decoder — required before manual currentTime scrubbing works
       v.play().catch(() => {}).finally(() => { v.pause(); v.currentTime = 0 })
@@ -354,6 +372,8 @@ export function MedhaLair() {
           pointerEvents: 'none',
         }}
       />
+      {/* Note: loop/autoPlay are set imperatively in useEffect based on device type.
+          Desktop uses RAF scrubbing (no loop attr); mobile uses autoPlay + loop. */}
       <SkyLightning />
     </>
   )
