@@ -75,7 +75,7 @@ export default function LoaderClient() {
         <img
           ref={logoRef}
           className="vyan-loader__logo"
-          src="/logo.png"
+          src="/logo-symbol.png"
           alt="VYAN Technologies"
           draggable={false}
         />

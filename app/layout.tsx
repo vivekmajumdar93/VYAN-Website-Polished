@@ -20,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <head>
         {/* Preload the logo so the loader has it instantly */}
-        <link rel="preload" as="image" href="/logo.png" />
+        <link rel="preload" as="image" href="/logo-symbol.png" />
       </head>
       <body>
         {children}
