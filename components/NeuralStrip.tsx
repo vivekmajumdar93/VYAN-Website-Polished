@@ -82,7 +82,7 @@ export function NeuralStrip({ messages, facultyColor, onEditMessage, onOpenTrans
                     flex: 1, background: 'rgba(255,255,255,0.06)',
                     border: `1px solid ${facultyColor}44`, borderRadius: '6px',
                     color: 'rgba(255,255,255,0.8)', fontSize: '10px',
-                    fontFamily: 'system-ui', padding: '3px 6px',
+                    fontFamily: 'var(--font-vyan)', padding: '3px 6px',
                     outline: 'none', resize: 'none', lineHeight: '1.4',
                   }}
                   rows={2}
@@ -93,7 +93,7 @@ export function NeuralStrip({ messages, facultyColor, onEditMessage, onOpenTrans
                   style={{
                     flex: 1, fontSize: '10px', lineHeight: '1.4',
                     color: m.role === 'assistant' ? 'rgba(255,225,195,0.65)' : 'rgba(255,255,255,0.45)',
-                    fontFamily: 'system-ui', cursor: 'text',
+                    fontFamily: 'var(--font-vyan)', cursor: 'text',
                     overflow: 'hidden', textOverflow: 'ellipsis',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,

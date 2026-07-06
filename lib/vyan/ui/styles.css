@@ -6,7 +6,7 @@ margin: 0;
 overflow: hidden;
 background: #000;
 color: rgba(244, 235, 255, 0.94);
-font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+font-family: var(--font-vyan);
 }
 canvas {
 position: fixed;
@@ -707,7 +707,7 @@ color: rgba(255, 255, 255, 1);
 .vy-slab {
   padding: 28px 32px 36px;
   color: rgba(232, 232, 240, 0.92);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-vyan);
   letter-spacing: 0.01em;
   font-weight: 300;
   line-height: 1.68;
@@ -989,7 +989,7 @@ color: rgba(255, 255, 255, 1);
   border-radius: 50%;
   border: 1px solid rgba(220, 190, 255, 0.45);
   color: rgba(244, 235, 255, 0.96);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-vyan);
   font-style: italic;
   font-weight: 400;
   font-size: 14px;
@@ -1285,7 +1285,7 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
   left: -16px !important;
   bottom: auto !important;
   transform: translate(-100%, -50%) !important;
-  font: 600 11px/1 'Inter', system-ui, sans-serif !important;
+  font: 600 11px/1 var(--font-vyan) !important;
   letter-spacing: 0.36em !important;
   text-transform: uppercase !important;
   color: #fff !important;
@@ -1339,7 +1339,7 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
 .sk-row--toggle { display: inline-flex; gap: 6px; padding: 4px; background: rgba(20, 12, 38, 0.45); border: 1px solid rgba(255, 184, 77, 0.22); border-radius: 999px; align-self: flex-start; }
 .sk-toggle { position: relative; cursor: pointer; }
 .sk-toggle input { position: absolute; opacity: 0; pointer-events: none; }
-.sk-toggle span { display: block; padding: 8px 18px; border-radius: 999px; font: 600 11px/1 'Inter', system-ui, sans-serif; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255, 220, 200, 0.62); transition: all 0.22s ease; }
+.sk-toggle span { display: block; padding: 8px 18px; border-radius: 999px; font: 600 11px/1 var(--font-vyan); letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255, 220, 200, 0.62); transition: all 0.22s ease; }
 .sk-toggle input:checked + span { background: linear-gradient(180deg, rgba(255, 184, 77, 0.32), rgba(255, 90, 58, 0.18)); color: #fff; box-shadow: 0 0 18px rgba(255, 184, 77, 0.32); }
 
 .sk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -1357,7 +1357,7 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
   border-radius: 10px;
   padding: 11px 14px;
   color: #fff;
-  font: 14px 'Inter', system-ui, sans-serif;
+  font: 14px var(--font-vyan);
   outline: none;
   transition: border-color 0.18s ease, background 0.18s ease;
 }
@@ -1386,7 +1386,7 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
   border: 1px solid rgba(255, 184, 77, 0.55);
   background: linear-gradient(180deg, rgba(255, 184, 77, 0.32), rgba(255, 90, 58, 0.22));
   color: #fff;
-  font: 600 11.5px/1 'Inter', system-ui, sans-serif;
+  font: 600 11.5px/1 var(--font-vyan);
   letter-spacing: 0.3em;
   text-transform: uppercase;
   cursor: pointer;

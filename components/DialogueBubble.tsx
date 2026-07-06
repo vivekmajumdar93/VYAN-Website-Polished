@@ -48,7 +48,7 @@ export function DialogueBubble({
           <div style={{
             fontSize: '8px', letterSpacing: '0.25em',
             color: isMediah ? `${facultyColor}90` : 'rgba(255,255,255,0.25)',
-            textTransform: 'uppercase', fontFamily: 'system-ui',
+            textTransform: 'uppercase', fontFamily: 'var(--font-vyan)',
             marginBottom: '5px',
             paddingLeft: isMediah ? '14px' : '0',
             textAlign: isMediah ? 'left' : 'center',
@@ -80,7 +80,7 @@ export function DialogueBubble({
             )}
 
             <p style={{
-              fontFamily: 'system-ui',
+              fontFamily: 'var(--font-vyan)',
               fontSize: isMediah ? '13px' : '12px',
               lineHeight: '1.65',
               color: isMediah ? 'rgba(255,225,195,0.88)' : 'rgba(255,255,255,0.72)',

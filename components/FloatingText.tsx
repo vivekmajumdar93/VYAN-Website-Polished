@@ -119,7 +119,7 @@ export function FloatingText({
           }}>
             {isAssistant ? (
               <p style={{
-                fontFamily: "'Cormorant Garamond', 'Cormorant', Georgia, serif",
+                fontFamily: 'var(--font-vyan)',
                 fontSize: 'clamp(13px, 1.4vw, 17px)',
                 fontWeight: 400,
                 lineHeight: 1.82,
@@ -132,7 +132,7 @@ export function FloatingText({
               </p>
             ) : (
               <p style={{
-                fontFamily: 'system-ui, sans-serif',
+                fontFamily: 'var(--font-vyan)',
                 fontSize: 'clamp(11px, 1.1vw, 14px)',
                 fontWeight: 400,
                 lineHeight: 1.65,

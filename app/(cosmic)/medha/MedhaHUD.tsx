@@ -166,12 +166,12 @@ function Bubble({msg,fc,onCopy,isLast,onRegenerate}:{msg:StoredMsg;fc:string;onC
       style={{width:'100%',display:'flex',flexDirection:'column',alignItems:isU?'flex-end':'flex-start',gap:'6px'}}>
       <div style={{display:'flex',alignItems:'flex-start',gap:'8px',flexDirection:isU?'row-reverse':'row'}}>
         <div style={{paddingTop:'10px',flexShrink:0}}><NL color={isU?'rgba(255,255,255,0.3)':fc} align={isU?'right':'left'}/></div>
-        <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'12px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'system-ui',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer'}}>
+        <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'12px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'var(--font-vyan)',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer'}}>
           {msg.role==='assistant'?<div dangerouslySetInnerHTML={{__html:renderMarkdown(msg.content)}} className="medha-md"/>:msg.content}
         </div>
       </div>
       {!isU&&isLast&&onRegenerate&&(
-        <button onClick={onRegenerate} style={{marginLeft:'34px',display:'flex',alignItems:'center',gap:'5px',background:'transparent',border:'none',color:'rgba(255,255,255,0.25)',fontSize:'9px',letterSpacing:'0.18em',textTransform:'uppercase',fontFamily:'system-ui',cursor:'pointer',padding:'2px 0'}}>
+        <button onClick={onRegenerate} style={{marginLeft:'34px',display:'flex',alignItems:'center',gap:'5px',background:'transparent',border:'none',color:'rgba(255,255,255,0.25)',fontSize:'9px',letterSpacing:'0.18em',textTransform:'uppercase',fontFamily:'var(--font-vyan)',cursor:'pointer',padding:'2px 0'}}>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
           Regenerate
         </button>
@@ -187,7 +187,7 @@ function ThinkingBubble({fc}:{fc:string}){
       style={{width:'100%',display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'6px'}}>
       <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
         <div style={{width:'5px',height:'5px',borderRadius:'50%',background:fc,boxShadow:`0 0 4px ${fc}`}}/>
-        <span style={{fontSize:'9px',letterSpacing:'0.22em',color:'rgba(255,200,160,0.4)',textTransform:'uppercase',fontFamily:'system-ui'}}>MEDHĀ</span>
+        <span style={{fontSize:'9px',letterSpacing:'0.22em',color:'rgba(255,200,160,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)'}}>MEDHĀ</span>
       </div>
       <div style={{display:'flex',alignItems:'flex-start',gap:'8px'}}>
         <div style={{paddingTop:'10px',flexShrink:0}}><NL color={fc} align="left"/></div>
@@ -446,8 +446,8 @@ export default function MedhaHUD(){
       {/* Header — title + history only; Back/Settings/Faculty float via HangingOrbs */}
       <div style={{position:'fixed',top:0,left:0,right:0,zIndex:50,padding:'16px 18px',display:'flex',justifyContent:'center',alignItems:'flex-start',pointerEvents:'none'}}>
         <div style={{textAlign:'center',pointerEvents:'auto'}}>
-          <div style={{fontFamily:'Georgia,serif',fontSize:'12px',letterSpacing:'0.35em',color:'rgba(255,255,255,0.55)',textTransform:'uppercase'}}>MEDHĀ</div>
-          <div style={{fontSize:'9px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.20)',fontFamily:'system-ui',marginTop:'2px',textTransform:'uppercase'}}>
+          <div style={{fontFamily:'var(--font-vyan)',fontSize:'12px',letterSpacing:'0.35em',color:'rgba(255,255,255,0.55)',textTransform:'uppercase'}}>MEDHĀ</div>
+          <div style={{fontSize:'9px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.20)',fontFamily:'var(--font-vyan)',marginTop:'2px',textTransform:'uppercase'}}>
             {es.toUpperCase()}
           </div>
         </div>
@@ -470,7 +470,7 @@ export default function MedhaHUD(){
               onChange={e=>setComposerText(e.target.value)}
               onKeyDown={onKey} placeholder={listening?'Listening…':`Speak to ${mdef.name}…`}
               rows={1} disabled={busy} maxLength={1000}
-              style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'system-ui',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
+              style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'var(--font-vyan)',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
             <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
               <button onClick={()=>fileR.current?.click()} title="Attach" className="vyan-icon-btn">
                 <AttachIcon size={22} />
@@ -492,7 +492,7 @@ export default function MedhaHUD(){
             </div>
             <AnimatePresence>{busy&&<motion.div initial={{scaleX:0,opacity:0}} animate={{scaleX:1,opacity:1}} exit={{scaleX:0,opacity:0}} style={{position:'absolute',bottom:0,left:'10px',right:'10px',height:'1px',background:`linear-gradient(90deg,${fc},#7b2fff,${fc})`,transformOrigin:'left',borderRadius:'1px'}}/>}</AnimatePresence>
           </div>
-          <p style={{textAlign:'center',color:'rgba(255,255,255,0.11)',fontSize:'9px',letterSpacing:'0.16em',fontFamily:'system-ui',textTransform:'uppercase',marginTop:'7px'}}>Enter · Shift+Enter new line</p>
+          <p style={{textAlign:'center',color:'rgba(255,255,255,0.11)',fontSize:'9px',letterSpacing:'0.16em',fontFamily:'var(--font-vyan)',textTransform:'uppercase',marginTop:'7px'}}>Enter · Shift+Enter new line</p>
         </div>
       </div>
 
@@ -503,7 +503,7 @@ export default function MedhaHUD(){
           <motion.div initial={{opacity:0,x:'100%'}} animate={{opacity:1,x:0}} exit={{opacity:0,x:'100%'}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
             style={{position:'fixed',top:0,right:0,bottom:0,width:'min(360px,100vw)',zIndex:200,background:'rgba(0,0,0,0.96)',borderLeft:'1px solid rgba(255,255,255,0.06)',backdropFilter:'blur(20px)',overflowY:'auto',padding:'24px',scrollbarWidth:'none'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'26px'}}>
-              <div style={{fontFamily:'Georgia,serif',fontSize:'13px',letterSpacing:'0.3em',color:'rgba(255,255,255,0.8)',textTransform:'uppercase'}}>Settings</div>
+              <div style={{fontFamily:'var(--font-vyan)',fontSize:'13px',letterSpacing:'0.3em',color:'rgba(255,255,255,0.8)',textTransform:'uppercase'}}>Settings</div>
               <button
                 onMouseEnter={()=>setSettingsCloseHovered(true)}
                 onMouseLeave={()=>setSettingsCloseHovered(false)}
@@ -515,33 +515,33 @@ export default function MedhaHUD(){
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:'22px'}}>
               <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Active Mode</div>
+                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Active Mode</div>
                 <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 11px',background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',borderRadius:'10px',marginBottom:'8px'}}>
                   <div style={{width:'7px',height:'7px',borderRadius:'50%',background:fc,boxShadow:`0 0 7px ${fc}`,flexShrink:0}}/>
-                  <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'system-ui'}}>{mdef.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'system-ui'}}>{mdef.englishName}</div></div>
+                  <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'var(--font-vyan)'}}>{mdef.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'var(--font-vyan)'}}>{mdef.englishName}</div></div>
                 </div>
                 <ul style={{margin:0,padding:'0 0 0 16px',display:'flex',flexDirection:'column',gap:'4px'}}>
                   {mdef.capabilities.map(c=>(
-                    <li key={c} style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',fontFamily:'system-ui',lineHeight:'1.5'}}>{c}</li>
+                    <li key={c} style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',fontFamily:'var(--font-vyan)',lineHeight:'1.5'}}>{c}</li>
                   ))}
                 </ul>
-                <div style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontFamily:'system-ui',marginTop:'8px'}}>Switch modes from the selector above the composer.</div>
+                <div style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontFamily:'var(--font-vyan)',marginTop:'8px'}}>Switch modes from the selector above the composer.</div>
               </section>
               <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Response Style</div>
+                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Response Style</div>
                 <div style={{display:'flex',gap:'6px'}}>
                   {(['concise','balanced','detailed'] as const).map(s=>(
                     <button key={s} onClick={()=>setResponseStyle(s)}
-                      style={{flex:1,padding:'8px 6px',background:responseStyle===s?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.02)',border:`1px solid ${responseStyle===s?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.05)'}`,borderRadius:'8px',color:responseStyle===s?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.35)',fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',fontFamily:'system-ui',cursor:'pointer'}}>
+                      style={{flex:1,padding:'8px 6px',background:responseStyle===s?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.02)',border:`1px solid ${responseStyle===s?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.05)'}`,borderRadius:'8px',color:responseStyle===s?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.35)',fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',fontFamily:'var(--font-vyan)',cursor:'pointer'}}>
                       {s}
                     </button>
                   ))}
                 </div>
               </section>
               <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Voice</div>
+                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Voice</div>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)',fontFamily:'system-ui'}}>Voice Reply (TTS)</span>
+                  <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)',fontFamily:'var(--font-vyan)'}}>Voice Reply (TTS)</span>
                   <button onClick={()=>setTtsEnabled(v=>{if(v)ttsR.current?.cancel();return!v;})}
                     style={{width:'40px',height:'22px',borderRadius:'11px',background:ttsEnabled?'rgba(123,47,255,0.6)':'rgba(255,255,255,0.1)',border:'none',cursor:'pointer',position:'relative',transition:'all 0.2s'}}>
                     <div style={{position:'absolute',top:'3px',left:ttsEnabled?'21px':'3px',width:'16px',height:'16px',borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
@@ -549,7 +549,7 @@ export default function MedhaHUD(){
                 </div>
               </section>
               <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Your Text Color</div>
+                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Your Text Color</div>
                 <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
                   {['#d4a853','#ffffff','#e8c4ff','#a8d8ea','#f0c4a0','#c8f0c8'].map(c=>(
                     <button key={c} onClick={()=>{setUserColor(c);localStorage.setItem('medha_user_color',c);}}
@@ -558,10 +558,10 @@ export default function MedhaHUD(){
                 </div>
               </section>
               <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>History</div>
-                <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)',fontFamily:'system-ui',marginBottom:'10px'}}>{chats.length} conversation{chats.length!==1?'s':''} stored</div>
+                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>History</div>
+                <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)',fontFamily:'var(--font-vyan)',marginBottom:'10px'}}>{chats.length} conversation{chats.length!==1?'s':''} stored</div>
                 <button onClick={()=>{if(!confirm('Erase ALL conversations?'))return;chats.forEach(c=>deleteChat(c.id));setChats([]);newChat();}}
-                  style={{width:'100%',padding:'10px',background:'rgba(220,38,38,0.08)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',color:'rgba(220,100,100,0.7)',fontSize:'11px',letterSpacing:'0.15em',textTransform:'uppercase',fontFamily:'system-ui',cursor:'pointer'}}>
+                  style={{width:'100%',padding:'10px',background:'rgba(220,38,38,0.08)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',color:'rgba(220,100,100,0.7)',fontSize:'11px',letterSpacing:'0.15em',textTransform:'uppercase',fontFamily:'var(--font-vyan)',cursor:'pointer'}}>
                   Erase All Conversations
                 </button>
               </section>
@@ -574,18 +574,18 @@ export default function MedhaHUD(){
       {showQuotaLock&&(
         <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)',backdropFilter:'blur(8px)',padding:'24px'}}>
           <div style={{maxWidth:'400px',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'32px',backdropFilter:'blur(20px)'}}>
-            <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,200,160,0.5)',textTransform:'uppercase',fontFamily:'system-ui',marginBottom:'10px'}}>Cognition Threshold</div>
-            <h2 style={{fontFamily:'Georgia,serif',fontSize:'18px',color:'rgba(255,255,255,0.85)',marginBottom:'10px'}}>You have reached the visitor limit.</h2>
-            <p style={{fontFamily:'system-ui',fontSize:'13px',color:'rgba(255,255,255,0.5)',lineHeight:'1.65',marginBottom:'22px'}}>Medhā grants every wanderer <strong style={{color:'rgba(255,255,255,0.7)'}}>{quotaLimit('medha')} conversations</strong> as a first taste.</p>
+            <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,200,160,0.5)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px'}}>Cognition Threshold</div>
+            <h2 style={{fontFamily:'var(--font-vyan)',fontSize:'18px',color:'rgba(255,255,255,0.85)',marginBottom:'10px'}}>You have reached the visitor limit.</h2>
+            <p style={{fontFamily:'var(--font-vyan)',fontSize:'13px',color:'rgba(255,255,255,0.5)',lineHeight:'1.65',marginBottom:'22px'}}>Medhā grants every wanderer <strong style={{color:'rgba(255,255,255,0.7)'}}>{quotaLimit('medha')} conversations</strong> as a first taste.</p>
             <div style={{display:'flex',flexDirection:'column',gap:'9px',marginBottom:'18px'}}>
-              <input type="text" placeholder="Your name" value={regName} onChange={e=>setRegName(e.target.value)} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',color:'rgba(255,255,255,0.8)',fontSize:'13px',fontFamily:'system-ui',padding:'9px 13px',outline:'none'}}/>
-              <input type="email" placeholder="you@domain.com" value={regEmail} onChange={e=>setRegEmail(e.target.value)} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',color:'rgba(255,255,255,0.8)',fontSize:'13px',fontFamily:'system-ui',padding:'9px 13px',outline:'none'}}/>
-              {regErr&&<div style={{fontSize:'12px',color:'rgba(220,100,100,0.8)',fontFamily:'system-ui'}}>{regErr}</div>}
-              <button onClick={subReg} disabled={regBusy||!regEmail.trim()} style={{padding:'11px',background:'rgba(123,47,255,0.2)',border:'1px solid rgba(123,47,255,0.3)',borderRadius:'10px',color:'rgba(200,160,255,0.9)',fontSize:'11px',letterSpacing:'0.18em',textTransform:'uppercase',fontFamily:'system-ui',cursor:regBusy||!regEmail.trim()?'not-allowed':'pointer',opacity:regBusy||!regEmail.trim()?0.5:1}}>
+              <input type="text" placeholder="Your name" value={regName} onChange={e=>setRegName(e.target.value)} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',color:'rgba(255,255,255,0.8)',fontSize:'13px',fontFamily:'var(--font-vyan)',padding:'9px 13px',outline:'none'}}/>
+              <input type="email" placeholder="you@domain.com" value={regEmail} onChange={e=>setRegEmail(e.target.value)} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',color:'rgba(255,255,255,0.8)',fontSize:'13px',fontFamily:'var(--font-vyan)',padding:'9px 13px',outline:'none'}}/>
+              {regErr&&<div style={{fontSize:'12px',color:'rgba(220,100,100,0.8)',fontFamily:'var(--font-vyan)'}}>{regErr}</div>}
+              <button onClick={subReg} disabled={regBusy||!regEmail.trim()} style={{padding:'11px',background:'rgba(123,47,255,0.2)',border:'1px solid rgba(123,47,255,0.3)',borderRadius:'10px',color:'rgba(200,160,255,0.9)',fontSize:'11px',letterSpacing:'0.18em',textTransform:'uppercase',fontFamily:'var(--font-vyan)',cursor:regBusy||!regEmail.trim()?'not-allowed':'pointer',opacity:regBusy||!regEmail.trim()?0.5:1}}>
                 {regBusy?'Transmitting…':'Register with VYAN'}
               </button>
             </div>
-            <p style={{fontSize:'11px',color:'rgba(255,255,255,0.2)',fontFamily:'system-ui',textAlign:'center'}}>VYAN will send a verification to your address.</p>
+            <p style={{fontSize:'11px',color:'rgba(255,255,255,0.2)',fontFamily:'var(--font-vyan)',textAlign:'center'}}>VYAN will send a verification to your address.</p>
           </div>
         </div>
       )}
@@ -632,7 +632,7 @@ export default function MedhaHUD(){
                 background:'rgba(4,2,14,0.88)',border:'1px solid rgba(255,255,255,0.07)',
                 borderRadius:'18px',backdropFilter:'blur(18px)',overflow:'hidden'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{fontSize:'10px',letterSpacing:'0.28em',color:'rgba(255,255,255,0.4)',fontFamily:'system-ui',textTransform:'uppercase'}}>Conversation</div>
+                <div style={{fontSize:'10px',letterSpacing:'0.28em',color:'rgba(255,255,255,0.4)',fontFamily:'var(--font-vyan)',textTransform:'uppercase'}}>Conversation</div>
                 <button onClick={()=>setShowTranscript(false)} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.3)',cursor:'pointer',fontSize:'14px',padding:'2px 6px'}}>✕</button>
               </div>
               <div ref={transcriptRef} style={{flex:1,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'14px',padding:'14px 16px',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 24px)',maskImage:'linear-gradient(to bottom, transparent, black 24px)'}}>
@@ -678,7 +678,7 @@ function FacultySel({mode,onSelect}:{mode:CognitiveModeKey;onSelect:(k:Cognitive
     <div style={{position:'relative'}}>
       <button onClick={()=>setOpen(!open)} style={{display:'flex',alignItems:'center',gap:'7px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'5px 11px',cursor:'pointer'}}>
         <div style={{width:'6px',height:'6px',borderRadius:'50%',background:color,boxShadow:`0 0 6px ${color}`}}/>
-        <span style={{fontSize:'11px',letterSpacing:'0.15em',color:'rgba(255,255,255,0.6)',fontFamily:'system-ui',textTransform:'uppercase'}}>{cur.name}</span>
+        <span style={{fontSize:'11px',letterSpacing:'0.15em',color:'rgba(255,255,255,0.6)',fontFamily:'var(--font-vyan)',textTransform:'uppercase'}}>{cur.name}</span>
         <span style={{fontSize:'9px',color:'rgba(255,255,255,0.25)'}}>▾</span>
       </button>
       <AnimatePresence>
@@ -689,7 +689,7 @@ function FacultySel({mode,onSelect}:{mode:CognitiveModeKey;onSelect:(k:Cognitive
               <button key={m.key} onClick={()=>{onSelect(m.key);setOpen(false);}}
                 style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'9px 11px',background:mode===m.key?'rgba(255,255,255,0.05)':'transparent',border:'none',borderRadius:'9px',cursor:'pointer',textAlign:'left'}}>
                 <div style={{width:'7px',height:'7px',borderRadius:'50%',background:FC[m.key],boxShadow:`0 0 7px ${FC[m.key]}`,flexShrink:0}}/>
-                <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'system-ui'}}>{m.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'system-ui'}}>{m.englishName}</div></div>
+                <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'var(--font-vyan)'}}>{m.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'var(--font-vyan)'}}>{m.englishName}</div></div>
               </button>
             ))}
           </motion.div>

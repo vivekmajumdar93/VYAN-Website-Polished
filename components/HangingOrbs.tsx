@@ -303,7 +303,7 @@ export function HangingOrbs({
                         boxShadow: `0 0 9px ${f.color}, 0 0 18px ${f.color}80`,
                       }}/>
                       <div style={{
-                        fontFamily: "'Cormorant Garamond', Georgia, serif",
+                        fontFamily: 'var(--font-vyan)',
                         fontSize: '11px', letterSpacing: '0.09em',
                         color: f.color, textAlign: 'center',
                         textShadow: `0 0 10px ${f.color}90`,
@@ -311,7 +311,7 @@ export function HangingOrbs({
                         {f.name}
                       </div>
                       <div style={{
-                        fontFamily: 'system-ui', fontSize: '7.5px',
+                        fontFamily: 'var(--font-vyan)', fontSize: '7.5px',
                         color: 'rgba(255,255,255,0.38)',
                         textAlign: 'center', padding: '0 7px',
                         lineHeight: 1.35, letterSpacing: '0.04em',

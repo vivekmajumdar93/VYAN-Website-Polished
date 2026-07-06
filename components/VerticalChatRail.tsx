@@ -196,7 +196,7 @@ export function VerticalChatRail({
           fontSize: '7px',
           letterSpacing: '0.18em',
           color: `${facultyColor}70`,
-          fontFamily: 'system-ui',
+          fontFamily: 'var(--font-vyan)',
           pointerEvents: 'none',
           whiteSpace: 'nowrap',
         }}>
@@ -240,7 +240,7 @@ export function VerticalChatRail({
                 cursor: 'pointer',
                 fontSize: '11px',
                 padding: '0 4px 2px',
-                fontFamily: 'system-ui',
+                fontFamily: 'var(--font-vyan)',
                 lineHeight: 1,
               }}
             >
@@ -261,7 +261,7 @@ export function VerticalChatRail({
                 letterSpacing: '0.24em',
                 color: `${facultyColor}70`,
                 textTransform: 'uppercase',
-                fontFamily: 'system-ui',
+                fontFamily: 'var(--font-vyan)',
                 marginBottom: '8px',
               }}>
                 You · #{(panelIdx ?? 0) + 1}
@@ -281,7 +281,7 @@ export function VerticalChatRail({
                       color: 'rgba(255,255,255,0.82)',
                       fontSize: '12px',
                       lineHeight: '1.65',
-                      fontFamily: 'system-ui',
+                      fontFamily: 'var(--font-vyan)',
                       padding: '8px 10px',
                       resize: 'none',
                       outline: 'none',
@@ -301,7 +301,7 @@ export function VerticalChatRail({
                         letterSpacing: '0.12em',
                         padding: '4px 10px',
                         cursor: 'pointer',
-                        fontFamily: 'system-ui',
+                        fontFamily: 'var(--font-vyan)',
                       }}
                     >
                       Cancel
@@ -323,7 +323,7 @@ export function VerticalChatRail({
                         letterSpacing: '0.12em',
                         padding: '4px 10px',
                         cursor: 'pointer',
-                        fontFamily: 'system-ui',
+                        fontFamily: 'var(--font-vyan)',
                       }}
                     >
                       Send
@@ -337,7 +337,7 @@ export function VerticalChatRail({
                     fontSize: '12px',
                     lineHeight: '1.65',
                     color: 'rgba(255,255,255,0.75)',
-                    fontFamily: 'system-ui',
+                    fontFamily: 'var(--font-vyan)',
                     wordBreak: 'break-word',
                     whiteSpace: 'pre-wrap',
                   }}>
@@ -358,7 +358,7 @@ export function VerticalChatRail({
                         letterSpacing: '0.18em',
                         textTransform: 'uppercase',
                         cursor: 'pointer',
-                        fontFamily: 'system-ui',
+                        fontFamily: 'var(--font-vyan)',
                         padding: '2px 0',
                         display: 'flex',
                         alignItems: 'center',
@@ -391,14 +391,14 @@ export function VerticalChatRail({
                   letterSpacing: '0.24em',
                   color: `${facultyColor}70`,
                   textTransform: 'uppercase',
-                  fontFamily: 'system-ui',
+                  fontFamily: 'var(--font-vyan)',
                   marginBottom: '8px',
                 }}>
                   Medhā
                 </div>
                 <p style={{
                   margin: 0,
-                  fontFamily: "'Cormorant Garamond', 'Cormorant', Georgia, serif",
+                  fontFamily: 'var(--font-vyan)',
                   fontSize: 'clamp(12px, 1.25vw, 15px)',
                   lineHeight: '1.82',
                   color: facultyColor,
@@ -423,7 +423,7 @@ export function VerticalChatRail({
                       letterSpacing: '0.18em',
                       textTransform: 'uppercase',
                       cursor: 'pointer',
-                      fontFamily: 'system-ui',
+                      fontFamily: 'var(--font-vyan)',
                       padding: '2px 0',
                       display: 'flex',
                       alignItems: 'center',
@@ -449,7 +449,7 @@ export function VerticalChatRail({
                 backdropFilter: 'blur(20px)',
                 WebkitBackdropFilter: 'blur(20px)',
               }}>
-                <p style={{ margin: 0, fontSize: '11px', color: `${facultyColor}45`, fontFamily: 'system-ui', fontStyle: 'italic' }}>
+                <p style={{ margin: 0, fontSize: '11px', color: `${facultyColor}45`, fontFamily: 'var(--font-vyan)', fontStyle: 'italic' }}>
                   Medhā is thinking…
                 </p>
               </div>

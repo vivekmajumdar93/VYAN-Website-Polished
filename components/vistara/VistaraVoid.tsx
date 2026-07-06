@@ -545,7 +545,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
             }}
           >
             <div style={{
-              fontFamily: 'Georgia, serif',
+              fontFamily: 'var(--font-vyan)',
               fontSize: '13px',
               letterSpacing: '0.32em',
               color: hoveredGateway.color,
@@ -556,7 +556,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
               {hoveredGateway.name}
             </div>
             <div style={{
-              fontFamily: 'system-ui',
+              fontFamily: 'var(--font-vyan)',
               fontSize: '9px',
               letterSpacing: '0.2em',
               color: 'rgba(255,255,255,0.4)',
@@ -576,10 +576,10 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           pointerEvents: 'none', textAlign: 'right',
         }}
       >
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '11px', letterSpacing: '0.4em', color: 'rgba(212,180,80,0.55)', textTransform: 'uppercase' }}>
+        <div style={{ fontFamily: 'var(--font-vyan)', fontSize: '11px', letterSpacing: '0.4em', color: 'rgba(212,180,80,0.55)', textTransform: 'uppercase' }}>
           Vistāra
         </div>
-        <div style={{ fontFamily: 'system-ui', fontSize: '8px', letterSpacing: '0.22em', color: 'rgba(255,255,255,0.18)', textTransform: 'uppercase', marginTop: '3px' }}>
+        <div style={{ fontFamily: 'var(--font-vyan)', fontSize: '8px', letterSpacing: '0.22em', color: 'rgba(255,255,255,0.18)', textTransform: 'uppercase', marginTop: '3px' }}>
           The Manifestations
         </div>
       </motion.div>
@@ -596,7 +596,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           }}
         >
           <BackIcon size={28} />
-          <span style={{ fontFamily: 'Cinzel', fontSize: 11, letterSpacing: '0.2em', opacity: 0.7 }}>ŚŪNYA MAṆḌALA</span>
+          <span style={{ fontFamily: 'var(--font-vyan)', fontSize: 11, letterSpacing: '0.2em', opacity: 0.7 }}>ŚŪNYA MAṆḌALA</span>
         </motion.button>
       )}
 
@@ -608,7 +608,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           transform: 'translateX(-50%)', zIndex: 20, pointerEvents: 'none',
         }}
       >
-        <p style={{ fontFamily: 'system-ui', fontSize: '9px', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.14)', textTransform: 'uppercase' }}>
+        <p style={{ fontFamily: 'var(--font-vyan)', fontSize: '9px', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.14)', textTransform: 'uppercase' }}>
           Hover to discover · Click to enter
         </p>
       </motion.div>
@@ -657,9 +657,9 @@ function GatewayPanel({ gateway, onClose, onEnter }: {
         <div style={{ position: 'absolute', top: 0, left: '12%', right: '12%', height: '1px', background: `linear-gradient(90deg, transparent, ${gateway.color}55, transparent)` }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '22px' }}>
           <div>
-            <div style={{ fontSize: '9px', letterSpacing: '0.28em', color: `${gateway.color}80`, fontFamily: 'system-ui', textTransform: 'uppercase', marginBottom: '7px' }}>{gateway.tantra}</div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '24px', letterSpacing: '0.18em', color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', marginBottom: '6px', textShadow: `0 0 30px ${gateway.color}35` }}>{gateway.name}</h2>
-            <p style={{ fontFamily: 'system-ui', fontSize: '10px', letterSpacing: '0.15em', color: `${gateway.color}70`, textTransform: 'uppercase' }}>{gateway.tagline}</p>
+            <div style={{ fontSize: '9px', letterSpacing: '0.28em', color: `${gateway.color}80`, fontFamily: 'var(--font-vyan)', textTransform: 'uppercase', marginBottom: '7px' }}>{gateway.tantra}</div>
+            <h2 style={{ fontFamily: 'var(--font-vyan)', fontSize: '24px', letterSpacing: '0.18em', color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', marginBottom: '6px', textShadow: `0 0 30px ${gateway.color}35` }}>{gateway.name}</h2>
+            <p style={{ fontFamily: 'var(--font-vyan)', fontSize: '10px', letterSpacing: '0.15em', color: `${gateway.color}70`, textTransform: 'uppercase' }}>{gateway.tagline}</p>
           </div>
           <button
             onMouseEnter={() => setCloseHov(true)}
@@ -670,10 +670,10 @@ function GatewayPanel({ gateway, onClose, onEnter }: {
             <CloseIcon size={24} isHovered={closeHov} />
           </button>
         </div>
-        <p style={{ fontFamily: 'system-ui', fontSize: '14px', lineHeight: '1.75', color: 'rgba(255,255,255,0.58)', letterSpacing: '0.02em', marginBottom: '30px' }}>{gateway.description}</p>
+        <p style={{ fontFamily: 'var(--font-vyan)', fontSize: '14px', lineHeight: '1.75', color: 'rgba(255,255,255,0.58)', letterSpacing: '0.02em', marginBottom: '30px' }}>{gateway.description}</p>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: 'rgba(255,255,255,0.45)', fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'system-ui', cursor: 'pointer' }}>Return</button>
-          <button onClick={onEnter} style={{ padding: '12px 26px', background: `${gateway.color}15`, border: `1px solid ${gateway.color}38`, borderRadius: '10px', color: gateway.color, fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'system-ui', cursor: 'pointer', boxShadow: `0 0 20px ${gateway.color}12` }}>Enter</button>
+          <button onClick={onClose} style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: 'rgba(255,255,255,0.45)', fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', cursor: 'pointer' }}>Return</button>
+          <button onClick={onEnter} style={{ padding: '12px 26px', background: `${gateway.color}15`, border: `1px solid ${gateway.color}38`, borderRadius: '10px', color: gateway.color, fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', cursor: 'pointer', boxShadow: `0 0 20px ${gateway.color}12` }}>Enter</button>
         </div>
       </motion.div>
     </motion.div>

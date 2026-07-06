@@ -79,7 +79,7 @@ export function ChatHistoryModal({
               }}>
                 <div>
                   <div style={{
-                    fontFamily: 'Georgia, serif', fontSize: '14px',
+                    fontFamily: 'var(--font-vyan)', fontSize: '14px',
                     letterSpacing: '0.3em', color: 'rgba(255,255,255,0.85)',
                     textTransform: 'uppercase', marginBottom: '6px',
                   }}>
@@ -87,7 +87,7 @@ export function ChatHistoryModal({
                   </div>
                   <div style={{
                     fontSize: '9px', letterSpacing: '0.2em',
-                    color: 'rgba(255,255,255,0.25)', fontFamily: 'system-ui',
+                    color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-vyan)',
                     textTransform: 'uppercase',
                   }}>
                     {chats.length} conversation{chats.length !== 1 ? 's' : ''}
@@ -113,7 +113,7 @@ export function ChatHistoryModal({
             }}>
               {chats.length === 0 && (
                 <p style={{
-                  color: 'rgba(255,255,255,0.25)', fontFamily: 'system-ui',
+                  color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-vyan)',
                   fontSize: '13px', textAlign: 'center', padding: '24px 0',
                 }}>
                   No conversations yet.
@@ -156,7 +156,7 @@ export function ChatHistoryModal({
                     >
                       <div style={{
                         fontSize: '13px', color: 'rgba(255,255,255,0.78)',
-                        fontFamily: 'system-ui', marginBottom: '4px',
+                        fontFamily: 'var(--font-vyan)', marginBottom: '4px',
                         overflow: 'hidden', textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                       }}>
@@ -164,7 +164,7 @@ export function ChatHistoryModal({
                       </div>
                       <div style={{
                         fontSize: '10px', color: 'rgba(255,255,255,0.25)',
-                        fontFamily: 'system-ui', display: 'flex', gap: '8px',
+                        fontFamily: 'var(--font-vyan)', display: 'flex', gap: '8px',
                       }}>
                         <span>{dateStr} · {timeStr}</span>
                         <span>·</span>
@@ -173,7 +173,7 @@ export function ChatHistoryModal({
                       {chat.topic && (
                         <div style={{
                           fontSize: '10px', color: 'rgba(255,255,255,0.2)',
-                          fontFamily: 'system-ui', marginTop: '4px',
+                          fontFamily: 'var(--font-vyan)', marginTop: '4px',
                           overflow: 'hidden', textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                         }}>
@@ -214,7 +214,7 @@ export function ChatHistoryModal({
                   border: '1px solid rgba(255,255,255,0.09)',
                   borderRadius: '10px', color: 'rgba(255,255,255,0.6)',
                   fontSize: '10px', letterSpacing: '0.22em',
-                  textTransform: 'uppercase', fontFamily: 'system-ui',
+                  textTransform: 'uppercase', fontFamily: 'var(--font-vyan)',
                   cursor: 'pointer',
                 }}
               >

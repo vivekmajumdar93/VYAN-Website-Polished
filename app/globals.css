@@ -1,9 +1,39 @@
+@font-face {
+  font-family: 'VYAN Shunyalekh';
+  src: url('/fonts/VYANShunyalekh-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VYAN Shunyalekh';
+  src: url('/fonts/VYANShunyalekh-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VYAN Shunyalekh';
+  src: url('/fonts/VYANShunyalekh-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VYAN Shunyalekh';
+  src: url('/fonts/VYANShunyalekh-BoldItalic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: dark;
+  --font-vyan: 'VYAN Shunyalekh', Georgia, 'Times New Roman', serif;
 }
 
 html, body {
@@ -14,13 +44,17 @@ html, body {
   background: #000;
   color: #e6e8ee;
   overflow: hidden;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-vyan);
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
   /* CRITICAL for mobile/iframe: stop the browser from interpreting touch as page-scroll/zoom */
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+input, textarea, select, button {
+  font-family: var(--font-vyan);
 }
 
 #vyan-root, canvas {
@@ -59,12 +93,14 @@ html, body {
   font-weight: 300;
   text-align: center;
   color: #ff2a4a;
+  font-family: var(--font-vyan);
 }
 .vyan-loader__brand {
   font-size: clamp(20px, 2.6vw, 30px);
   letter-spacing: 0.36em;
   font-weight: 600;
   color: #ff2a4a;
+  font-family: var(--font-vyan);
   text-shadow:
     0 0 22px rgba(255, 50, 80, 0.55),
     0 0 60px rgba(255, 20, 50, 0.32);
@@ -75,6 +111,7 @@ html, body {
   letter-spacing: 0.36em;
   font-weight: 300;
   color: #ff5a72;
+  font-family: var(--font-vyan);
   text-shadow: 0 0 16px rgba(255, 70, 100, 0.35);
   opacity: 0.92;
 }
