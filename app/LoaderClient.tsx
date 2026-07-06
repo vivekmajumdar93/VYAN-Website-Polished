@@ -28,8 +28,8 @@ export default function LoaderClient() {
 
     tl.fromTo(
       logoRef.current,
-      { opacity: 0, scale: 0.94, filter: 'blur(14px)' },
-      { opacity: 1, scale: 1, filter: 'blur(0px)', duration: 0.9, ease: 'sine.out' }
+      { opacity: 0, scale: 0.94, filter: 'saturate(2.2) brightness(1.25) blur(14px)' },
+      { opacity: 1, scale: 1, filter: 'saturate(2.2) brightness(1.25) blur(0px)', duration: 0.9, ease: 'sine.out' }
     )
       .fromTo(
         tagRef.current,
@@ -40,7 +40,7 @@ export default function LoaderClient() {
       // Breath 1
       .to(logoRef.current, {
         scale: 1.07,
-        filter: 'drop-shadow(0 0 60px rgba(140,110,255,0.85)) drop-shadow(0 0 120px rgba(80,40,220,0.55))',
+        filter: 'saturate(2.4) brightness(1.35) drop-shadow(0 0 60px rgba(180,80,255,0.95)) drop-shadow(0 0 120px rgba(100,40,240,0.65))',
         duration: 0.85,
         ease: 'sine.inOut',
         yoyo: true,
@@ -49,7 +49,7 @@ export default function LoaderClient() {
       // Breath 2
       .to(logoRef.current, {
         scale: 1.085,
-        filter: 'drop-shadow(0 0 70px rgba(160,130,255,0.95)) drop-shadow(0 0 140px rgba(90,50,230,0.65))',
+        filter: 'saturate(2.6) brightness(1.45) drop-shadow(0 0 80px rgba(200,90,255,1.0)) drop-shadow(0 0 160px rgba(120,50,255,0.75))',
         duration: 0.85,
         ease: 'sine.inOut',
         yoyo: true,

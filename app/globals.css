@@ -82,7 +82,7 @@ input, textarea, select, button {
 .vyan-loader__logo {
   width: clamp(110px, 18vw, 200px);
   height: auto;
-  filter: drop-shadow(0 0 38px rgba(120, 90, 255, 0.55)) drop-shadow(0 0 90px rgba(60, 30, 200, 0.35));
+  filter: saturate(2.2) brightness(1.25) drop-shadow(0 0 38px rgba(180, 80, 255, 0.65)) drop-shadow(0 0 90px rgba(100, 40, 240, 0.45));
   opacity: 0;
 }
 .vyan-loader__tag {
