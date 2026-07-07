@@ -460,15 +460,11 @@ export default function MedhaHUD(){
       {/* Composer — bottom-right; darker gradient fully covers Hailuo watermark */}
       <div style={{position:'fixed',right:0,left:'auto',width:'clamp(300px,62vw,560px)',bottom:0,zIndex:42,padding:'8px 14px 10px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(3,1,10,0.97) 0px, rgba(3,1,10,0.90) 18px, rgba(3,1,10,0.60) 55px, rgba(3,1,10,0.18) 100px, transparent 148px)'}}>
         <div style={{maxWidth:'clamp(260px,50vw,480px)',margin:'0 0 0 auto',pointerEvents:'auto'}}>
-          {/* Faculty selector */}
-          <div style={{marginBottom:'8px',position:'relative'}}>
-            <FacultySel mode={mode} onSelect={k=>{actModel(k);setStardustColor(FC[k]);setStardustActive(true);}}/>
-          </div>
           {/* Composer */}
           <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
             <textarea ref={taR} value={composerText}
               onChange={e=>setComposerText(e.target.value)}
-              onKeyDown={onKey} placeholder={listening?'Listening…':`Speak to ${mdef.name}…`}
+              onKeyDown={onKey} placeholder={listening?'Listening…':'Interact with Medhā…'}
               rows={1} disabled={busy} maxLength={1000}
               style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'var(--font-vyan)',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
             <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
@@ -525,7 +521,7 @@ export default function MedhaHUD(){
                     <li key={c} style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',fontFamily:'var(--font-vyan)',lineHeight:'1.5'}}>{c}</li>
                   ))}
                 </ul>
-                <div style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontFamily:'var(--font-vyan)',marginTop:'8px'}}>Switch modes from the selector above the composer.</div>
+                <div style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontFamily:'var(--font-vyan)',marginTop:'8px'}}>Switch modes from the faculty ring above.</div>
               </section>
               <section>
                 <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Response Style</div>
