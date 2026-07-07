@@ -5,27 +5,113 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 interface MedhaLightningTransitionProps {
   active: boolean
-  medhaImageSrc: string
+  medhaImageSrc: string   // kept in interface for compat; not used for image
   onComplete: () => void
 }
 
 const STRIKES = [
-  { at: 800,  duration: 90,   medhaX: 38, medhaY: 42, medhaScale: 0.72 },
-  { at: 1400, duration: 85,   medhaX: 44, medhaY: 38, medhaScale: 0.76 },
-  { at: 2100, duration: 2400, medhaX: 50, medhaY: 40, medhaScale: 0.82 },
+  { at: 800,  duration: 90,   medhaX: 50, medhaY: 50 },
+  { at: 1400, duration: 85,   medhaX: 50, medhaY: 50 },
+  { at: 2100, duration: 2400, medhaX: 50, medhaY: 50 },
 ]
 
+// Draw Medhā as a glowing luminous silhouette — wings spread, upright figure
+function drawMedha(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number,
+  intensity: number,
+  W: number, H: number
+) {
+  const s = Math.min(W, H) * 0.38   // scale relative to screen
+
+  ctx.save()
+  ctx.translate(cx, cy)
+
+  // Outer radial aura
+  const aura = ctx.createRadialGradient(0, 0, s * 0.05, 0, 0, s * 1.1)
+  aura.addColorStop(0,   `rgba(180,120,255,${0.55 * intensity})`)
+  aura.addColorStop(0.3, `rgba(120,60,255,${0.30 * intensity})`)
+  aura.addColorStop(0.7, `rgba(80,20,180,${0.12 * intensity})`)
+  aura.addColorStop(1,   'rgba(0,0,0,0)')
+  ctx.fillStyle = aura
+  ctx.beginPath()
+  ctx.ellipse(0, 0, s * 1.1, s * 1.3, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Wings — left
+  ctx.save()
+  ctx.globalAlpha = intensity
+  const wingGradL = ctx.createLinearGradient(-s * 0.05, -s * 0.1, -s * 0.9, s * 0.3)
+  wingGradL.addColorStop(0, 'rgba(200,140,255,0.9)')
+  wingGradL.addColorStop(0.4, 'rgba(140,80,255,0.55)')
+  wingGradL.addColorStop(1,  'rgba(60,20,160,0)')
+  ctx.fillStyle = wingGradL
+  ctx.beginPath()
+  ctx.moveTo(-s * 0.05, -s * 0.1)
+  ctx.bezierCurveTo(-s * 0.3, -s * 0.5, -s * 0.85, -s * 0.2, -s * 0.9,  s * 0.3)
+  ctx.bezierCurveTo(-s * 0.7,  s * 0.25, -s * 0.3,  s * 0.15, -s * 0.05, s * 0.1)
+  ctx.closePath()
+  ctx.fill()
+
+  // Wings — right (mirror)
+  const wingGradR = ctx.createLinearGradient(s * 0.05, -s * 0.1, s * 0.9, s * 0.3)
+  wingGradR.addColorStop(0, 'rgba(200,140,255,0.9)')
+  wingGradR.addColorStop(0.4, 'rgba(140,80,255,0.55)')
+  wingGradR.addColorStop(1,  'rgba(60,20,160,0)')
+  ctx.fillStyle = wingGradR
+  ctx.beginPath()
+  ctx.moveTo(s * 0.05, -s * 0.1)
+  ctx.bezierCurveTo(s * 0.3, -s * 0.5, s * 0.85, -s * 0.2, s * 0.9,  s * 0.3)
+  ctx.bezierCurveTo(s * 0.7,  s * 0.25, s * 0.3,  s * 0.15, s * 0.05, s * 0.1)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+
+  // Body — vertical luminous form
+  const bodyGrad = ctx.createLinearGradient(0, -s * 0.55, 0, s * 0.55)
+  bodyGrad.addColorStop(0,   `rgba(255,220,255,${0.95 * intensity})`)
+  bodyGrad.addColorStop(0.3, `rgba(200,140,255,${0.85 * intensity})`)
+  bodyGrad.addColorStop(0.7, `rgba(140,80,255,${0.6 * intensity})`)
+  bodyGrad.addColorStop(1,   `rgba(80,20,180,${0.2 * intensity})`)
+  ctx.fillStyle = bodyGrad
+  ctx.beginPath()
+  ctx.ellipse(0, -s * 0.05, s * 0.07, s * 0.52, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Head glow
+  const headGrad = ctx.createRadialGradient(0, -s * 0.5, 0, 0, -s * 0.5, s * 0.14)
+  headGrad.addColorStop(0, `rgba(255,240,255,${intensity})`)
+  headGrad.addColorStop(0.5, `rgba(200,160,255,${0.7 * intensity})`)
+  headGrad.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = headGrad
+  ctx.beginPath()
+  ctx.arc(0, -s * 0.5, s * 0.14, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Core spine — bright white streak
+  ctx.save()
+  ctx.filter = 'blur(3px)'
+  const spineGrad = ctx.createLinearGradient(0, -s * 0.55, 0, s * 0.5)
+  spineGrad.addColorStop(0, `rgba(255,255,255,${intensity})`)
+  spineGrad.addColorStop(0.5, `rgba(220,180,255,${0.8 * intensity})`)
+  spineGrad.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.strokeStyle = spineGrad
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.moveTo(0, -s * 0.55)
+  ctx.lineTo(0,  s * 0.5)
+  ctx.stroke()
+  ctx.restore()
+
+  ctx.restore()
+}
+
 export function MedhaLightningTransition({
-  active, medhaImageSrc, onComplete
+  active, onComplete
 }: MedhaLightningTransitionProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number>(0)
   const startRef = useRef<number | null>(null)
-  const [medhaStrike, setMedhaStrike] = useState<{
-    visible: boolean
-    x: number; y: number; scale: number
-    opacity: number; strikeIdx: number
-  } | null>(null)
   const [realmVisible, setRealmVisible] = useState(false)
   const strikeFiredRef = useRef<boolean[]>([false, false, false])
 
@@ -46,7 +132,6 @@ export function MedhaLightningTransition({
       const mx = (sx+ex)/2 + (Math.random()-0.5)*(H*0.06/depth)
       const my = (sy+ey)/2 + (Math.random()-0.5)*(H*0.04/depth)
 
-      // Violet-purple glow — Medhā's palette
       ctx.save()
       ctx.filter = 'blur(8px)'
       ctx.beginPath()
@@ -57,7 +142,6 @@ export function MedhaLightningTransition({
       ctx.stroke()
       ctx.filter = 'none'
 
-      // Luminous violet-white core
       ctx.beginPath()
       ctx.moveTo(sx, sy)
       ctx.quadraticCurveTo(mx, my, ex, ey)
@@ -109,17 +193,6 @@ export function MedhaLightningTransition({
 
         if (!strikeFiredRef.current[i]) {
           strikeFiredRef.current[i] = true
-          setMedhaStrike({
-            visible: true,
-            x: strike.medhaX, y: strike.medhaY,
-            scale: strike.medhaScale,
-            opacity: 1, strikeIdx: i,
-          })
-          if (!isSustained) {
-            setTimeout(() => {
-              setMedhaStrike(prev => prev?.strikeIdx === i ? null : prev)
-            }, strike.duration)
-          }
         }
 
         if (age < strike.duration) {
@@ -137,12 +210,10 @@ export function MedhaLightningTransition({
           }
           flashOp = Math.max(0, flashOp)
 
-          // Deep violet flash — NOT white
           const flashOp2 = isSustained ? flashOp * 0.18 : flashOp * 0.55
           ctx.fillStyle = `rgba(80,40,160,${flashOp2})`
           ctx.fillRect(0, 0, W, H)
 
-          // Crimson edge vignette on flash
           if (flashOp > 0.3) {
             const vign = ctx.createRadialGradient(W/2, H/2, H*0.2, W/2, H/2, H*0.75)
             vign.addColorStop(0, 'rgba(0,0,0,0)')
@@ -153,13 +224,11 @@ export function MedhaLightningTransition({
 
           if (flashOp > 0.1) {
             const strikeX = W * strike.medhaX / 100
-            // Main bolt — violet
             drawLightning(ctx, W, H,
               strikeX + (Math.random()-0.5)*W*0.2, 0,
               strikeX + (Math.random()-0.5)*W*0.05, H*0.35,
               flashOp, true
             )
-            // Secondary bolt — electric blue
             if (Math.random() > 0.3) {
               ctx.save()
               drawLightning(ctx, W, H,
@@ -171,6 +240,16 @@ export function MedhaLightningTransition({
             }
           }
 
+          // Draw Medhā's glowing form during the sustained strike
+          if (isSustained) {
+            const medhaFade = flashProgress < 0.08
+              ? flashProgress / 0.08
+              : flashProgress > 0.75
+                ? 1 - (flashProgress - 0.75) / 0.25
+                : 1
+            drawMedha(ctx, W * 0.5, H * 0.48, Math.max(0, medhaFade) * flashOp, W, H)
+          }
+
           if (isSustained && flashProgress > 0.3 && !realmVisible) {
             setRealmVisible(true)
           }
@@ -180,7 +259,6 @@ export function MedhaLightningTransition({
       const totalDuration = STRIKES[2].at + STRIKES[2].duration + 600
       if (elapsed >= totalDuration) {
         cancelAnimationFrame(rafRef.current)
-        setMedhaStrike(null)
         onComplete()
         return
       }
@@ -204,41 +282,6 @@ export function MedhaLightningTransition({
           zIndex: 100, pointerEvents: 'none',
         }}
       />
-
-      <AnimatePresence>
-        {medhaStrike?.visible && (
-          <motion.div
-            key={`strike-${medhaStrike.strikeIdx}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: medhaStrike.strikeIdx === 2 ? [1, 1, 0] : 1 }}
-            exit={{ opacity: 0 }}
-            transition={{
-              duration: medhaStrike.strikeIdx === 2 ? 2.4 : 0.05,
-              times: medhaStrike.strikeIdx === 2 ? [0, 0.3, 1] : undefined,
-              ease: 'easeOut',
-            }}
-            style={{
-              position: 'fixed',
-              left: `${medhaStrike.x}%`,
-              top: `${medhaStrike.y}%`,
-              transform: 'translate(-50%, -50%)',
-              width: `${medhaStrike.scale * 100}vmin`,
-              height: `${medhaStrike.scale * 100}vmin`,
-              zIndex: 101, pointerEvents: 'none',
-              mixBlendMode: 'screen',
-              filter: medhaStrike.strikeIdx === 2
-                ? 'brightness(1.6) saturate(2.0)'
-                : 'brightness(2.2) saturate(1.8)',
-            }}
-          >
-            <img
-              src={medhaImageSrc}
-              alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {realmVisible && (
