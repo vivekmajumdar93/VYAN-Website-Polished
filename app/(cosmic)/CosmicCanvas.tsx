@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import '../../lib/vyan/ui/styles.css';
+import { MedhaLightningTransition } from '@/components/MedhaLightningTransition';
 
 let appInstance: any = null;
 let rootEl: HTMLDivElement | null = null;
@@ -90,6 +91,26 @@ export default function CosmicCanvas() {
   const pathname = usePathname();
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
+  const [transitioningToMedha, setTransitioningToMedha] = useState(false);
+  const [medhaImageSrc, setMedhaImageSrc] = useState('');
+  const triggerMedhaRef = useRef<() => void>(() => {});
+  triggerMedhaRef.current = () => setTransitioningToMedha(true);
+
+  useEffect(() => {
+    const candidates = [
+      '/assets/medha-still.png',
+      '/assets/medha-entity.png',
+      '/assets/medha-dormant.png',
+      '/medha-entity.png',
+      '/medha.png',
+    ];
+    let found = false;
+    candidates.forEach(src => {
+      const img = new Image();
+      img.onload = () => { if (!found) { found = true; setMedhaImageSrc(src); } };
+      img.src = src;
+    });
+  }, []);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -113,12 +134,12 @@ export default function CosmicCanvas() {
         initialMode,
         onEnterVoid: () => { router.push('/shunya'); },
         onOrbActivate: (key: string) => {
-          if (key === 'medha') router.push('/medha-transition');
+          if (key === 'medha') triggerMedhaRef.current();
           else if (key === 'vistara') router.push('/vistara');
           else router.push(`/shunya/${key}`);
         },
         onEnterVistara: () => { router.push('/vistara'); },
-        onEnterMedha:   () => { router.push('/medha-transition'); },
+        onEnterMedha:   () => { triggerMedhaRef.current(); },
       });
       appInstance.start();
       (window as any).__vyan = appInstance;
@@ -299,5 +320,17 @@ export default function CosmicCanvas() {
     return () => { cancelled = true; };
   }, [pathname]);
 
-  return <div id="vyan-root" ref={ref} />;
+  return (
+    <>
+      <div id="vyan-root" ref={ref} />
+      <MedhaLightningTransition
+        active={transitioningToMedha}
+        medhaImageSrc={medhaImageSrc}
+        onComplete={() => {
+          setTransitioningToMedha(false);
+          router.push('/medha');
+        }}
+      />
+    </>
+  );
 }
