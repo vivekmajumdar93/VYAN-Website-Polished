@@ -166,7 +166,7 @@ function Bubble({msg,fc,onCopy,isLast,onRegenerate}:{msg:StoredMsg;fc:string;onC
       style={{width:'100%',display:'flex',flexDirection:'column',alignItems:isU?'flex-end':'flex-start',gap:'6px'}}>
       <div style={{display:'flex',alignItems:'flex-start',gap:'8px',flexDirection:isU?'row-reverse':'row'}}>
         <div style={{paddingTop:'10px',flexShrink:0}}><NL color={isU?'rgba(255,255,255,0.3)':fc} align={isU?'right':'left'}/></div>
-        <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'12px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'var(--font-vyan)',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer'}}>
+        <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'12px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'var(--font-vyan)',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer',textShadow:isU?'none':'0 0 10px rgba(255,200,150,0.55), 0 0 24px rgba(255,160,100,0.28)'}}>
           {msg.role==='assistant'?<div dangerouslySetInnerHTML={{__html:renderMarkdown(msg.content)}} className="medha-md"/>:msg.content}
         </div>
       </div>

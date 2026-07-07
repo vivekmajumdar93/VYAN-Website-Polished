@@ -755,11 +755,11 @@
 }
 
 /* ── Markdown in dialogue ───────────────────────────────────────────── */
-.medha-md { color: rgba(232, 232, 240, 0.92); font-size: 14px; line-height: 1.7; }
+.medha-md { color: rgba(232, 232, 240, 0.92); font-size: 14px; line-height: 1.7; text-shadow: 0 0 10px rgba(255, 200, 150, 0.45), 0 0 26px rgba(255, 160, 100, 0.22); }
 .medha-md .md-p { margin: 0 0 10px 0; }
 .medha-md .md-p:last-child { margin-bottom: 0; }
-.medha-md strong { color: #ffd9e4; font-weight: 600; }
-.medha-md em { color: rgba(216, 200, 255, 0.92); font-style: italic; }
+.medha-md strong { color: #ffd9e4; font-weight: 600; text-shadow: 0 0 12px rgba(255, 180, 200, 0.7), 0 0 28px rgba(255, 120, 160, 0.35); }
+.medha-md em { color: rgba(216, 200, 255, 0.92); font-style: italic; text-shadow: 0 0 12px rgba(190, 160, 255, 0.65), 0 0 28px rgba(150, 100, 255, 0.30); }
 .medha-md code {
   background: rgba(120, 80, 200, 0.18); border: 1px solid rgba(180, 130, 255, 0.18);
   padding: 1px 6px; border-radius: 4px;
@@ -774,7 +774,7 @@
   background: linear-gradient(135deg, var(--mode-a), var(--mode-b));
   box-shadow: 0 0 8px var(--mode-a);
 }
-.medha-md .md-h { margin: 12px 0 6px; color: #fff; }
+.medha-md .md-h { margin: 12px 0 6px; color: #fff; text-shadow: 0 0 16px rgba(255, 220, 180, 0.7), 0 0 36px rgba(255, 180, 120, 0.35); }
 .medha-md .md-h1 { font-size: 17px; } .medha-md .md-h2 { font-size: 15px; } .medha-md .md-h3 { font-size: 13.5px; color: #ffd9e4; }
 .medha-md .md-quote {
   margin: 10px 0; padding: 8px 12px;
