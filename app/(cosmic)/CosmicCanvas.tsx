@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import '../../lib/vyan/ui/styles.css';
-import { MedhaLightningTransition } from '@/components/MedhaLightningTransition';
+import { NeuralBloom } from '@/components/neural-bloom/NeuralBloom';
 
 let appInstance: any = null;
 let rootEl: HTMLDivElement | null = null;
@@ -323,9 +323,8 @@ export default function CosmicCanvas() {
   return (
     <>
       <div id="vyan-root" ref={ref} />
-      <MedhaLightningTransition
+      <NeuralBloom
         active={transitioningToMedha}
-        medhaImageSrc={medhaImageSrc}
         onComplete={() => {
           setTransitioningToMedha(false);
           router.push('/medha');
