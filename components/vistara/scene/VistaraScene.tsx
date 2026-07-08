@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Canvas } from '@react-three/fiber'
-import { EffectComposer, Bloom, Vignette, DepthOfField } from '@react-three/postprocessing'
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import { GATEWAYS } from '@/lib/vistara/gateways'
 import { KnowledgeStreams } from './KnowledgeStreams'
 import { SacredGeometry }  from './SacredGeometry'
@@ -53,12 +53,7 @@ function Scene({ onOrbHover, onOrbClick, hoveredId, activeId }: VistaraSceneProp
           luminanceSmoothing={0.9}
           mipmapBlur
         />
-        <DepthOfField
-          focusDistance={0.0}
-          focalLength={0.04}
-          bokehScale={2.5}
-        />
-        <Vignette darkness={0.65} offset={0.3} />
+        <Vignette darkness={0.55} offset={0.4} />
       </EffectComposer>
     </>
   )
