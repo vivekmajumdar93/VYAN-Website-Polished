@@ -19,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/vivekmajumdar93/VYAN-SHUNYALEKH@main/web/vyan-font.css" />
         {/* Preload the logo so the loader has it instantly */}
         <link rel="preload" as="image" href="/logo-symbol.png" />
       </head>
