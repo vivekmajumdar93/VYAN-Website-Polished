@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -172,7 +172,7 @@ function TransitionCanvas({ direction, onComplete }: {
 
 type Phase = 'filaments' | 'blackout' | 'done'
 
-export default function MedhaTransitionPage() {
+function MedhaTransitionInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [phase, setPhase] = useState<Phase>('filaments')
@@ -218,6 +218,14 @@ export default function MedhaTransitionPage() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function MedhaTransitionPage() {
+  return (
+    <Suspense>
+      <MedhaTransitionInner />
+    </Suspense>
   )
 }
 

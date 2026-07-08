@@ -13,9 +13,10 @@ export function generateStaticParams() {
 
 export const dynamicParams = false;
 
-export default function VistaraProductPage({ params }: { params: { product: string } }) {
-  if (!VALID_SET.has(params.product)) notFound();
-  return <VistaraProductDemo productKey={params.product as ValidProduct} />;
+export default async function VistaraProductPage({ params }: { params: Promise<{ product: string }> }) {
+  const { product } = await params;
+  if (!VALID_SET.has(product)) notFound();
+  return <VistaraProductDemo productKey={product as ValidProduct} />;
 }
 
 export const metadata = { title: 'Vistāra Product' };

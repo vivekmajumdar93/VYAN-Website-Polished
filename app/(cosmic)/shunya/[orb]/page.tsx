@@ -9,8 +9,9 @@ export function generateStaticParams() {
 
 export const dynamicParams = false;
 
-export default function ShunyaOrbPage({ params }: { params: { orb: string } }) {
-  if (!VALID_ORBS.has(params.orb)) notFound();
+export default async function ShunyaOrbPage({ params }: { params: Promise<{ orb: string }> }) {
+  const { orb } = await params;
+  if (!VALID_ORBS.has(orb)) notFound();
   return null;
 }
 
