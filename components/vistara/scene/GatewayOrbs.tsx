@@ -1,282 +1,173 @@
 'use client'
 
-import { useRef, useMemo, useCallback, useState } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Gateway } from '@/lib/vistara/gateways'
 
-// ── Fresnel orb shader ────────────────────────────────────────────────────────
-const ORB_VERT = `
+// ── Orb: a billboarded radial glow sprite, not a 3D ball ─────────────────────
+// Two quads per orb: tight core + wide aura. Additive blending = light, not plastic.
+
+const CORE_VERT = `
 uniform float time;
 uniform float pulse;
-varying vec3 vNormal;
-varying vec3 vViewDir;
+varying vec2 vUv;
 
 void main() {
-  vNormal  = normalize(normalMatrix * normal);
-  vec4 mv  = modelViewMatrix * vec4(position, 1.0);
-  vViewDir = normalize(-mv.xyz);
-  float breathe = 1.0 + sin(time * 1.6 + pulse) * 0.035;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position * breathe, 1.0);
+  vUv = uv;
+  // Billboard: always face camera
+  vec3 right   = vec3(modelViewMatrix[0][0], modelViewMatrix[1][0], modelViewMatrix[2][0]);
+  vec3 up      = vec3(modelViewMatrix[0][1], modelViewMatrix[1][1], modelViewMatrix[2][1]);
+  float breathe = 1.0 + sin(time * 1.8 + pulse) * 0.06;
+  vec3 worldPos = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  worldPos += right * position.x * breathe + up * position.y * breathe;
+  gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
 }
 `
-const ORB_FRAG = `
+const CORE_FRAG = `
 uniform vec3  orbColor;
 uniform float time;
 uniform float hovered;
 uniform float pulse;
-varying vec3 vNormal;
-varying vec3 vViewDir;
+varying vec2 vUv;
 
 void main() {
-  float fresnel = pow(1.0 - abs(dot(vNormal, vViewDir)), 2.8);
-  float glow    = fresnel * (0.7 + hovered * 0.5);
+  vec2  p = vUv - 0.5;
+  float r = length(p);
+  if (r > 0.5) discard;
 
-  // Subtle inner shimmer
-  float shimmer = 0.5 + 0.5 * sin(time * 3.0 + pulse * 4.0 + vNormal.y * 5.0);
-  float inner   = (1.0 - fresnel) * shimmer * 0.12 * (1.0 + hovered);
+  // Tight bright core
+  float core  = exp(-r * 16.0);
+  // Soft inner glow
+  float glow  = exp(-r * 5.0) * 0.6;
+  // Edge shimmer ring on hover
+  float ring  = smoothstep(0.38, 0.42, r) * smoothstep(0.50, 0.44, r) * hovered;
+  float shimmer = 0.8 + 0.2 * sin(time * 4.0 + pulse * 6.0 + r * 20.0);
 
-  vec3  col   = orbColor;
-  float alpha = glow * 0.9 + inner;
-  alpha = clamp(alpha, 0.0, 0.95);
+  float alpha = (core + glow + ring * 0.4) * shimmer * (0.85 + hovered * 0.3);
+  vec3  col   = mix(orbColor, vec3(1.0), core * 0.6);
 
-  gl_FragColor = vec4(col + inner * vec3(0.5, 0.5, 0.8), alpha);
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }
 `
 
-// ── Emission ring shader ───────────────────────────────────────────────────────
-const RING_VERT = `
-uniform float time;
-uniform float active;
-varying float vAlpha;
-
-void main() {
-  float angle = atan(position.y, position.x);
-  float expand = 1.0 + active * (0.5 + 0.5 * sin(time * 4.0));
-  vAlpha = 0.6 + 0.4 * sin(angle * 3.0 + time * 2.0);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position * expand, 1.0);
-}
-`
-const RING_FRAG = `
+const AURA_FRAG = `
 uniform vec3  orbColor;
-uniform float active;
-varying float vAlpha;
+uniform float hovered;
+varying vec2 vUv;
 
 void main() {
-  gl_FragColor = vec4(orbColor, vAlpha * active * 0.5);
+  vec2  p = vUv - 0.5;
+  float r = length(p);
+  if (r > 0.5) discard;
+  float aura  = exp(-r * 3.5) * (0.18 + hovered * 0.22);
+  gl_FragColor = vec4(orbColor, aura);
 }
 `
 
-// ── 2D position to 3D world mapping ───────────────────────────────────────────
-function gatewayTo3D(gw: Gateway): [number, number, number] {
+// 2D position → 3D world
+function to3D(gw: Gateway): [number, number, number] {
   return [
-    (gw.x / 100 - 0.5) * 9,
-    -(gw.y / 100 - 0.5) * 5.5,
-    -(1 - gw.depth) * 6,
+    (gw.x / 100 - 0.5) * 10,
+    -(gw.y / 100 - 0.5) * 6,
+    -(1 - gw.depth) * 5,
   ]
 }
 
 interface OrbProps {
-  gateway: Gateway
+  gateway:   Gateway
   isHovered: boolean
-  isActive: boolean
-  onHover: (id: string | null) => void
-  onClick: (id: string) => void
+  isActive:  boolean
+  onHover:   (id: string | null) => void
+  onClick:   (id: string) => void
 }
 
-function OrbMesh({ gateway, isHovered, isActive, onHover, onClick }: OrbProps) {
-  const meshRef  = useRef<THREE.Mesh>(null)
-  const ringRef  = useRef<THREE.Mesh>(null)
-  const pos3D    = useMemo(() => gatewayTo3D(gateway), [gateway])
-  const orbColor = useMemo(() => new THREE.Color(gateway.color), [gateway.color])
-  const pulseOffset = useMemo(() => Math.random() * Math.PI * 2, [])
-  const orbR     = 0.12 + gateway.depth * 0.12   // near orbs bigger
+function OrbSprite({ gateway, isHovered, isActive, onHover, onClick }: OrbProps) {
+  const coreRef = useRef<THREE.Mesh>(null)
+  const auraRef = useRef<THREE.Mesh>(null)
+  const pos     = useMemo(() => to3D(gateway), [gateway])
+  const color   = useMemo(() => new THREE.Color(gateway.color), [gateway.color])
+  const pulse   = useMemo(() => Math.random() * Math.PI * 2, [])
 
-  const mat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader:   ORB_VERT,
-    fragmentShader: ORB_FRAG,
+  // Core size scales with depth (near = larger apparent size)
+  const coreSize = 0.08 + gateway.depth * 0.08
+  const auraSize = coreSize * 5.5
+
+  const coreMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   CORE_VERT,
+    fragmentShader: CORE_FRAG,
     uniforms: {
-      orbColor: { value: orbColor },
+      orbColor: { value: color },
       time:     { value: 0 },
       hovered:  { value: 0 },
-      pulse:    { value: pulseOffset },
-    },
-    transparent: true,
-    blending:    THREE.AdditiveBlending,
-    depthWrite:  false,
-    side:        THREE.FrontSide,
-  }), [orbColor, pulseOffset])
-
-  const ringMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader:   RING_VERT,
-    fragmentShader: RING_FRAG,
-    uniforms: {
-      orbColor: { value: orbColor },
-      time:     { value: 0 },
-      active:   { value: 0 },
+      pulse:    { value: pulse },
     },
     transparent: true,
     blending:    THREE.AdditiveBlending,
     depthWrite:  false,
     side:        THREE.DoubleSide,
-  }), [orbColor])
+  }), [color, pulse])
 
-  // Orbit drift — each orb follows its own tiny ellipse
+  const auraMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   CORE_VERT,
+    fragmentShader: AURA_FRAG,
+    uniforms: {
+      orbColor: { value: color },
+      time:     { value: 0 },
+      hovered:  { value: 0 },
+      pulse:    { value: pulse },
+    },
+    transparent: true,
+    blending:    THREE.AdditiveBlending,
+    depthWrite:  false,
+    side:        THREE.DoubleSide,
+  }), [color, pulse])
+
   const orbitRef = useRef({ phase: Math.random() * Math.PI * 2 })
 
   useFrame((_, delta) => {
-    const t = (mat.uniforms.time.value += delta)
-    ringMat.uniforms.time.value = t
+    const t = (coreMat.uniforms.time.value += delta)
+    auraMat.uniforms.time.value = t
 
-    const targetHov = isHovered || isActive ? 1 : 0
-    mat.uniforms.hovered.value += (targetHov - mat.uniforms.hovered.value) * 0.08
-    ringMat.uniforms.active.value += (targetHov - ringMat.uniforms.active.value) * 0.06
+    const target = isHovered || isActive ? 1 : 0
+    coreMat.uniforms.hovered.value += (target - coreMat.uniforms.hovered.value) * 0.08
+    auraMat.uniforms.hovered.value  = coreMat.uniforms.hovered.value
 
-    if (meshRef.current) {
-      orbitRef.current.phase += gateway.orbitSpeed * 0.5
-      const ph = orbitRef.current.phase
-      meshRef.current.position.set(
-        pos3D[0] + Math.cos(ph) * gateway.orbitRadius * 0.004,
-        pos3D[1] + Math.sin(ph * 0.7) * gateway.orbitRadius * 0.003,
-        pos3D[2],
-      )
-      if (ringRef.current) {
-        ringRef.current.position.copy(meshRef.current.position)
-        ringRef.current.rotation.y = t * 0.3
-        ringRef.current.rotation.x = t * 0.15
-      }
-    }
+    orbitRef.current.phase += gateway.orbitSpeed * 0.6
+    const ph = orbitRef.current.phase
+    const ox = Math.cos(ph) * gateway.orbitRadius * 0.005
+    const oy = Math.sin(ph * 0.7) * gateway.orbitRadius * 0.003
+
+    if (coreRef.current) coreRef.current.position.set(pos[0]+ox, pos[1]+oy, pos[2])
+    if (auraRef.current) auraRef.current.position.set(pos[0]+ox, pos[1]+oy, pos[2])
   })
 
   return (
     <>
+      {/* Invisible hit-target sphere — bigger than the sprite so it's easy to click */}
       <mesh
-        ref={meshRef}
-        position={pos3D}
+        position={pos}
         onPointerOver={() => onHover(gateway.id)}
         onPointerOut={() => onHover(null)}
         onClick={e => { e.stopPropagation(); onClick(gateway.id) }}
       >
-        <sphereGeometry args={[orbR, 32, 32]} />
-        <primitive object={mat} attach="material" />
+        <sphereGeometry args={[coreSize * 3, 8, 8]} />
+        <meshBasicMaterial visible={false} />
       </mesh>
-      {/* Outer glow / emission ring */}
-      <mesh ref={ringRef} position={pos3D}>
-        <torusGeometry args={[orbR * 1.8, orbR * 0.06, 4, 64]} />
-        <primitive object={ringMat} attach="material" />
+
+      {/* Wide aura glow */}
+      <mesh ref={auraRef} position={pos}>
+        <planeGeometry args={[auraSize, auraSize]} />
+        <primitive object={auraMat} attach="material" />
+      </mesh>
+
+      {/* Tight bright core */}
+      <mesh ref={coreRef} position={pos}>
+        <planeGeometry args={[coreSize * 2, coreSize * 2]} />
+        <primitive object={coreMat} attach="material" />
       </mesh>
     </>
   )
-}
-
-// ── Orb particle halo ─────────────────────────────────────────────────────────
-const HALO_VERT = `
-attribute float life;
-attribute float speed;
-varying float vLife;
-uniform float time;
-
-void main() {
-  vLife = life;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = 2.5 * (1.0 - life) * (6.0 / max(-mv.z, 0.5));
-  gl_Position  = projectionMatrix * mv;
-}
-`
-const HALO_FRAG = `
-uniform vec3 haloColor;
-varying float vLife;
-
-void main() {
-  float r = length(gl_PointCoord - 0.5);
-  if (r > 0.5) discard;
-  float a = (1.0 - r * 2.0) * (1.0 - vLife) * 0.7;
-  gl_FragColor = vec4(haloColor, a);
-}
-`
-
-function OrbHalo({ gateway, active }: { gateway: Gateway; active: boolean }) {
-  const N   = 80
-  const pos = useMemo(() => new Float32Array(N * 3), [])
-  const lif = useMemo(() => {
-    const a = new Float32Array(N)
-    for (let i = 0; i < N; i++) a[i] = Math.random()
-    return a
-  }, [])
-  const spd = useMemo(() => {
-    const a = new Float32Array(N)
-    for (let i = 0; i < N; i++) a[i] = 0.003 + Math.random() * 0.007
-    return a
-  }, [])
-  const center = useMemo(() => gatewayTo3D(gateway), [gateway])
-  const color  = useMemo(() => new THREE.Color(gateway.color), [gateway.color])
-  const orbR   = 0.12 + gateway.depth * 0.12
-
-  const geo = useMemo(() => {
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    g.setAttribute('life',     new THREE.BufferAttribute(lif, 1))
-    g.setAttribute('speed',    new THREE.BufferAttribute(spd, 1))
-    return g
-  }, [pos, lif, spd])
-
-  const mat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader:   HALO_VERT,
-    fragmentShader: HALO_FRAG,
-    uniforms: { haloColor: { value: color }, time: { value: 0 } },
-    transparent: true,
-    blending:    THREE.AdditiveBlending,
-    depthWrite:  false,
-  }), [color])
-
-  const dirRef = useRef<THREE.Vector3[]>(
-    Array.from({ length: N }, () =>
-      new THREE.Vector3(
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2,
-      ).normalize()
-    )
-  )
-
-  useFrame((_, delta) => {
-    if (!active) {
-      // reset all particles
-      lif.fill(1)
-      const pa = geo.getAttribute('position') as THREE.BufferAttribute
-      for (let i = 0; i < N; i++) {
-        pa.setXYZ(i, center[0], center[1], center[2])
-      }
-      pa.needsUpdate = true
-      return
-    }
-    mat.uniforms.time.value += delta
-    for (let i = 0; i < N; i++) {
-      lif[i] += spd[i]
-      if (lif[i] >= 1) {
-        lif[i] = 0
-        // respawn at random point on orb surface
-        const d = dirRef.current[i]
-        d.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize()
-        pos[i*3]   = center[0] + d.x * orbR
-        pos[i*3+1] = center[1] + d.y * orbR
-        pos[i*3+2] = center[2] + d.z * orbR
-      } else {
-        const d = dirRef.current[i]
-        pos[i*3]   += d.x * 0.006
-        pos[i*3+1] += d.y * 0.006
-        pos[i*3+2] += d.z * 0.004
-      }
-    }
-    const pa = geo.getAttribute('position') as THREE.BufferAttribute
-    pa.array = pos
-    pa.needsUpdate = true
-    const la = geo.getAttribute('life') as THREE.BufferAttribute
-    ;(la.array as Float32Array).set(lif)
-    la.needsUpdate = true
-  })
-
-  return <points geometry={geo} material={mat} />
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -292,19 +183,14 @@ export function GatewayOrbs({ gateways, onHover, onClick, activeId, hoveredId }:
   return (
     <>
       {gateways.map(gw => (
-        <group key={gw.id}>
-          <OrbMesh
-            gateway={gw}
-            isHovered={hoveredId === gw.id}
-            isActive={activeId === gw.id}
-            onHover={onHover}
-            onClick={onClick}
-          />
-          <OrbHalo
-            gateway={gw}
-            active={hoveredId === gw.id || activeId === gw.id}
-          />
-        </group>
+        <OrbSprite
+          key={gw.id}
+          gateway={gw}
+          isHovered={hoveredId === gw.id}
+          isActive={activeId === gw.id}
+          onHover={onHover}
+          onClick={onClick}
+        />
       ))}
     </>
   )

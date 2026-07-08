@@ -98,7 +98,7 @@ void main() {
   vCrimson = isCrimson;
   vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
   float d = -mvPos.z;
-  gl_PointSize = (3.5 - isCrimson * 0.5) * (6.0 / max(d, 0.5)) * vBrightness;
+  gl_PointSize = (5.0 - isCrimson * 0.5) * (7.0 / max(d, 0.5)) * vBrightness;
   gl_Position = projectionMatrix * mvPos;
 }
 `
@@ -205,13 +205,12 @@ export function KnowledgeStreams() {
       const pts   = sampled[pIdx]
       const si    = Math.min(Math.floor(phases[i] * SAMPLES) * 3, pts.length - 3)
 
-      // Curl noise turbulence
-      const cx = pos[i*3], cy = pos[i*3+1], cz = pos[i*3+2]
-      const [cu, cv, cw] = curl(cx * 0.5, cy * 0.5, cz * 0.5 + mat.uniforms.time.value * 0.03)
+      // Tiny turbulence — keeps streams coherent, not scattered
+      const [cu, cv, cw] = curl(pts[si]*0.3, pts[si+1]*0.3, pts[si+2]*0.3 + mat.uniforms.time.value * 0.015)
 
-      pos[i*3]   = pts[si]   + cu * 0.06 + (Math.random() - 0.5) * 0.002
-      pos[i*3+1] = pts[si+1] + cv * 0.06 + (Math.random() - 0.5) * 0.002
-      pos[i*3+2] = pts[si+2] + cw * 0.04
+      pos[i*3]   = pts[si]   + cu * 0.012
+      pos[i*3+1] = pts[si+1] + cv * 0.012
+      pos[i*3+2] = pts[si+2] + cw * 0.008
     }
 
     const posAttr = geo.getAttribute('position') as THREE.BufferAttribute
