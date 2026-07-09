@@ -67,14 +67,7 @@ export function VistaraScene(props: VistaraSceneProps) {
   const dpr: [number, number] = [1, Math.min(window.devicePixelRatio, 2)]
 
   return createPortal(
-    <div
-      style={{
-        position: 'fixed', inset: 0,
-        zIndex: 1,
-        background: '#01020e',
-      }}
-    >
-      {/* Base video — reversed, ultra-slow loop */}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1, background: '#000' }}>
       <video
         src="/vistara-bg.mp4"
         autoPlay
@@ -86,25 +79,9 @@ export function VistaraScene(props: VistaraSceneProps) {
           position: 'absolute', inset: 0,
           width: '100%', height: '100%',
           objectFit: 'cover',
-          opacity: 0.72,
           pointerEvents: 'none',
         }}
       />
-      <Canvas
-        style={{ width: '100%', height: '100%', background: 'transparent' }}
-        camera={{ fov: 55, near: 0.1, far: 200, position: [0, 0, 8] }}
-        gl={{
-          antialias: true,
-          alpha: true,
-          powerPreference: 'high-performance',
-          stencil: false,
-        }}
-        dpr={dpr}
-        frameloop="always"
-      >
-        <fog attach="fog" args={['#010510', 18, 90]} />
-        <Scene {...props} />
-      </Canvas>
     </div>,
     document.body,
   )
