@@ -74,17 +74,19 @@ export function VistaraScene(props: VistaraSceneProps) {
         background: '#01020e',
       }}
     >
-      {/* Base cosmic void image — HTML layer so it's immune to fog/opacity/texture-load timing */}
-      <img
-        src={typeof window !== 'undefined' && window.innerWidth <= 768
-          ? '/02594BF3-E885-4D46-92BF-0187367C0AC6.png'
-          : '/D0070A92-4437-4E55-9AC1-08A7AD47EA1A.png'}
-        alt=""
+      {/* Base video — reversed, ultra-slow loop */}
+      <video
+        src="/vistara-bg.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+        ref={el => { if (el) el.playbackRate = 0.18 }}
         style={{
           position: 'absolute', inset: 0,
           width: '100%', height: '100%',
           objectFit: 'cover',
-          opacity: 0.55,
+          opacity: 0.72,
           pointerEvents: 'none',
         }}
       />
