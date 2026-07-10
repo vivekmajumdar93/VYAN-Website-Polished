@@ -14,7 +14,7 @@ interface VistaraSceneProps {
 // All-keyframe encoding means each seek resolves immediately.
 // At ~30 callbacks/sec: 0.0015 × 30 = 0.045 s of video per real second → ~112× slower.
 // The 5-second clip becomes a ~9-minute ping-pong cycle — reads as a living still.
-const STEP = 0.0003
+const STEP = 0.0006
 
 export function VistaraScene(_props: VistaraSceneProps) {
   const [mounted, setMounted] = useState(false)
