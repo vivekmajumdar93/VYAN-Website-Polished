@@ -59,27 +59,38 @@ export function VistaraScene(_props: VistaraSceneProps) {
     }
 
     video.addEventListener('seeked', step)
+    video.addEventListener('loadedmetadata', () => { fit(); video.currentTime = 0 })
 
-    video.addEventListener('loadedmetadata', () => {
-      canvas.width  = window.innerWidth
-      canvas.height = window.innerHeight
-      t = 0
-      video.currentTime = 0
-    })
-
-    video.load()
-
-    const onResize = () => {
+    // Resize canvas pixel buffer to match the true viewport.
+    // Uses visualViewport when available (accounts for mobile browser chrome),
+    // falls back to documentElement client dimensions, then window.innerWidth/Height.
+    // Redraws immediately so there's no flash of wrong aspect ratio.
+    function fit() {
       if (!canvas) return
-      canvas.width  = window.innerWidth
-      canvas.height = window.innerHeight
+      const vv = window.visualViewport
+      canvas.width  = vv ? Math.round(vv.width)  : (document.documentElement.clientWidth  || window.innerWidth)
+      canvas.height = vv ? Math.round(vv.height) : (document.documentElement.clientHeight || window.innerHeight)
+      drawCover()
     }
+
+    // Both resize and orientationchange fire on rotation.
+    // iOS updates dimensions asynchronously after orientationchange,
+    // so re-fit after a short delay as well.
+    const onResize = () => fit()
+    const onOrient = () => { fit(); setTimeout(fit, 150); setTimeout(fit, 400) }
+
     window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onOrient)
+    window.visualViewport?.addEventListener('resize', onResize)
+    screen.orientation?.addEventListener?.('change', onOrient)
 
     return () => {
       destroyed = true
       video.removeEventListener('seeked', step)
       window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onOrient)
+      window.visualViewport?.removeEventListener('resize', onResize)
+      screen.orientation?.removeEventListener?.('change', onOrient)
       video.src = ''
     }
   }, [mounted])
@@ -87,10 +98,11 @@ export function VistaraScene(_props: VistaraSceneProps) {
   if (!mounted) return null
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1, background: '#000' }}>
+    // 100dvh uses the dynamic viewport height on mobile (shrinks when browser UI shows)
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1, background: '#000', width: '100dvw', height: '100dvh' }}>
       <canvas
         ref={canvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', display: 'block' }}
       />
     </div>,
     document.body,
