@@ -276,6 +276,25 @@ overscroll-behavior: contain;
 .glass-panel-inner::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, rgba(200,160,255,0.45), rgba(255,80,110,0.35));
 }
+.glass-panel-logo-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.glass-panel-logo-img {
+  width: 48px;
+  height: auto;
+  filter: drop-shadow(0 0 12px rgba(160, 100, 255, 0.55));
+}
+.glass-panel-logo-name {
+  font-family: var(--font-vyan), sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.46em;
+  text-transform: uppercase;
+  color: rgba(220, 200, 255, 0.75);
+}
 .glass-panel-kicker {
 font-size: 10px;
 letter-spacing: 0.44em;
@@ -1335,7 +1354,7 @@ body:has(.sound-console-panel.open) .sound-console { opacity: 1 !important; visi
 }
 .vy-cta-link:hover { background: rgba(255, 184, 77, 0.32); color: #fff; border-color: #ffd49a; }
 
-.sk-form { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; color: rgba(232, 232, 240, 0.92); }
+.sk-form { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; padding-bottom: 32px; color: rgba(232, 232, 240, 0.92); }
 .sk-row--toggle { display: inline-flex; gap: 6px; padding: 4px; background: rgba(20, 12, 38, 0.45); border: 1px solid rgba(255, 184, 77, 0.22); border-radius: 999px; align-self: flex-start; }
 .sk-toggle { position: relative; cursor: pointer; }
 .sk-toggle input { position: absolute; opacity: 0; pointer-events: none; }

@@ -23,7 +23,7 @@ const PANEL_SELECTORS = [
   '.netra-root',
   '.mcc-veil',
   '.mlv-modal',
-  '.glass-panel.is-open',
+  '.glass-panel.open',
   '[data-vyan-panel="open"]',
 ].join(',');
 

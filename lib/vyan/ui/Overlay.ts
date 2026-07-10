@@ -168,6 +168,10 @@ this.gatewayHint.className = 'gateway-hint';
     this.panel.className = 'glass-panel';
     this.panel.innerHTML = `
       <div class="glass-panel-inner">
+        <div class="glass-panel-logo-header">
+          <img src="/logo-symbol.png" alt="" class="glass-panel-logo-img" />
+          <div class="glass-panel-logo-name">VYAN</div>
+        </div>
         <div class="glass-panel-kicker">SHUNYA MANDALA</div>
       </div>
     `;
@@ -497,8 +501,9 @@ private wireSlabForms() {
     form.classList.toggle('is-enterprise', type === 'enterprise');
     const products = form.querySelector('.sk-products[data-show-on]') as HTMLElement | null;
     if (products) products.style.display = intent === 'modify_combination' ? '' : 'none';
-    const companyField = form.querySelector('.sk-field--enterprise') as HTMLElement | null;
-    if (companyField) companyField.style.display = type === 'enterprise' ? '' : 'none';
+    form.querySelectorAll('.sk-field--enterprise').forEach(el => {
+      (el as HTMLElement).style.display = type === 'enterprise' ? '' : 'none';
+    });
   };
   form.addEventListener('change', reflect);
   reflect();

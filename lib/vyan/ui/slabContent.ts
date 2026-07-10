@@ -106,7 +106,7 @@ export const SLAB_UDBHAVA_HTML = /* html */ `
 
   <footer class="vy-slab__foot">
     <div class="vy-slab__sig">VYAN™</div>
-    <div class="vy-slab__sigsub">Engineered for Cognitive Intelligence.</div>
+    <div class="vy-slab__sigsub">engineering the liquid infinite</div>
   </footer>
 </div>
 `;
@@ -116,11 +116,6 @@ export const SLAB_UDBHAVA_HTML = /* html */ `
 // `data-status` attribute on each card from `active` to `inactive`.
 export const SLAB_SANDHI_HTML = /* html */ `
 <div class="vy-slab vy-slab--sandhi">
-  <header class="vy-slab__hero vy-slab__hero--center">
-    <div class="vy-slab__brand">SANDHI</div>
-    <div class="vy-slab__tag">The Communiqué of VYAN</div>
-  </header>
-
   <div class="vy-card-grid">
     <article class="vy-card vy-card--hue-1" data-status="active">
       <div class="vy-card__head">
@@ -159,7 +154,7 @@ export const SLAB_SANDHI_HTML = /* html */ `
     </article>
 
     <article class="vy-card vy-card--hue-4 vy-card--brand" data-status="active" data-auto-status="true">
-      <img class="vy-card__logo" src="/logo.png" alt="VYAN" />
+      <img class="vy-card__logo" src="/logo-symbol.png" alt="VYAN" />
       <div class="vy-card__brandname">VYAN</div>
       <div class="vy-card__brandtag">Architecting the Liquid Infinite</div>
       <a class="vy-card__site" href="https://vyanlabs.com" target="_blank" rel="noopener">vyanlabs.com</a>
@@ -201,7 +196,7 @@ export const SLAB_SANKALPA_HTML = /* html */ `
         <span class="sk-k">Company <em data-only="enterprise">*</em></span>
         <input type="text" name="company" maxlength="200" placeholder="Organization name" />
       </label>
-      <label class="sk-field">
+      <label class="sk-field sk-field--enterprise">
         <span class="sk-k">Role / Title</span>
         <input type="text" name="role" maxlength="120" placeholder="Founder, CTO, etc." />
       </label>
