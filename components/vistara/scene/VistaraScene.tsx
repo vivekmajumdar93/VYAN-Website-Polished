@@ -10,10 +10,11 @@ interface VistaraSceneProps {
   activeId:   string | null
 }
 
-// Seconds of video time to step backward per seeked callback.
-// All-keyframe video means each seek resolves instantly.
-// At ~30 seeks/sec this gives ≈0.09s of video per real second → ~55× slower than realtime.
-const STEP = 0.003
+// How many seconds of video time to advance per seeked callback.
+// All-keyframe encoding means each seek resolves immediately.
+// At ~30 callbacks/sec: 0.0015 × 30 = 0.045 s of video per real second → ~112× slower.
+// The 5-second clip becomes a ~9-minute ping-pong cycle — reads as a living still.
+const STEP = 0.0015
 
 export function VistaraScene(_props: VistaraSceneProps) {
   const [mounted, setMounted] = useState(false)
@@ -35,6 +36,7 @@ export function VistaraScene(_props: VistaraSceneProps) {
     video.playsInline = true
 
     let t = 0
+    let dir = 1        // +1 = forward, -1 = reverse
     let destroyed = false
 
     function drawCover() {
@@ -49,8 +51,10 @@ export function VistaraScene(_props: VistaraSceneProps) {
     function step() {
       if (destroyed) return
       drawCover()
-      t -= STEP
-      if (t <= 0) t = video.duration
+      t += dir * STEP
+      // Flip direction instantly at each end — no pause, seamless ping-pong
+      if (t >= video.duration) { t = video.duration; dir = -1 }
+      if (t <= 0)              { t = 0;               dir =  1 }
       video.currentTime = t
     }
 
@@ -59,8 +63,8 @@ export function VistaraScene(_props: VistaraSceneProps) {
     video.addEventListener('loadedmetadata', () => {
       canvas.width  = window.innerWidth
       canvas.height = window.innerHeight
-      t = video.duration
-      video.currentTime = t
+      t = 0
+      video.currentTime = 0
     })
 
     video.load()
