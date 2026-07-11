@@ -49,7 +49,8 @@ export function VistaraScene(_props: VistaraSceneProps) {
     // requestVideoFrameCallback fires when a decoded frame is actually ready
     // to paint — no stutter, no tick-tick. Supported on Safari 15.4+, all
     // modern Chrome/Firefox. Falls back to the seeked-chain on older browsers.
-    const hasRVFC = 'requestVideoFrameCallback' in video
+    const vid = video as any
+    const hasRVFC = typeof vid.requestVideoFrameCallback === 'function'
 
     // ── Draw ─────────────────────────────────────────────────────────────────
     function drawCover() {
