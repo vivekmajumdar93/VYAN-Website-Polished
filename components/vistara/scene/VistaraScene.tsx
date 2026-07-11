@@ -11,7 +11,7 @@ interface VistaraSceneProps {
 }
 
 // video-seconds advanced per real-second (< 1 = slow-mo). Matches MedhaLair.
-const SPEED = 0.35
+const SPEED = 0.15
 // flip direction this many video-seconds before reaching either end.
 const TRANSITION_BUFFER = 0.10
 
