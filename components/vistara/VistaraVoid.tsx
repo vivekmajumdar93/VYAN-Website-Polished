@@ -1,10 +1,106 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
+import { GATEWAYS, type Gateway, assetPath } from '@/lib/vistara/gateways'
 import { BackIcon, CloseIcon } from '@/components/icons/VyanIcons'
 import { VistaraScene } from './scene/VistaraScene'
+
+// ── Gateway orb ───────────────────────────────────────────────────────────────
+
+function GatewayOrb({ gw, isHovered, isActive, onEnter, onLeave, onClick }: {
+  gw: Gateway
+  isHovered: boolean
+  isActive: boolean
+  onEnter: () => void
+  onLeave: () => void
+  onClick: () => void
+}) {
+  const innerRef = useRef<HTMLDivElement>(null)
+  const size = Math.round(gw.scale * 700)
+
+  useEffect(() => {
+    let raf = 0
+    function tick(t: number) {
+      if (innerRef.current) {
+        const dx = gw.orbitRadius * Math.cos(t * gw.orbitSpeed + gw.orbitPhase)
+        const dy = gw.orbitRadius * 0.45 * Math.sin(t * gw.orbitSpeed + gw.orbitPhase)
+        innerRef.current.style.transform = `translate(${dx}px, ${dy}px)`
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [gw.orbitRadius, gw.orbitSpeed, gw.orbitPhase])
+
+  const lit = isHovered || isActive
+  const glowSize  = Math.round(size * (lit ? 0.55 : 0.28))
+  const glowSize2 = Math.round(size * (lit ? 1.1  : 0.55))
+  const alpha1 = lit ? '70' : '38'
+  const alpha2 = lit ? '28' : '12'
+
+  return (
+    <div style={{
+      position: 'absolute',
+      left: `${gw.x}%`,
+      top: `${gw.y}%`,
+      transform: 'translate(-50%, -50%)',
+      zIndex: Math.round(gw.depth * 10) + 1,
+      pointerEvents: 'none',
+    }}>
+      <div
+        ref={innerRef}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onClick={onClick}
+        style={{
+          width: size,
+          height: size,
+          pointerEvents: 'all',
+          cursor: 'pointer',
+          position: 'relative',
+          filter: `drop-shadow(0 0 ${Math.round(size * (lit ? 0.22 : 0.1))}px ${gw.color}${lit ? '80' : '50'})`,
+          transition: 'filter 0.35s ease',
+        }}
+      >
+        {/* Outer halo */}
+        <div style={{
+          position: 'absolute',
+          inset: '-18%',
+          borderRadius: '50%',
+          border: `1px solid ${gw.color}${lit ? '40' : '18'}`,
+          boxShadow: `0 0 ${glowSize}px ${gw.color}${alpha1}, 0 0 ${glowSize2}px ${gw.color}${alpha2}`,
+          transition: 'all 0.35s ease',
+          pointerEvents: 'none',
+        }} />
+        {/* Second inner halo — tighter pulse ring */}
+        <div style={{
+          position: 'absolute',
+          inset: '-6%',
+          borderRadius: '50%',
+          border: `1px solid ${gw.color}${lit ? '55' : '22'}`,
+          transition: 'all 0.35s ease',
+          pointerEvents: 'none',
+        }} />
+        {/* Product image */}
+        <img
+          src={assetPath(gw.filename)}
+          alt={gw.name}
+          draggable={false}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            display: 'block',
+            opacity: 0.45 + gw.depth * 0.55,
+            transition: 'opacity 0.35s ease',
+            userSelect: 'none',
+          }}
+        />
+      </div>
+    </div>
+  )
+}
 
 // ── Main Vistara component ─────────────────────────────────────────────────────
 
@@ -43,6 +139,19 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         hoveredId={hoveredId}
         activeId={activeId}
       />
+
+      {/* ── Gateway orbs — float above the nebula ── */}
+      {GATEWAYS.map(gw => (
+        <GatewayOrb
+          key={gw.id}
+          gw={gw}
+          isHovered={hoveredId === gw.id}
+          isActive={activeId === gw.id}
+          onEnter={() => setHoveredId(gw.id)}
+          onLeave={() => setHoveredId(null)}
+          onClick={() => handleOrbClick(gw.id)}
+        />
+      ))}
 
       {/* ── HTML UI overlay — sits above the Canvas ── */}
 

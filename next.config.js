@@ -10,6 +10,7 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['three', 'gsap']
   },
+  turbopack: { root: '/home/user/VYAN-Website-Polished' },
   webpack(config) {
     config.module.rules.push({ test: /\.glsl$/, type: 'asset/source' });
     return config;
