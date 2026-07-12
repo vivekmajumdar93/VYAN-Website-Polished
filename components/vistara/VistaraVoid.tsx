@@ -130,7 +130,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   }, [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: 2 }}>
 
       {/* ── 3D Scene — all 8 layers ── */}
       <VistaraScene
