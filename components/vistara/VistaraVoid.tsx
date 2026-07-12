@@ -11,9 +11,71 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { GATEWAYS, type Gateway, assetPath } from '@/lib/vistara/gateways'
 import { BackIcon, CloseIcon } from '@/components/icons/VyanIcons'
-import { VistaraScene } from './scene/VistaraScene'
 
-// ── Shaders ────────────────────────────────────────────────────────────────────
+// ── Nebula background shaders (clip-space quad — unaffected by camera) ─────────
+
+const BG_VERT = /* glsl */`
+void main() { gl_Position = vec4(position.xy, 0.9999, 1.0); }
+`
+
+const BG_FRAG = /* glsl */`
+precision highp float;
+uniform vec2  u_res;
+uniform float u_t;
+
+float hash(vec2 p) {
+  p = fract(p * vec2(127.1, 311.7));
+  p += dot(p, p + 114.51);
+  return fract(p.x * p.y);
+}
+float n2d(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
+}
+float fbm(vec2 p) {
+  float v=0., a=.5;
+  for(int i=0;i<7;i++){ v+=a*n2d(p); p=p*2.1+vec2(3.7,1.3); a*=.46; }
+  return v;
+}
+float star(vec2 uv, float scale, float thresh, float sz) {
+  vec2 g = floor(uv*scale);
+  vec2 l = fract(uv*scale)-.5;
+  float h = hash(g);
+  float vis = step(thresh, h);
+  float tw = .6+.4*sin(u_t*(1.2+2.1*hash(g+.5))+h*6.28);
+  return (1.-smoothstep(0.,sz,length(l))) * vis * tw;
+}
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  vec2 st = (uv-.5); st.x *= u_res.x / u_res.y;
+  float T = u_t * .014;
+  float rad = length(st);
+  float ang = atan(st.y, st.x) + rad*.5 + T*.25;
+  vec2 wp = uv + vec2(cos(ang), sin(ang)) * rad * .06;
+  vec2 q = vec2(fbm(wp+T*.13), fbm(wp+vec2(5.2,1.3)+T*.11));
+  vec2 r = vec2(fbm(wp+3.1*q+vec2(1.7,9.2)+T*.08), fbm(wp+3.1*q+vec2(8.3,2.8)+T*.06));
+  float cl = fbm(wp + 3.*r + T*.04);
+  vec3 c = vec3(.006,.002,.015);
+  c = mix(c, vec3(.11,.03,.27),  smoothstep(.20,.62,cl)  * .95);
+  c = mix(c, vec3(.03,.05,.22),  smoothstep(.32,.72,q.x) * .75);
+  c = mix(c, vec3(.26,.05,.17),  smoothstep(.42,.82,r.y) * .50);
+  c = mix(c, vec3(.03,.11,.30),  smoothstep(.12,.52,q.y) * .60);
+  c = mix(c, vec3(.20,.08,.32),  smoothstep(.50,.90,r.x) * .35);
+  float vign = 1. - smoothstep(.55, 1.45, rad);
+  c *= vign;
+  c += vec3(.07,.02,.17) * (1.-smoothstep(0.,.65,rad));
+  c += vec3(.03,.01,.08) * (1.-smoothstep(0.,.25,rad));
+  vec3 sw = vec3(.92,.88,1.);
+  c += sw      * star(uv+T*.025,  90., .90, .020);
+  c += sw*.75  * star(uv+T*.018, 150., .92, .013);
+  c += sw*1.35 * star(uv*.75+T*.012, 55., .87, .032);
+  c = c / (c + .45);
+  gl_FragColor = vec4(c, 1.);
+}
+`
+
+// ── Orb shaders ────────────────────────────────────────────────────────────────
 
 const orbVert = /* glsl */`
 varying vec2 vUv;
@@ -34,41 +96,68 @@ void main() {
   vec2  c = vUv - 0.5;
   float r = length(c);
 
-  // Sample image — slightly zoom to avoid edge sampling artefacts
   vec4 img = texture2D(uTex, (vUv - 0.5) * 0.92 + 0.5);
 
-  // Soft dark vignette toward the perimeter
-  float vign  = 1.0 - smoothstep(0.30, 0.50, r);
-  vec3  lit   = img.rgb * (0.55 + 0.45 * vign);
+  // Soft vignette — image stays visible near centre
+  float vign = 1.0 - smoothstep(0.20, 0.50, r);
+  vec3  lit  = img.rgb * (0.68 + 0.32 * vign);
 
-  // Glow ring — narrow band near the edge
+  // Narrow glow ring near the edge — subtle base, brightens on hover
   float inner = smoothstep(0.48, 0.44, r);
   float outer = smoothstep(0.44, 0.38, r);
   float ring  = inner - outer;
-  float pulse = 0.60 + 0.40 * sin(uTime * 1.3 + uHover * 1.57);
-  float str   = ring * (0.85 + uHover * 2.2) * pulse;
+  float pulse = 0.65 + 0.35 * sin(uTime * 1.3 + uHover * 1.57);
+  float str   = ring * (0.35 + uHover * 0.90) * pulse;
 
-  vec3  col   = lit + uColor * str;
+  vec3 col = lit + uColor * str;
 
-  // Second faint outer corona
-  float corona = smoothstep(0.50, 0.48, r) * (1.0 - inner) * 0.4 * (0.6 + uHover * 0.4);
+  // Faint outer corona — only visible near/on hover
+  float corona = smoothstep(0.50, 0.48, r) * (1.0 - inner) * 0.16 * (0.5 + uHover * 0.5);
   col += uColor * corona;
 
-  // Fade to black at the very edge so bloom spills into void cleanly
   float alpha = smoothstep(0.50, 0.46, r);
   gl_FragColor = vec4(col, alpha);
 }`
 
-// ── Camera drift ───────────────────────────────────────────────────────────────
+// ── Nebula background inside the R3F canvas ────────────────────────────────────
+
+function NebulaBG() {
+  const matRef = useRef<THREE.ShaderMaterial>(null)
+
+  const uniforms = useMemo(() => ({
+    u_res: { value: new THREE.Vector2(1, 1) },
+    u_t:   { value: 0 },
+  }), [])
+
+  useFrame(({ gl, clock }) => {
+    if (!matRef.current) return
+    matRef.current.uniforms.u_t.value = clock.elapsedTime
+    gl.getDrawingBufferSize(matRef.current.uniforms.u_res.value)
+  })
+
+  return (
+    <mesh renderOrder={-10}>
+      <planeGeometry args={[2, 2]} />
+      <shaderMaterial
+        ref={matRef}
+        vertexShader={BG_VERT}
+        fragmentShader={BG_FRAG}
+        uniforms={uniforms}
+        depthTest={false}
+        depthWrite={false}
+      />
+    </mesh>
+  )
+}
+
+// ── Gentle camera figure-8 drift ───────────────────────────────────────────────
 
 function CameraOrbit() {
   const { camera } = useThree()
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const tx = Math.sin(t * 0.08) * 1.4
-    const ty = Math.cos(t * 0.055) * 0.8
-    camera.position.x += (tx - camera.position.x) * 0.018
-    camera.position.y += (ty - camera.position.y) * 0.018
+    camera.position.x += (Math.sin(t * 0.08) * 1.2 - camera.position.x) * 0.018
+    camera.position.y += (Math.cos(t * 0.055) * 0.7 - camera.position.y) * 0.018
     camera.lookAt(0, 0, 0)
   })
   return null
@@ -82,13 +171,12 @@ function Bloom() {
   const composer = useMemo(() => {
     const c = new EffectComposer(gl)
     c.addPass(new RenderPass(scene, camera))
-    const bloom = new UnrealBloomPass(
+    c.addPass(new UnrealBloomPass(
       new THREE.Vector2(size.width, size.height),
-      1.1,   // strength
-      0.55,  // radius
-      0.08,  // threshold — low, so rings and coronas bloom
-    )
-    c.addPass(bloom)
+      0.28,  // strength  — gentle ring glow only
+      0.50,  // radius
+      0.42,  // threshold — only the bright ring bands bloom
+    ))
     c.addPass(new OutputPass())
     return c
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,8 +188,7 @@ function Bloom() {
   return null
 }
 
-// ── Connection web ─────────────────────────────────────────────────────────────
-// Gossamer threads connecting each node to its two nearest neighbours.
+// ── Gossamer connection web ────────────────────────────────────────────────────
 
 function OrbWeb({ positions }: { positions: THREE.Vector3[] }) {
   const verts = useMemo(() => {
@@ -219,19 +306,24 @@ function ProductOrb({ gw, pos, size: orbSize, onHover, onClick }: {
   )
 }
 
-// ── Full constellation ─────────────────────────────────────────────────────────
+// ── Full constellation — viewport-adaptive positions ───────────────────────────
+// Uses useThree viewport (world-units) so orbs spread across the screen on any
+// aspect ratio — portrait mobile and landscape desktop both fill correctly.
 
 function Constellation({ onHover, onClick }: {
   onHover: (id: string | null) => void
   onClick: (id: string) => void
 }) {
+  const { viewport } = useThree()
+
   const positions = useMemo(() =>
     GATEWAYS.map(gw => new THREE.Vector3(
-      (gw.x / 100 - 0.5) * 14,
-      (0.5 - gw.y / 100) * 9,
-      -gw.depth * 3,
+      (gw.x / 100 - 0.5) * viewport.width  * 0.86,
+      (0.5 - gw.y / 100) * viewport.height * 0.80,
+      -gw.depth * 2,
     )),
-  [])
+    [viewport.width, viewport.height]
+  )
 
   return (
     <>
@@ -280,21 +372,14 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: 2 }}>
 
-      {/* ── Procedural void nebula (portal → body, zIndex 1) ── */}
-      <VistaraScene
-        onOrbHover={setHoveredId}
-        onOrbClick={handleOrbClick}
-        hoveredId={hoveredId}
-        activeId={activeId}
-      />
-
-      {/* ── Three.js constellation (transparent over nebula) ── */}
+      {/* ── Nebula + orbs — single WebGL context, no alpha compositing needed ── */}
       <Canvas
         camera={{ position: [0, 0, 10], fov: 60, near: 0.1, far: 200 }}
-        style={{ position: 'absolute', inset: 0, zIndex: 3 }}
-        gl={{ antialias: true, alpha: true }}
+        style={{ position: 'absolute', inset: 0 }}
+        gl={{ antialias: true }}
         dpr={[1, 1.5]}
       >
+        <NebulaBG />
         <Suspense fallback={null}>
           <Constellation onHover={setHoveredId} onClick={handleOrbClick} />
         </Suspense>
@@ -302,7 +387,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         <Bloom />
       </Canvas>
 
-      {/* ── UI: hover tooltip ── */}
+      {/* ── Hover tooltip ── */}
       <AnimatePresence>
         {hoveredGateway && !showPanel && (
           <motion.div
@@ -337,7 +422,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         )}
       </AnimatePresence>
 
-      {/* ── UI: wordmark ── */}
+      {/* ── Wordmark ── */}
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }}
         style={{
@@ -353,7 +438,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         </div>
       </motion.div>
 
-      {/* ── UI: back ── */}
+      {/* ── Back button ── */}
       {onBack && (
         <motion.button
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}
@@ -371,7 +456,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         </motion.button>
       )}
 
-      {/* ── UI: interaction hint ── */}
+      {/* ── Interaction hint ── */}
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }}
         style={{
@@ -398,7 +483,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   )
 }
 
-// ── Gateway glass panel ────────────────────────────────────────────────────────
+// ── Gateway frosted glass panel ────────────────────────────────────────────────
 
 function GatewayPanel({ gateway, onClose, onEnter }: {
   gateway: Gateway
