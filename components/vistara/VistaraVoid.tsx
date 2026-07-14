@@ -46,20 +46,22 @@ function toLine(pts: THREE.Vector3[], seg: number): THREE.Line {
   return new THREE.Line(geo)
 }
 
-// Each fruit sits at the tip of one dedicated arm branch.
-// Positions chosen to form a dome over the trunk crown (y≈9).
-const ARM_TIPS: [number, number, number][] = [
-  [ 4.8, 13.8,  0.0],   // 0°   front
-  [ 3.4, 12.5,  3.4],   // 45°
-  [ 0.0, 13.2,  4.8],   // 90°  right
-  [-3.4, 11.8,  3.4],   // 135°
-  [-4.8, 13.5,  0.0],   // 180° back
-  [-3.4, 11.2, -3.4],   // 225°
-  [ 0.0, 12.6, -4.8],   // 270° left
-  [ 3.4, 11.2, -3.4],   // 315°
+// ARM_ANCHORS: where each main branch terminates (the hanging point).
+// Fruits hang 1.3 units BELOW each anchor.
+const ARM_ANCHORS: [number, number, number][] = [
+  [ 4.8, 14.5,  0.0],
+  [ 3.4, 13.2,  3.4],
+  [ 0.0, 14.0,  4.8],
+  [-3.4, 12.8,  3.4],
+  [-4.8, 14.3,  0.0],
+  [-3.4, 12.2, -3.4],
+  [ 0.0, 13.5, -4.8],
+  [ 3.4, 12.2, -3.4],
 ]
 
-const FRUIT_POS = ARM_TIPS
+// Fruits hang BELOW their anchor point
+const FRUIT_POS: [number, number, number][] =
+  ARM_ANCHORS.map(([x, y, z]) => [x, y - 1.35, z])
 
 // ── Crystal Tree ───────────────────────────────────────────────────────────────
 function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
@@ -74,7 +76,7 @@ function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
 
   // 70 trunk wire strands
   const trunkLines = useMemo(() => {
-    const mat = new THREE.LineBasicMaterial({ color: '#a0b0c0', transparent: true, opacity: 0.72 })
+    const mat = new THREE.LineBasicMaterial({ color: '#a8b8c8', transparent: true, opacity: 0.72 })
     return Array.from({ length: 70 }, (_, i) => {
       const l = toLine(trunkStrand(i, 70), 28)
       l.material = mat
@@ -82,73 +84,91 @@ function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
     })
   }, [])
 
-  // 8 main arm branches: trunk crown → fruit tip (clearly visible spine)
+  // 8 main arm branches — trunk crown → anchor point (bright spine)
   const armLines = useMemo(() => {
-    const mat = new THREE.LineBasicMaterial({ color: '#b0c4d8', transparent: true, opacity: 0.85 })
-    return ARM_TIPS.map((tip, i) => {
+    const mat = new THREE.LineBasicMaterial({ color: '#b8ccde', transparent: true, opacity: 0.88 })
+    return ARM_ANCHORS.map((anchor, i) => {
       const θ      = (i / 8) * Math.PI * 2
-      const origin = new THREE.Vector3(1.6 * Math.cos(θ), 9.0, 1.6 * Math.sin(θ))
-      const mid    = new THREE.Vector3(
-        origin.x * 0.35 + tip[0] * 0.65,
-        origin.y * 0.30 + tip[1] * 0.70 + 0.6,
-        origin.z * 0.35 + tip[2] * 0.65,
+      const origin = new THREE.Vector3(1.6 * Math.cos(θ), 9.2, 1.6 * Math.sin(θ))
+      const anc    = new THREE.Vector3(...anchor)
+      // Mid control point arcs upward above the straight line
+      const mid = new THREE.Vector3(
+        origin.x * 0.30 + anc.x * 0.70,
+        Math.max(origin.y, anc.y) + 0.8,
+        origin.z * 0.30 + anc.z * 0.70,
       )
-      const l = toLine([origin, mid, new THREE.Vector3(...tip)], 28)
+      const l = toLine([origin, mid, anc], 30)
       l.material = mat
       return l
     })
   }, [])
 
-  // Secondary fill branches: 22 per arm, fanning from arm midpoints
+  // 120 fill branches — all start from crown, arc upward to dome surface.
+  // Uses golden-angle spiral on upper hemisphere so they form a proper dome.
   const branchLines = useMemo(() => {
-    const mat  = new THREE.LineBasicMaterial({ color: '#8899b4', transparent: true, opacity: 0.58 })
+    const mat  = new THREE.LineBasicMaterial({ color: '#8898b2', transparent: true, opacity: 0.55 })
     const lines: THREE.Line[] = []
-    ARM_TIPS.forEach((tip, armI) => {
-      const θ      = (armI / 8) * Math.PI * 2
-      const origin = new THREE.Vector3(1.6 * Math.cos(θ), 9.0, 1.6 * Math.sin(θ))
-      const armTip = new THREE.Vector3(...tip)
-      for (let j = 0; j < 22; j++) {
-        const r2     = rng(200 + armI * 25 + j)
-        const t1     = 0.20 + r2() * 0.65
-        const bO     = origin.clone().lerp(armTip, t1)
-        const spread = 1.2 + r2() * 2.4
-        const angle  = θ + (r2() - 0.5) * 2.2
-        const bT     = new THREE.Vector3(
-          bO.x + spread * Math.cos(angle),
-          bO.y - r2() * 1.4,
-          bO.z + spread * Math.sin(angle),
-        )
-        const l = toLine([bO, bT], 8)
-        l.material = mat
-        lines.push(l)
-      }
-    })
+
+    for (let i = 0; i < 120; i++) {
+      const r2 = rng(300 + i * 7)
+
+      // Distribute tips on upper hemisphere (φ: 0=top → 75°=outer edge)
+      const φ   = (i / 120) * Math.PI * 0.42      // 0 → 75°
+      const θ   = i * 2.399                         // golden angle
+      const rad = 4.0 + r2() * 2.8
+
+      // Origin clusters around trunk crown
+      const oR = 0.8 + r2() * 0.9
+      const origin = new THREE.Vector3(
+        oR * Math.cos(θ),
+        8.6 + r2() * 0.8,
+        oR * Math.sin(θ),
+      )
+
+      // Tip on dome surface
+      const tipR = rad * Math.sin(φ)
+      const tipY = 9.5 + rad * Math.cos(φ) * 0.80 + (r2() - 0.5) * 0.5
+      const tipθ = θ + (r2() - 0.5) * 0.25
+      const tip  = new THREE.Vector3(tipR * Math.cos(tipθ), tipY, tipR * Math.sin(tipθ))
+
+      // Mid control: always above both endpoints → natural upward arc
+      const mid = new THREE.Vector3(
+        origin.x * 0.32 + tip.x * 0.68,
+        Math.max(origin.y, tip.y) + 0.5 + r2() * 0.7,
+        origin.z * 0.32 + tip.z * 0.68,
+      )
+
+      const l = toLine([origin, mid, tip], 12)
+      l.material = mat
+      lines.push(l)
+    }
     return lines
   }, [])
 
-  // 296 crystal drops (37 per arm) hanging along each arm
+  // 240 crystal drops hanging from dome surface
   const dropMatrices = useMemo(() => {
     const dummy = new THREE.Object3D()
     const arr: THREE.Matrix4[] = []
-    ARM_TIPS.forEach((tip, armI) => {
-      const θ      = (armI / 8) * Math.PI * 2
-      const origin = new THREE.Vector3(1.6 * Math.cos(θ), 9.0, 1.6 * Math.sin(θ))
-      const armTip = new THREE.Vector3(...tip)
-      for (let j = 0; j < 37; j++) {
-        const r2 = rng(500 + armI * 40 + j)
-        const p  = origin.clone().lerp(armTip, r2())
-        p.x += (r2() - 0.5) * 2.0
-        p.z += (r2() - 0.5) * 2.0
-        p.y -= r2() * 0.8
-        const s = 0.20 + r2() * 0.45
-        dummy.position.copy(p)
-        dummy.scale.setScalar(s)
-        dummy.rotation.x = (r2() - 0.5) * 0.4
-        dummy.rotation.z = (r2() - 0.5) * 0.3
-        dummy.updateMatrix()
-        arr.push(dummy.matrix.clone())
-      }
-    })
+    for (let i = 0; i < 240; i++) {
+      const r2  = rng(600 + i * 11)
+      const φ   = r2() * Math.PI * 0.44
+      const θ   = r2() * Math.PI * 2
+      const rad = 3.5 + r2() * 3.0
+      const tipR = rad * Math.sin(φ)
+      const tipY = 9.5 + rad * Math.cos(φ) * 0.80
+      const p = new THREE.Vector3(
+        tipR * Math.cos(θ) + (r2() - 0.5) * 1.4,
+        tipY - r2() * 1.0,
+        tipR * Math.sin(θ) + (r2() - 0.5) * 1.4,
+      )
+      const s = 0.18 + r2() * 0.44
+      dummy.position.copy(p)
+      dummy.scale.setScalar(s)
+      dummy.rotation.x = (r2() - 0.5) * 0.4
+      dummy.rotation.z = (r2() - 0.5) * 0.3
+      dummy.updateMatrix()
+      arr.push(dummy.matrix.clone())
+    }
     return arr
   }, [])
 
@@ -174,7 +194,10 @@ function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
     }
     window.addEventListener('touchstart', ts, { passive: true })
     window.addEventListener('touchmove',  tm, { passive: true })
-    return () => { window.removeEventListener('touchstart', ts); window.removeEventListener('touchmove', tm) }
+    return () => {
+      window.removeEventListener('touchstart', ts)
+      window.removeEventListener('touchmove', tm)
+    }
   }, [])
 
   const focusClock = useRef(0)
@@ -198,6 +221,7 @@ function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
 
   return (
     <group ref={treeRef}>
+      {/* Base */}
       <mesh position={[0, -0.18, 0]}>
         <cylinderGeometry args={[3.4, 3.4, 0.14, 80]} />
         <meshStandardMaterial color="#070710" metalness={0.95} roughness={0.08} />
@@ -207,11 +231,12 @@ function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
         <meshStandardMaterial color="#12122a" metalness={1.0} roughness={0.04} />
       </mesh>
 
-      {trunkLines.map((l, i) => <primitive key={`t${i}`} object={l} />)}
-      {armLines.map((l, i)   => <primitive key={`a${i}`} object={l} />)}
+      {trunkLines.map((l, i)  => <primitive key={`t${i}`} object={l} />)}
+      {armLines.map((l, i)    => <primitive key={`a${i}`} object={l} />)}
       {branchLines.map((l, i) => <primitive key={`b${i}`} object={l} />)}
 
-      <instancedMesh ref={iMeshRef} args={[TEAR_GEO, undefined, 296]} renderOrder={2}>
+      {/* Crystal drops */}
+      <instancedMesh ref={iMeshRef} args={[TEAR_GEO, undefined, 240]} renderOrder={2}>
         <meshPhysicalMaterial
           color="#ddeeff"
           metalness={0.05}
@@ -225,12 +250,14 @@ function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
         />
       </instancedMesh>
 
+      {/* Product fruits hanging from arm anchors */}
       <Suspense fallback={null}>
         {GATEWAYS.map((gw, i) => (
           <ProductFruit
             key={gw.id}
             gw={gw}
             pos={FRUIT_POS[i]}
+            anchor={ARM_ANCHORS[i]}
             isHovered={hoveredId === gw.id}
             onHover={onHover}
             onClick={onFruitClick}
@@ -241,10 +268,11 @@ function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
   )
 }
 
-// ── Product fruit ──────────────────────────────────────────────────────────────
-function ProductFruit({ gw, pos, isHovered, onHover, onClick }: {
+// ── Product fruit — hangs below its arm anchor ─────────────────────────────────
+function ProductFruit({ gw, pos, anchor, isHovered, onHover, onClick }: {
   gw: Gateway
   pos: [number, number, number]
+  anchor: [number, number, number]
   isHovered: boolean
   onHover: (id: string | null) => void
   onClick: (id: string) => void
@@ -255,6 +283,16 @@ function ProductFruit({ gw, pos, isHovered, onHover, onClick }: {
   const glowRef  = useRef<THREE.Mesh>(null)
   const hov      = useRef(0)
   const emissive = useMemo(() => new THREE.Color(gw.color), [gw.color])
+
+  // Thread: from sphere-top up to the arm anchor (in local space of fruit group)
+  const threadObj = useMemo(() => {
+    const dy = anchor[1] - pos[1]   // ≈ 1.35 — distance from fruit center to anchor
+    const g  = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0.42, 0),  // sphere top
+      new THREE.Vector3(0, dy, 0),    // arm anchor
+    ])
+    return new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#9aaabb', transparent: true, opacity: 0.60 }))
+  }, [anchor, pos])
 
   useFrame(({ clock }) => {
     hov.current += ((isHovered ? 1 : 0) - hov.current) * 0.09
@@ -274,10 +312,12 @@ function ProductFruit({ gw, pos, isHovered, onHover, onClick }: {
 
   return (
     <group position={pos}>
+      {/* Glow halo */}
       <mesh ref={glowRef}>
         <sphereGeometry args={[0.64, 16, 16]} />
         <meshBasicMaterial color={gw.color} transparent opacity={0.08} depthWrite={false} side={THREE.BackSide} />
       </mesh>
+      {/* Product sphere */}
       <mesh
         ref={meshRef}
         onPointerOver={e => { e.stopPropagation(); onHover(gw.id) }}
@@ -294,14 +334,9 @@ function ProductFruit({ gw, pos, isHovered, onHover, onClick }: {
           emissiveIntensity={0.08}
         />
       </mesh>
-      {/* Thread from sphere top up to branch connection */}
-      <primitive object={(() => {
-        const g = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(0, 0.42, 0),
-          new THREE.Vector3(0, 1.30, 0),
-        ])
-        return new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#8899bb', transparent: true, opacity: 0.55 }))
-      })()} />
+      {/* Thread upward to arm anchor */}
+      <primitive object={threadObj} />
+      {/* Hover label */}
       <Html center distanceFactor={14} position={[0, -0.85, 0]} occlude={false}
         style={{ pointerEvents:'none', textAlign:'center', whiteSpace:'nowrap', opacity: isHovered ? 1 : 0, transition:'opacity 0.35s' }}
       >
