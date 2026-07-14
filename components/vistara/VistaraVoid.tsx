@@ -374,16 +374,17 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const focusedGw = focusedId ? GATEWAYS.find(g => g.id === focusedId) : null
 
   return (
-    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:2 }}>
+    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000' }}>
 
       <Canvas
-        camera={{ position:[0, 8, 26], fov:48, near:0.1, far:300 }}
+        camera={{ position:[0, 8.5, 32], fov:52, near:0.1, far:300 }}
         style={{ position:'absolute', inset:0 }}
         gl={{ antialias:true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
         dpr={[1, 1.5]}
-        onCreated={({ gl, scene }) => {
+        onCreated={({ gl, scene, camera }) => {
           gl.setClearColor(0x000000, 1)
           scene.background = new THREE.Color(0x000000)
+          camera.lookAt(0, 8.5, 0)
         }}
       >
         <Lighting />
