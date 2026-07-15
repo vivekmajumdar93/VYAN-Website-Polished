@@ -1,366 +1,122 @@
 'use client'
 
-import { useState, useCallback, useRef, Suspense, useMemo, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useTexture, Html } from '@react-three/drei'
+import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { GATEWAYS, type Gateway, assetPath } from '@/lib/vistara/gateways'
-import { BackIcon, CloseIcon } from '@/components/icons/VyanIcons'
 
-function rng(seed: number) {
-  let s = seed
-  return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff }
-}
-
-const TEAR_GEO = (() => {
-  const pts: THREE.Vector2[] = []
-  for (let i = 0; i <= 14; i++) {
-    const t = i / 14
-    const y = t * 1.7 - 0.15
-    const r = Math.sin(t * Math.PI) * 0.40 * (1 - t * 0.22)
-    pts.push(new THREE.Vector2(r, y))
-  }
-  return new THREE.LatheGeometry(pts, 12)
-})()
-
-// Trunk: wide base → narrow waist → converges to near-point at crown.
-// This creates the classic tree silhouette (NOT a vase).
-function trunkStrand(i: number, N: number): THREE.Vector3[] {
-  const θ  = (i / N) * Math.PI * 2
-  const tw = θ + (i / N) * 1.1
+// ─── helpers ──────────────────────────────────────────────────────────────────
+function to3D(gw: Gateway): [number, number, number] {
   return [
-    new THREE.Vector3(3.0 * Math.cos(θ),         0.0, 3.0 * Math.sin(θ)),          // wide base
-    new THREE.Vector3(2.0 * Math.cos(θ + 0.08),  1.6, 2.0 * Math.sin(θ + 0.08)),
-    new THREE.Vector3(0.8 * Math.cos(tw),         4.2, 0.8 * Math.sin(tw)),         // waist
-    new THREE.Vector3(0.45 * Math.cos(tw + 0.18), 6.8, 0.45 * Math.sin(tw + 0.18)),
-    new THREE.Vector3(0.25 * Math.cos(tw + 0.38), 9.0, 0.25 * Math.sin(tw + 0.38)), // converging tip → branches fan from here
+    (gw.x / 100 - 0.5) * 10,
+    -(gw.y / 100 - 0.5) * 6,
+    -(1 - gw.depth) * 5,
   ]
 }
 
-function toLine(pts: THREE.Vector3[], seg: number): THREE.Line {
-  const curve = new THREE.CatmullRomCurve3(pts)
-  const geo   = new THREE.BufferGeometry().setFromPoints(curve.getPoints(seg))
-  return new THREE.Line(geo)
+function easeInExpo(t: number): number {
+  return t <= 0 ? 0 : Math.pow(2, 10 * t - 10)
 }
 
-// Hemisphere centred at trunk crown. All canopy geometry fans from this point.
-const CROWN_Y = 9.2
-const DOME_R  = 8.0   // hemisphere radius
+// ─── particle field ───────────────────────────────────────────────────────────
+const N_PARTICLES = 300
 
-// ARM_ANCHORS: 8 points on dome at φ=60° — outer perimeter where fruits hang
-// x = 8·sin60° ≈ 6.93,  y = CROWN_Y + 8·cos60° = 9.2+4.0 = 13.2
-const ARM_ANCHORS: [number, number, number][] = [
-  [ 6.93, 13.2,  0.00],
-  [ 4.90, 13.2,  4.90],
-  [ 0.00, 13.2,  6.93],
-  [-4.90, 13.2,  4.90],
-  [-6.93, 13.2,  0.00],
-  [-4.90, 13.2, -4.90],
-  [ 0.00, 13.2, -6.93],
-  [ 4.90, 13.2, -4.90],
-]
-
-// Fruits hang 1.4 units below anchor, pulled slightly inward
-const FRUIT_POS: [number, number, number][] =
-  ARM_ANCHORS.map(([x, y, z]) => [x * 0.82, y - 1.4, z * 0.82])
-
-// ── Crystal Tree ───────────────────────────────────────────────────────────────
-function CrystalTree({ onFocusChange, hoveredId, onHover, onFruitClick }: {
-  onFocusChange: (id: string | null) => void
-  hoveredId: string | null
-  onHover: (id: string | null) => void
-  onFruitClick: (id: string) => void
+function ParticleField({ spiralTarget, spiralT }: {
+  spiralTarget: [number, number, number] | null
+  spiralT: number
 }) {
-  const treeRef  = useRef<THREE.Group>(null)
-  const targetRY = useRef(0)
+  const ptsRef = useRef<THREE.Points>(null)
+
+  const { base, speed, phase } = useMemo(() => {
+    const base: number[] = []
+    const speed: number[] = []
+    const phase: number[] = []
+    for (let i = 0; i < N_PARTICLES; i++) {
+      base.push((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 8 - 2)
+      speed.push(0.2 + Math.random() * 0.8)
+      phase.push(Math.random() * Math.PI * 2)
+    }
+    return { base, speed, phase }
+  }, [])
+
+  const geo = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    const p = new Float32Array(N_PARTICLES * 3)
+    for (let i = 0; i < N_PARTICLES; i++) {
+      p[i * 3] = base[i * 3]; p[i * 3 + 1] = base[i * 3 + 1]; p[i * 3 + 2] = base[i * 3 + 2]
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(p, 3))
+    return g
+  }, [base])
+
+  useFrame(({ clock }) => {
+    if (!ptsRef.current) return
+    const attr = ptsRef.current.geometry.attributes.position as THREE.BufferAttribute
+    const t = clock.elapsedTime
+    for (let i = 0; i < N_PARTICLES; i++) {
+      const bx = base[i * 3], by = base[i * 3 + 1], bz = base[i * 3 + 2]
+      let px = bx + Math.sin(t * speed[i] * 0.35 + phase[i]) * 0.18
+      let py = by + Math.cos(t * speed[i] * 0.28 + phase[i] * 1.3) * 0.14
+      let pz = bz
+      if (spiralTarget && spiralT > 0) {
+        const pull = Math.min(spiralT, 1)
+        px += (spiralTarget[0] - px) * pull * 0.9
+        py += (spiralTarget[1] - py) * pull * 0.9
+        pz += (spiralTarget[2] - pz) * pull * 0.9
+      }
+      attr.setXYZ(i, px, py, pz)
+    }
+    attr.needsUpdate = true
+  })
+
+  return (
+    <points ref={ptsRef} geometry={geo}>
+      <pointsMaterial color="#5577aa" size={0.035} transparent opacity={0.55} sizeAttenuation depthWrite={false} />
+    </points>
+  )
+}
+
+// ─── camera rig ───────────────────────────────────────────────────────────────
+function CameraRig({ target, progress }: {
+  target: [number, number, number] | null
+  progress: number
+}) {
   const { camera } = useThree()
 
-  // 70 trunk wire strands — converge to narrow tip at y=9
-  const trunkLines = useMemo(() => {
-    const mat = new THREE.LineBasicMaterial({ color: '#a8b8c8', transparent: true, opacity: 0.72 })
-    return Array.from({ length: 70 }, (_, i) => {
-      const l = toLine(trunkStrand(i, 70), 28)
-      l.material = mat
-      return l
-    })
-  }, [])
-
-  // 8 main arm branches: from narrow crown tip → ARM_ANCHOR (bright, clear spines)
-  const armLines = useMemo(() => {
-    const mat = new THREE.LineBasicMaterial({ color: '#c8d8e8', transparent: true, opacity: 0.92 })
-    return ARM_ANCHORS.map((anchor, i) => {
-      const θ   = (i / 8) * Math.PI * 2
-      // Origin RIGHT at the narrow trunk tip
-      const org = new THREE.Vector3(Math.cos(θ) * 0.22, CROWN_Y, Math.sin(θ) * 0.22)
-      const anc = new THREE.Vector3(...anchor)
-      const mid = new THREE.Vector3(
-        (org.x + anc.x) * 0.5,
-        (org.y + anc.y) * 0.5 + 0.8,
-        (org.z + anc.z) * 0.5,
-      )
-      const l = toLine([org, mid, anc], 28)
-      l.material = mat
-      return l
-    })
-  }, [])
-
-  // 160 fill branches: straight spokes from crown → hemisphere surface.
-  // Single RNG, φ: 3°–68° (golden angle azimuth) — true dome shape.
-  const branchLines = useMemo(() => {
-    const dimMat  = new THREE.LineBasicMaterial({ color: '#8090a8', transparent: true, opacity: 0.46 })
-    const apexMat = new THREE.LineBasicMaterial({ color: '#c8d8e8', transparent: true, opacity: 0.80 })
-    const lines: THREE.Line[] = []
-    const r2 = rng(300)
-
-    // One apex spoke straight to dome top
-    const apexGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, CROWN_Y, 0),
-      new THREE.Vector3(0, CROWN_Y + DOME_R + 0.3, 0),
-    ])
-    lines.push(new THREE.Line(apexGeo, apexMat))
-
-    const PHI_MIN = 3  * Math.PI / 180   //  3°
-    const PHI_MAX = 68 * Math.PI / 180   // 68°
-
-    for (let i = 0; i < 159; i++) {
-      const φ = PHI_MIN + (i / 159) * (PHI_MAX - PHI_MIN)
-      const θ = i * 2.399                             // golden angle
-      const R = DOME_R * (0.84 + r2() * 0.20)
-
-      // Tip on hemisphere surface
-      const tip = new THREE.Vector3(
-        R * Math.sin(φ) * Math.cos(θ + (r2() - 0.5) * 0.18),
-        CROWN_Y + R * Math.cos(φ),
-        R * Math.sin(φ) * Math.sin(θ + (r2() - 0.5) * 0.18),
-      )
-      // All origins cluster tightly at trunk tip — this is the KEY visual difference
-      const org = new THREE.Vector3(
-        (r2() - 0.5) * 0.45,
-        CROWN_Y - 0.1 + r2() * 0.3,
-        (r2() - 0.5) * 0.45,
-      )
-      const geo = new THREE.BufferGeometry().setFromPoints([org, tip])
-      lines.push(new THREE.Line(geo, dimMat))
-    }
-    return lines
-  }, [])
-
-  // 260 crystal drops uniformly scattered on dome surface (single RNG = no clustering)
-  const dropMatrices = useMemo(() => {
-    const dummy = new THREE.Object3D()
-    const arr: THREE.Matrix4[] = []
-    const r2 = rng(600)
-
-    for (let i = 0; i < 260; i++) {
-      const φ = Math.acos(1 - r2() * 0.88)   // area-uniform sampling
-      const θ = r2() * Math.PI * 2
-      const R = DOME_R * (0.70 + r2() * 0.40)
-
-      dummy.position.set(
-        R * Math.sin(φ) * Math.cos(θ),
-        CROWN_Y + R * Math.cos(φ) - r2() * 0.9,
-        R * Math.sin(φ) * Math.sin(θ),
-      )
-      dummy.scale.setScalar(0.16 + r2() * 0.42)
-      dummy.rotation.x = (r2() - 0.5) * 0.5
-      dummy.rotation.z = (r2() - 0.5) * 0.3
-      dummy.updateMatrix()
-      arr.push(dummy.matrix.clone())
-    }
-    return arr
-  }, [])
-
-  const iMeshRef = useRef<THREE.InstancedMesh>(null)
-  useEffect(() => {
-    if (!iMeshRef.current) return
-    dropMatrices.forEach((m, i) => iMeshRef.current!.setMatrixAt(i, m))
-    iMeshRef.current.instanceMatrix.needsUpdate = true
-  }, [dropMatrices])
-
-  useEffect(() => {
-    const h = (e: WheelEvent) => { targetRY.current += e.deltaY * 0.0018 }
-    window.addEventListener('wheel', h, { passive: true })
-    return () => window.removeEventListener('wheel', h)
-  }, [])
-
-  const touchX = useRef(0)
-  useEffect(() => {
-    const ts = (e: TouchEvent) => { touchX.current = e.touches[0].clientX }
-    const tm = (e: TouchEvent) => {
-      targetRY.current -= (e.touches[0].clientX - touchX.current) * 0.008
-      touchX.current = e.touches[0].clientX
-    }
-    window.addEventListener('touchstart', ts, { passive: true })
-    window.addEventListener('touchmove',  tm, { passive: true })
-    return () => {
-      window.removeEventListener('touchstart', ts)
-      window.removeEventListener('touchmove', tm)
-    }
-  }, [])
-
-  const focusClock = useRef(0)
   useFrame(({ clock }) => {
-    if (!treeRef.current) return
-    treeRef.current.rotation.y += (targetRY.current - treeRef.current.rotation.y) * 0.055
-
-    if (clock.elapsedTime - focusClock.current > 0.12) {
-      focusClock.current = clock.elapsedTime
-      let bestId = null as string | null
-      let bestD  = Infinity
-      FRUIT_POS.forEach(([lx, ly, lz], i) => {
-        const wp = new THREE.Vector3(lx, ly, lz).applyMatrix4(treeRef.current!.matrixWorld)
-        const n  = wp.project(camera)
-        const d  = n.x * n.x + n.y * n.y
-        if (d < bestD && n.z < 1) { bestD = d; bestId = GATEWAYS[i].id }
-      })
-      onFocusChange(bestId)
+    if (target && progress > 0) {
+      const [tx, ty, tz] = target
+      const t = easeInExpo(Math.min(progress, 1))
+      camera.position.x += (tx * 0.4 - camera.position.x) * t * 0.12
+      camera.position.y += (ty * 0.25 - camera.position.y) * t * 0.12
+      camera.position.z = 12 - t * 9
+      camera.lookAt(tx, ty, tz)
+    } else {
+      const s = clock.elapsedTime
+      const ax = Math.sin(s * 0.08) * 0.4
+      const ay = Math.cos(s * 0.06) * 0.25
+      camera.position.x += (ax - camera.position.x) * 0.02
+      camera.position.y += (ay - camera.position.y) * 0.02
+      camera.position.z += (12 - camera.position.z) * 0.04
+      camera.lookAt(0, 0, 0)
     }
   })
 
-  return (
-    <group ref={treeRef}>
-      {/* Base platform */}
-      <mesh position={[0, -0.18, 0]}>
-        <cylinderGeometry args={[3.4, 3.4, 0.14, 80]} />
-        <meshStandardMaterial color="#070710" metalness={0.95} roughness={0.08} />
-      </mesh>
-      <mesh position={[0, -0.10, 0]}>
-        <cylinderGeometry args={[3.1, 3.1, 0.03, 80]} />
-        <meshStandardMaterial color="#12122a" metalness={1.0} roughness={0.04} />
-      </mesh>
-
-      {trunkLines.map((l, i)  => <primitive key={`t${i}`} object={l} />)}
-      {armLines.map((l, i)    => <primitive key={`a${i}`} object={l} />)}
-      {branchLines.map((l, i) => <primitive key={`b${i}`} object={l} />)}
-
-      {/* Crystal drops — metallic material works on all mobile GPUs */}
-      <instancedMesh ref={iMeshRef} args={[TEAR_GEO, undefined, 260]} renderOrder={2}>
-        <meshStandardMaterial
-          color="#ccddf0"
-          metalness={0.88}
-          roughness={0.06}
-          emissive="#7799cc"
-          emissiveIntensity={0.14}
-        />
-      </instancedMesh>
-
-      {/* 8 product fruits hanging from arm anchors */}
-      <Suspense fallback={null}>
-        {GATEWAYS.map((gw, i) => (
-          <ProductFruit
-            key={gw.id}
-            gw={gw}
-            pos={FRUIT_POS[i]}
-            anchorY={ARM_ANCHORS[i][1]}
-            isHovered={hoveredId === gw.id}
-            onHover={onHover}
-            onClick={onFruitClick}
-          />
-        ))}
-      </Suspense>
-    </group>
-  )
+  return null
 }
 
-// ── Product fruit ──────────────────────────────────────────────────────────────
-function ProductFruit({ gw, pos, anchorY, isHovered, onHover, onClick }: {
-  gw: Gateway
-  pos: [number, number, number]
-  anchorY: number
-  isHovered: boolean
-  onHover: (id: string | null) => void
-  onClick: (id: string) => void
-}) {
-  const tex      = useTexture(assetPath(gw.filename))
-  const meshRef  = useRef<THREE.Mesh>(null)
-  const matRef   = useRef<THREE.MeshStandardMaterial>(null)
-  const glowRef  = useRef<THREE.Mesh>(null)
-  const hov      = useRef(0)
-  const emissive = useMemo(() => new THREE.Color(gw.color), [gw.color])
-
-  const threadObj = useMemo(() => {
-    const threadLen = anchorY - pos[1]
-    const g = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0.42, 0),
-      new THREE.Vector3(0, threadLen, 0),
-    ])
-    return new THREE.Line(g, new THREE.LineBasicMaterial({ color: '#9aaabb', transparent: true, opacity: 0.65 }))
-  }, [anchorY, pos])
-
-  useFrame(({ clock }) => {
-    hov.current += ((isHovered ? 1 : 0) - hov.current) * 0.09
-    const t = clock.elapsedTime
-    if (meshRef.current) {
-      const s = 0.82 + hov.current * 0.38 + Math.sin(t * 0.9 + pos[0]) * 0.04
-      meshRef.current.scale.setScalar(s)
-    }
-    if (matRef.current) {
-      matRef.current.emissiveIntensity = 0.08 + hov.current * 0.88
-    }
-    if (glowRef.current) {
-      const mat = glowRef.current.material as THREE.MeshBasicMaterial
-      mat.opacity = 0.08 + hov.current * 0.52 + Math.sin(t * 1.3) * 0.03
-    }
-  })
-
-  return (
-    <group position={pos}>
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[0.64, 16, 16]} />
-        <meshBasicMaterial color={gw.color} transparent opacity={0.08} depthWrite={false} side={THREE.BackSide} />
-      </mesh>
-      <mesh
-        ref={meshRef}
-        onPointerOver={e => { e.stopPropagation(); onHover(gw.id) }}
-        onPointerOut={() => onHover(null)}
-        onClick={e => { e.stopPropagation(); onClick(gw.id) }}
-      >
-        <sphereGeometry args={[0.42, 36, 36]} />
-        <meshStandardMaterial
-          ref={matRef}
-          map={tex}
-          metalness={0.08}
-          roughness={0.12}
-          emissive={emissive}
-          emissiveIntensity={0.08}
-        />
-      </mesh>
-      <primitive object={threadObj} />
-      <Html center distanceFactor={14} position={[0, -0.85, 0]} occlude={false}
-        style={{ pointerEvents:'none', textAlign:'center', whiteSpace:'nowrap', opacity: isHovered ? 1 : 0, transition:'opacity 0.35s' }}
-      >
-        <div style={{ fontFamily:'var(--font-vyan)', fontSize:'11px', letterSpacing:'0.28em', color:gw.color, textTransform:'uppercase', textShadow:`0 0 18px ${gw.color}` }}>{gw.name}</div>
-        <div style={{ fontFamily:'var(--font-vyan)', fontSize:'7px', letterSpacing:'0.18em', color:'rgba(255,255,255,0.3)', textTransform:'uppercase', marginTop:'4px' }}>{gw.tantra}</div>
-      </Html>
-    </group>
-  )
-}
-
-// ── Lighting ───────────────────────────────────────────────────────────────────
-function Lighting() {
-  return (
-    <>
-      <ambientLight intensity={0.10} />
-      <pointLight position={[0, 30, 8]}   intensity={6.0} color="#ffffff" decay={2} />
-      <pointLight position={[-8, 16, 8]}  intensity={2.0} color="#c0d8ff" decay={2} />
-      <pointLight position={[10, 12, -4]} intensity={1.2} color="#fff0d0" decay={2} />
-      <pointLight position={[0,  0.5, 0]} intensity={0.6} color="#6080a0" decay={2} />
-    </>
-  )
-}
-
-// ── Bloom ──────────────────────────────────────────────────────────────────────
+// ─── bloom ────────────────────────────────────────────────────────────────────
 function Bloom() {
   const { gl, scene, camera, size } = useThree()
   const composer = useMemo(() => {
     const c = new EffectComposer(gl)
     c.addPass(new RenderPass(scene, camera))
-    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 0.65, 0.55, 0.28))
+    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 0.9, 0.5, 0.15))
     c.addPass(new OutputPass())
     return c
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -371,135 +127,537 @@ function Bloom() {
   return null
 }
 
-// ── Main export ────────────────────────────────────────────────────────────────
+// ─── orb position tracker ─────────────────────────────────────────────────────
+function OrbPositionTracker({ posRef }: {
+  posRef: React.MutableRefObject<Record<string, { x: number; y: number }>>
+}) {
+  const { camera, size } = useThree()
+  const v = useMemo(() => new THREE.Vector3(), [])
+
+  useFrame(() => {
+    GATEWAYS.forEach(gw => {
+      const [wx, wy, wz] = to3D(gw)
+      v.set(wx, wy, wz)
+      v.project(camera)
+      posRef.current[gw.id] = {
+        x: (v.x + 1) / 2 * size.width,
+        y: (-v.y + 1) / 2 * size.height,
+      }
+    })
+  })
+
+  return null
+}
+
+// ─── glass orb ────────────────────────────────────────────────────────────────
+interface GlassOrbProps {
+  gateway: Gateway
+  isHovered: boolean
+  onHover: (id: string | null) => void
+  onClick: (id: string) => void
+  pullTarget: [number, number, number] | null
+  pullProgress: number
+}
+
+function GlassOrb({ gateway, isHovered, onHover, onClick, pullTarget, pullProgress }: GlassOrbProps) {
+  const basePos = useMemo(() => to3D(gateway), [gateway])
+  const radius = 0.20 + gateway.depth * 0.25
+
+  const groupRef   = useRef<THREE.Group>(null)
+  const outerMatRef = useRef<THREE.MeshPhysicalMaterial>(null)
+  const innerMatRef = useRef<THREE.MeshStandardMaterial>(null)
+  const ringMatRef  = useRef<THREE.MeshBasicMaterial>(null)
+  const ringRef     = useRef<THREE.Mesh>(null)
+  const lightRef    = useRef<THREE.PointLight>(null)
+  const hov         = useRef(0)
+  const phaseOff    = useRef(gateway.orbitPhase)
+  const pulseT      = useRef(Math.random() * Math.PI * 2)
+
+  useFrame((_, delta) => {
+    hov.current += ((isHovered ? 1 : 0) - hov.current) * 0.09
+    const h = hov.current
+
+    phaseOff.current += gateway.orbitSpeed * 60 * delta
+    const ox = Math.cos(phaseOff.current) * gateway.orbitRadius * 0.005
+    const oy = Math.sin(phaseOff.current * 0.7) * gateway.orbitRadius * 0.003
+
+    let gx = basePos[0] + ox
+    let gy = basePos[1] + oy
+    let gz = basePos[2]
+
+    if (pullTarget && pullProgress > 0) {
+      const t = pullProgress * pullProgress
+      gx += (pullTarget[0] - gx) * t
+      gy += (pullTarget[1] - gy) * t
+      gz += (pullTarget[2] - gz) * t
+    }
+
+    groupRef.current?.position.set(gx, gy, gz)
+
+    const pullFade = pullTarget && pullProgress > 0 ? Math.max(0, 1 - pullProgress) : 1
+
+    if (outerMatRef.current) {
+      outerMatRef.current.opacity = 0.15 * pullFade
+    }
+    if (innerMatRef.current) {
+      innerMatRef.current.emissiveIntensity = 2.4 + h * 1.6
+      innerMatRef.current.opacity = 0.6 * pullFade
+    }
+
+    pulseT.current += delta * 1.2 * Math.PI * 2
+    const pct = (pulseT.current % (Math.PI * 2)) / (Math.PI * 2)
+
+    if (ringMatRef.current) {
+      ringMatRef.current.opacity = (isHovered ? 0.7 : 0.4) * Math.sin(pct * Math.PI) * pullFade
+    }
+    if (ringRef.current) {
+      ringRef.current.scale.setScalar(1.0 + pct * 0.8)
+    }
+    if (lightRef.current) {
+      lightRef.current.intensity = (isHovered ? 1.6 : 0.8) * pullFade
+    }
+  })
+
+  const imgPx = Math.round(gateway.scale * 200)
+  const floatAnim = `vfloat${(Math.round(gateway.orbitPhase * 10)) % 4}`
+
+  return (
+    <group ref={groupRef} position={basePos}>
+      {/* Invisible hit sphere */}
+      <mesh
+        onPointerOver={e => { e.stopPropagation(); onHover(gateway.id) }}
+        onPointerOut={() => onHover(null)}
+        onClick={e => { e.stopPropagation(); onClick(gateway.id) }}
+      >
+        <sphereGeometry args={[radius * 2.0, 8, 8]} />
+        <meshBasicMaterial visible={false} />
+      </mesh>
+
+      {/* Outer glass sphere */}
+      <mesh>
+        <sphereGeometry args={[radius, 32, 32]} />
+        <meshPhysicalMaterial
+          ref={outerMatRef}
+          color="#4488ff"
+          transparent
+          opacity={0.15}
+          roughness={0.0}
+          metalness={0.0}
+          transmission={0.95}
+          thickness={1.2}
+          envMapIntensity={2.0}
+          ior={1.5}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Inner glow sphere */}
+      <mesh>
+        <sphereGeometry args={[radius * 0.6, 24, 24]} />
+        <meshStandardMaterial
+          ref={innerMatRef}
+          color="#88ccff"
+          emissive="#2266ff"
+          emissiveIntensity={2.4}
+          transparent
+          opacity={0.6}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Pulse ring */}
+      <mesh ref={ringRef}>
+        <torusGeometry args={[radius * 1.2, radius * 0.04, 6, 32]} />
+        <meshBasicMaterial
+          ref={ringMatRef}
+          color="#4499ff"
+          transparent
+          opacity={0}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Inner point light */}
+      <pointLight ref={lightRef} color="#6699ff" intensity={0.8} distance={120} decay={2} />
+
+      {/* Floating product image */}
+      <Html center distanceFactor={12} occlude={false} style={{ pointerEvents: 'none' }}>
+        <div
+          style={{
+            width: imgPx,
+            height: imgPx,
+            animation: `${floatAnim} 4s ease-in-out infinite`,
+            animationDelay: `${gateway.orbitPhase * 0.5}s`,
+          }}
+        >
+          <img
+            src={assetPath(gateway.filename)}
+            alt={gateway.name}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+              mixBlendMode: 'screen',
+              opacity: isHovered ? 0.85 : 0.45,
+              filter: isHovered ? 'brightness(1.4) saturate(1.3)' : 'none',
+              transform: isHovered ? 'scale(1.08)' : 'scale(1)',
+              transition: 'opacity 0.3s, filter 0.3s, transform 0.3s',
+            }}
+          />
+        </div>
+      </Html>
+    </group>
+  )
+}
+
+// ─── shard generation ─────────────────────────────────────────────────────────
+interface ShardData {
+  angle: number; dist: number; rotate: number; clipPath: string
+}
+
+const SHARDS: ShardData[] = Array.from({ length: 16 }, (_, i) => {
+  const angle = (i / 16) * Math.PI * 2 + (i % 3 - 1) * 0.3
+  const dist = 180 + (i % 5) * 30
+  const rotate = (i % 7 - 3) * 30
+  const pts = Array.from({ length: 5 }, (__, j) => {
+    const a = (j / 5) * Math.PI * 2 + (j % 2) * 0.6
+    const r = 38 + (j % 3) * 20
+    return `${50 + Math.cos(a) * r}% ${50 + Math.sin(a) * r}%`
+  })
+  return { angle, dist, rotate, clipPath: `polygon(${pts.join(', ')})` }
+})
+
+// ─── glass panel ─────────────────────────────────────────────────────────────
+type PanelPhase = 'shattering' | 'hold' | 'reforming' | 'open' | 'closing'
+
+function GlassPanel({ gateway, onClose, onEnter }: {
+  gateway: Gateway
+  onClose: () => void
+  onEnter: () => void
+}) {
+  const [phase, setPhase] = useState<PanelPhase>('shattering')
+  const [contentVisible, setContentVisible] = useState(false)
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('hold'), 280)
+    const t2 = setTimeout(() => setPhase('reforming'), 430)
+    const t3 = setTimeout(() => { setPhase('open'); setContentVisible(true) }, 900)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [])
+
+  const handleClose = useCallback(() => {
+    setContentVisible(false)
+    setPhase('closing')
+    setTimeout(onClose, 400)
+  }, [onClose])
+
+  const isOut = phase === 'shattering' || phase === 'hold' || phase === 'closing'
+
+  const shardTransition =
+    phase === 'shattering' ? 'transform 280ms cubic-bezier(0.16,1,0.3,1)' :
+    phase === 'hold'       ? 'none' :
+    phase === 'closing'    ? 'transform 280ms cubic-bezier(0.16,1,0.3,1), opacity 280ms' :
+    'transform 450ms cubic-bezier(0.65,0,0.35,1)'
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      {/* Backdrop */}
+      <div
+        onClick={handleClose}
+        style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(14px)' }}
+      />
+
+      {/* Shards */}
+      {SHARDS.map((shard, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            width: '110px',
+            height: '110px',
+            left: '50%',
+            top: '50%',
+            marginLeft: '-55px',
+            marginTop: '-55px',
+            background: `linear-gradient(${Math.round(shard.angle * 57)}deg, rgba(100,160,255,0.4) 0%, rgba(180,210,255,0.15) 50%, rgba(68,136,255,0.08) 100%)`,
+            clipPath: shard.clipPath,
+            transform: isOut
+              ? `translate(${Math.cos(shard.angle) * shard.dist}px, ${Math.sin(shard.angle) * shard.dist}px) rotate(${shard.rotate}deg)`
+              : 'translate(0,0) rotate(0)',
+            opacity: phase === 'closing' ? 0 : 1,
+            transition: shardTransition,
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+      ))}
+
+      {/* Panel */}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          width: '100%',
+          maxWidth: '460px',
+          padding: '34px',
+          background: 'rgba(10,20,60,0.4)',
+          backdropFilter: 'blur(24px)',
+          border: '1px solid rgba(100,160,255,0.25)',
+          borderRadius: '20px',
+          boxShadow: '0 0 60px rgba(68,136,255,0.15)',
+          opacity: phase === 'open' ? 1 : 0,
+          transition: 'opacity 0.3s',
+        }}
+      >
+        {/* Accent line */}
+        <div style={{
+          position: 'absolute', top: 0, left: '12%', right: '12%', height: '1px',
+          background: `linear-gradient(90deg, transparent, ${gateway.color}60, transparent)`,
+        }} />
+
+        <div style={{ opacity: contentVisible ? 1 : 0, transition: 'opacity 0.3s 0.1s' }}>
+          <div style={{ fontSize: '9px', letterSpacing: '0.28em', color: gateway.color, fontFamily: 'var(--font-vyan)', textTransform: 'uppercase', marginBottom: '7px' }}>
+            {gateway.tantra}
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-vyan)', fontSize: '24px', letterSpacing: '0.18em', color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', margin: '0 0 6px' }}>
+            {gateway.name}
+          </h2>
+          <p style={{ fontSize: '10px', letterSpacing: '0.15em', color: `${gateway.color}b3`, textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', margin: '0 0 22px' }}>
+            {gateway.tagline}
+          </p>
+          <p style={{ fontSize: '14px', lineHeight: '1.75', color: 'rgba(255,255,255,0.58)', fontFamily: 'var(--font-vyan)', letterSpacing: '0.02em', margin: '0 0 28px' }}>
+            {gateway.description}
+          </p>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={handleClose}
+              style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: 'rgba(255,255,255,0.45)', fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', cursor: 'pointer' }}
+            >
+              Return
+            </button>
+            <button
+              onClick={onEnter}
+              style={{ padding: '12px 26px', background: `${gateway.color}26`, border: `1px solid ${gateway.color}60`, borderRadius: '10px', color: gateway.color, fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', cursor: 'pointer', boxShadow: `0 0 20px ${gateway.color}1f` }}
+            >
+              Enter
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── main export ──────────────────────────────────────────────────────────────
+type VortexPhase = 'idle' | 'pull' | 'peak' | 'passage' | 'done'
+
 export function VistaraVoid({ onBack, onGatewayEnter }: {
   onBack?: () => void
   onGatewayEnter?: (gateway: Gateway) => void
 }) {
-  const [hoveredId,    setHoveredId]    = useState<string | null>(null)
-  const [focusedId,    setFocusedId]    = useState<string | null>(null)
-  const [showPanel,    setShowPanel]    = useState(false)
-  const [panelGateway, setPanelGateway] = useState<Gateway | null>(null)
+  const [hoveredId,     setHoveredId]     = useState<string | null>(null)
+  const [vortexPhase,   setVortexPhase]   = useState<VortexPhase>('idle')
+  const [vortexProgress, setVortexProgress] = useState(0)
+  const [vortexTargetId, setVortexTargetId] = useState<string | null>(null)
+  const [showFlash,     setShowFlash]     = useState(false)
+  const [showPanel,     setShowPanel]     = useState(false)
+  const [panelGateway,  setPanelGateway]  = useState<Gateway | null>(null)
+  const animRef    = useRef<number>(0)
+  const startRef   = useRef(0)
+  const orbPosRef  = useRef<Record<string, { x: number; y: number }>>({})
 
-  const handleClick = useCallback((id: string) => {
-    const gw = GATEWAYS.find(g => g.id === id)
-    if (!gw) return
-    setPanelGateway(gw)
-    setShowPanel(true)
-  }, [])
+  const vortexTarget3D = useMemo((): [number, number, number] | null => {
+    if (!vortexTargetId) return null
+    const gw = GATEWAYS.find(g => g.id === vortexTargetId)
+    return gw ? to3D(gw) : null
+  }, [vortexTargetId])
+
+  const handleOrbClick = useCallback((id: string) => {
+    if (vortexPhase !== 'idle') return
+    setVortexTargetId(id)
+    setVortexPhase('pull')
+    startRef.current = performance.now()
+
+    const tick = () => {
+      const elapsed = performance.now() - startRef.current
+      if (elapsed < 400) {
+        setVortexProgress(elapsed / 400)
+        setVortexPhase('pull')
+        animRef.current = requestAnimationFrame(tick)
+      } else if (elapsed < 800) {
+        setVortexProgress((elapsed - 400) / 400)
+        setVortexPhase('peak')
+        animRef.current = requestAnimationFrame(tick)
+      } else if (elapsed < 1200) {
+        setVortexProgress((elapsed - 800) / 400)
+        setVortexPhase('passage')
+        animRef.current = requestAnimationFrame(tick)
+      } else {
+        setShowFlash(true)
+        setTimeout(() => setShowFlash(false), 80)
+        const gw = GATEWAYS.find(g => g.id === id)!
+        setPanelGateway(gw)
+        setShowPanel(true)
+        setVortexPhase('done')
+        setVortexProgress(0)
+        setTimeout(() => { setVortexPhase('idle'); setVortexTargetId(null) }, 200)
+      }
+    }
+    animRef.current = requestAnimationFrame(tick)
+  }, [vortexPhase])
+
+  useEffect(() => () => cancelAnimationFrame(animRef.current), [])
 
   const handleClose = useCallback(() => {
     setShowPanel(false)
     setPanelGateway(null)
   }, [])
 
-  const focusedGw = focusedId ? GATEWAYS.find(g => g.id === focusedId) : null
+  const handleEnter = useCallback(() => {
+    const gw = panelGateway
+    handleClose()
+    if (gw) onGatewayEnter?.(gw)
+  }, [panelGateway, handleClose, onGatewayEnter])
+
+  // Pull progress for non-target orbs
+  const getPull = useCallback((id: string): number => {
+    if (!vortexTargetId || id === vortexTargetId) return 0
+    if (vortexPhase === 'pull') return vortexProgress
+    if (vortexPhase === 'peak' || vortexPhase === 'passage') return 1
+    return 0
+  }, [vortexPhase, vortexProgress, vortexTargetId])
+
+  // Camera progress (0-1 for pull, 1-2 for peak, 2-3 for passage)
+  const camProgress =
+    vortexPhase === 'pull'    ? vortexProgress :
+    vortexPhase === 'peak'    ? 1 + vortexProgress :
+    vortexPhase === 'passage' ? 2 + vortexProgress : 0
+
+  // Vignette intensity
+  const vig =
+    vortexPhase === 'pull'    ? vortexProgress * 0.5 :
+    vortexPhase === 'peak'    ? 0.5 + vortexProgress * 0.5 :
+    vortexPhase === 'passage' ? 1 : 0
+
+  // Expanding orb overlay during passage
+  const passCenter = vortexTargetId ? orbPosRef.current[vortexTargetId] : null
+
+  const spiralT =
+    vortexPhase === 'pull'    ? vortexProgress :
+    vortexPhase === 'peak'    ? 1 :
+    vortexPhase === 'passage' ? 1 : 0
 
   return (
-    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000' }}>
+    <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: 100, background: '#000000' }}>
+      {/* Float keyframes */}
+      <style>{`
+        @keyframes vfloat0 { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-8px) } }
+        @keyframes vfloat1 { 0%,100%{ transform:translateY(-4px) } 50%{ transform:translateY(4px) } }
+        @keyframes vfloat2 { 0%,100%{ transform:translateY(-8px) } 50%{ transform:translateY(0) } }
+        @keyframes vfloat3 { 0%,100%{ transform:translateY(4px) } 50%{ transform:translateY(-4px) } }
+      `}</style>
+
+      {/* 3D Canvas */}
       <Canvas
-        camera={{ position:[0, 9.0, 26], fov:52, near:0.1, far:300 }}
-        style={{ position:'absolute', inset:0 }}
-        gl={{ antialias:true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+        camera={{ position: [0, 0, 12], fov: 55, near: 0.1, far: 200 }}
+        style={{ position: 'absolute', inset: 0 }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
         dpr={[1, 1.5]}
-        onCreated={({ gl, scene, camera }) => {
+        onCreated={({ gl, scene }) => {
           gl.setClearColor(0x000000, 1)
           scene.background = new THREE.Color(0x000000)
-          camera.lookAt(0, 9.0, 0)
         }}
       >
-        <Lighting />
-        <CrystalTree
-          onFocusChange={setFocusedId}
-          hoveredId={hoveredId}
-          onHover={setHoveredId}
-          onFruitClick={handleClick}
+        <ambientLight intensity={0.03} />
+
+        <ParticleField spiralTarget={vortexTarget3D} spiralT={spiralT} />
+
+        {GATEWAYS.map(gw => (
+          <GlassOrb
+            key={gw.id}
+            gateway={gw}
+            isHovered={hoveredId === gw.id}
+            onHover={setHoveredId}
+            onClick={handleOrbClick}
+            pullTarget={vortexTargetId && vortexTargetId !== gw.id ? vortexTarget3D : null}
+            pullProgress={getPull(gw.id)}
+          />
+        ))}
+
+        <CameraRig
+          target={vortexTargetId ? vortexTarget3D : null}
+          progress={camProgress > 0 ? Math.min(camProgress / 3, 1) : 0}
         />
+
+        <OrbPositionTracker posRef={orbPosRef} />
         <Bloom />
       </Canvas>
 
-      <AnimatePresence>
-        {focusedGw && !showPanel && (
-          <motion.div
-            key={focusedGw.id}
-            initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-6 }}
-            transition={{ duration:0.3 }}
-            style={{ position:'fixed', bottom:'12%', left:'50%', transform:'translateX(-50%)', textAlign:'center', pointerEvents:'none', zIndex:40 }}
-          >
-            <div style={{ fontFamily:'var(--font-vyan)', fontSize:'13px', letterSpacing:'0.32em', color:focusedGw.color, textTransform:'uppercase', textShadow:`0 0 28px ${focusedGw.color}`, marginBottom:'5px' }}>{focusedGw.name}</div>
-            <div style={{ fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.20em', color:'rgba(255,255,255,0.35)', textTransform:'uppercase' }}>{focusedGw.tagline}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Blue edge vignette */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 5, pointerEvents: 'none',
+        background: `radial-gradient(ellipse at center, transparent 40%, rgba(0,20,80,${vig.toFixed(2)}) 100%)`,
+        transition: vig === 0 ? 'background 0.6s' : 'none',
+      }} />
 
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:1.2 }}
-        style={{ position:'fixed', top:'22px', right:'24px', zIndex:40, pointerEvents:'none', textAlign:'right' }}
-      >
-        <div style={{ fontFamily:'var(--font-vyan)', fontSize:'11px', letterSpacing:'0.40em', color:'rgba(212,180,80,0.55)', textTransform:'uppercase' }}>Vistāra</div>
-        <div style={{ fontFamily:'var(--font-vyan)', fontSize:'8px', letterSpacing:'0.22em', color:'rgba(255,255,255,0.18)', textTransform:'uppercase', marginTop:'3px' }}>The Manifestations</div>
-      </motion.div>
-
-      {onBack && (
-        <motion.button initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:0.8 }}
-          onClick={onBack}
-          style={{ position:'fixed', top:'22px', left:'22px', zIndex:40, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:8, color:'#9B59FF' }}
-        >
-          <BackIcon size={28} />
-          <span style={{ fontFamily:'var(--font-vyan)', fontSize:11, letterSpacing:'0.2em', opacity:0.7 }}>ŚŪNYA MAṆḌALA</span>
-        </motion.button>
+      {/* Expanding orb overlay (passage phase) */}
+      {vortexPhase === 'passage' && passCenter && (
+        <div style={{
+          position: 'fixed',
+          left: passCenter.x - 10,
+          top: passCenter.y - 10,
+          width: 20,
+          height: 20,
+          transform: `scale(${vortexProgress * 120})`,
+          transformOrigin: 'center center',
+          background: 'radial-gradient(circle at center, #88ccff 0%, #4488ff 35%, #1144bb 70%, #000820 100%)',
+          borderRadius: '50%',
+          zIndex: 170,
+          pointerEvents: 'none',
+          opacity: vortexProgress,
+          transition: 'none',
+        }} />
       )}
 
-      <motion.p initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay:3 }}
-        style={{ position:'fixed', bottom:'5%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.25em', color:'rgba(255,255,255,0.10)', textTransform:'uppercase', margin:0 }}
-      >
-        Scroll or swipe to rotate · Tap a fruit to enter
-      </motion.p>
+      {/* Screen flash */}
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 190, pointerEvents: 'none',
+        background: '#4488ff',
+        opacity: showFlash ? 1 : 0,
+        transition: showFlash ? 'none' : 'opacity 80ms',
+      }} />
 
-      <AnimatePresence>
-        {showPanel && panelGateway && (
-          <GatewayPanel gateway={panelGateway} onClose={handleClose}
-            onEnter={() => { handleClose(); onGatewayEnter?.(panelGateway) }}
-          />
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
+      {/* UI: title */}
+      <div style={{ position: 'fixed', top: '22px', right: '24px', zIndex: 40, pointerEvents: 'none', textAlign: 'right' }}>
+        <div style={{ fontFamily: 'var(--font-vyan)', fontSize: '11px', letterSpacing: '0.40em', color: 'rgba(212,180,80,0.55)', textTransform: 'uppercase' }}>Vistāra</div>
+        <div style={{ fontFamily: 'var(--font-vyan)', fontSize: '8px', letterSpacing: '0.22em', color: 'rgba(255,255,255,0.18)', textTransform: 'uppercase', marginTop: '3px' }}>The Manifestations</div>
+      </div>
 
-// ── Gateway detail panel ───────────────────────────────────────────────────────
-function GatewayPanel({ gateway, onClose, onEnter }: {
-  gateway: Gateway; onClose: () => void; onEnter: () => void
-}) {
-  const [ch, setCh] = useState(false)
-  return (
-    <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} transition={{ duration:0.4 }}
-      style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px' }}
-    >
-      <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} onClick={onClose}
-        style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.82)', backdropFilter:'blur(14px)' }}
-      />
-      <motion.div
-        initial={{ opacity:0, scale:0.88, y:20 }} animate={{ opacity:1, scale:1, y:0 }} exit={{ opacity:0, scale:0.88, y:20 }}
-        transition={{ duration:0.45, ease:[0.16,1,0.3,1] }}
-        style={{ position:'relative', zIndex:1, width:'100%', maxWidth:'460px', background:'rgba(255,255,255,0.03)', border:`1px solid ${gateway.color}28`, borderRadius:'20px', backdropFilter:'blur(24px)', padding:'34px', boxShadow:`0 0 70px ${gateway.color}18` }}
-      >
-        <div style={{ position:'absolute', top:0, left:'12%', right:'12%', height:'1px', background:`linear-gradient(90deg,transparent,${gateway.color}60,transparent)` }} />
-        <div style={{ marginBottom:'22px' }}>
-          <div style={{ fontSize:'9px', letterSpacing:'0.28em', color:`${gateway.color}80`, fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'7px' }}>{gateway.tantra}</div>
-          <h2 style={{ fontFamily:'var(--font-vyan)', fontSize:'24px', letterSpacing:'0.18em', color:'rgba(255,255,255,0.92)', textTransform:'uppercase', marginBottom:'6px', textShadow:`0 0 30px ${gateway.color}40` }}>{gateway.name}</h2>
-          <p style={{ fontFamily:'var(--font-vyan)', fontSize:'10px', letterSpacing:'0.15em', color:`${gateway.color}70`, textTransform:'uppercase' }}>{gateway.tagline}</p>
-        </div>
-        <button onMouseEnter={() => setCh(true)} onMouseLeave={() => setCh(false)} onClick={onClose}
-          style={{ position:'absolute', top:16, right:16, background:'none', border:'none', cursor:'pointer' }}
+      {/* Back button */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          style={{ position: 'fixed', top: '22px', left: '22px', zIndex: 40, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: '#9B59FF' }}
         >
-          <CloseIcon size={24} isHovered={ch} />
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+          <span style={{ fontFamily: 'var(--font-vyan)', fontSize: 11, letterSpacing: '0.2em', opacity: 0.7 }}>ŚŪNYA MAṆḌALA</span>
         </button>
-        <p style={{ fontFamily:'var(--font-vyan)', fontSize:'14px', lineHeight:'1.75', color:'rgba(255,255,255,0.55)', letterSpacing:'0.02em', marginBottom:'30px' }}>{gateway.description}</p>
-        <div style={{ display:'flex', gap:'12px' }}>
-          <button onClick={onClose} style={{ flex:1, padding:'12px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'10px', color:'rgba(255,255,255,0.45)', fontSize:'10px', letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer' }}>Return</button>
-          <button onClick={onEnter} style={{ padding:'12px 26px', background:`${gateway.color}15`, border:`1px solid ${gateway.color}40`, borderRadius:'10px', color:gateway.color, fontSize:'10px', letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer' }}>Enter</button>
-        </div>
-      </motion.div>
-    </motion.div>
+      )}
+
+      {/* Hint */}
+      <p style={{ position: 'fixed', bottom: '5%', left: '50%', transform: 'translateX(-50%)', zIndex: 40, pointerEvents: 'none', fontFamily: 'var(--font-vyan)', fontSize: '9px', letterSpacing: '0.25em', color: 'rgba(255,255,255,0.10)', textTransform: 'uppercase', margin: 0, whiteSpace: 'nowrap' }}>
+        Click an orb to enter
+      </p>
+
+      {/* Glass panel */}
+      {showPanel && panelGateway && (
+        <GlassPanel gateway={panelGateway} onClose={handleClose} onEnter={handleEnter} />
+      )}
+    </div>
   )
 }
