@@ -41,6 +41,56 @@ function nearestTarget(current: number, raw: number): number {
   return current + d
 }
 
+// ─── billboard orb shaders (same visual language as GatewayOrbs / Shunya) ─────
+const ORB_VERT = `
+uniform float time;
+uniform float pulse;
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  vec3 right   = vec3(modelViewMatrix[0][0], modelViewMatrix[1][0], modelViewMatrix[2][0]);
+  vec3 up      = vec3(modelViewMatrix[0][1], modelViewMatrix[1][1], modelViewMatrix[2][1]);
+  float breathe = 1.0 + sin(time * 1.8 + pulse) * 0.06;
+  vec3 worldPos = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  worldPos += right * position.x * breathe + up * position.y * breathe;
+  gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
+}
+`
+const ORB_CORE_FRAG = `
+uniform vec3  orbColor;
+uniform float time;
+uniform float hovered;
+uniform float pulse;
+varying vec2 vUv;
+void main() {
+  vec2  p = vUv - 0.5;
+  float r = length(p);
+  if (r > 0.5) discard;
+  float core    = exp(-r * 16.0);
+  float glow    = exp(-r * 5.0) * 0.6;
+  float ring    = smoothstep(0.38, 0.42, r) * smoothstep(0.50, 0.44, r) * hovered;
+  float shimmer = 0.8 + 0.2 * sin(time * 4.0 + pulse * 6.0 + r * 20.0);
+  float alpha   = (core + glow + ring * 0.4) * shimmer * (0.85 + hovered * 0.3);
+  vec3  col     = mix(orbColor, vec3(1.0), core * 0.6);
+  gl_FragColor  = vec4(col, clamp(alpha, 0.0, 1.0));
+}
+`
+const ORB_AURA_FRAG = `
+uniform vec3  orbColor;
+uniform float hovered;
+varying vec2 vUv;
+void main() {
+  vec2  p = vUv - 0.5;
+  float r = length(p);
+  if (r > 0.5) discard;
+  float aura = exp(-r * 3.5) * (0.18 + hovered * 0.22);
+  gl_FragColor = vec4(orbColor, aura);
+}
+`
+
+// blue-violet, matching Shunya Mandala's colorA/colorB family
+const ORB_COLOR_VALUE = new THREE.Color('#5533ff')
+
 // ─── shard generation ─────────────────────────────────────────────────────────
 const PANEL_W = 440
 const PANEL_H = 360
@@ -182,123 +232,104 @@ function VistaraOrb({
   isFocused, isHovered, isPulled, pullProgress, pullTarget,
   onHover, onClick, worldPosRef,
 }: VistaraOrbProps) {
-  // Position within the ring group's local space
   const basePos = useMemo<[number, number, number]>(() => {
     if (ringType === 'B') return [0, ringRadius * Math.cos(localAngle), ringRadius * Math.sin(localAngle)]
     return [ringRadius * Math.cos(localAngle), 0, ringRadius * Math.sin(localAngle)]
   }, [ringType, localAngle, ringRadius])
 
-  const groupRef    = useRef<THREE.Group>(null)
-  const m1Ref       = useRef<THREE.MeshStandardMaterial>(null)
-  const m2Ref       = useRef<THREE.MeshStandardMaterial>(null)
-  const m3Ref       = useRef<THREE.MeshStandardMaterial>(null)
-  const pulseRef    = useRef<THREE.Mesh>(null)
-  const pulseMatRef = useRef<THREE.MeshBasicMaterial>(null)
-  const lightRef    = useRef<THREE.PointLight>(null)
-  const hov         = useRef(0)
-  const pulseT      = useRef(Math.random() * Math.PI * 2)
-  const scaleRef    = useRef(1)
+  const groupRef = useRef<THREE.Group>(null)
+  const hov      = useRef(0)
+  const pulse    = useMemo(() => Math.random() * Math.PI * 2, [])
+  const scaleRef = useRef(1)
+
+  // billboard plane sizes — smaller than Shunya orbs, same visual language
+  const coreSize = orbSize * 0.8
+  const auraSize = coreSize * 5.5
+
+  const coreMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   ORB_VERT,
+    fragmentShader: ORB_CORE_FRAG,
+    uniforms: {
+      orbColor: { value: ORB_COLOR_VALUE },
+      time:     { value: 0 },
+      hovered:  { value: 0 },
+      pulse:    { value: pulse },
+    },
+    transparent: true,
+    blending:    THREE.AdditiveBlending,
+    depthWrite:  false,
+    side:        THREE.DoubleSide,
+  }), [pulse])
+
+  const auraMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   ORB_VERT,
+    fragmentShader: ORB_AURA_FRAG,
+    uniforms: {
+      orbColor: { value: ORB_COLOR_VALUE },
+      time:     { value: 0 },
+      hovered:  { value: 0 },
+      pulse:    { value: pulse },
+    },
+    transparent: true,
+    blending:    THREE.AdditiveBlending,
+    depthWrite:  false,
+    side:        THREE.DoubleSide,
+  }), [pulse])
 
   useFrame((_, delta) => {
-    hov.current += ((isHovered ? 1 : 0) - hov.current) * 0.1
-    const h = hov.current
+    const t = (coreMat.uniforms.time.value += delta)
+    auraMat.uniforms.time.value = t
 
-    // Update world position for camera + screen tracking
+    const hovTarget = isHovered || isFocused ? 1 : 0
+    hov.current += (hovTarget - hov.current) * 0.08
+    coreMat.uniforms.hovered.value = hov.current
+    auraMat.uniforms.hovered.value = hov.current
+
     if (groupRef.current) {
       const wp = new THREE.Vector3()
       groupRef.current.getWorldPosition(wp)
       worldPosRef.current[orbIdx] = wp
 
-      // Vortex pull: move toward click target
       if (isPulled && pullTarget && pullProgress > 0) {
-        const t = pullProgress * pullProgress
-        groupRef.current.position.lerp(pullTarget, t * 0.05)
+        const p2 = pullProgress * pullProgress
+        groupRef.current.position.lerp(pullTarget, p2 * 0.05)
       } else {
         groupRef.current.position.set(...basePos)
       }
 
-      // Scale: focused + hover
-      const targetScale = 1 + (isFocused ? 0.15 : 0) + h * 0.12
+      const targetScale = 1 + (isFocused ? 0.15 : 0) + hov.current * 0.12
       scaleRef.current += (targetScale - scaleRef.current) * 0.08
       groupRef.current.scale.setScalar(scaleRef.current)
-    }
-
-    const focused = isFocused ? 1 : 0.5
-    const hoverMult = 1 + h
-    const pullFade = isPulled && pullProgress > 0 ? Math.max(0, 1 - pullProgress) : 1
-
-    if (m1Ref.current) {
-      m1Ref.current.emissiveIntensity = 1.8 * hoverMult * focused
-      m1Ref.current.opacity = 0.9 * focused * pullFade
-    }
-    if (m2Ref.current) {
-      m2Ref.current.emissiveIntensity = 1.2 * hoverMult * focused
-      m2Ref.current.opacity = 0.45 * focused * pullFade
-    }
-    if (m3Ref.current) {
-      m3Ref.current.emissiveIntensity = 0.6 * hoverMult * focused
-      m3Ref.current.opacity = 0.18 * focused * pullFade
-    }
-
-    // Pulse ring 1.0 Hz
-    pulseT.current += delta * 1.0 * Math.PI * 2
-    const pct = (pulseT.current % (Math.PI * 2)) / (Math.PI * 2)
-    if (pulseMatRef.current) {
-      pulseMatRef.current.opacity = (isHovered ? 0.65 : 0.35) * Math.sin(pct * Math.PI) * focused * pullFade
-    }
-    if (pulseRef.current) { pulseRef.current.scale.setScalar(1.0 + pct * 0.6) }
-
-    if (lightRef.current) {
-      lightRef.current.intensity = 1.2 * hoverMult * focused * pullFade
     }
   })
 
   return (
     <group ref={groupRef} position={basePos}>
-      {/* Hit sphere */}
+      {/* Invisible hit target — easier to click than the sprite */}
       <mesh
         onPointerOver={e => { e.stopPropagation(); onHover(gateway.id) }}
         onPointerOut={() => onHover(null)}
         onClick={e => { e.stopPropagation(); onClick(orbIdx, gateway.id) }}
       >
-        <sphereGeometry args={[orbSize * 1.6, 8, 8]} />
+        <sphereGeometry args={[coreSize * 1.5, 8, 8]} />
         <meshBasicMaterial visible={false} />
       </mesh>
 
-      {/* Layer 1 — deep navy core */}
+      {/* Wide aura glow */}
       <mesh>
-        <sphereGeometry args={[orbSize * 0.35, 24, 24]} />
-        <meshStandardMaterial ref={m1Ref} color="#0a1a6d" emissive="#1a0a4d" emissiveIntensity={1.8}
-          transparent opacity={0.9} depthWrite={false} />
+        <planeGeometry args={[auraSize, auraSize]} />
+        <primitive object={auraMat} attach="material" />
       </mesh>
 
-      {/* Layer 2 — dark violet mid */}
+      {/* Tight bright core */}
       <mesh>
-        <sphereGeometry args={[orbSize * 0.65, 24, 24]} />
-        <meshStandardMaterial ref={m2Ref} color="#2a0a8d" emissive="#3a1aad" emissiveIntensity={1.2}
-          transparent opacity={0.45} depthWrite={false} />
+        <planeGeometry args={[coreSize * 2, coreSize * 2]} />
+        <primitive object={coreMat} attach="material" />
       </mesh>
-
-      {/* Layer 3 — deep purple outer shell */}
-      <mesh>
-        <sphereGeometry args={[orbSize * 1.0, 32, 32]} />
-        <meshStandardMaterial ref={m3Ref} color="#4a0a9d" emissive="#5a2abd" emissiveIntensity={0.6}
-          transparent opacity={0.18} side={THREE.FrontSide} depthWrite={false} />
-      </mesh>
-
-      {/* Pulse ring */}
-      <mesh ref={pulseRef}>
-        <torusGeometry args={[orbSize * 1.2, orbSize * 0.05, 6, 32]} />
-        <meshBasicMaterial ref={pulseMatRef} color="#6633cc" transparent opacity={0}
-          side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
-
-      {/* Point light */}
-      <pointLight ref={lightRef} color="#4422aa" intensity={1.2} distance={150} decay={2} />
 
       {/* Label */}
       <Html center distanceFactor={250} occlude={false}
-        position={[0, -(orbSize * 1.6), 0]}
+        position={[0, -(coreSize * 1.8), 0]}
         style={{ pointerEvents: 'none' }}
       >
         <div style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
