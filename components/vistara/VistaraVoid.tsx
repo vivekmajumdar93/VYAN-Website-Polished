@@ -4,10 +4,6 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 
 // ─── gyroscope constants ──────────────────────────────────────────────────────
@@ -144,23 +140,6 @@ function ParticleField({ spiralTarget, spiralT }: {
       <pointsMaterial color="#3344aa" size={1.2} transparent opacity={0.4} sizeAttenuation depthWrite={false} />
     </points>
   )
-}
-
-// ─── bloom ────────────────────────────────────────────────────────────────────
-function Bloom() {
-  const { gl, scene, camera, size } = useThree()
-  const comp = useMemo(() => {
-    const c = new EffectComposer(gl)
-    c.addPass(new RenderPass(scene, camera))
-    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 1.0, 0.6, 0.12))
-    c.addPass(new OutputPass())
-    return c
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gl, scene, camera])
-  useEffect(() => { comp.setSize(size.width, size.height) }, [comp, size])
-  useEffect(() => () => comp.dispose(), [comp])
-  useFrame(() => comp.render(), 1)
-  return null
 }
 
 // ─── screen position tracker ──────────────────────────────────────────────────
@@ -527,7 +506,6 @@ function GyroScene({
       </group>
 
       <ScreenTracker worldRef={worldPosRef} screenRef={screenPosRef} />
-      <Bloom />
     </>
   )
 }
