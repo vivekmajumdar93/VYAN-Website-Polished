@@ -8,7 +8,6 @@ import { NanoOrb } from '@/lib/vyan/objects/NanoOrb'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 
 // ─── gyroscope constants ──────────────────────────────────────────────────────
-// index → { ring, localAngle } for GATEWAYS array order
 const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34]
 
 const ORB_CFG: { ring: 'A' | 'B' | 'C'; localAngle: number }[] = [
@@ -23,9 +22,12 @@ const ORB_CFG: { ring: 'A' | 'B' | 'C'; localAngle: number }[] = [
 ]
 
 const RING_RADII = { A: 280, B: 240, C: 200 } as const
-const RING_SPEEDS = { A: 0.0008, B: 0.0006, C: 0.001 } as const  // rad/frame @60fps
-const FRONT = Math.PI / 2   // ring angle that puts orb at max-Z (facing camera)
+const RING_SPEEDS = { A: 0.0008, B: 0.0006, C: 0.001 } as const
+const FRONT = Math.PI / 2
 const TRAVERSE_MS = 600
+
+// ─── phantom orb palette — excluded from blue-violet (that's the gyroscope) ──
+const PHANTOM_HEX = ['#ff5520', '#20d8a0', '#ff0055', '#aaff40', '#ff9020', '#cc40ff']
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function easeInExpo(t: number) { return t <= 0 ? 0 : Math.pow(2, 10 * t - 10) }
@@ -38,7 +40,7 @@ function nearestTarget(current: number, raw: number): number {
   return current + d
 }
 
-// ─── shard generation — grid-based tiles that together form the full panel ─────
+// ─── shard generation ─────────────────────────────────────────────────────────
 const PANEL_W = 440
 const PANEL_H = 360
 const SHARD_COLS = 7
@@ -56,7 +58,6 @@ function mkShards(pw: number, ph: number): ShardDef[] {
   const ch = ph / SHARD_ROWS
   const JITTER = 0.38
 
-  // Build jittered grid: interior vertices get randomness, edges stay fixed
   const grid: [number, number][][] = []
   for (let r = 0; r <= SHARD_ROWS; r++) {
     const row: [number, number][] = []
@@ -78,7 +79,6 @@ function mkShards(pw: number, ph: number): ShardDef[] {
       const br = grid[r+1][c+1], bl = grid[r+1][c]
       const cx = (tl[0]+tr[0]+br[0]+bl[0]) / 4
       const cy = (tl[1]+tr[1]+br[1]+bl[1]) / 4
-      // clip path in % of panel dimensions — tiles perfectly to cover entire panel
       const pt = (x: number, y: number) => `${(x/pw*100).toFixed(2)}% ${(y/ph*100).toFixed(2)}%`
       shards.push({
         cx, cy,
@@ -143,6 +143,105 @@ function ParticleField({ spiralTarget, spiralT }: {
   )
 }
 
+// ─── phantom passing orbs ─────────────────────────────────────────────────────
+// Distinct-colored orbs that cross the scene at intervals, visible 5-7s, no interaction
+function PhantomOrbsSystem() {
+  const parentRef = useRef<THREE.Group>(null)
+
+  const pool = useMemo(() => {
+    const POOL = 4
+    return Array.from({ length: POOL }, (_, i) => {
+      const hex = PHANTOM_HEX[i % PHANTOM_HEX.length]
+      const col = new THREE.Color(hex)
+      const size = 10 + Math.random() * 18
+
+      const coreGeo = new THREE.SphereGeometry(size, 8, 8)
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: col, transparent: true, opacity: 0, depthWrite: false,
+      })
+      const core = new THREE.Mesh(coreGeo, coreMat)
+
+      // Wide halo gives the orb a nebula-like corona
+      const haloGeo = new THREE.SphereGeometry(size * 3.2, 6, 6)
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: col, transparent: true, opacity: 0,
+        depthWrite: false, side: THREE.BackSide,
+      })
+      const halo = new THREE.Mesh(haloGeo, haloMat)
+
+      const group = new THREE.Group()
+      group.add(core, halo)
+      group.position.set(-3000, 0, 0) // park off-scene initially
+
+      return {
+        group, coreMat, haloMat,
+        active: false,
+        startT: 0,
+        nextT: 4 + i * 10,   // staggered first triggers: 4s, 14s, 24s, 34s
+        duration: 0,
+        x0: 0, y0: 0, z0: 0,
+        x1: 0, y1: 0, z1: 0,
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    const parent = parentRef.current
+    if (!parent) return
+    pool.forEach(p => parent.add(p.group))
+    return () => { pool.forEach(p => parent.remove(p.group)) }
+  }, [pool])
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+
+    for (const pd of pool) {
+      if (!pd.active) {
+        if (t >= pd.nextT) {
+          // Random crossing path at varying depths
+          const dir  = Math.random() < 0.5 ? 1 : -1
+          const depth = (Math.random() - 0.5) * 500   // z: -250 … +250
+          const yA   = (Math.random() - 0.5) * 300
+          const yB   = yA + (Math.random() - 0.5) * 80
+
+          pd.x0 = -dir * 780; pd.y0 = yA; pd.z0 = depth
+          pd.x1 =  dir * 780; pd.y1 = yB; pd.z1 = depth + (Math.random() - 0.5) * 60
+          pd.startT   = t
+          pd.duration = 5 + Math.random() * 2           // 5-7 s visible
+          pd.nextT    = t + pd.duration + 9 + Math.random() * 13  // 9-22 s gap
+          pd.active   = true
+        } else {
+          pd.coreMat.opacity = 0
+          pd.haloMat.opacity = 0
+        }
+        continue
+      }
+
+      const p = Math.min((t - pd.startT) / pd.duration, 1)
+      if (p >= 1) {
+        pd.active = false
+        pd.coreMat.opacity = 0
+        pd.haloMat.opacity = 0
+        pd.group.position.set(-3000, 0, 0)
+        continue
+      }
+
+      // Smooth sin fade-in / fade-out envelope
+      const alpha = Math.sin(Math.PI * p)
+      pd.coreMat.opacity = alpha * 0.88
+      pd.haloMat.opacity = alpha * 0.13
+
+      pd.group.position.set(
+        pd.x0 + (pd.x1 - pd.x0) * p,
+        pd.y0 + (pd.y1 - pd.y0) * p,
+        pd.z0 + (pd.z1 - pd.z0) * p,
+      )
+    }
+  })
+
+  return <group ref={parentRef} />
+}
+
 // ─── screen position tracker ──────────────────────────────────────────────────
 function ScreenTracker({ worldRef, screenRef }: {
   worldRef: React.MutableRefObject<Record<number, THREE.Vector3>>
@@ -191,11 +290,8 @@ function VistaraOrb({
 
   const groupRef = useRef<THREE.Group>(null)
   const ZERO     = useMemo(() => new THREE.Vector3(), [])
-  // Scale NanoOrb up to fit gyroscope scene (ring radii 200-280)
-  // while staying visually smaller than Shunya Mandala orbs
   const GYRO_SCALE = orbSize * 0.15
 
-  // Exact same NanoOrb as Shunya — only colorA/colorB changed to blue-violet
   const nanoOrb = useMemo(() => {
     const inst = new NanoOrb({
       id:          gateway.id,
@@ -213,16 +309,12 @@ function VistaraOrb({
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
 
-    // Signal state drives web shimmer / brightness — same as Shunya interaction states
     if (isHovered)      nanoOrb.setSignal('hover')
     else if (isFocused) nanoOrb.setSignal('listening')
     else                nanoOrb.setSignal('idle')
     nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.55)
 
-    // overridePosition=ZERO keeps NanoOrb at local origin; parent group handles ring placement
     nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.3, 1, ZERO)
-
-    // Post-multiply: NanoOrb internal scale (~0.5–1.1) × GYRO_SCALE
     nanoOrb.group.scale.multiplyScalar(GYRO_SCALE)
 
     if (groupRef.current) {
@@ -241,7 +333,6 @@ function VistaraOrb({
 
   return (
     <group ref={groupRef} position={basePos}>
-      {/* Hit sphere for pointer events */}
       <mesh
         onPointerOver={e => { e.stopPropagation(); onHover(gateway.id) }}
         onPointerOut={() => onHover(null)}
@@ -251,7 +342,6 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
 
-      {/* Exact same NanoOrb as Shunya Mandala — blue-violet, smaller */}
       <primitive object={nanoOrb.group} />
 
       <Html center distanceFactor={250} occlude={false}
@@ -309,7 +399,11 @@ function GyroScene({
   const lookAt = useRef(new THREE.Vector3(0, 0, 0))
   const anglesRef = useRef({ A: 0, B: 0, C: 0 })
 
-  useFrame((_, delta) => {
+  // Camera throw state — fires a brief zoom-toward-orb impulse when focus changes
+  const prevFocusRef = useRef(focusedIdx)
+  const throwRef     = useRef({ startT: -10 })
+
+  useFrame(({ clock }, delta) => {
     const tr = traverseRef.current
     const frac60 = delta * 60
 
@@ -344,6 +438,17 @@ function GyroScene({
     if (ringBRef.current) ringBRef.current.rotation.x = anglesRef.current.B
     if (ringCRef.current) ringCRef.current.rotation.z = anglesRef.current.C
 
+    // Detect focus change → trigger throw impulse
+    if (prevFocusRef.current !== focusedIdx) {
+      prevFocusRef.current = focusedIdx
+      throwRef.current.startT = clock.elapsedTime
+    }
+    const throwElapsed = clock.elapsedTime - throwRef.current.startT
+    const throwDur = 0.75
+    const tp = Math.min(throwElapsed / throwDur, 1)
+    // Smooth sin bell: 0 at start and end, peak at midpoint → zoom-in pulse
+    const throwZ = Math.sin(Math.PI * tp) * 72
+
     // Camera
     if (vortexTargetIdx !== null && vortexProgress > 0) {
       const wp = worldPosRef.current[vortexTargetIdx]
@@ -353,7 +458,9 @@ function GyroScene({
         camera.lookAt(wp)
       }
     } else {
-      camera.position.lerp(new THREE.Vector3(0, 0, 550), 0.04)
+      // Faster lerp during throw so the impulse is felt immediately
+      const camLerp = tp < 1 ? 0.18 : 0.04
+      camera.position.lerp(new THREE.Vector3(0, 0, 550 - throwZ), camLerp)
       const wp = worldPosRef.current[focusedIdx]
       if (wp) lookAt.current.lerp(wp, 0.04)
       else lookAt.current.lerp(new THREE.Vector3(0, 0, 0), 0.04)
@@ -373,6 +480,7 @@ function GyroScene({
     <>
       <ambientLight intensity={0.04} />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
+      <PhantomOrbsSystem />
 
       {/* ── Ring A (Y-axis, horizontal equatorial) ── */}
       <group ref={ringARef}>
@@ -490,19 +598,24 @@ function GlassPanel({ gateway, onClose, onEnter }: {
         style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(12px)' }}
       />
 
-      {/* Shards — full-panel tiles that together form the glass surface */}
-      <div style={{ position:'absolute', width:PANEL_W, height:PANEL_H, pointerEvents:'none', zIndex:3 }}>
+      {/* Shards — overflow:hidden when assembled so they respect the panel's rounded border */}
+      <div style={{
+        position: 'absolute', width: PANEL_W, height: PANEL_H,
+        pointerEvents: 'none', zIndex: 3,
+        overflow: isScattered ? 'visible' : 'hidden',
+        borderRadius: isScattered ? '0' : '20px',
+      }}>
         {shards.map((sh, i) => (
           <div key={i} style={{
             position: 'absolute',
             left: 0, top: 0,
             width: '100%', height: '100%',
+            // Near-transparent so the background orb system shows through faintly
             background: `linear-gradient(${sh.gradAngle}deg,
-              rgba(130,175,255,0.52) 0%,
-              rgba(55,95,210,0.22) 45%,
-              rgba(100,145,255,0.38) 100%)`,
+              rgba(160,200,255,0.07) 0%,
+              rgba(70,110,220,0.04) 45%,
+              rgba(130,170,255,0.06) 100%)`,
             clipPath: sh.clipPath,
-            // rotate/translate from the shard's own centre so pieces fly outward naturally
             transformOrigin: `${(sh.cx / PANEL_W * 100).toFixed(2)}% ${(sh.cy / PANEL_H * 100).toFixed(2)}%`,
             transform: isScattered
               ? `translate(${sh.vx}px,${sh.vy}px) rotate(${sh.vr}deg)`
@@ -671,12 +784,10 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const handleOrbClick = useCallback((idx: number, id: string) => {
     if (vortexPhase !== 'idle') return
     if (idx !== focusedIdx) {
-      // First click: bring to focus
       triggerTraverse(idx)
       setFocusedIdx(idx)
       return
     }
-    // Second click: enter vortex
     setVortexTargetIdx(idx)
     setVortexPhase('pull')
     vortexStartRef.current = performance.now()
@@ -717,26 +828,127 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
     if (gw) onGatewayEnter?.(gw)
   }, [panelGateway, handleClose, onGatewayEnter])
 
-  // Vignette
   const vig = vortexPhase === 'pull' ? vortexProgress * 0.5
     : vortexPhase === 'peak' ? 0.5 + vortexProgress * 0.5
     : vortexPhase === 'passage' ? 1 : 0
 
-  // Expansion overlay
   const passCenter = vortexTargetIdx !== null ? screenPosRef.current[vortexTargetIdx] : null
 
   return (
-    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000000' }}>
-      <style>{`@keyframes fadeIn { from{opacity:0} to{opacity:1} }`}</style>
+    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000005' }}>
 
+      {/* ── CSS keyframes ─────────────────────────────────────────────────── */}
+      <style>{`
+        @keyframes nebDrift1 {
+          0%,100% { transform: translateX(-5%) translateY(8%) scale(1.0) }
+          50%      { transform: translateX(8%) translateY(-4%) scale(1.18) }
+        }
+        @keyframes nebDrift2 {
+          0%,100% { transform: translateX(6%) translateY(-6%) scale(0.90) }
+          50%      { transform: translateX(-7%) translateY(10%) scale(1.12) }
+        }
+        @keyframes nebDrift3 {
+          0%,100% { transform: translateX(4%) translateY(12%) scale(1.06) }
+          50%      { transform: translateX(-9%) translateY(-4%) scale(0.86) }
+        }
+        @keyframes nebSweep1 {
+          0%   { transform: translateX(calc(-50% - 150vw)) scaleY(1.2); opacity: 0 }
+          7%   { opacity: 0.085 }
+          93%  { opacity: 0.085 }
+          100% { transform: translateX(calc(-50% + 150vw)) scaleY(0.9); opacity: 0 }
+        }
+        @keyframes nebSweep2 {
+          0%   { transform: translateX(calc(-50% + 150vw)) scaleY(0.85); opacity: 0 }
+          7%   { opacity: 0.065 }
+          93%  { opacity: 0.065 }
+          100% { transform: translateX(calc(-50% - 150vw)) scaleY(1.1); opacity: 0 }
+        }
+        @keyframes nebSweepFg {
+          0%   { transform: translateX(calc(-50% - 130vw)); opacity: 0 }
+          8%   { opacity: 0.055 }
+          92%  { opacity: 0.055 }
+          100% { transform: translateX(calc(-50% + 130vw)); opacity: 0 }
+        }
+        @keyframes stTrail1 {
+          0%    { transform: translateX(-130vw) rotate(-9deg); opacity: 0 }
+          0.5%  { opacity: 1 }
+          4%    { transform: translateX(130vw) rotate(-9deg); opacity: 0 }
+          4.1%  { opacity: 0 }
+          100%  { opacity: 0 }
+        }
+        @keyframes stTrail2 {
+          0%    { transform: translateX(-130vw) rotate(-4deg); opacity: 0 }
+          0.5%  { opacity: 0.82 }
+          3.5%  { transform: translateX(130vw) rotate(-4deg); opacity: 0 }
+          3.6%  { opacity: 0 }
+          100%  { opacity: 0 }
+        }
+        @keyframes stTrail3 {
+          0%    { transform: translateX(130vw) rotate(11deg); opacity: 0 }
+          0.5%  { opacity: 0.90 }
+          4.5%  { transform: translateX(-130vw) rotate(11deg); opacity: 0 }
+          4.6%  { opacity: 0 }
+          100%  { opacity: 0 }
+        }
+        @keyframes stTrail4 {
+          0%    { transform: translateX(-130vw) rotate(-2deg); opacity: 0 }
+          0.5%  { opacity: 0.70 }
+          3%    { transform: translateX(130vw) rotate(-2deg); opacity: 0 }
+          3.1%  { opacity: 0 }
+          100%  { opacity: 0 }
+        }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+      `}</style>
+
+      {/* ── Background nebula atmosphere (behind Canvas) ───────────────── */}
+      <div style={{ position:'absolute', inset:0, zIndex:1, pointerEvents:'none', overflow:'hidden' }}>
+
+        {/* Static large nebula volumes — hydrogen, oxygen, sulfur band colors */}
+        <div style={{
+          position:'absolute', width:'72vw', height:'62vh', top:'-8%', left:'-12%',
+          background:'radial-gradient(ellipse at center, rgba(160,0,220,0.14) 0%, rgba(90,0,160,0.05) 55%, transparent 100%)',
+          filter:'blur(64px)',
+          animation:'nebDrift1 58s ease-in-out infinite',
+        }} />
+        <div style={{
+          position:'absolute', width:'62vw', height:'52vh', top:'38%', right:'-8%',
+          background:'radial-gradient(ellipse at center, rgba(0,160,190,0.12) 0%, rgba(0,90,130,0.05) 55%, transparent 100%)',
+          filter:'blur(52px)',
+          animation:'nebDrift2 47s ease-in-out infinite',
+        }} />
+        <div style={{
+          position:'absolute', width:'54vw', height:'44vh', bottom:'4%', left:'18%',
+          background:'radial-gradient(ellipse at center, rgba(190,70,0,0.11) 0%, rgba(130,35,0,0.04) 55%, transparent 100%)',
+          filter:'blur(48px)',
+          animation:'nebDrift3 68s ease-in-out infinite',
+        }} />
+
+        {/* Sweeping nebula wisps — left→right */}
+        <div style={{
+          position:'absolute', width:'80vw', height:'32vh', top:'18%', left:'50%',
+          background:'radial-gradient(ellipse at center, rgba(130,0,190,0.11) 0%, rgba(70,0,130,0.04) 60%, transparent 100%)',
+          filter:'blur(38px)',
+          animation:'nebSweep1 52s linear infinite',
+          animationDelay:'-17s',
+        }} />
+        {/* Sweeping nebula wisps — right→left */}
+        <div style={{
+          position:'absolute', width:'68vw', height:'26vh', top:'58%', left:'50%',
+          background:'radial-gradient(ellipse at center, rgba(0,140,170,0.10) 0%, rgba(0,70,110,0.04) 60%, transparent 100%)',
+          filter:'blur(44px)',
+          animation:'nebSweep2 66s linear infinite',
+          animationDelay:'-30s',
+        }} />
+      </div>
+
+      {/* ── Three.js canvas (transparent so background nebula shows through) */}
       <Canvas
         camera={{ position:[0,0,550], fov:60, near:1, far:3000 }}
-        style={{ position:'absolute', inset:0 }}
-        gl={{ antialias:true, toneMapping:THREE.ACESFilmicToneMapping, toneMappingExposure:1.1 }}
+        style={{ position:'absolute', inset:0, zIndex:2 }}
+        gl={{ antialias:true, alpha:true, toneMapping:THREE.ACESFilmicToneMapping, toneMappingExposure:1.1 }}
         dpr={[1, 1.5]}
-        onCreated={({ gl, scene }) => {
-          gl.setClearColor(0x000000, 1)
-          scene.background = new THREE.Color(0x000000)
+        onCreated={({ gl }) => {
+          gl.setClearColor(0x000000, 0)
         }}
       >
         <GyroScene
@@ -752,6 +964,58 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           traverseRef={traverseRef}
         />
       </Canvas>
+
+      {/* ── Foreground nebula wisps (in front of Canvas, behind UI) ──────── */}
+      <div style={{ position:'absolute', inset:0, zIndex:3, pointerEvents:'none', overflow:'hidden' }}>
+        <div style={{
+          position:'absolute', width:'55vw', height:'22vh', top:'8%', left:'50%',
+          background:'radial-gradient(ellipse at center, rgba(210,100,0,0.09) 0%, rgba(140,50,0,0.03) 65%, transparent 100%)',
+          filter:'blur(32px)',
+          animation:'nebSweepFg 41s linear infinite',
+          animationDelay:'-9s',
+        }} />
+        <div style={{
+          position:'absolute', width:'48vw', height:'18vh', top:'65%', left:'50%',
+          background:'radial-gradient(ellipse at center, rgba(0,180,150,0.08) 0%, transparent 65%)',
+          filter:'blur(28px)',
+          animation:'nebSweep1 35s linear infinite',
+          animationDelay:'-24s',
+        }} />
+      </div>
+
+      {/* ── Star trails (shooting stars) ──────────────────────────────────── */}
+      <div style={{ position:'absolute', inset:0, zIndex:4, pointerEvents:'none', overflow:'hidden' }}>
+        <div style={{
+          position:'absolute', top:'22%', left:0,
+          width:'210px', height:'1.5px',
+          background:'linear-gradient(90deg, transparent 0%, rgba(200,215,255,0.5) 30%, rgba(255,255,255,0.95) 70%, rgba(255,255,255,0.3) 88%, transparent 100%)',
+          filter:'blur(0.5px)',
+          animation:'stTrail1 26s linear infinite',
+          animationDelay:'-4s',
+        }} />
+        <div style={{
+          position:'absolute', top:'68%', left:0,
+          width:'165px', height:'1px',
+          background:'linear-gradient(90deg, transparent 0%, rgba(200,220,255,0.4) 25%, rgba(255,255,255,0.88) 68%, transparent 100%)',
+          animation:'stTrail2 20s linear infinite',
+          animationDelay:'-11s',
+        }} />
+        <div style={{
+          position:'absolute', top:'42%', left:0,
+          width:'245px', height:'2px',
+          background:'linear-gradient(270deg, transparent 0%, rgba(210,230,255,0.5) 30%, rgba(255,255,255,0.92) 70%, rgba(255,255,255,0.2) 88%, transparent 100%)',
+          filter:'blur(0.8px)',
+          animation:'stTrail3 32s linear infinite',
+          animationDelay:'-21s',
+        }} />
+        <div style={{
+          position:'absolute', top:'80%', left:0,
+          width:'135px', height:'1px',
+          background:'linear-gradient(90deg, transparent 0%, rgba(180,200,255,0.35) 20%, rgba(255,255,255,0.80) 65%, transparent 100%)',
+          animation:'stTrail4 22s linear infinite',
+          animationDelay:'-14s',
+        }} />
+      </div>
 
       {/* Blue edge vignette */}
       <div style={{
