@@ -27,10 +27,11 @@ const FRONT = Math.PI / 2
 const TRAVERSE_MS = 600
 
 // ─── phantom orb configs — distinct non-blue colors, different densities ─────
+// scale must match main orb GYRO_SCALE range (orbSize * 0.15 ≈ 3.3–5.1)
 const PHANTOM_CONFIGS = [
-  { colorA: '#ff8820', colorB: '#ff5000', brightness: 0.45, scale: 0.90 },
-  { colorA: '#00e8a8', colorB: '#00b870', brightness: 0.38, scale: 0.78 },
-  { colorA: '#ff0050', colorB: '#cc0030', brightness: 0.48, scale: 1.00 },
+  { colorA: '#ff8820', colorB: '#ff5000', brightness: 0.50, scale: 3.6 },
+  { colorA: '#00e8a8', colorB: '#00b870', brightness: 0.42, scale: 3.0 },
+  { colorA: '#ff0050', colorB: '#cc0030', brightness: 0.52, scale: 4.2 },
 ] as const
 
 // ─── stardust trail shaders ───────────────────────────────────────────────────
@@ -74,8 +75,8 @@ function nearestTarget(current: number, raw: number): number {
 // ─── shard generation ─────────────────────────────────────────────────────────
 const PANEL_W = 440
 const PANEL_H = 360
-const SHARD_COLS = 7
-const SHARD_ROWS = 6
+const SHARD_COLS = 5
+const SHARD_ROWS = 4
 
 interface ShardDef {
   cx: number; cy: number; clipPath: string
@@ -211,7 +212,7 @@ function PhantomOrbsSystem() {
         pd.z0 + (pd.z1 - pd.z0) * p,
       )
       pd.nanoOrb.setVisualDim(alpha * pd.brightness)
-      pd.nanoOrb.update(t, 0, false, false, 0.2, 0.6, pd.posVec)
+      pd.nanoOrb.update(t, 0, false, false, 0.55, 0.8, pd.posVec)
       pd.nanoOrb.group.scale.multiplyScalar(pd.scale)
     }
   })
@@ -407,7 +408,7 @@ function VistaraOrb({
   const nanoOrb = useMemo(() => {
     const inst = new NanoOrb({
       id: gateway.id, title: gateway.name, subtitle: gateway.tagline,
-      description: gateway.description, colorA: '#0014ff', colorB: '#5600ff',
+      description: gateway.description, colorA: '#0033ff', colorB: '#0077ff',
     })
     inst.setVisible(true)
     return inst
@@ -639,7 +640,7 @@ function GlassPanel({ gateway, onClose, onEnter }: {
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px' }}>
-      <div onClick={handleClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(12px)' }} />
+      <div onClick={handleClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.82)' }} />
       <div style={{
         position:'absolute', width:PANEL_W, height:PANEL_H,
         pointerEvents:'none', zIndex:3,
