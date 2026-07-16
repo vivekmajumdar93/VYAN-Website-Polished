@@ -153,19 +153,20 @@ function PhantomOrbsSystem() {
     return Array.from({ length: POOL }, (_, i) => {
       const hex = PHANTOM_HEX[i % PHANTOM_HEX.length]
       const col = new THREE.Color(hex)
-      const size = 10 + Math.random() * 18
+      const size = 6 + Math.random() * 10
 
       const coreGeo = new THREE.SphereGeometry(size, 8, 8)
       const coreMat = new THREE.MeshBasicMaterial({
-        color: col, transparent: true, opacity: 0, depthWrite: false,
+        color: col, transparent: true, opacity: 0,
+        depthWrite: false, blending: THREE.AdditiveBlending,
       })
       const core = new THREE.Mesh(coreGeo, coreMat)
 
-      // Wide halo gives the orb a nebula-like corona
-      const haloGeo = new THREE.SphereGeometry(size * 3.2, 6, 6)
+      // Soft corona halo — additive so it glows without covering the scene
+      const haloGeo = new THREE.SphereGeometry(size * 4.5, 6, 6)
       const haloMat = new THREE.MeshBasicMaterial({
         color: col, transparent: true, opacity: 0,
-        depthWrite: false, side: THREE.BackSide,
+        depthWrite: false, blending: THREE.AdditiveBlending,
       })
       const halo = new THREE.Mesh(haloGeo, haloMat)
 
@@ -226,10 +227,10 @@ function PhantomOrbsSystem() {
         continue
       }
 
-      // Smooth sin fade-in / fade-out envelope
+      // Smooth sin fade-in / fade-out envelope; additive blending amplifies visually
       const alpha = Math.sin(Math.PI * p)
-      pd.coreMat.opacity = alpha * 0.88
-      pd.haloMat.opacity = alpha * 0.13
+      pd.coreMat.opacity = alpha * 0.55
+      pd.haloMat.opacity = alpha * 0.07
 
       pd.group.position.set(
         pd.x0 + (pd.x1 - pd.x0) * p,
