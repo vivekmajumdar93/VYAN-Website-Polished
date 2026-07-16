@@ -315,7 +315,7 @@ function VistaraOrb({
             letterSpacing: '0.25em',
             color: isFocused ? 'rgba(180,200,255,0.8)' : 'rgba(140,160,255,0.35)',
             textTransform: 'uppercase',
-            fontFamily: 'system-ui',
+            fontFamily: 'var(--font-vyan)',
             transition: 'all 0.3s',
           }}>{gateway.name}</div>
           {isFocused && (
@@ -324,7 +324,7 @@ function VistaraOrb({
               letterSpacing: '0.15em',
               color: 'rgba(140,160,255,0.45)',
               textTransform: 'uppercase',
-              fontFamily: 'system-ui',
+              fontFamily: 'var(--font-vyan)',
               marginTop: '4px',
             }}>{gateway.tagline}</div>
           )}
