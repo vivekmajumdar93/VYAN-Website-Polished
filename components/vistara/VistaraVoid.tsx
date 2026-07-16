@@ -41,59 +41,11 @@ function nearestTarget(current: number, raw: number): number {
   return current + d
 }
 
-// ─── billboard orb shaders (same visual language as GatewayOrbs / Shunya) ─────
-const ORB_VERT = `
-uniform float time;
-uniform float pulse;
-varying vec2 vUv;
-void main() {
-  vUv = uv;
-  vec3 right   = vec3(modelViewMatrix[0][0], modelViewMatrix[1][0], modelViewMatrix[2][0]);
-  vec3 up      = vec3(modelViewMatrix[0][1], modelViewMatrix[1][1], modelViewMatrix[2][1]);
-  float breathe = 1.0 + sin(time * 1.8 + pulse) * 0.06;
-  vec3 worldPos = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-  worldPos += right * position.x * breathe + up * position.y * breathe;
-  gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
-}
-`
-const ORB_CORE_FRAG = `
-uniform vec3  orbColor;
-uniform float time;
-uniform float hovered;
-uniform float pulse;
-varying vec2 vUv;
-void main() {
-  vec2  p = vUv - 0.5;
-  float r = length(p);
-  if (r > 0.5) discard;
-  float core    = exp(-r * 16.0);
-  float glow    = exp(-r * 5.0) * 0.6;
-  float ring    = smoothstep(0.38, 0.42, r) * smoothstep(0.50, 0.44, r) * hovered;
-  float shimmer = 0.8 + 0.2 * sin(time * 4.0 + pulse * 6.0 + r * 20.0);
-  float alpha   = (core + glow + ring * 0.4) * shimmer * (0.85 + hovered * 0.3);
-  vec3  col     = mix(orbColor, vec3(1.0), core * 0.6);
-  gl_FragColor  = vec4(col, clamp(alpha, 0.0, 1.0));
-}
-`
-const ORB_AURA_FRAG = `
-uniform vec3  orbColor;
-uniform float hovered;
-varying vec2 vUv;
-void main() {
-  vec2  p = vUv - 0.5;
-  float r = length(p);
-  if (r > 0.5) discard;
-  float aura = exp(-r * 3.5) * (0.18 + hovered * 0.22);
-  gl_FragColor = vec4(orbColor, aura);
-}
-`
-
-// blue-violet, matching Shunya Mandala's colorA/colorB family
-const ORB_COLOR_VALUE = new THREE.Color('#5533ff')
-
-// ─── shard generation ─────────────────────────────────────────────────────────
+// ─── shard generation — grid-based tiles that together form the full panel ─────
 const PANEL_W = 440
 const PANEL_H = 360
+const SHARD_COLS = 7
+const SHARD_ROWS = 6
 
 interface ShardDef {
   cx: number; cy: number
@@ -102,26 +54,46 @@ interface ShardDef {
   gradAngle: number
 }
 
-function mkShards(pw: number, ph: number, n: number): ShardDef[] {
-  return Array.from({ length: n }, () => {
-    const cx = 10 + Math.random() * (pw - 20)
-    const cy = 10 + Math.random() * (ph - 20)
-    const sides = 5 + Math.floor(Math.random() * 4)
-    const baseR = 8 + Math.random() * 18
-    const verts = Array.from({ length: sides }, (_, i) => {
-      const a = (i / sides) * Math.PI * 2
-      const r = baseR * (0.6 + Math.random() * 0.8)
-      return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]
-    })
-    return {
-      cx, cy,
-      clipPath: `polygon(${verts.map(v => `${+(v[0]-cx+50).toFixed(1)}% ${+(v[1]-cy+50).toFixed(1)}%`).join(',')})`,
-      vx: (cx - pw / 2) * (0.3 + Math.random() * 0.8),
-      vy: (cy - ph / 2) * (0.3 + Math.random() * 0.8),
-      vr: (Math.random() - 0.5) * 720,
-      gradAngle: Math.round(Math.random() * 360),
+function mkShards(pw: number, ph: number): ShardDef[] {
+  const cw = pw / SHARD_COLS
+  const ch = ph / SHARD_ROWS
+  const JITTER = 0.38
+
+  // Build jittered grid: interior vertices get randomness, edges stay fixed
+  const grid: [number, number][][] = []
+  for (let r = 0; r <= SHARD_ROWS; r++) {
+    const row: [number, number][] = []
+    for (let c = 0; c <= SHARD_COLS; c++) {
+      const jx = (c > 0 && c < SHARD_COLS) ? (Math.random() - 0.5) * cw * JITTER : 0
+      const jy = (r > 0 && r < SHARD_ROWS) ? (Math.random() - 0.5) * ch * JITTER : 0
+      row.push([
+        Math.max(0, Math.min(pw, c * cw + jx)),
+        Math.max(0, Math.min(ph, r * ch + jy)),
+      ])
     }
-  })
+    grid.push(row)
+  }
+
+  const shards: ShardDef[] = []
+  for (let r = 0; r < SHARD_ROWS; r++) {
+    for (let c = 0; c < SHARD_COLS; c++) {
+      const tl = grid[r][c], tr = grid[r][c+1]
+      const br = grid[r+1][c+1], bl = grid[r+1][c]
+      const cx = (tl[0]+tr[0]+br[0]+bl[0]) / 4
+      const cy = (tl[1]+tr[1]+br[1]+bl[1]) / 4
+      // clip path in % of panel dimensions — tiles perfectly to cover entire panel
+      const pt = (x: number, y: number) => `${(x/pw*100).toFixed(2)}% ${(y/ph*100).toFixed(2)}%`
+      shards.push({
+        cx, cy,
+        clipPath: `polygon(${pt(...tl)},${pt(...tr)},${pt(...br)},${pt(...bl)})`,
+        vx: (cx - pw/2) * (0.7 + Math.random() * 1.0),
+        vy: (cy - ph/2) * (0.7 + Math.random() * 1.0),
+        vr: (Math.random() - 0.5) * 480,
+        gradAngle: Math.round(Math.random() * 360),
+      })
+    }
+  }
+  return shards
 }
 
 // ─── particles ────────────────────────────────────────────────────────────────
@@ -237,53 +209,68 @@ function VistaraOrb({
     return [ringRadius * Math.cos(localAngle), 0, ringRadius * Math.sin(localAngle)]
   }, [ringType, localAngle, ringRadius])
 
-  const groupRef = useRef<THREE.Group>(null)
-  const hov      = useRef(0)
-  const pulse    = useMemo(() => Math.random() * Math.PI * 2, [])
-  const scaleRef = useRef(1)
+  const groupRef    = useRef<THREE.Group>(null)
+  const networkRef  = useRef<THREE.Group>(null)
+  const nodeMatRef  = useRef<THREE.PointsMaterial>(null)
+  const lineMatRef  = useRef<THREE.LineBasicMaterial>(null)
+  const hov         = useRef(0)
+  const scaleRef    = useRef(1)
 
-  // billboard plane sizes — smaller than Shunya orbs, same visual language
-  const coreSize = orbSize * 0.8
-  const auraSize = coreSize * 5.5
+  // ── particle network geometry (same visual language as NanoOrb / Shunya) ──
+  const { nodeGeo, lineGeo } = useMemo(() => {
+    const R  = orbSize
+    const CA = new THREE.Color('#0014ff')   // blue   — NanoOrb colorA
+    const CB = new THREE.Color('#8833ff')   // violet — NanoOrb colorB
+    const N  = 90
 
-  const coreMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader:   ORB_VERT,
-    fragmentShader: ORB_CORE_FRAG,
-    uniforms: {
-      orbColor: { value: ORB_COLOR_VALUE },
-      time:     { value: 0 },
-      hovered:  { value: 0 },
-      pulse:    { value: pulse },
-    },
-    transparent: true,
-    blending:    THREE.AdditiveBlending,
-    depthWrite:  false,
-    side:        THREE.DoubleSide,
-  }), [pulse])
+    const npos: number[] = [], ncol: number[] = []
+    for (let i = 0; i < N; i++) {
+      const theta = Math.random() * Math.PI * 2
+      const phi   = Math.acos(2 * Math.random() - 1)
+      const r     = Math.pow(Math.random(), 0.65) * R
+      npos.push(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi))
+      const c = CA.clone().lerp(CB, Math.random())
+      ncol.push(c.r, c.g, c.b)
+    }
 
-  const auraMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader:   ORB_VERT,
-    fragmentShader: ORB_AURA_FRAG,
-    uniforms: {
-      orbColor: { value: ORB_COLOR_VALUE },
-      time:     { value: 0 },
-      hovered:  { value: 0 },
-      pulse:    { value: pulse },
-    },
-    transparent: true,
-    blending:    THREE.AdditiveBlending,
-    depthWrite:  false,
-    side:        THREE.DoubleSide,
-  }), [pulse])
+    const lpos: number[] = [], lcol: number[] = []
+    const maxD2 = (R * 0.85) * (R * 0.85)
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const dx = npos[i*3]-npos[j*3], dy = npos[i*3+1]-npos[j*3+1], dz = npos[i*3+2]-npos[j*3+2]
+        if (dx*dx + dy*dy + dz*dz < maxD2) {
+          lpos.push(npos[i*3], npos[i*3+1], npos[i*3+2], npos[j*3], npos[j*3+1], npos[j*3+2])
+          lcol.push(ncol[i*3], ncol[i*3+1], ncol[i*3+2], ncol[j*3], ncol[j*3+1], ncol[j*3+2])
+        }
+      }
+    }
+
+    const nodeGeo = new THREE.BufferGeometry()
+    nodeGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(npos), 3))
+    nodeGeo.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(ncol), 3))
+
+    const lineGeo = new THREE.BufferGeometry()
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(lpos), 3))
+    lineGeo.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(lcol), 3))
+
+    return { nodeGeo, lineGeo }
+  }, [orbSize])
 
   useFrame((_, delta) => {
-    const t = (coreMat.uniforms.time.value += delta)
-    auraMat.uniforms.time.value = t
-
     const hovTarget = isHovered || isFocused ? 1 : 0
     hov.current += (hovTarget - hov.current) * 0.08
-    coreMat.uniforms.hovered.value = hov.current
-    auraMat.uniforms.hovered.value = hov.current
+
+    const focused  = isFocused ? 1 : 0.55
+    const pullFade = isPulled && pullProgress > 0 ? Math.max(0, 1 - pullProgress) : 1
+
+    if (nodeMatRef.current) nodeMatRef.current.opacity = 0.9  * focused * pullFade * (1 + hov.current * 0.25)
+    if (lineMatRef.current) lineMatRef.current.opacity = 0.28 * focused * pullFade * (1 + hov.current * 0.40)
+
+    // slow gyroscopic rotation of the network itself
+    if (networkRef.current) {
+      networkRef.current.rotation.y += delta * 0.28
+      networkRef.current.rotation.x += delta * 0.09
+    }
 
     if (groupRef.current) {
       const wp = new THREE.Vector3()
@@ -305,31 +292,42 @@ function VistaraOrb({
 
   return (
     <group ref={groupRef} position={basePos}>
-      {/* Invisible hit target — easier to click than the sprite */}
+      {/* Invisible hit sphere */}
       <mesh
         onPointerOver={e => { e.stopPropagation(); onHover(gateway.id) }}
         onPointerOut={() => onHover(null)}
         onClick={e => { e.stopPropagation(); onClick(orbIdx, gateway.id) }}
       >
-        <sphereGeometry args={[coreSize * 1.5, 8, 8]} />
+        <sphereGeometry args={[orbSize * 1.2, 8, 8]} />
         <meshBasicMaterial visible={false} />
       </mesh>
 
-      {/* Wide aura glow */}
-      <mesh>
-        <planeGeometry args={[auraSize, auraSize]} />
-        <primitive object={auraMat} attach="material" />
-      </mesh>
+      <group ref={networkRef}>
+        {/* Connection web */}
+        <lineSegments>
+          <primitive object={lineGeo} attach="geometry" />
+          <lineBasicMaterial ref={lineMatRef} vertexColors transparent opacity={0.28}
+            blending={THREE.AdditiveBlending} depthWrite={false} />
+        </lineSegments>
 
-      {/* Tight bright core */}
-      <mesh>
-        <planeGeometry args={[coreSize * 2, coreSize * 2]} />
-        <primitive object={coreMat} attach="material" />
-      </mesh>
+        {/* Node particles */}
+        <points>
+          <primitive object={nodeGeo} attach="geometry" />
+          <pointsMaterial ref={nodeMatRef} vertexColors size={orbSize * 0.07}
+            transparent opacity={0.9} sizeAttenuation
+            blending={THREE.AdditiveBlending} depthWrite={false} />
+        </points>
 
-      {/* Label */}
+        {/* Bright stardust core */}
+        <mesh>
+          <sphereGeometry args={[orbSize * 0.10, 6, 6]} />
+          <meshBasicMaterial color="#aabbff" transparent opacity={0.95}
+            blending={THREE.AdditiveBlending} depthWrite={false} />
+        </mesh>
+      </group>
+
       <Html center distanceFactor={250} occlude={false}
-        position={[0, -(coreSize * 1.8), 0]}
+        position={[0, -(orbSize * 1.3), 0]}
         style={{ pointerEvents: 'none' }}
       >
         <div style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
@@ -540,7 +538,7 @@ type PanelPhase = 'shattering' | 'hold' | 'reforming' | 'open' | 'closing'
 function GlassPanel({ gateway, onClose, onEnter }: {
   gateway: Gateway; onClose: () => void; onEnter: () => void
 }) {
-  const shards = useMemo(() => mkShards(PANEL_W, PANEL_H, 50), [])
+  const shards = useMemo(() => mkShards(PANEL_W, PANEL_H), [])
   const [phase, setPhase] = useState<PanelPhase>('shattering')
   const [contentVisible, setContentVisible] = useState(false)
 
@@ -565,20 +563,20 @@ function GlassPanel({ gateway, onClose, onEnter }: {
         style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(12px)' }}
       />
 
-      {/* Shards */}
+      {/* Shards — full-panel tiles that together form the glass surface */}
       <div style={{ position:'absolute', width:PANEL_W, height:PANEL_H, pointerEvents:'none', zIndex:3 }}>
         {shards.map((sh, i) => (
           <div key={i} style={{
             position: 'absolute',
-            left: sh.cx - 50,
-            top: sh.cy - 50,
-            width: 100,
-            height: 100,
-            background: `linear-gradient(${sh.gradAngle}deg, rgba(140,180,255,0.6) 0%, rgba(80,120,220,0.3) 100%)`,
-            border: '0.5px solid rgba(200,220,255,0.8)',
-            boxShadow: '0 0 4px rgba(100,160,255,0.4)',
-            backdropFilter: 'blur(2px)',
+            left: 0, top: 0,
+            width: '100%', height: '100%',
+            background: `linear-gradient(${sh.gradAngle}deg,
+              rgba(130,175,255,0.52) 0%,
+              rgba(55,95,210,0.22) 45%,
+              rgba(100,145,255,0.38) 100%)`,
             clipPath: sh.clipPath,
+            // rotate/translate from the shard's own centre so pieces fly outward naturally
+            transformOrigin: `${(sh.cx / PANEL_W * 100).toFixed(2)}% ${(sh.cy / PANEL_H * 100).toFixed(2)}%`,
             transform: isScattered
               ? `translate(${sh.vx}px,${sh.vy}px) rotate(${sh.vr}deg)`
               : 'translate(0,0) rotate(0deg)',
