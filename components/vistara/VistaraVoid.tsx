@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
+import { NanoOrb } from '@/lib/vyan/objects/NanoOrb'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 
 // ─── gyroscope constants ──────────────────────────────────────────────────────
@@ -188,68 +189,41 @@ function VistaraOrb({
     return [ringRadius * Math.cos(localAngle), 0, ringRadius * Math.sin(localAngle)]
   }, [ringType, localAngle, ringRadius])
 
-  const groupRef    = useRef<THREE.Group>(null)
-  const networkRef  = useRef<THREE.Group>(null)
-  const nodeMatRef  = useRef<THREE.PointsMaterial>(null)
-  const lineMatRef  = useRef<THREE.LineBasicMaterial>(null)
-  const hov         = useRef(0)
-  const scaleRef    = useRef(1)
+  const groupRef = useRef<THREE.Group>(null)
+  const ZERO     = useMemo(() => new THREE.Vector3(), [])
+  // Scale NanoOrb up to fit gyroscope scene (ring radii 200-280)
+  // while staying visually smaller than Shunya Mandala orbs
+  const GYRO_SCALE = orbSize * 0.15
 
-  // ── particle network geometry (same visual language as NanoOrb / Shunya) ──
-  const { nodeGeo, lineGeo } = useMemo(() => {
-    const R  = orbSize
-    const CA = new THREE.Color('#0014ff')   // blue   — NanoOrb colorA
-    const CB = new THREE.Color('#8833ff')   // violet — NanoOrb colorB
-    const N  = 90
+  // Exact same NanoOrb as Shunya — only colorA/colorB changed to blue-violet
+  const nanoOrb = useMemo(() => {
+    const inst = new NanoOrb({
+      id:          gateway.id,
+      title:       gateway.name,
+      subtitle:    gateway.tagline,
+      description: gateway.description,
+      colorA:      '#0014ff',
+      colorB:      '#5600ff',
+    })
+    inst.setVisible(true)
+    return inst
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gateway.id])
 
-    const npos: number[] = [], ncol: number[] = []
-    for (let i = 0; i < N; i++) {
-      const theta = Math.random() * Math.PI * 2
-      const phi   = Math.acos(2 * Math.random() - 1)
-      const r     = Math.pow(Math.random(), 0.65) * R
-      npos.push(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi))
-      const c = CA.clone().lerp(CB, Math.random())
-      ncol.push(c.r, c.g, c.b)
-    }
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
 
-    const lpos: number[] = [], lcol: number[] = []
-    const maxD2 = (R * 0.85) * (R * 0.85)
-    for (let i = 0; i < N; i++) {
-      for (let j = i + 1; j < N; j++) {
-        const dx = npos[i*3]-npos[j*3], dy = npos[i*3+1]-npos[j*3+1], dz = npos[i*3+2]-npos[j*3+2]
-        if (dx*dx + dy*dy + dz*dz < maxD2) {
-          lpos.push(npos[i*3], npos[i*3+1], npos[i*3+2], npos[j*3], npos[j*3+1], npos[j*3+2])
-          lcol.push(ncol[i*3], ncol[i*3+1], ncol[i*3+2], ncol[j*3], ncol[j*3+1], ncol[j*3+2])
-        }
-      }
-    }
+    // Signal state drives web shimmer / brightness — same as Shunya interaction states
+    if (isHovered)      nanoOrb.setSignal('hover')
+    else if (isFocused) nanoOrb.setSignal('listening')
+    else                nanoOrb.setSignal('idle')
+    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.55)
 
-    const nodeGeo = new THREE.BufferGeometry()
-    nodeGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(npos), 3))
-    nodeGeo.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(ncol), 3))
+    // overridePosition=ZERO keeps NanoOrb at local origin; parent group handles ring placement
+    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.3, 1, ZERO)
 
-    const lineGeo = new THREE.BufferGeometry()
-    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(lpos), 3))
-    lineGeo.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(lcol), 3))
-
-    return { nodeGeo, lineGeo }
-  }, [orbSize])
-
-  useFrame((_, delta) => {
-    const hovTarget = isHovered || isFocused ? 1 : 0
-    hov.current += (hovTarget - hov.current) * 0.08
-
-    const focused  = isFocused ? 1 : 0.55
-    const pullFade = isPulled && pullProgress > 0 ? Math.max(0, 1 - pullProgress) : 1
-
-    if (nodeMatRef.current) nodeMatRef.current.opacity = 0.9  * focused * pullFade * (1 + hov.current * 0.25)
-    if (lineMatRef.current) lineMatRef.current.opacity = 0.28 * focused * pullFade * (1 + hov.current * 0.40)
-
-    // slow gyroscopic rotation of the network itself
-    if (networkRef.current) {
-      networkRef.current.rotation.y += delta * 0.28
-      networkRef.current.rotation.x += delta * 0.09
-    }
+    // Post-multiply: NanoOrb internal scale (~0.5–1.1) × GYRO_SCALE
+    nanoOrb.group.scale.multiplyScalar(GYRO_SCALE)
 
     if (groupRef.current) {
       const wp = new THREE.Vector3()
@@ -262,51 +236,26 @@ function VistaraOrb({
       } else {
         groupRef.current.position.set(...basePos)
       }
-
-      const targetScale = 1 + (isFocused ? 0.15 : 0) + hov.current * 0.12
-      scaleRef.current += (targetScale - scaleRef.current) * 0.08
-      groupRef.current.scale.setScalar(scaleRef.current)
     }
   })
 
   return (
     <group ref={groupRef} position={basePos}>
-      {/* Invisible hit sphere */}
+      {/* Hit sphere for pointer events */}
       <mesh
         onPointerOver={e => { e.stopPropagation(); onHover(gateway.id) }}
         onPointerOut={() => onHover(null)}
         onClick={e => { e.stopPropagation(); onClick(orbIdx, gateway.id) }}
       >
-        <sphereGeometry args={[orbSize * 1.2, 8, 8]} />
+        <sphereGeometry args={[orbSize * 0.7, 8, 8]} />
         <meshBasicMaterial visible={false} />
       </mesh>
 
-      <group ref={networkRef}>
-        {/* Connection web */}
-        <lineSegments>
-          <primitive object={lineGeo} attach="geometry" />
-          <lineBasicMaterial ref={lineMatRef} vertexColors transparent opacity={0.28}
-            blending={THREE.AdditiveBlending} depthWrite={false} />
-        </lineSegments>
-
-        {/* Node particles */}
-        <points>
-          <primitive object={nodeGeo} attach="geometry" />
-          <pointsMaterial ref={nodeMatRef} vertexColors size={orbSize * 0.07}
-            transparent opacity={0.9} sizeAttenuation
-            blending={THREE.AdditiveBlending} depthWrite={false} />
-        </points>
-
-        {/* Bright stardust core */}
-        <mesh>
-          <sphereGeometry args={[orbSize * 0.10, 6, 6]} />
-          <meshBasicMaterial color="#aabbff" transparent opacity={0.95}
-            blending={THREE.AdditiveBlending} depthWrite={false} />
-        </mesh>
-      </group>
+      {/* Exact same NanoOrb as Shunya Mandala — blue-violet, smaller */}
+      <primitive object={nanoOrb.group} />
 
       <Html center distanceFactor={250} occlude={false}
-        position={[0, -(orbSize * 1.3), 0]}
+        position={[0, -(orbSize * 0.9), 0]}
         style={{ pointerEvents: 'none' }}
       >
         <div style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
