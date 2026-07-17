@@ -696,6 +696,21 @@ function GlassPanel({ gateway, onClose, onEnter }: {
               textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 22px' }}>{gateway.tagline}</p>
             <p style={{ fontSize:'14px', lineHeight:'1.75', color:'rgba(255,255,255,0.58)',
               fontFamily:'var(--font-vyan)', letterSpacing:'0.02em', margin:'0 0 28px' }}>{gateway.description}</p>
+
+            {/* ── LIVE APP SLOT ── Set gateway.appUrl to embed a live app here ── */}
+            {gateway.appUrl && (
+              <div style={{ marginBottom:'28px', borderRadius:'12px', overflow:'hidden',
+                border:'1px solid rgba(80,140,255,0.18)', background:'rgba(0,2,18,0.60)' }}>
+                <iframe
+                  src={gateway.appUrl}
+                  title={`${gateway.name} live app`}
+                  style={{ width:'100%', height:'280px', border:'none', display:'block' }}
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  loading="lazy"
+                />
+              </div>
+            )}
+
             <div style={{ display:'flex', gap:'12px' }}>
               <button onClick={handleClose} style={{ flex:1, padding:'12px',
                 background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)',

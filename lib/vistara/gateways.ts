@@ -19,6 +19,10 @@ export interface Gateway {
   orbitSpeed: number    // orbit speed multiplier
   orbitPhase: number    // initial phase offset
   color: string         // accent color for hover/active glow
+  // ── LIVE APP PROVISION ── set this to mount a live app inside the panel ──
+  // Leave undefined (default) until the app is ready to embed.
+  // Supported: any URL that allows iframe embedding (same-origin or permissive CORS).
+  appUrl?: string
 }
 
 export const GATEWAYS: Gateway[] = [
