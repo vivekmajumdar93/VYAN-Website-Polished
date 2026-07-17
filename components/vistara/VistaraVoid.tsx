@@ -103,7 +103,7 @@ function mkShards(pw: number, ph: number): ShardDef[] {
       const pt = (x: number, y: number) => `${(x/pw*100).toFixed(2)}% ${(y/ph*100).toFixed(2)}%`
       shards.push({ cx, cy,
         clipPath: `polygon(${pt(...tl)},${pt(...tr)},${pt(...br)},${pt(...bl)})`,
-        vx: (cx-pw/2)*(0.7+Math.random()*1.0), vy: (cy-ph/2)*(0.7+Math.random()*1.0),
+        vx: (cx-pw/2)*(0.35+Math.random()*0.45), vy: (cy-ph/2)*(0.35+Math.random()*0.45),
         vr: (Math.random()-0.5)*480, gradAngle: Math.round(Math.random()*360),
       })
     }
@@ -662,7 +662,8 @@ function GlassPanel({ gateway, onClose, onEnter }: {
           <div key={i} style={{
             position:'absolute', left:0, top:0, width:'100%', height:'100%',
             background: `linear-gradient(${sh.gradAngle}deg, rgba(160,200,255,0.07) 0%, rgba(70,110,220,0.04) 45%, rgba(130,170,255,0.06) 100%)`,
-            clipPath: sh.clipPath,
+            clipPath: phase === 'open' ? sh.clipPath : 'none',
+            willChange: isScattered ? 'transform' : 'auto',
             transformOrigin: `${(sh.cx/PANEL_W*100).toFixed(2)}% ${(sh.cy/PANEL_H*100).toFixed(2)}%`,
             transform: isScattered ? `translate(${sh.vx}px,${sh.vy}px) rotate(${sh.vr}deg)` : 'none',
             opacity: phase === 'closing' ? 0 : 1,
