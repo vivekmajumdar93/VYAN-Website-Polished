@@ -383,7 +383,7 @@ function ScreenTracker({ worldRef, screenRef }: {
 interface VistaraOrbProps {
   gateway: Gateway; orbIdx: number; orbSize: number
   ringType: 'A' | 'B' | 'C'; localAngle: number; ringRadius: number
-  isFocused: boolean; isHovered: boolean
+  isFocused: boolean; isHovered: boolean; panelOpen: boolean
   isPulled: boolean; pullProgress: number; pullTarget: THREE.Vector3 | null
   onHover: (id: string | null) => void
   onClick: (idx: number, id: string) => void
@@ -392,7 +392,7 @@ interface VistaraOrbProps {
 
 function VistaraOrb({
   gateway, orbIdx, orbSize, ringType, localAngle, ringRadius,
-  isFocused, isHovered, isPulled, pullProgress, pullTarget,
+  isFocused, isHovered, panelOpen, isPulled, pullProgress, pullTarget,
   onHover, onClick, worldPosRef,
 }: VistaraOrbProps) {
   const basePos = useMemo<[number,number,number]>(() => {
@@ -403,7 +403,9 @@ function VistaraOrb({
   const groupRef  = useRef<THREE.Group>(null)
   const ZERO      = useMemo(() => new THREE.Vector3(), [])
   // Animated scale: smoothly grows larger when focused so the orb appears thrown toward the lens
-  const scaleRef  = useRef(orbSize * 0.15)
+  const scaleRef      = useRef(orbSize * 0.15)
+  const burstRef      = useRef(-10)
+  const prevPanelOpen = useRef(false)
 
   const nanoOrb = useMemo(() => {
     const inst = new NanoOrb({
@@ -425,8 +427,13 @@ function VistaraOrb({
 
     nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.3, 1, ZERO)
 
-    // Smooth scale transition — focused orb is 47% larger, making it visually "closer"
-    const targetScale = orbSize * (isFocused ? 0.22 : 0.15)
+    // On panel open for this orb: fire a sin-bell burst so the node web appears
+    // to unfold outward — glass shards are timed to begin assembling at the peak
+    if (isFocused && panelOpen && !prevPanelOpen.current) burstRef.current = t
+    prevPanelOpen.current = isFocused && panelOpen
+    const bp    = Math.min((t - burstRef.current) / 0.65, 1)
+    const burst = isFocused ? Math.sin(Math.PI * bp) * (orbSize * 1.0) : 0
+    const targetScale = orbSize * (isFocused ? 0.22 : 0.15) + burst
     scaleRef.current += (targetScale - scaleRef.current) * 0.06
     nanoOrb.group.scale.multiplyScalar(scaleRef.current)
 
@@ -482,12 +489,13 @@ interface GyroSceneProps {
   worldPosRef: React.MutableRefObject<Record<number, THREE.Vector3>>
   screenPosRef: React.MutableRefObject<Record<number, { x: number; y: number }>>
   traverseRef: React.MutableRefObject<TraverseState>
+  panelOpen: boolean
 }
 
 function GyroScene({
   focusedIdx, hoveredId, onHover, onOrbClick,
   vortexTargetIdx, vortexProgress, vortexPhase,
-  worldPosRef, screenPosRef, traverseRef,
+  worldPosRef, screenPosRef, traverseRef, panelOpen,
 }: GyroSceneProps) {
   const ringARef = useRef<THREE.Group>(null)
   const ringBRef = useRef<THREE.Group>(null)
@@ -568,6 +576,7 @@ function GyroScene({
           <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
             ringType="A" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.A}
             isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
+            panelOpen={panelOpen && focusedIdx===idx}
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
             pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgress:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
@@ -584,6 +593,7 @@ function GyroScene({
           <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
             ringType="B" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.B}
             isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
+            panelOpen={panelOpen && focusedIdx===idx}
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
             pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgress:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
@@ -601,6 +611,7 @@ function GyroScene({
             <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
               ringType="C" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.C}
               isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
+              panelOpen={panelOpen && focusedIdx===idx}
               isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
               pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgress:0}
               pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
@@ -626,8 +637,8 @@ function GlassPanel({ gateway, onClose, onEnter }: {
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('hold'),      350)
-    const t2 = setTimeout(() => setPhase('reforming'), 500)
-    const t3 = setTimeout(() => { setPhase('open'); setContentVisible(true) }, 1000)
+    const t2 = setTimeout(() => setPhase('reforming'), 650)
+    const t3 = setTimeout(() => { setPhase('open'); setContentVisible(true) }, 1150)
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
   }, [])
 
@@ -864,6 +875,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           onHover={setHoveredId} onOrbClick={handleOrbClick}
           vortexTargetIdx={vortexTargetIdx} vortexProgress={vortexProgress} vortexPhase={vortexPhase}
           worldPosRef={worldPosRef} screenPosRef={screenPosRef} traverseRef={traverseRef}
+          panelOpen={showPanel}
         />
       </Canvas>
 
