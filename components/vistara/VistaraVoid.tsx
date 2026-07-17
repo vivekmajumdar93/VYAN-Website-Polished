@@ -6,6 +6,7 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { NanoOrb } from '@/lib/vyan/objects/NanoOrb'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
+import { BackIcon, SendIcon, CloseIcon } from '@/components/icons/VyanIcons'
 
 // ─── gyroscope constants ──────────────────────────────────────────────────────
 const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34]
@@ -703,6 +704,15 @@ function GlassPanel({ gateway, onClose, onEnter }: {
         }}>
           <div style={{ position:'absolute', top:0, left:'12%', right:'12%', height:'1px',
             background:`linear-gradient(90deg,transparent,${gateway.color}60,transparent)` }} />
+          {/* Close icon — top right corner */}
+          <button onClick={handleClose} style={{
+            position:'absolute', top:'14px', right:'14px', zIndex:3,
+            background:'none', border:'none', cursor:'pointer', padding:'4px',
+            opacity: contentVisible ? 0.55 : 0, transition:'opacity 0.3s',
+            lineHeight:0,
+          }}>
+            <CloseIcon size={22} />
+          </button>
           <div style={{ opacity: contentVisible ? 1 : 0, transition:'opacity 0.3s 0.1s' }}>
             <div style={{ fontSize:'9px', letterSpacing:'0.28em', color:gateway.color,
               fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'7px' }}>{gateway.tantra}</div>
@@ -731,12 +741,18 @@ function GlassPanel({ gateway, onClose, onEnter }: {
               <button onClick={handleClose} style={{ flex:1, padding:'12px',
                 background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)',
                 borderRadius:'10px', color:'rgba(255,255,255,0.45)', fontSize:'10px',
-                letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer' }}>Return</button>
+                letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
+                <BackIcon size={18} />Return
+              </button>
               <button onClick={onEnter} style={{ padding:'12px 26px',
                 background:`${gateway.color}26`, border:`1px solid ${gateway.color}60`,
                 borderRadius:'10px', color:gateway.color, fontSize:'10px',
                 letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
-                cursor:'pointer', boxShadow:`0 0 20px ${gateway.color}1f` }}>Enter</button>
+                cursor:'pointer', boxShadow:`0 0 20px ${gateway.color}1f`,
+                display:'flex', alignItems:'center', gap:'8px' }}>
+                <SendIcon size={18} />Enter
+              </button>
             </div>
           </div>
         </div>
@@ -768,12 +784,17 @@ function ComingSoonPanel({ onClose }: { onClose: () => void }) {
           background:'linear-gradient(22deg,rgba(140,185,255,0.08) 0%,transparent 55%),linear-gradient(158deg,rgba(60,100,210,0.06) 0%,transparent 55%)',
         }} />
         <div style={{ position:'relative', zIndex:2, padding:'48px 34px', background:'rgba(4,8,30,0.92)', border:'1px solid rgba(80,140,255,0.20)', borderRadius:'20px', boxShadow:'0 0 60px rgba(40,80,200,0.15)' }}>
+          <button onClick={handleClose} style={{ position:'absolute', top:'14px', right:'14px', background:'none', border:'none', cursor:'pointer', padding:'4px', opacity:0.5, lineHeight:0 }}>
+            <CloseIcon size={22} />
+          </button>
           <div style={{ fontSize:'8px', letterSpacing:'0.35em', color:'rgba(100,150,255,0.55)', fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'20px' }}>Traversal Node</div>
           <div style={{ fontSize:'26px', letterSpacing:'0.2em', color:'rgba(220,230,255,0.92)', fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'14px' }}>Coming Soon</div>
           <p style={{ fontSize:'12px', lineHeight:1.7, color:'rgba(150,170,255,0.48)', fontFamily:'var(--font-vyan)', letterSpacing:'0.06em', marginBottom:'32px' }}>
             This gateway is still forming in the field of consciousness.
           </p>
-          <button onClick={handleClose} style={{ padding:'12px 28px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', color:'rgba(255,255,255,0.48)', fontSize:'10px', letterSpacing:'0.22em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer' }}>Return</button>
+          <button onClick={handleClose} style={{ padding:'12px 28px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', color:'rgba(255,255,255,0.48)', fontSize:'10px', letterSpacing:'0.22em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'8px' }}>
+            <BackIcon size={18} />Return
+          </button>
         </div>
       </div>
     </div>

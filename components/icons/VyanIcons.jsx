@@ -6,16 +6,16 @@
 
 import { motion } from "framer-motion";
 
-// ─── Shared Design Tokens ────────────────────────────────────────────────────
+// ─── Shared Design Tokens — Vistara Void blue palette ────────────────────────
 const C = {
-  blue:    "#4FC3F7",
-  violet:  "#9B59FF",
-  pink:    "#E040FB",
-  indigo:  "#3D5AFE",
-  white:   "#E8EEFF",
-  glow:    "rgba(157, 89, 255, 0.6)",
-  glowB:   "rgba(79, 195, 247, 0.5)",
-  glowP:   "rgba(224, 64, 251, 0.5)",
+  blue:    "#5599ff",   // bright medium blue
+  violet:  "#1a44cc",   // deep royal blue (replaces violet)
+  pink:    "#00aaff",   // electric azure (replaces pink)
+  indigo:  "#2255ee",   // strong cobalt
+  white:   "#d0e4ff",   // cool blue-tinted white
+  glow:    "rgba(30, 90, 220, 0.65)",   // deep blue glow
+  glowB:   "rgba(70, 150, 255, 0.55)",  // bright blue glow
+  glowP:   "rgba(0, 170, 255, 0.50)",   // electric blue glow
 };
 
 const glowFilter = (id, color = C.glow, blur = 6) => (
@@ -71,7 +71,7 @@ export function SettingsIcon({ size = 64, className = "" }) {
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
         <radialGradient id="s-orb" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#1a0a3a" />
+          <stop offset="0%" stopColor="#050e24" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
       </defs>
@@ -154,7 +154,7 @@ export function BackIcon({ size = 64, className = "" }) {
         {glowFilter("b-glow", C.glow, 6)}
         {glowFilter("b-glow2", C.glowP, 4)}
         <radialGradient id="b-bg" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#0d0620" />
+          <stop offset="0%" stopColor="#030a1e" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
         <linearGradient id="b-arc1" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -366,7 +366,7 @@ export function CloseIcon({ size = 64, className = "", isHovered = false }) {
     >
       <defs>
         {glowFilter("cl-glow", C.glowP, 6)}
-        {glowFilter("cl-glow2", "rgba(61,90,254,0.6)", 4)}
+        {glowFilter("cl-glow2", "rgba(30,90,220,0.6)", 4)}
         <linearGradient id="cl-arm1" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor={C.violet} />
           <stop offset="50%" stopColor={C.pink} />
@@ -547,7 +547,7 @@ export function AttachIcon({ size = 64, className = "" }) {
           <stop offset="100%" stopColor={C.pink} />
         </linearGradient>
         <radialGradient id="at-bg" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#08031a" />
+          <stop offset="0%" stopColor="#020a1c" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
       </defs>
@@ -659,7 +659,7 @@ export function SpeakIcon({ size = 64, className = "" }) {
           <stop offset="100%" stopColor={C.violet} stopOpacity="0.2" />
         </radialGradient>
         <radialGradient id="sp-bg" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#040d1a" />
+          <stop offset="0%" stopColor="#020c20" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
       </defs>
@@ -737,7 +737,7 @@ export function RefreshIcon({ size = 64, className = "" }) {
         {glowFilter("rf-glowP", C.glowP, 4)}
         {glowFilter("rf-glowB", C.glowB, 3)}
         <radialGradient id="rf-bg" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#0a0316" />
+          <stop offset="0%" stopColor="#030a1a" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
         <linearGradient id="rf-upper" x1="0%" y1="0%" x2="100%" y2="0%">
