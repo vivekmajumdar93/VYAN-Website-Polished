@@ -63,6 +63,74 @@ const TRAIL_FRAG = `
   }
 `
 
+// ─── saturn ring shaders ──────────────────────────────────────────────────────
+const SATURN_VERT = `
+  attribute float aSize;
+  attribute float aPhase;
+  uniform float uTime;
+  uniform float uTilt;
+  varying float vAlpha;
+  void main() {
+    float theta = atan(position.y, position.x);
+    float w1 = 0.5 + 0.5 * sin(theta *  2.0 + uTime * 0.18 + aPhase);
+    float w2 = 0.5 + 0.5 * sin(theta *  6.0 - uTime * 0.11 + aPhase * 2.3);
+    float w3 = 0.5 + 0.5 * sin(theta * 14.0 + uTime * 0.27 + aPhase * 5.0);
+    float gap = 0.75 + 0.25 * sin(theta * 1.5 + uTime * 0.04);
+    float density = w1 * (0.4 + 0.6 * w2) * (0.65 + 0.35 * w3) * gap;
+    vAlpha = clamp(density * (0.35 + abs(uTilt) * 2.5), 0.0, 1.0);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = aSize * (550.0 / max(-mv.z, 1.0));
+    gl_Position  = projectionMatrix * mv;
+  }
+`
+const SATURN_FRAG = `
+  uniform float uTime;
+  varying float vAlpha;
+  void main() {
+    float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float disc = 1.0 - smoothstep(0.05, 0.9, r);
+    float sprk = exp(-r * r * 7.0);
+    float a    = (disc * 0.6 + sprk * 0.4) * vAlpha;
+    if (a < 0.008) discard;
+    float cycle = mod(uTime * 0.05, 3.0);
+    vec3 red    = vec3(0.95, 0.07, 0.04);
+    vec3 dblue  = vec3(0.02, 0.15, 0.95);
+    vec3 purple = vec3(0.38, 0.02, 0.62);
+    vec3 col;
+    if      (cycle < 1.0) { col = mix(red,    dblue,  cycle);       }
+    else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
+    else                  { col = mix(purple, red,    cycle - 2.0); }
+    gl_FragColor = vec4(col, a);
+  }
+`
+function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
+  const COUNT  = 2200
+  const geo    = new THREE.BufferGeometry()
+  const pos    = new Float32Array(COUNT * 3)
+  const sz     = new Float32Array(COUNT)
+  const ph     = new Float32Array(COUNT)
+  const rInner = radius * 0.78
+  const rOuter = radius * 1.22
+  for (let i = 0; i < COUNT; i++) {
+    const angle = Math.random() * Math.PI * 2
+    const u     = Math.random()
+    const r     = u < 0.22
+      ? rInner + Math.random() * radius * 0.12
+      : u > 0.78
+        ? rOuter - Math.random() * radius * 0.12
+        : rInner + Math.random() * (rOuter - rInner)
+    pos[i*3]   = r * Math.cos(angle)
+    pos[i*3+1] = r * Math.sin(angle)
+    pos[i*3+2] = (Math.random() - 0.5) * 4
+    sz[i]      = 1.5 + Math.random() * 3.5
+    ph[i]      = Math.random() * Math.PI * 2
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(sz,  1))
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(ph,  1))
+  return geo
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function easeInExpo(t: number) { return t <= 0 ? 0 : Math.pow(2, 10 * t - 10) }
 function easeInOutCubic(t: number) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
@@ -459,19 +527,21 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
-      <Html center distanceFactor={180} occlude={false}
-        position={[0, -(orbSize * 1.05), 0]} style={{ pointerEvents: 'none' }}>
+      <Html center occlude={false}
+        position={[0, -(orbSize * 1.35), 0]} style={{ pointerEvents: 'none' }}>
         <div style={{ textAlign:'center', whiteSpace:'nowrap' }}>
           <div style={{
-            fontSize: isFocused ? '15px' : '11px', letterSpacing: '0.28em',
-            color: isFocused ? 'rgba(215,228,255,0.96)' : 'rgba(170,195,255,0.72)',
+            fontSize: isFocused ? '22px' : '15px', letterSpacing: '0.22em',
+            color: isFocused ? '#ff4040' : 'rgba(210,40,40,0.85)',
             textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', transition: 'all 0.3s',
-            textShadow: isFocused ? '0 0 18px rgba(100,150,255,0.7)' : '0 0 8px rgba(80,120,255,0.3)',
+            textShadow: isFocused
+              ? '0 0 28px rgba(255,50,50,0.85), 0 0 10px rgba(180,0,0,0.65)'
+              : '0 0 12px rgba(180,20,20,0.55)',
           }}>{gateway.name}</div>
           <div style={{
-            fontSize: isFocused ? '9px' : '7px', letterSpacing: '0.18em',
-            color: isFocused ? 'rgba(160,185,255,0.65)' : 'rgba(130,155,255,0.32)',
-            textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', marginTop: '5px',
+            fontSize: isFocused ? '12px' : '9px', letterSpacing: '0.18em',
+            color: isFocused ? 'rgba(255,120,100,0.80)' : 'rgba(185,55,55,0.60)',
+            textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', marginTop: '6px',
             transition: 'all 0.3s',
           }}>{gateway.tagline}</div>
         </div>
@@ -505,6 +575,26 @@ function GyroScene({
   const anglesRef    = useRef({ A: 0, B: 0, C: 0 })
   const prevFocusRef = useRef(focusedIdx)
   const throwRef     = useRef({ startT: -10 })
+
+  // ── Saturn ring materials — one per ring so uniforms are independent ──
+  const ringAMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
+    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }), [])
+  const ringBMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
+    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }), [])
+  const ringCMat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
+    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }), [])
+  const ringAGeo = useMemo(() => createSaturnRingGeo(RING_RADII.A), [])
+  const ringBGeo = useMemo(() => createSaturnRingGeo(RING_RADII.B), [])
+  const ringCGeo = useMemo(() => createSaturnRingGeo(RING_RADII.C), [])
 
   useFrame(({ clock }, delta) => {
     const t   = clock.elapsedTime
@@ -544,6 +634,14 @@ function GyroScene({
       anglesRef.current.C,           // primary Z spin
     )
 
+    // Saturn ring colour/density — tilt magnitude drives particle visibility
+    ringAMat.uniforms.uTime.value = t
+    ringAMat.uniforms.uTilt.value = Math.abs(Math.sin(t * 0.17) * 0.22) + Math.abs(Math.cos(t * 0.13) * 0.15)
+    ringBMat.uniforms.uTime.value = t
+    ringBMat.uniforms.uTilt.value = Math.abs(Math.cos(t * 0.19) * 0.16) + Math.abs(Math.sin(t * 0.14) * 0.20)
+    ringCMat.uniforms.uTime.value = t
+    ringCMat.uniforms.uTilt.value = Math.abs(Math.cos(t * 0.22) * 0.10) + Math.abs(Math.sin(t * 0.11) * 0.18)
+
     // Camera throw when focus changes — orb appears to jump toward lens
     if (prevFocusRef.current !== focusedIdx) {
       prevFocusRef.current = focusedIdx
@@ -572,10 +670,6 @@ function GyroScene({
   const spiralTarget = vortexTargetIdx !== null ? (worldPosRef.current[vortexTargetIdx] ?? null) : null
   const spiralT = vortexPhase==='pull' ? vortexProgressRef.current : (vortexPhase==='peak'||vortexPhase==='passage') ? 1 : 0
 
-  const ringMat = useMemo(() => new THREE.MeshStandardMaterial({
-    color:'#2233aa', emissive:'#1122aa', emissiveIntensity:0.4,
-    transparent:true, opacity:0.08, depthWrite:false,
-  }), [])
 
   return (
     <>
@@ -585,10 +679,9 @@ function GyroScene({
       <StarTrailsSystem />
 
       <group ref={ringARef}>
-        <mesh rotation={[Math.PI/2, 0, 0]}>
-          <torusGeometry args={[280, 1.5, 8, 128]} />
-          <primitive object={ringMat} attach="material" />
-        </mesh>
+        <points rotation={[Math.PI/2, 0, 0]} geometry={ringAGeo}>
+          <primitive object={ringAMat} attach="material" />
+        </points>
         {[0, 3, 7].map(idx => (
           <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
             ringType="A" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.A}
@@ -602,10 +695,9 @@ function GyroScene({
       </group>
 
       <group ref={ringBRef}>
-        <mesh rotation={[0, Math.PI/2, 0]}>
-          <torusGeometry args={[240, 1.5, 8, 128]} />
-          <primitive object={ringMat} attach="material" />
-        </mesh>
+        <points rotation={[0, Math.PI/2, 0]} geometry={ringBGeo}>
+          <primitive object={ringBMat} attach="material" />
+        </points>
         {[1, 4, 6].map(idx => (
           <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
             ringType="B" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.B}
@@ -620,10 +712,9 @@ function GyroScene({
 
       <group ref={ringCRef}>
         <group rotation={[Math.PI/4, 0, 0]}>
-          <mesh rotation={[Math.PI/2, 0, 0]}>
-            <torusGeometry args={[200, 1.5, 8, 128]} />
-            <primitive object={ringMat} attach="material" />
-          </mesh>
+          <points rotation={[Math.PI/2, 0, 0]} geometry={ringCGeo}>
+            <primitive object={ringCMat} attach="material" />
+          </points>
           {[2, 5].map(idx => (
             <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
               ringType="C" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.C}
@@ -1029,11 +1120,9 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       </div>
 
       {onBack && (
-        <button onClick={onBack} style={{ position:'fixed', top:'22px', left:'22px', zIndex:40, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:8, color:'#9B59FF' }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-          <span style={{ fontFamily:'var(--font-vyan)', fontSize:11, letterSpacing:'0.2em', opacity:0.7 }}>ŚŪNYA MAṆḌALA</span>
+        <button onClick={onBack} style={{ position:'fixed', top:'22px', left:'22px', zIndex:40, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
+          <BackIcon size={28} />
+          <span style={{ fontFamily:'var(--font-vyan)', fontSize:11, letterSpacing:'0.2em', color:'rgba(100,160,255,0.70)' }}>ŚŪNYA MAṆḌALA</span>
         </button>
       )}
 
