@@ -35,9 +35,9 @@ const PHANTOM_CONFIGS = [
 ] as const
 
 // ─── stardust trail shaders ───────────────────────────────────────────────────
-const TRAIL_N    = 90
-const TRAIL_HEAD = 12     // bright head cluster
-const TRAIL_FRAC = 0.22   // trail length as fraction of total path
+const TRAIL_N    = 120
+const TRAIL_HEAD = 18     // bright head cluster
+const TRAIL_FRAC = 0.28   // trail length as fraction of total path
 
 const TRAIL_VERT = `
   attribute float aSize;
@@ -119,7 +119,29 @@ function ParticleField({ spiralTarget, spiralT }: { spiralTarget: THREE.Vector3 
 }
 
 // ─── phantom passing orbs — same NanoOrb structure, different colors/depths ──
-function PhantomOrbsSystem() {
+function randomPhantomPath(pd: { x0:number;y0:number;z0:number;x1:number;y1:number;z1:number }) {
+  const rx = () => (Math.random() - 0.5) * 340
+  const rz = () => (Math.random() - 0.5) * 500
+  // Pick one of 8 trajectory types for gyroscopic variety
+  const type = Math.floor(Math.random() * 8)
+  const d = rz()
+  switch (type) {
+    case 0: pd.x0=-820;pd.y0=rx();pd.z0=d;  pd.x1=820; pd.y1=rx();pd.z1=d+(Math.random()-0.5)*80;  break // L→R
+    case 1: pd.x0=820; pd.y0=rx();pd.z0=d;  pd.x1=-820;pd.y1=rx();pd.z1=d+(Math.random()-0.5)*80;  break // R→L
+    case 2: pd.x0=rx();pd.y0=520; pd.z0=d;  pd.x1=rx();pd.y1=-520;pd.z1=d+(Math.random()-0.5)*80;  break // T→B
+    case 3: pd.x0=rx();pd.y0=-520;pd.z0=d;  pd.x1=rx();pd.y1=520; pd.z1=d+(Math.random()-0.5)*80;  break // B→T
+    case 4: pd.x0=-820;pd.y0=440; pd.z0=rz();pd.x1=820;pd.y1=-440;pd.z1=rz();                       break // diag NW→SE
+    case 5: pd.x0=820; pd.y0=-440;pd.z0=rz();pd.x1=-820;pd.y1=440;pd.z1=rz();                       break // diag SE→NW
+    case 6: pd.x0=-820;pd.y0=-440;pd.z0=rz();pd.x1=600; pd.y1=360;pd.z1=rz();                       break // diag SW→NE arc
+    default:pd.x0=820; pd.y0=440; pd.z0=rz();pd.x1=-600;pd.y1=-360;pd.z1=rz();                      break // diag NE→SW arc
+  }
+}
+
+function PhantomOrbsSystem({ onPhantomClick }: { onPhantomClick: () => void }) {
+  const clickMeshRefs = [
+    useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null),
+  ]
+
   const pool = useMemo(() => {
     return PHANTOM_CONFIGS.map((cfg, i) => {
       const no = new NanoOrb({
@@ -129,45 +151,40 @@ function PhantomOrbsSystem() {
       no.setVisible(true)
       no.group.visible = false
       return {
-        nanoOrb: no,
-        posVec: new THREE.Vector3(),
-        brightness: cfg.brightness,
-        scale: cfg.scale,
-        active: false,
-        startT: 0,
-        nextT: 6 + i * 13,   // staggered first appearances: 6s, 19s, 32s
+        nanoOrb: no, posVec: new THREE.Vector3(),
+        brightness: cfg.brightness, scale: cfg.scale,
+        active: false, startT: 0,
+        nextT: 4 + i * 10,  // staggered: 4s, 14s, 24s
         duration: 0,
-        x0: 0, y0: 0, z0: 0,
-        x1: 0, y1: 0, z1: 0,
+        x0: 0, y0: 0, z0: 0, x1: 0, y1: 0, z1: 0,
       }
     })
   }, [])
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    for (const pd of pool) {
+    pool.forEach((pd, i) => {
       if (!pd.active) {
         if (t >= pd.nextT) {
-          const dir = Math.random() < 0.5 ? 1 : -1
-          const depth = (Math.random() - 0.5) * 420
-          const yA = (Math.random() - 0.5) * 280
-          pd.x0 = -dir * 780; pd.y0 = yA; pd.z0 = depth
-          pd.x1 =  dir * 780; pd.y1 = yA + (Math.random()-0.5)*70; pd.z1 = depth+(Math.random()-0.5)*50
+          randomPhantomPath(pd)
           pd.startT = t
-          pd.duration = 5 + Math.random() * 2
-          pd.nextT = t + pd.duration + 11 + Math.random() * 16
+          pd.duration = 14 + Math.random() * 10   // 14–24 s slow cross
+          pd.nextT = t + pd.duration + 8 + Math.random() * 12
           pd.active = true
           pd.nanoOrb.group.visible = true
           pd.nanoOrb.setSignal('idle')
+        } else {
+          if (clickMeshRefs[i].current) clickMeshRefs[i].current!.visible = false
+          return
         }
-        continue  // skip update for inactive orbs — saves GPU
       }
 
       const p = Math.min((t - pd.startT) / pd.duration, 1)
       if (p >= 1) {
         pd.active = false
         pd.nanoOrb.group.visible = false
-        continue
+        if (clickMeshRefs[i].current) clickMeshRefs[i].current!.visible = false
+        return
       }
 
       const alpha = Math.sin(Math.PI * p)
@@ -179,12 +196,25 @@ function PhantomOrbsSystem() {
       pd.nanoOrb.setVisualDim(alpha * pd.brightness)
       pd.nanoOrb.update(t, 0, false, false, 0.55, 0.8, pd.posVec)
       pd.nanoOrb.group.scale.multiplyScalar(pd.scale)
-    }
+
+      // Keep invisible click sphere co-located with the orb
+      if (clickMeshRefs[i].current) {
+        clickMeshRefs[i].current!.position.copy(pd.posVec)
+        clickMeshRefs[i].current!.visible = true
+      }
+    })
   })
 
   return (
     <>
       {pool.map((pd, i) => <primitive key={i} object={pd.nanoOrb.group} />)}
+      {PHANTOM_CONFIGS.map((_, i) => (
+        <mesh key={`pc-${i}`} ref={clickMeshRefs[i]} visible={false}
+          onClick={e => { e.stopPropagation(); onPhantomClick() }}>
+          <sphereGeometry args={[28, 8, 8]} />
+          <meshBasicMaterial visible={false} />
+        </mesh>
+      ))}
     </>
   )
 }
@@ -195,7 +225,7 @@ function StarTrailsSystem() {
 
   const trails = useMemo(() => {
     const N = TRAIL_N
-    return Array.from({ length: 4 }, (_, i) => {
+    return Array.from({ length: 6 }, (_, i) => {
       const positions = new Float32Array(N * 3)
       const sizes     = new Float32Array(N)
       const alphas    = new Float32Array(N)
@@ -226,7 +256,7 @@ function StarTrailsSystem() {
         posAttr: pA, sizeAttr: sA, alphaAttr: aA,
         phases, scatterX, scatterY,
         active: false, startT: 0,
-        nextT: i * 8 + 3,   // 3s, 11s, 19s, 27s
+        nextT: i * 3 + 1,   // 1s, 4s, 7s, 10s, 13s, 16s
         duration: 0,
         x0: 0, y0: 0, z0: 0, x1: 0, y1: 0, z1: 0,
       }
@@ -248,14 +278,17 @@ function StarTrailsSystem() {
     for (const td of trails) {
       if (!td.active) {
         if (t >= td.nextT) {
-          const dir  = Math.random() < 0.5 ? 1 : -1
-          const depth = 220 + Math.random() * 180  // z 220-400, in front of orb system
-          const yPos  = (Math.random() - 0.5) * 350
-          td.x0 = -dir*750; td.y0 = yPos; td.z0 = depth
-          td.x1 =  dir*750; td.y1 = yPos+(Math.random()-0.5)*50; td.z1 = depth+(Math.random()-0.5)*25
+          // Randomize angle: horizontal, diagonal, or steep diagonal
+          const depth = 300 + Math.random() * 150  // z 300-450, close to camera
+          const angle = (Math.random() - 0.5) * Math.PI * 0.6 // ±54°
+          const len = 900
+          const cx = (Math.random() - 0.5) * 200
+          const cy = (Math.random() - 0.5) * 200
+          td.x0 = cx - Math.cos(angle)*len; td.y0 = cy - Math.sin(angle)*len; td.z0 = depth
+          td.x1 = cx + Math.cos(angle)*len; td.y1 = cy + Math.sin(angle)*len; td.z1 = depth+(Math.random()-0.5)*40
           td.startT  = t
-          td.duration = 0.7 + Math.random() * 0.5
-          td.nextT   = t + td.duration + 18 + Math.random() * 22
+          td.duration = 1.8 + Math.random() * 1.4
+          td.nextT   = t + td.duration + 6 + Math.random() * 10
           td.active  = true
           // Fresh scatter for this pass
           for (let j = 0; j < N; j++) {
@@ -308,11 +341,11 @@ function StarTrailsSystem() {
         // Size and brightness taper from head to tail
         let sz: number, baseA: number
         if (isH) {
-          sz    = 5.5 - tT * 2.2      // head cluster: 5.5→3.3 px
-          baseA = 1.0  - tT * 0.18   // head: 1.0→0.82
+          sz    = 8.0 - tT * 3.0     // head cluster: 8→5 px
+          baseA = 1.0 - tT * 0.15    // head: 1.0→0.85
         } else {
-          sz    = 3.0  - tT * 2.4    // body:  3.0→0.6 px
-          baseA = 0.78 - tT * 0.68   // body:  0.78→0.1
+          sz    = 4.5 - tT * 3.8     // body: 4.5→0.7 px
+          baseA = 0.9 - tT * 0.8     // body: 0.9→0.1
         }
         td.sizeAttr.setX(j, Math.max(0.5, sz))
         td.alphaAttr.setX(j, Math.max(0, baseA) * env)
@@ -425,21 +458,21 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
-      <Html center distanceFactor={250} occlude={false}
-        position={[0, -(orbSize * 0.9), 0]} style={{ pointerEvents: 'none' }}>
+      <Html center distanceFactor={180} occlude={false}
+        position={[0, -(orbSize * 1.05), 0]} style={{ pointerEvents: 'none' }}>
         <div style={{ textAlign:'center', whiteSpace:'nowrap' }}>
           <div style={{
-            fontSize: isFocused ? '12px' : '9px', letterSpacing: '0.25em',
-            color: isFocused ? 'rgba(180,200,255,0.8)' : 'rgba(140,160,255,0.35)',
+            fontSize: isFocused ? '15px' : '11px', letterSpacing: '0.28em',
+            color: isFocused ? 'rgba(215,228,255,0.96)' : 'rgba(170,195,255,0.72)',
             textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', transition: 'all 0.3s',
+            textShadow: isFocused ? '0 0 18px rgba(100,150,255,0.7)' : '0 0 8px rgba(80,120,255,0.3)',
           }}>{gateway.name}</div>
-          {isFocused && (
-            <div style={{
-              fontSize: '8px', letterSpacing: '0.15em',
-              color: 'rgba(140,160,255,0.45)', textTransform: 'uppercase',
-              fontFamily: 'var(--font-vyan)', marginTop: '4px',
-            }}>{gateway.tagline}</div>
-          )}
+          <div style={{
+            fontSize: isFocused ? '9px' : '7px', letterSpacing: '0.18em',
+            color: isFocused ? 'rgba(160,185,255,0.65)' : 'rgba(130,155,255,0.32)',
+            textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', marginTop: '5px',
+            transition: 'all 0.3s',
+          }}>{gateway.tagline}</div>
         </div>
       </Html>
     </group>
@@ -450,17 +483,18 @@ function VistaraOrb({
 interface GyroSceneProps {
   focusedIdx: number; hoveredId: string | null
   onHover: (id: string | null) => void; onOrbClick: (idx: number, id: string) => void
-  vortexTargetIdx: number | null; vortexProgress: number; vortexPhase: VortexPhase
+  vortexTargetIdx: number | null; vortexProgressRef: React.MutableRefObject<number>; vortexPhase: VortexPhase
   worldPosRef: React.MutableRefObject<Record<number, THREE.Vector3>>
   screenPosRef: React.MutableRefObject<Record<number, { x: number; y: number }>>
   traverseRef: React.MutableRefObject<TraverseState>
   panelOpen: boolean
+  onPhantomClick: () => void
 }
 
 function GyroScene({
   focusedIdx, hoveredId, onHover, onOrbClick,
-  vortexTargetIdx, vortexProgress, vortexPhase,
-  worldPosRef, screenPosRef, traverseRef, panelOpen,
+  vortexTargetIdx, vortexProgressRef, vortexPhase,
+  worldPosRef, screenPosRef, traverseRef, panelOpen, onPhantomClick,
 }: GyroSceneProps) {
   const ringARef = useRef<THREE.Group>(null)
   const ringBRef = useRef<THREE.Group>(null)
@@ -501,10 +535,11 @@ function GyroScene({
     const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.75, 1)
     const throwZ = Math.sin(Math.PI * tp) * 72
 
-    if (vortexTargetIdx !== null && vortexProgress > 0) {
+    const vp = vortexProgressRef.current
+    if (vortexTargetIdx !== null && vp > 0) {
       const wp = worldPosRef.current[vortexTargetIdx]
       if (wp) {
-        const t2 = easeInExpo(Math.min(vortexProgress, 1))
+        const t2 = easeInExpo(Math.min(vp, 1))
         camera.position.lerp(new THREE.Vector3(wp.x*0.3, wp.y*0.2, 550 - t2*350), t2*0.12)
         camera.lookAt(wp)
       }
@@ -518,7 +553,7 @@ function GyroScene({
   })
 
   const spiralTarget = vortexTargetIdx !== null ? (worldPosRef.current[vortexTargetIdx] ?? null) : null
-  const spiralT = vortexPhase==='pull' ? vortexProgress : (vortexPhase==='peak'||vortexPhase==='passage') ? 1 : 0
+  const spiralT = vortexPhase==='pull' ? vortexProgressRef.current : (vortexPhase==='peak'||vortexPhase==='passage') ? 1 : 0
 
   const ringMat = useMemo(() => new THREE.MeshStandardMaterial({
     color:'#2233aa', emissive:'#1122aa', emissiveIntensity:0.4,
@@ -529,7 +564,7 @@ function GyroScene({
     <>
       <ambientLight intensity={0.04} />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
-      <PhantomOrbsSystem />
+      <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
       <StarTrailsSystem />
 
       <group ref={ringARef}>
@@ -543,7 +578,7 @@ function GyroScene({
             isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
             panelOpen={panelOpen && focusedIdx===idx}
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
-            pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgress:0}
+            pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
             onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
         ))}
@@ -560,7 +595,7 @@ function GyroScene({
             isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
             panelOpen={panelOpen && focusedIdx===idx}
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
-            pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgress:0}
+            pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
             onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
         ))}
@@ -578,7 +613,7 @@ function GyroScene({
               isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
               panelOpen={panelOpen && focusedIdx===idx}
               isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
-              pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgress:0}
+              pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
               pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
               onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
           ))}
@@ -679,6 +714,41 @@ function GlassPanel({ gateway, onClose, onEnter }: {
   )
 }
 
+// ─── coming soon panel ───────────────────────────────────────────────────────
+function ComingSoonPanel({ onClose }: { onClose: () => void }) {
+  const [phase, setPhase] = useState<PanelPhase>('opening')
+  useEffect(() => {
+    const t = setTimeout(() => setPhase('open'), 600)
+    return () => clearTimeout(t)
+  }, [])
+  const handleClose = useCallback(() => { setPhase('closing'); setTimeout(onClose, 300) }, [onClose])
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px' }}>
+      <div onClick={handleClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.82)', opacity: phase==='closing'?0:1, transition:'opacity 280ms' }} />
+      <div style={{
+        position:'relative', zIndex:2, width:380, maxWidth:'calc(100vw - 48px)',
+        borderRadius:'20px', overflow:'hidden', textAlign:'center',
+        transform: phase==='open' ? 'scale(1) translateY(0px)' : phase==='opening' ? 'scale(0.88) translateY(16px)' : 'scale(0.96) translateY(-8px)',
+        opacity: phase==='open' ? 1 : 0,
+        transition: phase==='closing' ? 'transform 260ms cubic-bezier(0.4,0,1,1), opacity 240ms' : 'transform 500ms cubic-bezier(0.34,1.15,0.64,1) 200ms, opacity 400ms 200ms',
+        willChange: 'transform, opacity',
+      }}>
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+          background:'linear-gradient(22deg,rgba(140,185,255,0.08) 0%,transparent 55%),linear-gradient(158deg,rgba(60,100,210,0.06) 0%,transparent 55%)',
+        }} />
+        <div style={{ position:'relative', zIndex:2, padding:'48px 34px', background:'rgba(4,8,30,0.92)', border:'1px solid rgba(80,140,255,0.20)', borderRadius:'20px', boxShadow:'0 0 60px rgba(40,80,200,0.15)' }}>
+          <div style={{ fontSize:'8px', letterSpacing:'0.35em', color:'rgba(100,150,255,0.55)', fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'20px' }}>Traversal Node</div>
+          <div style={{ fontSize:'26px', letterSpacing:'0.2em', color:'rgba(220,230,255,0.92)', fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'14px' }}>Coming Soon</div>
+          <p style={{ fontSize:'12px', lineHeight:1.7, color:'rgba(150,170,255,0.48)', fontFamily:'var(--font-vyan)', letterSpacing:'0.06em', marginBottom:'32px' }}>
+            This gateway is still forming in the field of consciousness.
+          </p>
+          <button onClick={handleClose} style={{ padding:'12px 28px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', color:'rgba(255,255,255,0.48)', fontSize:'10px', letterSpacing:'0.22em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer' }}>Return</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── traversal state ──────────────────────────────────────────────────────────
 interface TraverseState {
   active: boolean; startTime: number
@@ -695,16 +765,18 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const [focusedIdx,      setFocusedIdx]      = useState(0)
   const [hoveredId,       setHoveredId]       = useState<string | null>(null)
   const [vortexPhase,     setVortexPhase]     = useState<VortexPhase>('idle')
-  const [vortexProgress,  setVortexProgress]  = useState(0)
   const [vortexTargetIdx, setVortexTargetIdx] = useState<number | null>(null)
   const [showFlash,       setShowFlash]       = useState(false)
   const [showPanel,       setShowPanel]       = useState(false)
   const [panelGateway,    setPanelGateway]    = useState<Gateway | null>(null)
+  const [showComingSoon,  setShowComingSoon]  = useState(false)
 
-  const worldPosRef    = useRef<Record<number, THREE.Vector3>>({})
-  const screenPosRef   = useRef<Record<number, { x: number; y: number }>>({})
-  const vortexAnimRef  = useRef<number>(0)
-  const vortexStartRef = useRef(0)
+  const worldPosRef       = useRef<Record<number, THREE.Vector3>>({})
+  const screenPosRef      = useRef<Record<number, { x: number; y: number }>>({})
+  const vortexAnimRef     = useRef<number>(0)
+  const vortexStartRef    = useRef(0)
+  // vortexProgress as ref — avoids 75+ setState calls per vortex (each was a full React re-render)
+  const vortexProgressRef = useRef(0)
 
   const traverseRef = useRef<TraverseState>({
     active:false, startTime:0,
@@ -751,16 +823,27 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
     if (idx !== focusedIdx) { triggerTraverse(idx); setFocusedIdx(idx); return }
     setVortexTargetIdx(idx); setVortexPhase('pull')
     vortexStartRef.current = performance.now()
+    let curPhase = 'pull'
     const tick = () => {
       const el = performance.now() - vortexStartRef.current
-      if (el < 400) { setVortexProgress(el/400); setVortexPhase('pull'); vortexAnimRef.current=requestAnimationFrame(tick) }
-      else if (el < 800) { setVortexProgress((el-400)/400); setVortexPhase('peak'); vortexAnimRef.current=requestAnimationFrame(tick) }
-      else if (el < 1200) { setVortexProgress((el-800)/400); setVortexPhase('passage'); vortexAnimRef.current=requestAnimationFrame(tick) }
-      else {
-        setShowFlash(true); setTimeout(()=>setShowFlash(false),80)
-        const gw=GATEWAYS.find(g=>g.id===id)!; setPanelGateway(gw); setShowPanel(true)
-        setVortexPhase('done'); setVortexProgress(0)
-        setTimeout(()=>{ setVortexPhase('idle'); setVortexTargetIdx(null) },200)
+      if (el < 400) {
+        vortexProgressRef.current = el / 400
+        if (curPhase !== 'pull') { curPhase = 'pull'; setVortexPhase('pull') }
+        vortexAnimRef.current = requestAnimationFrame(tick)
+      } else if (el < 800) {
+        vortexProgressRef.current = (el - 400) / 400
+        if (curPhase !== 'peak') { curPhase = 'peak'; setVortexPhase('peak') }
+        vortexAnimRef.current = requestAnimationFrame(tick)
+      } else if (el < 1200) {
+        vortexProgressRef.current = (el - 800) / 400
+        if (curPhase !== 'passage') { curPhase = 'passage'; setVortexPhase('passage') }
+        vortexAnimRef.current = requestAnimationFrame(tick)
+      } else {
+        vortexProgressRef.current = 0
+        setShowFlash(true); setTimeout(() => setShowFlash(false), 80)
+        const gw = GATEWAYS.find(g => g.id === id)!; setPanelGateway(gw); setShowPanel(true)
+        setVortexPhase('done')
+        setTimeout(() => { setVortexPhase('idle'); setVortexTargetIdx(null) }, 200)
       }
     }
     vortexAnimRef.current = requestAnimationFrame(tick)
@@ -773,8 +856,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
     const gw = panelGateway; handleClose(); if (gw) onGatewayEnter?.(gw)
   }, [panelGateway, handleClose, onGatewayEnter])
 
-  const vig = vortexPhase==='pull' ? vortexProgress*0.5
-    : vortexPhase==='peak' ? 0.5+vortexProgress*0.5 : vortexPhase==='passage' ? 1 : 0
+  const vig = vortexPhase==='pull' ? 0.28 : vortexPhase==='peak' ? 0.72 : vortexPhase==='passage' ? 1 : 0
   const passCenter = vortexTargetIdx!==null ? screenPosRef.current[vortexTargetIdx] : null
 
   return (
@@ -811,25 +893,35 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           100% { transform: translateX(calc(-50% + 130vw)); opacity: 0 }
         }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        @keyframes passageExpand { from{transform:scale(0);opacity:0} to{transform:scale(130);opacity:1} }
+        @keyframes nebFloat1 {
+          0%,100%{transform:translate(-4%,6%) scale(1.0)} 33%{transform:translate(6%,-3%) scale(1.15)} 66%{transform:translate(-2%,10%) scale(0.92)}
+        }
+        @keyframes nebFloat2 {
+          0%,100%{transform:translate(5%,-5%) scale(0.94)} 40%{transform:translate(-6%,8%) scale(1.1)} 70%{transform:translate(3%,-2%) scale(1.04)}
+        }
+        @keyframes nebFloat3 {
+          0%,100%{transform:translate(3%,10%) scale(1.05)} 50%{transform:translate(-8%,-3%) scale(0.88)}
+        }
       `}</style>
 
       {/* Background nebula atmosphere (behind Canvas) */}
       <div style={{ position:'absolute', inset:0, zIndex:1, pointerEvents:'none', overflow:'hidden' }}>
         <div style={{ position:'absolute', width:'72vw', height:'62vh', top:'-8%', left:'-12%',
-          background:'radial-gradient(ellipse at center, rgba(160,0,220,0.14) 0%, rgba(90,0,160,0.05) 55%, transparent 100%)',
-          filter:'blur(64px)', animation:'nebDrift1 58s ease-in-out infinite' }} />
+          background:'radial-gradient(ellipse at center, rgba(160,0,220,0.16) 0%, rgba(90,0,160,0.06) 55%, transparent 100%)',
+          filter:'blur(56px)', animation:'nebFloat1 28s ease-in-out infinite' }} />
         <div style={{ position:'absolute', width:'62vw', height:'52vh', top:'38%', right:'-8%',
-          background:'radial-gradient(ellipse at center, rgba(0,160,190,0.12) 0%, rgba(0,90,130,0.05) 55%, transparent 100%)',
-          filter:'blur(52px)', animation:'nebDrift2 47s ease-in-out infinite' }} />
+          background:'radial-gradient(ellipse at center, rgba(0,160,190,0.14) 0%, rgba(0,90,130,0.06) 55%, transparent 100%)',
+          filter:'blur(44px)', animation:'nebFloat2 22s ease-in-out infinite' }} />
         <div style={{ position:'absolute', width:'54vw', height:'44vh', bottom:'4%', left:'18%',
-          background:'radial-gradient(ellipse at center, rgba(190,70,0,0.11) 0%, rgba(130,35,0,0.04) 55%, transparent 100%)',
-          filter:'blur(48px)', animation:'nebDrift3 68s ease-in-out infinite' }} />
+          background:'radial-gradient(ellipse at center, rgba(190,70,0,0.13) 0%, rgba(130,35,0,0.05) 55%, transparent 100%)',
+          filter:'blur(40px)', animation:'nebFloat3 32s ease-in-out infinite' }} />
         <div style={{ position:'absolute', width:'80vw', height:'32vh', top:'18%', left:'50%',
-          background:'radial-gradient(ellipse at center, rgba(130,0,190,0.11) 0%, rgba(70,0,130,0.04) 60%, transparent 100%)',
-          filter:'blur(38px)', animation:'nebSweep1 52s linear infinite', animationDelay:'-17s' }} />
+          background:'radial-gradient(ellipse at center, rgba(130,0,190,0.13) 0%, rgba(70,0,130,0.05) 60%, transparent 100%)',
+          filter:'blur(36px)', animation:'nebSweep1 38s linear infinite', animationDelay:'-8s' }} />
         <div style={{ position:'absolute', width:'68vw', height:'26vh', top:'58%', left:'50%',
-          background:'radial-gradient(ellipse at center, rgba(0,140,170,0.10) 0%, rgba(0,70,110,0.04) 60%, transparent 100%)',
-          filter:'blur(44px)', animation:'nebSweep2 66s linear infinite', animationDelay:'-30s' }} />
+          background:'radial-gradient(ellipse at center, rgba(0,140,170,0.12) 0%, rgba(0,70,110,0.05) 60%, transparent 100%)',
+          filter:'blur(40px)', animation:'nebSweep2 44s linear infinite', animationDelay:'-20s' }} />
       </div>
 
       {/* Canvas — transparent so background nebula shows through */}
@@ -843,9 +935,9 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         <GyroScene
           focusedIdx={focusedIdx} hoveredId={hoveredId}
           onHover={setHoveredId} onOrbClick={handleOrbClick}
-          vortexTargetIdx={vortexTargetIdx} vortexProgress={vortexProgress} vortexPhase={vortexPhase}
+          vortexTargetIdx={vortexTargetIdx} vortexProgressRef={vortexProgressRef} vortexPhase={vortexPhase}
           worldPosRef={worldPosRef} screenPosRef={screenPosRef} traverseRef={traverseRef}
-          panelOpen={showPanel}
+          panelOpen={showPanel} onPhantomClick={() => setShowComingSoon(true)}
         />
       </Canvas>
 
@@ -867,12 +959,12 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       }} />
 
       {vortexPhase==='passage' && passCenter && (
-        <div style={{
+        <div key={`passage-${vortexTargetIdx}`} style={{
           position:'fixed', left:passCenter.x-10, top:passCenter.y-10, width:20, height:20,
           borderRadius:'50%',
           background:'radial-gradient(circle at center, #8866ff 0%, #4422cc 35%, #110066 70%, #000010 100%)',
-          transform:`scale(${vortexProgress*130})`, transformOrigin:'center center',
-          zIndex:170, pointerEvents:'none', opacity:vortexProgress, transition:'none',
+          transformOrigin:'center center', zIndex:170, pointerEvents:'none',
+          animation:'passageExpand 400ms linear forwards',
         }} />
       )}
 
@@ -911,6 +1003,9 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 
       {showPanel && panelGateway && (
         <GlassPanel gateway={panelGateway} onClose={handleClose} onEnter={handleEnter} />
+      )}
+      {showComingSoon && (
+        <ComingSoonPanel onClose={() => setShowComingSoon(false)} />
       )}
     </div>
   )
