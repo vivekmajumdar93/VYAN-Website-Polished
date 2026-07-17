@@ -506,7 +506,8 @@ function GyroScene({
   const throwRef     = useRef({ startT: -10 })
 
   useFrame(({ clock }, delta) => {
-    const tr = traverseRef.current
+    const t   = clock.elapsedTime
+    const tr  = traverseRef.current
     const frac60 = delta * 60
 
     if (tr.active) {
@@ -523,9 +524,24 @@ function GyroScene({
       anglesRef.current.C += RING_SPEEDS.C * frac60
     }
 
-    if (ringARef.current) ringARef.current.rotation.y = anglesRef.current.A
-    if (ringBRef.current) ringBRef.current.rotation.x = anglesRef.current.B
-    if (ringCRef.current) ringCRef.current.rotation.z = anglesRef.current.C
+    // Primary spin axes + slow precession drifts → rings sweep through diagonal space
+    // Each ring gets 2 secondary drift axes at incommensurate frequencies so they
+    // never lock into horizontal/vertical planes.
+    if (ringARef.current) ringARef.current.rotation.set(
+      Math.sin(t * 0.17) * 0.22,   // X drift — tilts A's spin axis diagonally
+      anglesRef.current.A,           // primary Y spin
+      Math.cos(t * 0.13) * 0.15,   // Z drift — adds roll precession
+    )
+    if (ringBRef.current) ringBRef.current.rotation.set(
+      anglesRef.current.B,           // primary X spin
+      Math.cos(t * 0.19) * 0.16,   // Y drift — yaw precession
+      Math.sin(t * 0.14) * 0.20,   // Z drift — tilts B's spin axis diagonally
+    )
+    if (ringCRef.current) ringCRef.current.rotation.set(
+      Math.cos(t * 0.22) * 0.10,   // X drift — stacks with inner 45° static tilt
+      Math.sin(t * 0.11) * 0.18,   // Y drift — sweeps C through oblique planes
+      anglesRef.current.C,           // primary Z spin
+    )
 
     // Camera throw when focus changes — orb appears to jump toward lens
     if (prevFocusRef.current !== focusedIdx) {
