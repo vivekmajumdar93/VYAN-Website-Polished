@@ -626,83 +626,89 @@ function GyroScene({
 }
 
 // ─── glass panel ─────────────────────────────────────────────────────────────
-type PanelPhase = 'shattering' | 'hold' | 'reforming' | 'open' | 'closing'
+type PanelPhase = 'opening' | 'open' | 'closing'
 
 function GlassPanel({ gateway, onClose, onEnter }: {
   gateway: Gateway; onClose: () => void; onEnter: () => void
 }) {
   const shards = useMemo(() => mkShards(PANEL_W, PANEL_H), [])
-  const [phase, setPhase] = useState<PanelPhase>('shattering')
+  const [phase, setPhase] = useState<PanelPhase>('opening')
   const [contentVisible, setContentVisible] = useState(false)
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('hold'),      350)
-    const t2 = setTimeout(() => setPhase('reforming'), 650)
-    const t3 = setTimeout(() => { setPhase('open'); setContentVisible(true) }, 1150)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+    // 200ms delay lets the node-web burst peak before panel starts fading in
+    const t1 = setTimeout(() => { setPhase('open'); setContentVisible(true) }, 600)
+    return () => clearTimeout(t1)
   }, [])
 
   const handleClose = useCallback(() => {
     setContentVisible(false); setPhase('closing')
-    setTimeout(onClose, 420)
+    setTimeout(onClose, 300)
   }, [onClose])
-
-  const isScattered = phase === 'shattering' || phase === 'hold' || phase === 'closing'
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px' }}>
-      <div onClick={handleClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.82)' }} />
-      <div style={{
-        position:'absolute', width:PANEL_W, height:PANEL_H,
-        pointerEvents:'none', zIndex:3,
-        overflow: isScattered ? 'visible' : 'hidden',
-        borderRadius: isScattered ? '0' : '20px',
-      }}>
-        {shards.map((sh, i) => (
-          <div key={i} style={{
-            position:'absolute', left:0, top:0, width:'100%', height:'100%',
-            background: `linear-gradient(${sh.gradAngle}deg, rgba(160,200,255,0.07) 0%, rgba(70,110,220,0.04) 45%, rgba(130,170,255,0.06) 100%)`,
-            clipPath: phase === 'open' ? sh.clipPath : 'none',
-            willChange: isScattered ? 'transform' : 'auto',
-            transformOrigin: `${(sh.cx/PANEL_W*100).toFixed(2)}% ${(sh.cy/PANEL_H*100).toFixed(2)}%`,
-            transform: isScattered ? `translate(${sh.vx}px,${sh.vy}px) rotate(${sh.vr}deg)` : 'none',
-            opacity: phase === 'closing' ? 0 : 1,
-            transition: phase==='shattering' ? 'transform 350ms cubic-bezier(0.16,1,0.3,1)'
-              : phase==='hold' ? 'none'
-              : phase==='closing' ? 'transform 320ms cubic-bezier(0.16,1,0.3,1), opacity 300ms'
-              : 'transform 500ms cubic-bezier(0.65,0,0.35,1)',
-          }} />
-        ))}
-      </div>
+      {/* Overlay — single fade, no animation cost */}
+      <div onClick={handleClose} style={{
+        position:'absolute', inset:0, background:'rgba(0,0,0,0.82)',
+        opacity: phase === 'closing' ? 0 : 1, transition:'opacity 280ms',
+      }} />
 
+      {/* Panel shell — the ONLY element that animates. One GPU compositing layer. */}
       <div style={{
-        position:'relative', zIndex:2, width:'100%', maxWidth:'460px', padding:'34px',
-        background: phase==='open'||phase==='closing' ? 'rgba(8,16,48,0.45)' : 'transparent',
-        backdropFilter:'blur(24px)', border:'1px solid rgba(80,140,255,0.22)',
-        borderRadius:'20px', boxShadow:'0 0 80px rgba(40,80,200,0.18), inset 0 0 40px rgba(20,40,120,0.12)',
-        opacity: phase==='open' ? 1 : 0, transition:'opacity 0.3s, background 0.3s',
+        position:'relative', zIndex:2, width:PANEL_W, maxWidth:'calc(100vw - 48px)',
+        borderRadius:'20px', overflow:'hidden',
+        transform: phase === 'open'
+          ? 'scale(1) translateY(0px)'
+          : phase === 'opening' ? 'scale(0.88) translateY(16px)'
+          : 'scale(0.96) translateY(-8px)',
+        opacity: phase === 'open' ? 1 : 0,
+        transition: phase === 'closing'
+          ? 'transform 260ms cubic-bezier(0.4,0,1,1), opacity 240ms'
+          : 'transform 500ms cubic-bezier(0.34,1.15,0.64,1) 200ms, opacity 400ms 200ms',
+        willChange: 'transform, opacity',
       }}>
-        <div style={{ position:'absolute', top:0, left:'12%', right:'12%', height:'1px',
-          background:`linear-gradient(90deg,transparent,${gateway.color}60,transparent)` }} />
-        <div style={{ opacity: contentVisible ? 1 : 0, transition:'opacity 0.3s 0.1s' }}>
-          <div style={{ fontSize:'9px', letterSpacing:'0.28em', color:gateway.color,
-            fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'7px' }}>{gateway.tantra}</div>
-          <h2 style={{ fontFamily:'var(--font-vyan)', fontSize:'24px', letterSpacing:'0.18em',
-            color:'rgba(255,255,255,0.92)', textTransform:'uppercase', margin:'0 0 6px' }}>{gateway.name}</h2>
-          <p style={{ fontSize:'10px', letterSpacing:'0.15em', color:`${gateway.color}b3`,
-            textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 22px' }}>{gateway.tagline}</p>
-          <p style={{ fontSize:'14px', lineHeight:'1.75', color:'rgba(255,255,255,0.58)',
-            fontFamily:'var(--font-vyan)', letterSpacing:'0.02em', margin:'0 0 28px' }}>{gateway.description}</p>
-          <div style={{ display:'flex', gap:'12px' }}>
-            <button onClick={handleClose} style={{ flex:1, padding:'12px',
-              background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)',
-              borderRadius:'10px', color:'rgba(255,255,255,0.45)', fontSize:'10px',
-              letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer' }}>Return</button>
-            <button onClick={onEnter} style={{ padding:'12px 26px',
-              background:`${gateway.color}26`, border:`1px solid ${gateway.color}60`,
-              borderRadius:'10px', color:gateway.color, fontSize:'10px',
-              letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
-              cursor:'pointer', boxShadow:`0 0 20px ${gateway.color}1f` }}>Enter</button>
+        {/* Static glass shard texture — clipPath on non-animating elements costs nothing */}
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:1 }}>
+          {shards.map((sh, i) => (
+            <div key={i} style={{
+              position:'absolute', left:0, top:0, width:'100%', height:'100%',
+              background: `linear-gradient(${sh.gradAngle}deg, rgba(160,200,255,0.08) 0%, rgba(70,110,220,0.04) 45%, rgba(130,170,255,0.07) 100%)`,
+              clipPath: sh.clipPath,
+            }} />
+          ))}
+        </div>
+
+        {/* Content box — solid background, no backdropFilter */}
+        <div style={{
+          position:'relative', zIndex:2, padding:'34px',
+          background:'rgba(5,10,36,0.88)',
+          border:'1px solid rgba(80,140,255,0.22)',
+          borderRadius:'20px',
+          boxShadow:'0 0 80px rgba(40,80,200,0.18), inset 0 0 40px rgba(20,40,120,0.12)',
+        }}>
+          <div style={{ position:'absolute', top:0, left:'12%', right:'12%', height:'1px',
+            background:`linear-gradient(90deg,transparent,${gateway.color}60,transparent)` }} />
+          <div style={{ opacity: contentVisible ? 1 : 0, transition:'opacity 0.3s 0.1s' }}>
+            <div style={{ fontSize:'9px', letterSpacing:'0.28em', color:gateway.color,
+              fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'7px' }}>{gateway.tantra}</div>
+            <h2 style={{ fontFamily:'var(--font-vyan)', fontSize:'24px', letterSpacing:'0.18em',
+              color:'rgba(255,255,255,0.92)', textTransform:'uppercase', margin:'0 0 6px' }}>{gateway.name}</h2>
+            <p style={{ fontSize:'10px', letterSpacing:'0.15em', color:`${gateway.color}b3`,
+              textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 22px' }}>{gateway.tagline}</p>
+            <p style={{ fontSize:'14px', lineHeight:'1.75', color:'rgba(255,255,255,0.58)',
+              fontFamily:'var(--font-vyan)', letterSpacing:'0.02em', margin:'0 0 28px' }}>{gateway.description}</p>
+            <div style={{ display:'flex', gap:'12px' }}>
+              <button onClick={handleClose} style={{ flex:1, padding:'12px',
+                background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)',
+                borderRadius:'10px', color:'rgba(255,255,255,0.45)', fontSize:'10px',
+                letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer' }}>Return</button>
+              <button onClick={onEnter} style={{ padding:'12px 26px',
+                background:`${gateway.color}26`, border:`1px solid ${gateway.color}60`,
+                borderRadius:'10px', color:gateway.color, fontSize:'10px',
+                letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
+                cursor:'pointer', boxShadow:`0 0 20px ${gateway.color}1f` }}>Enter</button>
+            </div>
           </div>
         </div>
       </div>
