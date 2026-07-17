@@ -75,41 +75,6 @@ function nearestTarget(current: number, raw: number): number {
 // ─── shard generation ─────────────────────────────────────────────────────────
 const PANEL_W = 440
 const PANEL_H = 360
-const SHARD_COLS = 5
-const SHARD_ROWS = 4
-
-interface ShardDef {
-  cx: number; cy: number; clipPath: string
-  vx: number; vy: number; vr: number; gradAngle: number
-}
-
-function mkShards(pw: number, ph: number): ShardDef[] {
-  const cw = pw / SHARD_COLS, ch = ph / SHARD_ROWS, JITTER = 0.38
-  const grid: [number, number][][] = []
-  for (let r = 0; r <= SHARD_ROWS; r++) {
-    const row: [number, number][] = []
-    for (let c = 0; c <= SHARD_COLS; c++) {
-      const jx = (c > 0 && c < SHARD_COLS) ? (Math.random() - 0.5) * cw * JITTER : 0
-      const jy = (r > 0 && r < SHARD_ROWS) ? (Math.random() - 0.5) * ch * JITTER : 0
-      row.push([Math.max(0, Math.min(pw, c*cw+jx)), Math.max(0, Math.min(ph, r*ch+jy))])
-    }
-    grid.push(row)
-  }
-  const shards: ShardDef[] = []
-  for (let r = 0; r < SHARD_ROWS; r++) {
-    for (let c = 0; c < SHARD_COLS; c++) {
-      const tl=grid[r][c], tr=grid[r][c+1], br=grid[r+1][c+1], bl=grid[r+1][c]
-      const cx=(tl[0]+tr[0]+br[0]+bl[0])/4, cy=(tl[1]+tr[1]+br[1]+bl[1])/4
-      const pt = (x: number, y: number) => `${(x/pw*100).toFixed(2)}% ${(y/ph*100).toFixed(2)}%`
-      shards.push({ cx, cy,
-        clipPath: `polygon(${pt(...tl)},${pt(...tr)},${pt(...br)},${pt(...bl)})`,
-        vx: (cx-pw/2)*(0.35+Math.random()*0.45), vy: (cy-ph/2)*(0.35+Math.random()*0.45),
-        vr: (Math.random()-0.5)*480, gradAngle: Math.round(Math.random()*360),
-      })
-    }
-  }
-  return shards
-}
 
 // ─── particle field ───────────────────────────────────────────────────────────
 function ParticleField({ spiralTarget, spiralT }: { spiralTarget: THREE.Vector3 | null; spiralT: number }) {
@@ -631,7 +596,6 @@ type PanelPhase = 'opening' | 'open' | 'closing'
 function GlassPanel({ gateway, onClose, onEnter }: {
   gateway: Gateway; onClose: () => void; onEnter: () => void
 }) {
-  const shards = useMemo(() => mkShards(PANEL_W, PANEL_H), [])
   const [phase, setPhase] = useState<PanelPhase>('opening')
   const [contentVisible, setContentVisible] = useState(false)
 
@@ -668,16 +632,15 @@ function GlassPanel({ gateway, onClose, onEnter }: {
           : 'transform 500ms cubic-bezier(0.34,1.15,0.64,1) 200ms, opacity 400ms 200ms',
         willChange: 'transform, opacity',
       }}>
-        {/* Static glass shard texture — clipPath on non-animating elements costs nothing */}
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:1 }}>
-          {shards.map((sh, i) => (
-            <div key={i} style={{
-              position:'absolute', left:0, top:0, width:'100%', height:'100%',
-              background: `linear-gradient(${sh.gradAngle}deg, rgba(160,200,255,0.08) 0%, rgba(70,110,220,0.04) 45%, rgba(130,170,255,0.07) 100%)`,
-              clipPath: sh.clipPath,
-            }} />
-          ))}
-        </div>
+        {/* Glass sheen — single div, multi-angle gradients, zero clipPath */}
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:1,
+          background:`
+            linear-gradient(22deg,  rgba(140,185,255,0.08) 0%, transparent 55%),
+            linear-gradient(158deg, rgba(60,100,210,0.06)  0%, transparent 55%),
+            linear-gradient(70deg,  rgba(110,160,255,0.05) 20%, transparent 65%),
+            linear-gradient(250deg, rgba(80,130,220,0.04)  10%, transparent 50%)
+          `,
+        }} />
 
         {/* Content box — solid background, no backdropFilter */}
         <div style={{
