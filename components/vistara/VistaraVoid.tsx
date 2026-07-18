@@ -518,11 +518,10 @@ function VistaraOrb({
   })
 
   const nameChars = Array.from(gateway.name)
-  // Reduce font for longer names so the stack stays close to the orb
-  const nameFsF = Math.max(15, Math.min(28, Math.round(140 / nameChars.length)))
-  const nameFsU = Math.max(11, Math.round(nameFsF * 0.72))
-  // Tagline Y offset: clear below orb + below name stack
-  const taglineY = -(orbSize * 2.2 + nameChars.length * nameFsF * 0.38)
+  // Only reduce font for genuinely long names (8+ chars); never below 18px
+  const nameLen = nameChars.length
+  const nameFsF = nameLen <= 7 ? 28 : Math.max(18, Math.round(196 / nameLen))
+  const nameFsU = Math.max(14, Math.round(nameFsF * 0.72))
 
   return (
     <group ref={groupRef} position={basePos}>
@@ -535,46 +534,52 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
-      {/* φ name — one letter per line, column bisects orb center */}
-      <Html center occlude={false} distanceFactor={380}
-        position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {nameChars.map((char, i) => (
-            <span key={i} style={{
-              display: 'block',
-              textAlign: 'center',
-              fontSize: isFocused ? `${nameFsF}px` : `${nameFsU}px`,
-              lineHeight: '1.15',
-              color: isFocused ? '#ff4040' : 'rgba(200,35,35,0.45)',
-              textTransform: 'uppercase',
-              fontFamily: 'var(--font-vyan)',
-              opacity: isFocused ? 1 : 0.28,
-              transition: 'color 0.3s, font-size 0.3s, opacity 0.3s',
-              textShadow: isFocused
-                ? '0 0 48px rgba(255,60,60,1), 0 0 22px rgba(255,30,30,0.85), 0 0 8px rgba(220,0,0,0.95)'
-                : 'none',
-            }}>{char}</span>
-          ))}
+      {/* φ label — name column bisects orb; tagline in CSS below column (no 3D Y needed) */}
+      <Html center occlude={false} position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          {/* Name: bold italic uppercase, one letter per line */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {nameChars.map((char, i) => (
+              <span key={i} style={{
+                display: 'block',
+                textAlign: 'center',
+                fontSize: isFocused ? `${nameFsF}px` : `${nameFsU}px`,
+                fontWeight: 700,
+                fontStyle: 'italic',
+                lineHeight: '1.15',
+                color: isFocused ? '#ff4040' : 'rgba(200,35,35,0.45)',
+                textTransform: 'uppercase',
+                fontFamily: 'var(--font-vyan)',
+                opacity: isFocused ? 1 : 0.28,
+                transition: 'color 0.3s, font-size 0.3s, opacity 0.3s',
+                textShadow: isFocused
+                  ? '0 0 48px rgba(255,60,60,1), 0 0 22px rgba(255,30,30,0.85), 0 0 8px rgba(220,0,0,0.95)'
+                  : 'none',
+              }}>{char}</span>
+            ))}
+          </div>
+          {/* Tagline: normal weight, normal case, CSS-anchored below the column */}
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginTop: '10px',
+            width: 'clamp(180px, 32vw, 300px)',
+            textAlign: 'center',
+            whiteSpace: 'normal',
+            overflowWrap: 'break-word',
+            fontSize: 'clamp(10px, min(1.6vw, 2.8vh), 14px)',
+            letterSpacing: '0.08em',
+            lineHeight: '1.4',
+            color: 'rgba(255,120,100,0.85)',
+            fontFamily: 'var(--font-vyan)',
+            fontWeight: 400,
+            fontStyle: 'normal',
+            opacity: isFocused ? 1 : 0,
+            transition: 'opacity 0.4s',
+          }}>{gateway.tagline}</div>
         </div>
-      </Html>
-      {/* φ tagline — horizontal, below name stack, fades when not focused */}
-      <Html center occlude={false} distanceFactor={380}
-        position={[0, taglineY, 0]}
-        style={{ pointerEvents: 'none' }}>
-        <div style={{
-          width: 'clamp(180px, 32vw, 300px)',
-          textAlign: 'center',
-          whiteSpace: 'normal',
-          overflowWrap: 'break-word',
-          fontSize: 'clamp(10px, min(1.6vw, 2.8vh), 15px)',
-          letterSpacing: '0.12em',
-          lineHeight: '1.4',
-          color: 'rgba(255,120,100,0.85)',
-          textTransform: 'uppercase',
-          fontFamily: 'var(--font-vyan)',
-          opacity: isFocused ? 1 : 0,
-          transition: 'opacity 0.4s',
-        }}>{gateway.tagline}</div>
       </Html>
     </group>
   )
