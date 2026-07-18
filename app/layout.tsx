@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import NetraConsole from './(cosmic)/NetraConsole';
+import VersionPanel from '@/components/VersionPanel';
 
 export const metadata: Metadata = {
   title: 'VYAN Shunya Mandala — Architecting the Liquid Infinite',
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <NetraConsole />
+        <VersionPanel />
       </body>
     </html>
   );
