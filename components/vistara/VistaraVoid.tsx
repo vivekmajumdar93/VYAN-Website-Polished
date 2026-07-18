@@ -490,9 +490,10 @@ function VistaraOrb({
     if (isHovered)      nanoOrb.setSignal('hover')
     else if (isFocused) nanoOrb.setSignal('listening')
     else                nanoOrb.setSignal('idle')
-    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.55)
+    // Focused orb always significantly brighter — non-focused dim to not overpower focused label
+    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.28)
 
-    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.3, 1, ZERO)
+    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.10, 1, ZERO)
 
     // On panel open for this orb: fire a sin-bell burst so the node web appears
     // to unfold outward — glass shards are timed to begin assembling at the peak
@@ -527,32 +528,45 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
+      {/* φ name — vertical stroke bisects orb center */}
       <Html center occlude={false} distanceFactor={380}
-        position={[0, -(orbSize * 1.35), 0]} style={{ pointerEvents: 'none' }}>
-        {/* maxWidth + wordBreak keeps text inside viewport on all screen sizes */}
+        position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
         <div style={{
           textAlign: 'center',
           maxWidth: 'clamp(100px, 24vw, 210px)',
-          overflow: 'hidden',
           wordBreak: 'break-word',
-        }}>
-          <div style={{
-            fontSize: isFocused ? '30px' : '22px', letterSpacing: '0.18em',
-            lineHeight: '1.25',
-            color: isFocused ? '#ff4040' : 'rgba(210,40,40,0.85)',
-            textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', transition: 'all 0.3s',
-            textShadow: isFocused
-              ? '0 0 28px rgba(255,50,50,0.85), 0 0 10px rgba(180,0,0,0.65)'
-              : '0 0 12px rgba(180,20,20,0.55)',
-          }}>{gateway.name}</div>
-          <div style={{
-            fontSize: isFocused ? '15px' : '11px', letterSpacing: '0.12em',
-            lineHeight: '1.35',
-            color: isFocused ? 'rgba(255,120,100,0.80)' : 'rgba(185,55,55,0.60)',
-            textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', marginTop: '6px',
-            transition: 'all 0.3s',
-          }}>{gateway.tagline}</div>
-        </div>
+          writingMode: 'vertical-rl',
+          textOrientation: 'mixed',
+          transform: 'rotate(180deg)',
+          fontSize: isFocused ? '30px' : '22px',
+          letterSpacing: '0.18em',
+          lineHeight: '1.25',
+          color: isFocused ? '#ff4040' : 'rgba(210,40,40,0.85)',
+          textTransform: 'uppercase',
+          fontFamily: 'var(--font-vyan)',
+          transition: 'color 0.3s, font-size 0.3s',
+          textShadow: isFocused
+            ? '0 0 28px rgba(255,50,50,0.85), 0 0 10px rgba(180,0,0,0.65)'
+            : '0 0 12px rgba(180,20,20,0.55)',
+        }}>{gateway.name}</div>
+      </Html>
+      {/* φ tagline — horizontal, just below orb, fades when not focused */}
+      <Html center occlude={false} distanceFactor={380}
+        position={[0, -(orbSize * 0.9), 0]} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          textAlign: 'center',
+          maxWidth: 'clamp(130px, 38vw, 260px)',
+          wordBreak: 'break-word',
+          whiteSpace: 'normal',
+          fontSize: 'clamp(10px, min(1.6vw, 2.8vh), 15px)',
+          letterSpacing: '0.12em',
+          lineHeight: '1.4',
+          color: 'rgba(255,120,100,0.85)',
+          textTransform: 'uppercase',
+          fontFamily: 'var(--font-vyan)',
+          opacity: isFocused ? 1 : 0,
+          transition: 'opacity 0.4s',
+        }}>{gateway.tagline}</div>
       </Html>
     </group>
   )
