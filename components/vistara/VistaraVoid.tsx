@@ -517,6 +517,13 @@ function VistaraOrb({
     }
   })
 
+  const nameChars = Array.from(gateway.name)
+  // Reduce font for longer names so the stack stays close to the orb
+  const nameFsF = Math.max(15, Math.min(28, Math.round(140 / nameChars.length)))
+  const nameFsU = Math.max(11, Math.round(nameFsF * 0.72))
+  // Tagline Y offset: clear below orb + below name stack
+  const taglineY = -(orbSize * 2.2 + nameChars.length * nameFsF * 0.38)
+
   return (
     <group ref={groupRef} position={basePos}>
       <mesh
@@ -532,11 +539,11 @@ function VistaraOrb({
       <Html center occlude={false} distanceFactor={380}
         position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {Array.from(gateway.name).map((char, i) => (
+          {nameChars.map((char, i) => (
             <span key={i} style={{
               display: 'block',
               textAlign: 'center',
-              fontSize: isFocused ? '28px' : '20px',
+              fontSize: isFocused ? `${nameFsF}px` : `${nameFsU}px`,
               lineHeight: '1.15',
               color: isFocused ? '#ff4040' : 'rgba(210,40,40,0.85)',
               textTransform: 'uppercase',
@@ -551,7 +558,7 @@ function VistaraOrb({
       </Html>
       {/* φ tagline — horizontal, below name stack, fades when not focused */}
       <Html center occlude={false} distanceFactor={380}
-        position={[0, -(orbSize * 2.8 + Array.from(gateway.name).length * 10), 0]}
+        position={[0, taglineY, 0]}
         style={{ pointerEvents: 'none' }}>
         <div style={{
           width: 'clamp(180px, 32vw, 300px)',
