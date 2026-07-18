@@ -545,13 +545,14 @@ function VistaraOrb({
               textAlign: 'center',
               fontSize: isFocused ? `${nameFsF}px` : `${nameFsU}px`,
               lineHeight: '1.15',
-              color: isFocused ? '#ff4040' : 'rgba(210,40,40,0.85)',
+              color: isFocused ? '#ff4040' : 'rgba(200,35,35,0.45)',
               textTransform: 'uppercase',
               fontFamily: 'var(--font-vyan)',
-              transition: 'color 0.3s, font-size 0.3s',
+              opacity: isFocused ? 1 : 0.28,
+              transition: 'color 0.3s, font-size 0.3s, opacity 0.3s',
               textShadow: isFocused
-                ? '0 0 28px rgba(255,50,50,0.85), 0 0 10px rgba(180,0,0,0.65)'
-                : '0 0 12px rgba(180,20,20,0.55)',
+                ? '0 0 48px rgba(255,60,60,1), 0 0 22px rgba(255,30,30,0.85), 0 0 8px rgba(220,0,0,0.95)'
+                : 'none',
             }}>{char}</span>
           ))}
         </div>
