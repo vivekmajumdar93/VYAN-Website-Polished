@@ -527,11 +527,18 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
-      <Html center occlude={false}
+      <Html center occlude={false} distanceFactor={380}
         position={[0, -(orbSize * 1.35), 0]} style={{ pointerEvents: 'none' }}>
-        <div style={{ textAlign:'center', whiteSpace:'nowrap' }}>
+        {/* maxWidth + wordBreak keeps text inside viewport on all screen sizes */}
+        <div style={{
+          textAlign: 'center',
+          maxWidth: 'clamp(100px, 24vw, 210px)',
+          overflow: 'hidden',
+          wordBreak: 'break-word',
+        }}>
           <div style={{
-            fontSize: isFocused ? '22px' : '15px', letterSpacing: '0.22em',
+            fontSize: isFocused ? '30px' : '22px', letterSpacing: '0.18em',
+            lineHeight: '1.25',
             color: isFocused ? '#ff4040' : 'rgba(210,40,40,0.85)',
             textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', transition: 'all 0.3s',
             textShadow: isFocused
@@ -539,7 +546,8 @@ function VistaraOrb({
               : '0 0 12px rgba(180,20,20,0.55)',
           }}>{gateway.name}</div>
           <div style={{
-            fontSize: isFocused ? '12px' : '9px', letterSpacing: '0.18em',
+            fontSize: isFocused ? '15px' : '11px', letterSpacing: '0.12em',
+            lineHeight: '1.35',
             color: isFocused ? 'rgba(255,120,100,0.80)' : 'rgba(185,55,55,0.60)',
             textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', marginTop: '6px',
             transition: 'all 0.3s',
