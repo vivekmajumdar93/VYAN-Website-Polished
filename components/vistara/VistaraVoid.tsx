@@ -549,14 +549,15 @@ function VistaraOrb({
           ))}
         </div>
       </Html>
-      {/* φ tagline — horizontal, below orb, fades when not focused */}
+      {/* φ tagline — horizontal, below name stack, fades when not focused */}
       <Html center occlude={false} distanceFactor={380}
-        position={[0, -(orbSize * 1.8), 0]} style={{ pointerEvents: 'none' }}>
+        position={[0, -(orbSize * 2.8 + Array.from(gateway.name).length * 10), 0]}
+        style={{ pointerEvents: 'none' }}>
         <div style={{
+          width: 'clamp(180px, 32vw, 300px)',
           textAlign: 'center',
-          maxWidth: 'clamp(130px, 38vw, 260px)',
-          wordBreak: 'break-word',
           whiteSpace: 'normal',
+          overflowWrap: 'break-word',
           fontSize: 'clamp(10px, min(1.6vw, 2.8vh), 15px)',
           letterSpacing: '0.12em',
           lineHeight: '1.4',
