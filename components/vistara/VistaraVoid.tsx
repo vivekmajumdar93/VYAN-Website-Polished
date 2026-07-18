@@ -490,10 +490,9 @@ function VistaraOrb({
     if (isHovered)      nanoOrb.setSignal('hover')
     else if (isFocused) nanoOrb.setSignal('listening')
     else                nanoOrb.setSignal('idle')
-    // Focused orb always significantly brighter — non-focused dim to not overpower focused label
-    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.28)
+    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.55)
 
-    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.10, 1, ZERO)
+    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.3, 1, ZERO)
 
     // On panel open for this orb: fire a sin-bell burst so the node web appears
     // to unfold outward — glass shards are timed to begin assembling at the peak
