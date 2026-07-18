@@ -24,7 +24,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Full version history panel with per-release change log and git hash',
       'Version registry in lib/versions.ts — updated with every release going forward',
     ],
-    gitHash: 'pending',
+    gitHash: 'fecf058',
     pages: ['All pages'],
   },
   {
