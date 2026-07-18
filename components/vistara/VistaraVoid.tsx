@@ -528,31 +528,30 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
-      {/* φ name — vertical stroke bisects orb center */}
+      {/* φ name — one letter per line, column bisects orb center */}
       <Html center occlude={false} distanceFactor={380}
         position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
-        <div style={{
-          textAlign: 'center',
-          maxWidth: 'clamp(100px, 24vw, 210px)',
-          wordBreak: 'break-word',
-          writingMode: 'vertical-rl',
-          textOrientation: 'mixed',
-          transform: 'rotate(180deg)',
-          fontSize: isFocused ? '30px' : '22px',
-          letterSpacing: '0.18em',
-          lineHeight: '1.25',
-          color: isFocused ? '#ff4040' : 'rgba(210,40,40,0.85)',
-          textTransform: 'uppercase',
-          fontFamily: 'var(--font-vyan)',
-          transition: 'color 0.3s, font-size 0.3s',
-          textShadow: isFocused
-            ? '0 0 28px rgba(255,50,50,0.85), 0 0 10px rgba(180,0,0,0.65)'
-            : '0 0 12px rgba(180,20,20,0.55)',
-        }}>{gateway.name}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {Array.from(gateway.name).map((char, i) => (
+            <span key={i} style={{
+              display: 'block',
+              textAlign: 'center',
+              fontSize: isFocused ? '28px' : '20px',
+              lineHeight: '1.15',
+              color: isFocused ? '#ff4040' : 'rgba(210,40,40,0.85)',
+              textTransform: 'uppercase',
+              fontFamily: 'var(--font-vyan)',
+              transition: 'color 0.3s, font-size 0.3s',
+              textShadow: isFocused
+                ? '0 0 28px rgba(255,50,50,0.85), 0 0 10px rgba(180,0,0,0.65)'
+                : '0 0 12px rgba(180,20,20,0.55)',
+            }}>{char}</span>
+          ))}
+        </div>
       </Html>
-      {/* φ tagline — horizontal, just below orb, fades when not focused */}
+      {/* φ tagline — horizontal, below orb, fades when not focused */}
       <Html center occlude={false} distanceFactor={380}
-        position={[0, -(orbSize * 0.9), 0]} style={{ pointerEvents: 'none' }}>
+        position={[0, -(orbSize * 1.8), 0]} style={{ pointerEvents: 'none' }}>
         <div style={{
           textAlign: 'center',
           maxWidth: 'clamp(130px, 38vw, 260px)',
