@@ -630,6 +630,14 @@ function GyroScene({
     startT: 0, duration: 1.4,
   })
 
+  // On mount: point OrbitControls at origin so overview drag/pinch work immediately
+  useEffect(() => {
+    if (controlsRef.current) {
+      controlsRef.current.target.set(0, 0, 0)
+      controlsRef.current.update()
+    }
+  }, [])
+
   // ── Saturn ring materials — one per ring so uniforms are independent ──
   const ringAMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
@@ -761,7 +769,7 @@ function GyroScene({
 
   return (
     <>
-      <OrbitControls ref={controlsRef} enabled={orbitEnabled}
+      <OrbitControls ref={controlsRef} makeDefault enabled={orbitEnabled}
         enableDamping dampingFactor={0.07}
         minDistance={200} maxDistance={1800}
         enablePan={false} rotateSpeed={0.55} zoomSpeed={1.1}
@@ -1007,7 +1015,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const [panelGateway,    setPanelGateway]    = useState<Gateway | null>(null)
   const [showComingSoon,  setShowComingSoon]  = useState(false)
   const [isOverview,      setIsOverview]      = useState(true)
-  const [orbitEnabled,    setOrbitEnabled]    = useState(false)
+  const [orbitEnabled,    setOrbitEnabled]    = useState(true)   // camera already at z=1300 on load
   const isOverviewRef = useRef(true)
   useEffect(() => { isOverviewRef.current = isOverview }, [isOverview])
 
