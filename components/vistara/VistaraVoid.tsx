@@ -137,6 +137,15 @@ function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function easeInExpo(t: number) { return t <= 0 ? 0 : Math.pow(2, 10 * t - 10) }
 function easeInOutCubic(t: number) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
+
+// Returns the ideal overview camera Z for the current viewport aspect ratio.
+// Portrait phones (narrow) need a farther camera so the ring system fits horizontally.
+// Wide desktop screens need a closer camera so the system fills the screen meaningfully.
+function computeOverviewZ(aspect: number): number {
+  // t=0 at aspect≤0.5 (tall portrait), t=1 at aspect≥2.0 (ultra-wide)
+  const t = Math.max(0, Math.min(1, (aspect - 0.5) / 1.5))
+  return Math.max(550, Math.min(1100, Math.round(900 - 350 * t)))
+}
 function nearestTarget(current: number, raw: number): number {
   let d = (raw - current) % (2 * Math.PI)
   if (d > Math.PI)  d -= 2 * Math.PI
@@ -605,24 +614,26 @@ interface GyroSceneProps {
   panelOpen: boolean
   onPhantomClick: () => void
   isOverview: boolean; orbitEnabled: boolean; onOverviewAnimDone: () => void
+  overviewZRef: React.MutableRefObject<number>
 }
 
 function GyroScene({
   focusedIdx, hoveredId, onHover, onOrbClick,
   vortexTargetIdx, vortexProgressRef, vortexPhase,
   worldPosRef, screenPosRef, traverseRef, panelOpen, onPhantomClick,
-  isOverview, orbitEnabled, onOverviewAnimDone,
+  isOverview, orbitEnabled, onOverviewAnimDone, overviewZRef,
 }: GyroSceneProps) {
   const ringARef = useRef<THREE.Group>(null)
   const ringBRef = useRef<THREE.Group>(null)
   const ringCRef = useRef<THREE.Group>(null)
-  const { camera } = useThree()
+  const { camera, size } = useThree()
   const lookAt       = useRef(new THREE.Vector3())
   const anglesRef    = useRef({ A: 0, B: 0, C: 0 })
   const prevFocusRef = useRef(focusedIdx)
   const throwRef     = useRef({ startT: -10 })
   const controlsRef  = useRef<any>(null)
   const prevIsOverviewRef = useRef(isOverview)
+  const pendingOverviewZRef = useRef<number | null>(null)
   const camAnimRef = useRef<CamAnimState>({
     active: false,
     startPos: new THREE.Vector3(), endPos: new THREE.Vector3(),
@@ -630,13 +641,23 @@ function GyroScene({
     startT: 0, duration: 1.4,
   })
 
-  // On mount: point OrbitControls at origin so overview drag/pinch work immediately
+  // Mount: set camera to the viewport-appropriate overview distance immediately
   useEffect(() => {
-    if (controlsRef.current) {
-      controlsRef.current.target.set(0, 0, 0)
-      controlsRef.current.update()
+    const z = computeOverviewZ((camera as THREE.PerspectiveCamera).aspect)
+    overviewZRef.current = z
+    if (isOverview) {
+      camera.position.set(0, 0, z)
+      if (controlsRef.current) { controlsRef.current.target.set(0, 0, 0); controlsRef.current.update() }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Resize / orientation change: recompute and queue a smooth camera move
+  useEffect(() => {
+    const newZ = computeOverviewZ(size.width / size.height)
+    overviewZRef.current = newZ
+    if (isOverview) pendingOverviewZRef.current = newZ
+  }, [size])
 
   // ── Saturn ring materials — one per ring so uniforms are independent ──
   const ringAMat = useMemo(() => new THREE.ShaderMaterial({
@@ -704,13 +725,29 @@ function GyroScene({
     ringCMat.uniforms.uTime.value = t
     ringCMat.uniforms.uTilt.value = Math.abs(Math.cos(t * 0.22) * 0.10) + Math.abs(Math.sin(t * 0.11) * 0.18)
 
+    // ── Orientation / resize repositioning (while in overview) ─────────────
+    if (isOverview && !camAnimRef.current.active && pendingOverviewZRef.current !== null) {
+      const newZ = pendingOverviewZRef.current
+      pendingOverviewZRef.current = null
+      if (Math.abs(newZ - camera.position.z) > 25) {
+        const ca = camAnimRef.current
+        ca.active = true
+        ca.startPos.copy(camera.position)
+        ca.endPos.set(0, 0, newZ)
+        ca.startTarget.copy(lookAt.current)
+        ca.endTarget.set(0, 0, 0)
+        ca.startT = clock.elapsedTime
+        ca.duration = 0.7
+      }
+    }
+
     // ── Overview ↔ close-up camera animation ──────────────────────────────
     if (prevIsOverviewRef.current !== isOverview) {
       prevIsOverviewRef.current = isOverview
       const ca = camAnimRef.current
       ca.active    = true
       ca.startPos.copy(camera.position)
-      ca.endPos.set(0, 0, isOverview ? 750 : 550)
+      ca.endPos.set(0, 0, isOverview ? overviewZRef.current : 550)
       ca.startTarget.copy(lookAt.current)
       ca.endTarget.set(0, 0, 0)
       ca.startT    = clock.elapsedTime
@@ -1016,7 +1053,8 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const [showComingSoon,  setShowComingSoon]  = useState(false)
   const [isOverview,      setIsOverview]      = useState(true)
   const [orbitEnabled,    setOrbitEnabled]    = useState(true)   // camera already at z=1300 on load
-  const isOverviewRef = useRef(true)
+  const isOverviewRef  = useRef(true)
+  const overviewZRef   = useRef(750)
   useEffect(() => { isOverviewRef.current = isOverview }, [isOverview])
 
   const worldPosRef       = useRef<Record<number, THREE.Vector3>>({})
@@ -1202,6 +1240,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           worldPosRef={worldPosRef} screenPosRef={screenPosRef} traverseRef={traverseRef}
           panelOpen={showPanel} onPhantomClick={() => setShowComingSoon(true)}
           isOverview={isOverview} orbitEnabled={orbitEnabled} onOverviewAnimDone={onOverviewAnimDone}
+          overviewZRef={overviewZRef}
         />
       </Canvas>
 
