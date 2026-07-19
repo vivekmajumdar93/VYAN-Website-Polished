@@ -710,7 +710,7 @@ function GyroScene({
       const ca = camAnimRef.current
       ca.active    = true
       ca.startPos.copy(camera.position)
-      ca.endPos.set(0, 0, isOverview ? 1300 : 550)
+      ca.endPos.set(0, 0, isOverview ? 750 : 550)
       ca.startTarget.copy(lookAt.current)
       ca.endTarget.set(0, 0, 0)
       ca.startT    = clock.elapsedTime
@@ -771,7 +771,7 @@ function GyroScene({
     <>
       <OrbitControls ref={controlsRef} makeDefault enabled={orbitEnabled}
         enableDamping dampingFactor={0.07}
-        minDistance={200} maxDistance={1800}
+        minDistance={200} maxDistance={1600}
         enablePan={false} rotateSpeed={0.55} zoomSpeed={1.1}
       />
       <ambientLight intensity={0.04} />
@@ -1189,7 +1189,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 
       {/* Canvas — transparent so background nebula shows through */}
       <Canvas
-        camera={{ position:[0,0,1300], fov:60, near:1, far:4000 }}
+        camera={{ position:[0,0,750], fov:60, near:1, far:4000 }}
         style={{ position:'absolute', inset:0, zIndex:2 }}
         gl={{ antialias:true, alpha:true, toneMapping:THREE.ACESFilmicToneMapping, toneMappingExposure:1.1 }}
         dpr={[1, 1.5]}
