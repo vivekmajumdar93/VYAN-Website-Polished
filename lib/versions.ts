@@ -15,6 +15,24 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '1.3',
+    date: '2026-07-19',
+    title: 'Vistara — Overview Mode & OrbitControls',
+    summary: 'Page now loads in a zoomable overview showing all 8 orbs; click any orb to fly into close-up, or tap Overview to return.',
+    changes: [
+      'Overview mode on load — camera at z=1300, full gyroscopic system visible',
+      'OrbitControls in overview: scroll/pinch to zoom, drag to rotate the entire scene',
+      'Click any orb from overview → smooth 0.9 s camera fly-in to close-up',
+      'Overview button (bottom-right) in close-up → 1.4 s fly-out back to overview',
+      'Orb labels hidden in overview for a clean birds-eye view; revealed on close-up',
+      'Wheel/swipe traversal gated — only active in close-up mode',
+      'Hint text updates: "Scroll · Pinch · Drag to explore · Tap an orb to enter" in overview',
+      'Dot navigation bar hidden in overview; restored in close-up',
+    ],
+    gitHash: 'pending',
+    pages: ['Vistara'],
+  },
+  {
     version: '1.2',
     date: '2026-07-18',
     title: 'Site-wide Version History Panel',
