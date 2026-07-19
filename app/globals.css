@@ -2,9 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── VYAN Shunyalekh — self-hosted from /public/fonts ─────────────────────── */
+@font-face {
+  font-family: 'VYAN Shunyalekh';
+  src: url('/fonts/VYANShunyalekh-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VYAN Shunyalekh';
+  src: url('/fonts/VYANShunyalekh-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VYAN Shunyalekh';
+  src: url('/fonts/VYANShunyalekh-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'VYAN Shunyalekh';
+  src: url('/fonts/VYANShunyalekh-BoldItalic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
-  --font-vyan: 'VYAN Shunyalekh';
+  --font-vyan: 'VYAN Shunyalekh', Georgia, 'Times New Roman', serif;
+  --color-vyan-red: #e2001a;
+  --color-vyan-shadow: #000000;
 }
 
 html, body {
