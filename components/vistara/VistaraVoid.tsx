@@ -547,8 +547,13 @@ function VistaraOrb({
       </mesh>
       <primitive object={nanoOrb.group} />
       {/* φ label — hidden in overview to keep clean; visible in close-up */}
-      {!isOverview && <Html center occlude={false} position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
-        <div style={{ position: 'relative', display: 'inline-block' }}>
+      {!isOverview && <Html center occlude={false} position={[0, 0, 0]}>
+        <div
+          onClick={e => { e.stopPropagation(); onClick(orbIdx, gateway.id) }}
+          onMouseEnter={() => onHover(gateway.id)}
+          onMouseLeave={() => onHover(null)}
+          style={{ position: 'relative', display: 'inline-block', cursor: 'pointer' }}
+        >
           {/* Name: bold italic uppercase, one letter per line */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {nameChars.map((char, i) => (
@@ -922,25 +927,34 @@ function LiveAppPlaceholder({ gateway }: { gateway: Gateway }) {
 // ─── glass panel (side-sliding) ───────────────────────────────────────────────
 type PanelPhase = 'opening' | 'open' | 'closing'
 
-function GlassPanel({ gateway, onClose, onEnter, side }: {
-  gateway: Gateway; onClose: () => void; onEnter: () => void; side: 'left' | 'right'
+function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
+  gateway: Gateway; onClose: () => void; onBack: () => void; onEnter: () => void; side: 'left' | 'right'
 }) {
-  const [phase, setPhase]               = useState<PanelPhase>('opening')
-  const [contentVisible, setContentVisible] = useState(false)
-  const [isMobile, setIsMobile]         = useState(
+  const [phase, setPhase] = useState<PanelPhase>('opening')
+  const [step,  setStep]  = useState(0)   // stagger index: 0=hidden, 1..5=each section
+  const [isMobile, setIsMobile] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 768
   )
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('open'), 50)
-    const t2 = setTimeout(() => setContentVisible(true), 320)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
+    const t0 = setTimeout(() => setPhase('open'), 40)
+    const t1 = setTimeout(() => setStep(1), 200)
+    const t2 = setTimeout(() => setStep(2), 280)
+    const t3 = setTimeout(() => setStep(3), 360)
+    const t4 = setTimeout(() => setStep(4), 430)
+    const t5 = setTimeout(() => setStep(5), 500)
+    return () => { [t0,t1,t2,t3,t4,t5].forEach(clearTimeout) }
   }, [])
 
+  const CLOSE_MS = 300
   const handleClose = useCallback(() => {
-    setContentVisible(false); setPhase('closing')
-    setTimeout(onClose, 420)
+    setStep(0); setPhase('closing')
+    setTimeout(onClose, CLOSE_MS)
   }, [onClose])
+  const handleBack = useCallback(() => {
+    setStep(0); setPhase('closing')
+    setTimeout(onBack, CLOSE_MS)
+  }, [onBack])
 
   const isLeft = side === 'left'
   const c      = gateway.color
@@ -948,8 +962,15 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
   const slideTransform = phase === 'open'
     ? 'translate(0,0)'
     : isMobile
-      ? 'translateY(101%)'
-      : isLeft ? 'translateX(-101%)' : 'translateX(101%)'
+      ? 'translateY(100%)'
+      : isLeft ? 'translateX(-100%)' : 'translateX(100%)'
+
+  // Staggered reveal: each section lifts + fades in 60 ms after the previous
+  const reveal = (s: number): React.CSSProperties => ({
+    opacity:   step >= s ? 1 : 0,
+    transform: step >= s ? 'translateY(0)' : 'translateY(10px)',
+    transition:'opacity 0.38s, transform 0.38s',
+  })
 
   return (
     <div style={{
@@ -957,12 +978,12 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
       alignItems:     isMobile ? 'flex-end' : 'stretch',
       justifyContent: isMobile ? 'center' : isLeft ? 'flex-start' : 'flex-end',
     }}>
-      {/* Backdrop — subtle so orbs stay visible on the non-panel side */}
+      {/* Backdrop — click outside to dismiss panel, stay on current orb */}
       <div onClick={handleClose} style={{
         position:'absolute', inset:0,
         background:'rgba(0,0,0,0.28)',
         opacity: phase === 'open' ? 1 : 0,
-        transition:'opacity 380ms',
+        transition:'opacity 300ms',
       }} />
 
       {/* Panel — glass: semi-transparent + backdrop-filter so orbs show through */}
@@ -982,9 +1003,10 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
             ? `6px 0 60px rgba(0,0,0,0.50), inset -1px 0 0 ${c}55`
             : `-6px 0 60px rgba(0,0,0,0.50), inset 1px 0 0 ${c}55`,
         transform: slideTransform,
+        // Spring overshoot on open (slight bounce-in); snappy accelerating ease on close
         transition: phase === 'closing'
-          ? 'transform 380ms cubic-bezier(0.4,0,0.8,0.5)'
-          : 'transform 440ms cubic-bezier(0.22,1,0.36,1)',
+          ? `transform ${CLOSE_MS}ms cubic-bezier(0.55,0,1,0.45)`
+          : 'transform 500ms cubic-bezier(0.34,1.45,0.64,1)',
         willChange:'transform',
       }}>
         {/* Top accent line */}
@@ -1000,12 +1022,13 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
 
         {/* Header */}
         <div style={{ flexShrink:0, padding: isMobile ? '14px 24px 0' : '24px 32px 0', position:'relative' }}>
-          <button onClick={handleClose} style={{
+          {/* X — dismiss panel only; stays at current orb in close-up */}
+          <button onClick={handleClose} title="Dismiss · stay on this orb" style={{
             position:'absolute', top: isMobile ? 10 : 18, right: isMobile ? 18 : 24,
             width:'30px', height:'30px', borderRadius:'50%',
             background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)',
             cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
-            opacity: contentVisible ? 0.6 : 0, transition:'opacity 0.3s, background 0.2s',
+            opacity: step >= 1 ? 0.6 : 0, transition:'opacity 0.3s, background 0.2s',
             padding:0, lineHeight:0,
           }}
           onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='1'; b.style.background='rgba(255,255,255,0.10)' }}
@@ -1013,7 +1036,7 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
           >
             <CloseIcon size={16} />
           </button>
-          <div style={{ opacity: contentVisible ? 1 : 0, transition:'opacity 0.4s 0.05s' }}>
+          <div style={reveal(1)}>
             <span style={{
               display:'inline-block', padding:'2px 9px',
               border:`1px solid ${c}30`, borderRadius:'3px',
@@ -1023,9 +1046,9 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
           </div>
         </div>
 
-        {/* Scrollable content */}
+        {/* Scrollable content — each block reveals in sequence */}
         <div style={{ flex:1, overflowY:'auto', overflowX:'hidden', padding: isMobile ? '14px 24px 0' : '16px 32px 0' }}>
-          <div style={{ opacity: contentVisible ? 1 : 0, transition:'opacity 0.4s 0.1s' }}>
+          <div style={reveal(2)}>
             <h2 style={{
               fontFamily:'var(--font-vyan)', fontSize: isMobile ? '24px' : '26px',
               letterSpacing:'0.13em', color:'rgba(255,255,255,0.92)',
@@ -1036,11 +1059,15 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
               fontSize:'10px', letterSpacing:'0.18em', color:c,
               textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 18px', opacity:0.72,
             }}>{gateway.tagline}</p>
+          </div>
+          <div style={reveal(3)}>
             <div style={{ height:'1px', marginBottom:'18px', background:`linear-gradient(90deg,${c}55,transparent)` }} />
             <p style={{
               fontSize:'13px', lineHeight:'1.78', color:'rgba(255,255,255,0.50)',
               fontFamily:'var(--font-vyan)', letterSpacing:'0.03em', margin:'0 0 26px',
             }}>{gateway.description}</p>
+          </div>
+          <div style={reveal(4)}>
             <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.16)', fontFamily:'var(--font-vyan)', marginBottom:'10px' }}>
               Live Interface
             </div>
@@ -1060,15 +1087,16 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Footer — three distinct actions */}
         <div style={{
           flexShrink:0, padding: isMobile ? '14px 24px 28px' : '14px 32px 28px',
           borderTop:'1px solid rgba(255,255,255,0.07)',
           background:'rgba(2,4,16,0.35)',
-          opacity: contentVisible ? 1 : 0, transition:'opacity 0.4s 0.15s',
+          ...reveal(5),
         }}>
           <div style={{ display:'flex', gap:'10px' }}>
-            <button onClick={handleClose} style={{
+            {/* Overview — close panel and zoom out to see all 8 orbs */}
+            <button onClick={handleBack} title="Return to Overview" style={{
               flex:1, padding:'11px 0',
               background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)',
               borderRadius:'8px', color:'rgba(255,255,255,0.38)', fontSize:'9px',
@@ -1079,9 +1107,10 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
             onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.70)'; b.style.borderColor='rgba(255,255,255,0.14)'; b.style.background='rgba(255,255,255,0.07)' }}
             onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.38)'; b.style.borderColor='rgba(255,255,255,0.07)'; b.style.background='rgba(255,255,255,0.04)' }}
             >
-              <BackIcon size={15} />Back
+              <BackIcon size={15} />Overview
             </button>
-            <button onClick={onEnter} style={{
+            {/* Enter — launch this gateway's app */}
+            <button onClick={onEnter} title="Enter gateway" style={{
               padding:'11px 24px',
               background:`${c}1a`, border:`1px solid ${c}55`,
               borderRadius:'8px', color:c, fontSize:'9px',
@@ -1263,6 +1292,11 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const handleEnter = useCallback(() => {
     const gw = panelGateway; handleClose(); if (gw) onGatewayEnter?.(gw)
   }, [panelGateway, handleClose, onGatewayEnter])
+  // Panel "Overview" button — dismiss panel and fly camera out to overview
+  const handlePanelBack = useCallback(() => {
+    setShowPanel(false); setPanelGateway(null)
+    setIsOverview(true); setOrbitEnabled(false); setFocusedIdx(-1)
+  }, [])
 
   const goToOverview = useCallback(() => {
     setIsOverview(true)
@@ -1459,7 +1493,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       )}
 
       {showPanel && panelGateway && (
-        <GlassPanel gateway={panelGateway} onClose={handleClose} onEnter={handleEnter} side={panelSide} />
+        <GlassPanel gateway={panelGateway} onClose={handleClose} onBack={handlePanelBack} onEnter={handleEnter} side={panelSide} />
       )}
       {showComingSoon && (
         <ComingSoonPanel onClose={() => setShowComingSoon(false)} />
