@@ -871,118 +871,229 @@ function GyroScene({
   )
 }
 
-// ─── glass panel ─────────────────────────────────────────────────────────────
+// ─── live app placeholder ─────────────────────────────────────────────────────
+function LiveAppPlaceholder({ gateway }: { gateway: Gateway }) {
+  const c = gateway.color
+  return (
+    <div style={{
+      position:'relative', width:'100%', height:'190px',
+      borderRadius:'10px', overflow:'hidden',
+      background:'rgba(0,2,16,0.90)',
+      border:`1px solid ${c}25`,
+      marginBottom:'28px',
+    }}>
+      {/* Dot grid */}
+      <div style={{
+        position:'absolute', inset:0, opacity:0.45,
+        backgroundImage:`radial-gradient(circle, ${c}30 1px, transparent 1px)`,
+        backgroundSize:'18px 18px', backgroundPosition:'9px 9px',
+      }} />
+      {/* Scanning line */}
+      <div style={{
+        position:'absolute', left:0, right:0, height:'1px',
+        background:`linear-gradient(90deg,transparent 0%,${c}88 30%,${c}cc 50%,${c}88 70%,transparent 100%)`,
+        animation:'plhScan 3.4s ease-in-out infinite',
+        zIndex:2,
+      }} />
+      {/* Corner TL */}
+      <div style={{ position:'absolute', top:10, left:10, width:14, height:14, borderTop:`1px solid ${c}44`, borderLeft:`1px solid ${c}44` }} />
+      {/* Corner TR */}
+      <div style={{ position:'absolute', top:10, right:10, width:14, height:14, borderTop:`1px solid ${c}44`, borderRight:`1px solid ${c}44` }} />
+      {/* Corner BL */}
+      <div style={{ position:'absolute', bottom:10, left:10, width:14, height:14, borderBottom:`1px solid ${c}44`, borderLeft:`1px solid ${c}44` }} />
+      {/* Corner BR */}
+      <div style={{ position:'absolute', bottom:10, right:10, width:14, height:14, borderBottom:`1px solid ${c}44`, borderRight:`1px solid ${c}44` }} />
+      {/* Center */}
+      <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10, zIndex:3 }}>
+        <div style={{ fontSize:'7px', letterSpacing:'0.45em', textTransform:'uppercase', color:`${c}66`, fontFamily:'var(--font-vyan)', animation:'plhPulse 2.6s ease-in-out infinite' }}>
+          Initialising Interface
+        </div>
+        <div style={{ width:'24px', height:'1px', background:`linear-gradient(90deg,transparent,${c}77,transparent)` }} />
+        <div style={{ fontSize:'10px', letterSpacing:'0.24em', textTransform:'uppercase', color:`${c}44`, fontFamily:'var(--font-vyan)' }}>
+          {gateway.tantra}
+        </div>
+      </div>
+      {/* Bottom glow */}
+      <div style={{ position:'absolute', bottom:0, left:'10%', right:'10%', height:'40px', background:`radial-gradient(ellipse at center bottom,${c}28 0%,transparent 70%)`, animation:'plhGlow 2.6s ease-in-out infinite', zIndex:1 }} />
+    </div>
+  )
+}
+
+// ─── glass panel (side-sliding) ───────────────────────────────────────────────
 type PanelPhase = 'opening' | 'open' | 'closing'
 
-function GlassPanel({ gateway, onClose, onEnter }: {
-  gateway: Gateway; onClose: () => void; onEnter: () => void
+function GlassPanel({ gateway, onClose, onEnter, side }: {
+  gateway: Gateway; onClose: () => void; onEnter: () => void; side: 'left' | 'right'
 }) {
-  const [phase, setPhase] = useState<PanelPhase>('opening')
+  const [phase, setPhase]               = useState<PanelPhase>('opening')
   const [contentVisible, setContentVisible] = useState(false)
+  const [isMobile, setIsMobile]         = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 768
+  )
 
   useEffect(() => {
-    // 200ms delay lets the node-web burst peak before panel starts fading in
-    const t1 = setTimeout(() => { setPhase('open'); setContentVisible(true) }, 600)
-    return () => clearTimeout(t1)
+    const t1 = setTimeout(() => setPhase('open'), 50)
+    const t2 = setTimeout(() => setContentVisible(true), 320)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
 
   const handleClose = useCallback(() => {
     setContentVisible(false); setPhase('closing')
-    setTimeout(onClose, 300)
+    setTimeout(onClose, 420)
   }, [onClose])
 
+  const isLeft = side === 'left'
+  const c      = gateway.color
+
+  const slideTransform = phase === 'open'
+    ? 'translate(0,0)'
+    : isMobile
+      ? 'translateY(101%)'
+      : isLeft ? 'translateX(-101%)' : 'translateX(101%)'
+
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px' }}>
-      {/* Overlay — single fade, no animation cost */}
+    <div style={{
+      position:'fixed', inset:0, zIndex:200, display:'flex',
+      alignItems:     isMobile ? 'flex-end' : 'stretch',
+      justifyContent: isMobile ? 'center' : isLeft ? 'flex-start' : 'flex-end',
+    }}>
+      {/* Backdrop */}
       <div onClick={handleClose} style={{
-        position:'absolute', inset:0, background:'rgba(0,0,0,0.82)',
-        opacity: phase === 'closing' ? 0 : 1, transition:'opacity 280ms',
+        position:'absolute', inset:0,
+        background:'rgba(0,0,0,0.68)',
+        backdropFilter:'blur(3px)', WebkitBackdropFilter:'blur(3px)',
+        opacity: phase === 'open' ? 1 : 0,
+        transition:'opacity 380ms',
       }} />
 
-      {/* Panel shell — the ONLY element that animates. One GPU compositing layer. */}
+      {/* Panel */}
       <div style={{
-        position:'relative', zIndex:2, width:PANEL_W, maxWidth:'calc(100vw - 48px)',
-        borderRadius:'20px', overflow:'hidden',
-        transform: phase === 'open'
-          ? 'scale(1) translateY(0px)'
-          : phase === 'opening' ? 'scale(0.88) translateY(16px)'
-          : 'scale(0.96) translateY(-8px)',
-        opacity: phase === 'open' ? 1 : 0,
+        position:'relative', zIndex:2,
+        width:  isMobile ? '100%' : 'min(500px, 46vw)',
+        height: isMobile ? '88vh' : '100vh',
+        display:'flex', flexDirection:'column',
+        borderRadius: isMobile ? '18px 18px 0 0' : '0',
+        overflow:'hidden',
+        background:'rgba(3,6,22,0.97)',
+        boxShadow: isMobile
+          ? `0 -4px 80px rgba(0,0,0,0.65), inset 0 1px 0 ${c}33`
+          : isLeft
+            ? `4px 0 80px rgba(0,0,0,0.65), inset -1px 0 0 ${c}44`
+            : `-4px 0 80px rgba(0,0,0,0.65), inset 1px 0 0 ${c}44`,
+        transform: slideTransform,
         transition: phase === 'closing'
-          ? 'transform 260ms cubic-bezier(0.4,0,1,1), opacity 240ms'
-          : 'transform 500ms cubic-bezier(0.34,1.15,0.64,1) 200ms, opacity 400ms 200ms',
-        willChange: 'transform, opacity',
+          ? 'transform 380ms cubic-bezier(0.4,0,0.8,0.5)'
+          : 'transform 440ms cubic-bezier(0.22,1,0.36,1)',
+        willChange:'transform',
       }}>
-        {/* Glass sheen — single div, multi-angle gradients, zero clipPath */}
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:1,
-          background:`
-            linear-gradient(22deg,  rgba(140,185,255,0.08) 0%, transparent 55%),
-            linear-gradient(158deg, rgba(60,100,210,0.06)  0%, transparent 55%),
-            linear-gradient(70deg,  rgba(110,160,255,0.05) 20%, transparent 65%),
-            linear-gradient(250deg, rgba(80,130,220,0.04)  10%, transparent 50%)
-          `,
-        }} />
+        {/* Top accent line */}
+        <div style={{ position:'absolute', top:0, left:'5%', right:'5%', height:'1px', zIndex:10,
+          background:`linear-gradient(90deg,transparent,${c}99,${c}cc,${c}99,transparent)` }} />
 
-        {/* Content box — solid background, no backdropFilter */}
-        <div style={{
-          position:'relative', zIndex:2, padding:'34px',
-          background:'rgba(5,10,36,0.88)',
-          border:'1px solid rgba(80,140,255,0.22)',
-          borderRadius:'20px',
-          boxShadow:'0 0 80px rgba(40,80,200,0.18), inset 0 0 40px rgba(20,40,120,0.12)',
-        }}>
-          <div style={{ position:'absolute', top:0, left:'12%', right:'12%', height:'1px',
-            background:`linear-gradient(90deg,transparent,${gateway.color}60,transparent)` }} />
-          {/* Close icon — top right corner */}
+        {/* Mobile drag handle */}
+        {isMobile && (
+          <div style={{ display:'flex', justifyContent:'center', paddingTop:'12px', paddingBottom:'4px', flexShrink:0 }}>
+            <div style={{ width:'36px', height:'3px', borderRadius:'2px', background:'rgba(255,255,255,0.15)' }} />
+          </div>
+        )}
+
+        {/* Header */}
+        <div style={{ flexShrink:0, padding: isMobile ? '14px 24px 0' : '24px 32px 0', position:'relative' }}>
           <button onClick={handleClose} style={{
-            position:'absolute', top:'14px', right:'14px', zIndex:3,
-            background:'none', border:'none', cursor:'pointer', padding:'4px',
-            opacity: contentVisible ? 0.55 : 0, transition:'opacity 0.3s',
-            lineHeight:0,
-          }}>
-            <CloseIcon size={22} />
+            position:'absolute', top: isMobile ? 10 : 18, right: isMobile ? 18 : 24,
+            width:'30px', height:'30px', borderRadius:'50%',
+            background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)',
+            cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+            opacity: contentVisible ? 0.6 : 0, transition:'opacity 0.3s, background 0.2s',
+            padding:0, lineHeight:0,
+          }}
+          onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='1'; b.style.background='rgba(255,255,255,0.10)' }}
+          onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='0.6'; b.style.background='rgba(255,255,255,0.05)' }}
+          >
+            <CloseIcon size={16} />
           </button>
-          <div style={{ opacity: contentVisible ? 1 : 0, transition:'opacity 0.3s 0.1s' }}>
-            <div style={{ fontSize:'9px', letterSpacing:'0.28em', color:gateway.color,
-              fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'7px' }}>{gateway.tantra}</div>
-            <h2 style={{ fontFamily:'var(--font-vyan)', fontSize:'24px', letterSpacing:'0.18em',
-              color:'rgba(255,255,255,0.92)', textTransform:'uppercase', margin:'0 0 6px' }}>{gateway.name}</h2>
-            <p style={{ fontSize:'10px', letterSpacing:'0.15em', color:`${gateway.color}b3`,
-              textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 22px' }}>{gateway.tagline}</p>
-            <p style={{ fontSize:'14px', lineHeight:'1.75', color:'rgba(255,255,255,0.58)',
-              fontFamily:'var(--font-vyan)', letterSpacing:'0.02em', margin:'0 0 28px' }}>{gateway.description}</p>
+          <div style={{ opacity: contentVisible ? 1 : 0, transition:'opacity 0.4s 0.05s' }}>
+            <span style={{
+              display:'inline-block', padding:'2px 9px',
+              border:`1px solid ${c}30`, borderRadius:'3px',
+              fontSize:'7px', letterSpacing:'0.38em', textTransform:'uppercase',
+              color:`${c}77`, fontFamily:'var(--font-vyan)',
+            }}>{gateway.tantra}</span>
+          </div>
+        </div>
 
-            {/* ── LIVE APP SLOT ── Set gateway.appUrl to embed a live app here ── */}
-            {gateway.appUrl && (
-              <div style={{ marginBottom:'28px', borderRadius:'12px', overflow:'hidden',
-                border:'1px solid rgba(80,140,255,0.18)', background:'rgba(0,2,18,0.60)' }}>
+        {/* Scrollable content */}
+        <div style={{ flex:1, overflowY:'auto', overflowX:'hidden', padding: isMobile ? '14px 24px 0' : '16px 32px 0' }}>
+          <div style={{ opacity: contentVisible ? 1 : 0, transition:'opacity 0.4s 0.1s' }}>
+            <h2 style={{
+              fontFamily:'var(--font-vyan)', fontSize: isMobile ? '24px' : '26px',
+              letterSpacing:'0.13em', color:'rgba(255,255,255,0.92)',
+              textTransform:'uppercase', margin:'10px 0 6px',
+              textShadow:`0 0 28px ${c}2a`,
+            }}>{gateway.name}</h2>
+            <p style={{
+              fontSize:'10px', letterSpacing:'0.18em', color:c,
+              textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 18px', opacity:0.72,
+            }}>{gateway.tagline}</p>
+            <div style={{ height:'1px', marginBottom:'18px', background:`linear-gradient(90deg,${c}55,transparent)` }} />
+            <p style={{
+              fontSize:'13px', lineHeight:'1.78', color:'rgba(255,255,255,0.50)',
+              fontFamily:'var(--font-vyan)', letterSpacing:'0.03em', margin:'0 0 26px',
+            }}>{gateway.description}</p>
+            <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.16)', fontFamily:'var(--font-vyan)', marginBottom:'10px' }}>
+              Live Interface
+            </div>
+            {gateway.appUrl ? (
+              <div style={{ marginBottom:'24px', borderRadius:'10px', overflow:'hidden', border:`1px solid ${c}20`, background:'rgba(0,2,18,0.70)' }}>
                 <iframe
                   src={gateway.appUrl}
                   title={`${gateway.name} live app`}
-                  style={{ width:'100%', height:'280px', border:'none', display:'block' }}
+                  style={{ width:'100%', height:'260px', border:'none', display:'block' }}
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                   loading="lazy"
                 />
               </div>
+            ) : (
+              <LiveAppPlaceholder gateway={gateway} />
             )}
+          </div>
+        </div>
 
-            <div style={{ display:'flex', gap:'12px' }}>
-              <button onClick={handleClose} style={{ flex:1, padding:'12px',
-                background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)',
-                borderRadius:'10px', color:'rgba(255,255,255,0.45)', fontSize:'10px',
-                letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer',
-                display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
-                <BackIcon size={18} />Return
-              </button>
-              <button onClick={onEnter} style={{ padding:'12px 26px',
-                background:`${gateway.color}26`, border:`1px solid ${gateway.color}60`,
-                borderRadius:'10px', color:gateway.color, fontSize:'10px',
-                letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
-                cursor:'pointer', boxShadow:`0 0 20px ${gateway.color}1f`,
-                display:'flex', alignItems:'center', gap:'8px' }}>
-                <SendIcon size={18} />Enter
-              </button>
-            </div>
+        {/* Footer */}
+        <div style={{
+          flexShrink:0, padding: isMobile ? '14px 24px 28px' : '14px 32px 28px',
+          borderTop:'1px solid rgba(255,255,255,0.05)',
+          background:'rgba(2,4,16,0.50)',
+          opacity: contentVisible ? 1 : 0, transition:'opacity 0.4s 0.15s',
+        }}>
+          <div style={{ display:'flex', gap:'10px' }}>
+            <button onClick={handleClose} style={{
+              flex:1, padding:'11px 0',
+              background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)',
+              borderRadius:'8px', color:'rgba(255,255,255,0.38)', fontSize:'9px',
+              letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
+              cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'7px',
+              transition:'color 0.2s, border-color 0.2s, background 0.2s',
+            }}
+            onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.70)'; b.style.borderColor='rgba(255,255,255,0.14)'; b.style.background='rgba(255,255,255,0.07)' }}
+            onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.38)'; b.style.borderColor='rgba(255,255,255,0.07)'; b.style.background='rgba(255,255,255,0.04)' }}
+            >
+              <BackIcon size={15} />Back
+            </button>
+            <button onClick={onEnter} style={{
+              padding:'11px 24px',
+              background:`${c}1a`, border:`1px solid ${c}55`,
+              borderRadius:'8px', color:c, fontSize:'9px',
+              letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
+              cursor:'pointer', display:'flex', alignItems:'center', gap:'7px',
+              boxShadow:`0 0 16px ${c}14`,
+              transition:'background 0.2s, box-shadow 0.2s',
+            }}
+            onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.background=`${c}2a`; b.style.boxShadow=`0 0 26px ${c}2a` }}
+            onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.background=`${c}1a`; b.style.boxShadow=`0 0 16px ${c}14` }}
+            >
+              <SendIcon size={15} />Enter
+            </button>
           </div>
         </div>
       </div>
@@ -1050,6 +1161,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const [showFlash,       setShowFlash]       = useState(false)
   const [showPanel,       setShowPanel]       = useState(false)
   const [panelGateway,    setPanelGateway]    = useState<Gateway | null>(null)
+  const [panelSide,       setPanelSide]       = useState<'left' | 'right'>('left')
   const [showComingSoon,  setShowComingSoon]  = useState(false)
   const [isOverview,      setIsOverview]      = useState(true)
   const [orbitEnabled,    setOrbitEnabled]    = useState(true)   // camera already at z=1300 on load
@@ -1136,6 +1248,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         vortexProgressRef.current = 0
         setShowFlash(true); setTimeout(() => setShowFlash(false), 80)
         const gw = GATEWAYS.find(g => g.id === id)!; setPanelGateway(gw); setShowPanel(true)
+        setPanelSide(idx % 2 === 0 ? 'left' : 'right')
         setVortexPhase('done')
         setTimeout(() => { setVortexPhase('idle'); setVortexTargetIdx(null) }, 200)
       }
@@ -1203,6 +1316,20 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         }
         @keyframes nebFloat3 {
           0%,100%{transform:translate(3%,10%) scale(1.05)} 50%{transform:translate(-8%,-3%) scale(0.88)}
+        }
+        @keyframes plhScan {
+          0%   { top: -2px; opacity: 0 }
+          5%   { opacity: 1 }
+          95%  { opacity: 0.8 }
+          100% { top: 100%; opacity: 0 }
+        }
+        @keyframes plhPulse {
+          0%, 100% { opacity: 0.5 }
+          50%      { opacity: 1.0 }
+        }
+        @keyframes plhGlow {
+          0%, 100% { opacity: 0.5 }
+          50%      { opacity: 1.0 }
         }
       `}</style>
 
@@ -1331,7 +1458,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       )}
 
       {showPanel && panelGateway && (
-        <GlassPanel gateway={panelGateway} onClose={handleClose} onEnter={handleEnter} />
+        <GlassPanel gateway={panelGateway} onClose={handleClose} onEnter={handleEnter} side={panelSide} />
       )}
       {showComingSoon && (
         <ComingSoonPanel onClose={() => setShowComingSoon(false)} />

@@ -15,6 +15,26 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '1.4',
+    date: '2026-07-19',
+    title: 'Vistara — Side-Sliding Panels & Live App Placeholders',
+    summary: 'Orb panels now slide in from alternating left/right edges on desktop and sheet up from the bottom on mobile; a decorated live-app placeholder fills the interface slot until an app is ready.',
+    changes: [
+      'Even-indexed orbs open panel from the left edge; odd-indexed from the right',
+      'Desktop panel: full-height sidebar (min(500px, 46vw)), slides in with spring ease',
+      'Mobile panel: 88 vh bottom sheet with drag handle, slides up from bottom',
+      'Backdrop blur (3px) replaces hard black overlay',
+      'Inner-edge accent border glows in the gateway colour',
+      'Top accent line (gradient) at panel crown, gateway tantra badge in header',
+      'Scrollable content area with sticky footer buttons (Back + Enter)',
+      'LiveAppPlaceholder: animated dot-grid, sweeping scan line, corner brackets, pulsing glow',
+      'Placeholder shows when gateway.appUrl is unset; iframe mounts when set',
+      'Closing animation accelerates back to the originating edge (not a generic fade)',
+    ],
+    gitHash: '0000000',
+    pages: ['Vistara'],
+  },
+  {
     version: '1.3',
     date: '2026-07-19',
     title: 'Vistara — Overview Mode & OrbitControls',
@@ -101,4 +121,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = SITE_VERSIONS[0].version
+export const CURRENT_VERSION = '1.4'
