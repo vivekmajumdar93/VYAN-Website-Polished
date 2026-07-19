@@ -458,6 +458,113 @@ function ScreenTracker({ worldRef, screenRef }: {
   return null
 }
 
+// ─── shooting stars ──────────────────────────────────────────────────────────
+const SS_N  = 10   // number of stars
+const SS_TN = 24   // trail particles per star
+
+const SS_VERT = `
+  attribute vec3  aSeedPos;
+  attribute vec3  aDir;
+  attribute float aSpeed;
+  attribute float aPhase;
+  attribute float aTrailFrac;
+  attribute float aHeadSz;
+  attribute vec3  aCol;
+  uniform   float uTime;
+  varying   float vFrac;
+  varying   vec3  vCol;
+  varying   float vFade;
+  void main() {
+    float t    = mod(uTime * aSpeed + aPhase, 1.0);
+    float fade = min(smoothstep(0.0, 0.05, t), smoothstep(1.0, 0.92, t));
+    vec3  head = aSeedPos + aDir * t * 1600.0;
+    vec3  pos  = head - aDir * aTrailFrac * 88.0;
+    vFrac = aTrailFrac;
+    vCol  = aCol;
+    vFade = fade;
+    vec4  mv   = modelViewMatrix * vec4(pos, 1.0);
+    float dist = max(-mv.z, 1.0);
+    float sf   = 1.0 - aTrailFrac;
+    gl_PointSize = clamp(aHeadSz * sf * sf * (500.0 / dist), 0.5, aHeadSz * 3.0);
+    gl_Position  = projectionMatrix * mv;
+  }
+`
+const SS_FRAG = `
+  varying float vFrac;
+  varying vec3  vCol;
+  varying float vFade;
+  void main() {
+    float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float disc = 1.0 - smoothstep(0.0, 0.9, r);
+    float core = exp(-r * r * 5.0);
+    float sf   = 1.0 - vFrac;
+    float a    = (disc * 0.65 + core * 0.55) * sf * sf * vFade;
+    if (a < 0.008) discard;
+    vec3  col  = mix(vCol, vec3(1.0), sf * 0.5);
+    gl_FragColor = vec4(col, min(a, 1.0));
+  }
+`
+
+function ShootingStars() {
+  const total = SS_N * SS_TN
+  const geo = useMemo(() => {
+    const seedPos   = new Float32Array(total * 3)
+    const dir       = new Float32Array(total * 3)
+    const speed     = new Float32Array(total)
+    const phase     = new Float32Array(total)
+    const trailFrac = new Float32Array(total)
+    const headSz    = new Float32Array(total)
+    const col       = new Float32Array(total * 3)
+    const palette   = [
+      [1.0, 0.96, 0.88], [0.72, 0.88, 1.0],  [1.0, 0.82, 0.40],
+      [1.0, 0.50, 0.25], [0.80, 0.55, 1.0],  [0.45, 0.92, 1.0],
+      [1.0, 0.65, 0.85], [0.60, 1.0, 0.75],
+    ]
+    for (let s = 0; s < SS_N; s++) {
+      const θ = Math.random() * Math.PI * 2
+      const φ = Math.acos(2 * Math.random() - 1)
+      const R = 500 + Math.random() * 650
+      const sp = [R * Math.sin(φ) * Math.cos(θ), R * Math.sin(φ) * Math.sin(θ), (Math.random() * 2 - 1) * 520]
+      const dθ = Math.random() * Math.PI * 2
+      const dφ = Math.acos(2 * Math.random() - 1)
+      const dp = [Math.sin(dφ) * Math.cos(dθ), Math.sin(dφ) * Math.sin(dθ), Math.cos(dφ)]
+      const spd = 0.03 + Math.random() * 0.11
+      const ph  = Math.random()
+      const hsz = 13 + Math.random() * 11
+      const c   = palette[Math.floor(Math.random() * palette.length)]
+      for (let t = 0; t < SS_TN; t++) {
+        const i = s * SS_TN + t
+        seedPos[i*3]=sp[0]; seedPos[i*3+1]=sp[1]; seedPos[i*3+2]=sp[2]
+        dir[i*3]=dp[0]; dir[i*3+1]=dp[1]; dir[i*3+2]=dp[2]
+        speed[i] = spd; phase[i] = ph
+        trailFrac[i] = t / (SS_TN - 1)
+        headSz[i] = hsz
+        col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2]
+      }
+    }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position',   new THREE.BufferAttribute(new Float32Array(total * 3), 3))
+    g.setAttribute('aSeedPos',   new THREE.BufferAttribute(seedPos,   3))
+    g.setAttribute('aDir',       new THREE.BufferAttribute(dir,       3))
+    g.setAttribute('aSpeed',     new THREE.BufferAttribute(speed,     1))
+    g.setAttribute('aPhase',     new THREE.BufferAttribute(phase,     1))
+    g.setAttribute('aTrailFrac', new THREE.BufferAttribute(trailFrac, 1))
+    g.setAttribute('aHeadSz',    new THREE.BufferAttribute(headSz,    1))
+    g.setAttribute('aCol',       new THREE.BufferAttribute(col,       3))
+    return g
+  }, [])
+
+  const mat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: SS_VERT, fragmentShader: SS_FRAG,
+    uniforms: { uTime: { value: 0 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }), [])
+
+  useFrame(({ clock }) => { mat.uniforms.uTime.value = clock.elapsedTime })
+
+  return <points geometry={geo} material={mat} frustumCulled={false} />
+}
+
 // ─── vistara orb ─────────────────────────────────────────────────────────────
 interface VistaraOrbProps {
   gateway: Gateway; orbIdx: number; orbSize: number
@@ -1020,22 +1127,23 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
           </div>
         )}
 
+        {/* X — direct child of panel at zIndex 20 so scrollable area can't cover it */}
+        <button onClick={handleClose} title="Dismiss · stay on this orb" style={{
+          position:'absolute', top: isMobile ? 16 : 20, right: isMobile ? 18 : 22,
+          width:'32px', height:'32px', borderRadius:'50%', zIndex:20,
+          background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)',
+          cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+          opacity: step >= 1 ? 0.65 : 0, transition:'opacity 0.3s, background 0.2s',
+          padding:0, lineHeight:0,
+        }}
+        onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='1'; b.style.background='rgba(255,255,255,0.12)' }}
+        onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='0.65'; b.style.background='rgba(255,255,255,0.06)' }}
+        >
+          <CloseIcon size={16} />
+        </button>
+
         {/* Header */}
-        <div style={{ flexShrink:0, padding: isMobile ? '14px 24px 0' : '24px 32px 0', position:'relative' }}>
-          {/* X — dismiss panel only; stays at current orb in close-up */}
-          <button onClick={handleClose} title="Dismiss · stay on this orb" style={{
-            position:'absolute', top: isMobile ? 10 : 18, right: isMobile ? 18 : 24,
-            width:'30px', height:'30px', borderRadius:'50%',
-            background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)',
-            cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
-            opacity: step >= 1 ? 0.6 : 0, transition:'opacity 0.3s, background 0.2s',
-            padding:0, lineHeight:0,
-          }}
-          onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='1'; b.style.background='rgba(255,255,255,0.10)' }}
-          onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='0.6'; b.style.background='rgba(255,255,255,0.05)' }}
-          >
-            <CloseIcon size={16} />
-          </button>
+        <div style={{ flexShrink:0, padding: isMobile ? '14px 24px 0' : '24px 32px 0' }}>
           <div style={reveal(1)}>
             <span style={{
               display:'inline-block', padding:'2px 9px',
@@ -1134,37 +1242,103 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
 // ─── coming soon panel ───────────────────────────────────────────────────────
 function ComingSoonPanel({ onClose }: { onClose: () => void }) {
   const [phase, setPhase] = useState<PanelPhase>('opening')
+  const [step,  setStep]  = useState(0)
+
   useEffect(() => {
-    const t = setTimeout(() => setPhase('open'), 600)
-    return () => clearTimeout(t)
+    const t0 = setTimeout(() => setPhase('open'), 40)
+    const t1 = setTimeout(() => setStep(1), 200)
+    const t2 = setTimeout(() => setStep(2), 290)
+    const t3 = setTimeout(() => setStep(3), 375)
+    return () => { [t0,t1,t2,t3].forEach(clearTimeout) }
   }, [])
-  const handleClose = useCallback(() => { setPhase('closing'); setTimeout(onClose, 300) }, [onClose])
+
+  const CLOSE_MS = 280
+  const handleClose = useCallback(() => {
+    setStep(0); setPhase('closing')
+    setTimeout(onClose, CLOSE_MS)
+  }, [onClose])
+
+  const reveal = (s: number): React.CSSProperties => ({
+    opacity:   step >= s ? 1 : 0,
+    transform: step >= s ? 'translateY(0)' : 'translateY(8px)',
+    transition:'opacity 0.35s, transform 0.35s',
+  })
+
+  const panelT = phase === 'open'
+    ? 'scale(1) translateY(0)'
+    : phase === 'opening' ? 'scale(0.90) translateY(20px)'
+    : 'scale(0.96) translateY(-10px)'
+
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:'24px' }}>
-      <div onClick={handleClose} style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.82)', opacity: phase==='closing'?0:1, transition:'opacity 280ms' }} />
+      <div onClick={handleClose} style={{
+        position:'absolute', inset:0,
+        background:'rgba(0,0,0,0.28)',
+        backdropFilter:'blur(3px)', WebkitBackdropFilter:'blur(3px)',
+        opacity: phase === 'open' ? 1 : 0, transition:'opacity 300ms',
+      }} />
       <div style={{
         position:'relative', zIndex:2, width:380, maxWidth:'calc(100vw - 48px)',
-        borderRadius:'20px', overflow:'hidden', textAlign:'center',
-        transform: phase==='open' ? 'scale(1) translateY(0px)' : phase==='opening' ? 'scale(0.88) translateY(16px)' : 'scale(0.96) translateY(-8px)',
-        opacity: phase==='open' ? 1 : 0,
-        transition: phase==='closing' ? 'transform 260ms cubic-bezier(0.4,0,1,1), opacity 240ms' : 'transform 500ms cubic-bezier(0.34,1.15,0.64,1) 200ms, opacity 400ms 200ms',
-        willChange: 'transform, opacity',
+        borderRadius:'18px', overflow:'hidden', textAlign:'center',
+        background:'rgba(4,7,26,0.75)',
+        backdropFilter:'blur(26px) saturate(1.4)', WebkitBackdropFilter:'blur(26px) saturate(1.4)',
+        border:'1px solid rgba(80,120,255,0.18)',
+        boxShadow:'0 8px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(120,150,255,0.18)',
+        transform: panelT,
+        opacity: phase === 'open' ? 1 : 0,
+        transition: phase === 'closing'
+          ? `transform ${CLOSE_MS}ms cubic-bezier(0.55,0,1,0.45), opacity ${CLOSE_MS}ms`
+          : 'transform 500ms cubic-bezier(0.34,1.45,0.64,1), opacity 300ms 80ms',
+        willChange:'transform, opacity',
       }}>
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none',
-          background:'linear-gradient(22deg,rgba(140,185,255,0.08) 0%,transparent 55%),linear-gradient(158deg,rgba(60,100,210,0.06) 0%,transparent 55%)',
-        }} />
-        <div style={{ position:'relative', zIndex:2, padding:'48px 34px', background:'rgba(4,8,30,0.92)', border:'1px solid rgba(80,140,255,0.20)', borderRadius:'20px', boxShadow:'0 0 60px rgba(40,80,200,0.15)' }}>
-          <button onClick={handleClose} style={{ position:'absolute', top:'14px', right:'14px', background:'none', border:'none', cursor:'pointer', padding:'4px', opacity:0.5, lineHeight:0 }}>
-            <CloseIcon size={22} />
-          </button>
-          <div style={{ fontSize:'8px', letterSpacing:'0.35em', color:'rgba(100,150,255,0.55)', fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'20px' }}>Traversal Node</div>
-          <div style={{ fontSize:'26px', letterSpacing:'0.2em', color:'rgba(220,230,255,0.92)', fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'14px' }}>Coming Soon</div>
-          <p style={{ fontSize:'12px', lineHeight:1.7, color:'rgba(150,170,255,0.48)', fontFamily:'var(--font-vyan)', letterSpacing:'0.06em', marginBottom:'32px' }}>
-            This gateway is still forming in the field of consciousness.
-          </p>
-          <button onClick={handleClose} style={{ padding:'12px 28px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', color:'rgba(255,255,255,0.48)', fontSize:'10px', letterSpacing:'0.22em', textTransform:'uppercase', fontFamily:'var(--font-vyan)', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'8px' }}>
-            <BackIcon size={18} />Return
-          </button>
+        {/* Top accent line */}
+        <div style={{ position:'absolute', top:0, left:'20%', right:'20%', height:'1px',
+          background:'linear-gradient(90deg,transparent,rgba(100,140,255,0.85),transparent)' }} />
+        {/* X — high zIndex so it's always clickable */}
+        <button onClick={handleClose} style={{
+          position:'absolute', top:14, right:14, zIndex:20,
+          width:'28px', height:'28px', borderRadius:'50%',
+          background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)',
+          cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+          opacity: step >= 1 ? 0.6 : 0, transition:'opacity 0.3s, background 0.2s',
+          padding:0, lineHeight:0,
+        }}
+        onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='1'; b.style.background='rgba(255,255,255,0.10)' }}
+        onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.opacity='0.6'; b.style.background='rgba(255,255,255,0.05)' }}
+        >
+          <CloseIcon size={15} />
+        </button>
+
+        <div style={{ padding:'40px 32px 32px' }}>
+          <div style={reveal(1)}>
+            <div style={{ fontSize:'7px', letterSpacing:'0.42em', color:'rgba(100,140,255,0.50)', fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'18px' }}>
+              Traversal Node
+            </div>
+          </div>
+          <div style={reveal(2)}>
+            <div style={{ fontSize:'24px', letterSpacing:'0.2em', color:'rgba(220,230,255,0.90)', fontFamily:'var(--font-vyan)', textTransform:'uppercase', marginBottom:'10px' }}>
+              Coming Soon
+            </div>
+            <div style={{ width:'32px', height:'1px', background:'linear-gradient(90deg,transparent,rgba(100,140,255,0.65),transparent)', margin:'0 auto 16px' }} />
+          </div>
+          <div style={reveal(3)}>
+            <p style={{ fontSize:'12px', lineHeight:1.75, color:'rgba(150,170,255,0.42)', fontFamily:'var(--font-vyan)', letterSpacing:'0.06em', margin:'0 0 28px' }}>
+              This gateway is still forming in the field of consciousness.
+            </p>
+            <button onClick={handleClose} style={{
+              padding:'10px 24px',
+              background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)',
+              borderRadius:'8px', color:'rgba(255,255,255,0.40)', fontSize:'9px',
+              letterSpacing:'0.22em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
+              cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'7px',
+              transition:'color 0.2s, border-color 0.2s, background 0.2s',
+            }}
+            onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.70)'; b.style.borderColor='rgba(255,255,255,0.15)'; b.style.background='rgba(255,255,255,0.08)' }}
+            onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.40)'; b.style.borderColor='rgba(255,255,255,0.08)'; b.style.background='rgba(255,255,255,0.04)' }}
+            >
+              <BackIcon size={15} />Return
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1404,6 +1578,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           isOverview={isOverview} orbitEnabled={orbitEnabled} onOverviewAnimDone={onOverviewAnimDone}
           overviewZRef={overviewZRef}
         />
+        <ShootingStars />
       </Canvas>
 
       {/* Foreground nebula (in front of canvas) */}
