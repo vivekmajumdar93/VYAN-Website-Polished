@@ -29,7 +29,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Hint text updates: "Scroll · Pinch · Drag to explore · Tap an orb to enter" in overview',
       'Dot navigation bar hidden in overview; restored in close-up',
     ],
-    gitHash: 'pending',
+    gitHash: '4d32b1b',
     pages: ['Vistara'],
   },
   {
