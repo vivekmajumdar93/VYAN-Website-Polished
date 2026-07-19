@@ -957,16 +957,15 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
       alignItems:     isMobile ? 'flex-end' : 'stretch',
       justifyContent: isMobile ? 'center' : isLeft ? 'flex-start' : 'flex-end',
     }}>
-      {/* Backdrop */}
+      {/* Backdrop — subtle so orbs stay visible on the non-panel side */}
       <div onClick={handleClose} style={{
         position:'absolute', inset:0,
-        background:'rgba(0,0,0,0.68)',
-        backdropFilter:'blur(3px)', WebkitBackdropFilter:'blur(3px)',
+        background:'rgba(0,0,0,0.28)',
         opacity: phase === 'open' ? 1 : 0,
         transition:'opacity 380ms',
       }} />
 
-      {/* Panel */}
+      {/* Panel — glass: semi-transparent + backdrop-filter so orbs show through */}
       <div style={{
         position:'relative', zIndex:2,
         width:  isMobile ? '100%' : 'min(500px, 46vw)',
@@ -974,12 +973,14 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
         display:'flex', flexDirection:'column',
         borderRadius: isMobile ? '18px 18px 0 0' : '0',
         overflow:'hidden',
-        background:'rgba(3,6,22,0.97)',
+        background: isMobile ? 'rgba(4,7,26,0.78)' : 'rgba(4,7,26,0.62)',
+        backdropFilter:'blur(26px) saturate(1.4)',
+        WebkitBackdropFilter:'blur(26px) saturate(1.4)',
         boxShadow: isMobile
-          ? `0 -4px 80px rgba(0,0,0,0.65), inset 0 1px 0 ${c}33`
+          ? `0 -4px 80px rgba(0,0,0,0.55), inset 0 1px 0 ${c}44`
           : isLeft
-            ? `4px 0 80px rgba(0,0,0,0.65), inset -1px 0 0 ${c}44`
-            : `-4px 0 80px rgba(0,0,0,0.65), inset 1px 0 0 ${c}44`,
+            ? `6px 0 60px rgba(0,0,0,0.50), inset -1px 0 0 ${c}55`
+            : `-6px 0 60px rgba(0,0,0,0.50), inset 1px 0 0 ${c}55`,
         transform: slideTransform,
         transition: phase === 'closing'
           ? 'transform 380ms cubic-bezier(0.4,0,0.8,0.5)'
@@ -1062,8 +1063,8 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
         {/* Footer */}
         <div style={{
           flexShrink:0, padding: isMobile ? '14px 24px 28px' : '14px 32px 28px',
-          borderTop:'1px solid rgba(255,255,255,0.05)',
-          background:'rgba(2,4,16,0.50)',
+          borderTop:'1px solid rgba(255,255,255,0.07)',
+          background:'rgba(2,4,16,0.35)',
           opacity: contentVisible ? 1 : 0, transition:'opacity 0.4s 0.15s',
         }}>
           <div style={{ display:'flex', gap:'10px' }}>
