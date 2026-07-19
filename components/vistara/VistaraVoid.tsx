@@ -55,11 +55,13 @@ const TRAIL_FRAG = `
   varying float vAlpha;
   void main() {
     float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float a = (1.0 - smoothstep(0.2, 1.0, r)) * vAlpha;
-    if (a < 0.01) discard;
+    float disc = 1.0 - smoothstep(0.08, 0.80, r);
+    float core = exp(-r * r * 4.5);
+    float a = (disc * 0.7 + core * 0.55) * vAlpha;
+    if (a < 0.008) discard;
     // warm tail → cool head gradient driven by brightness
-    vec3 col = mix(vec3(1.0, 0.86, 0.68), vec3(0.88, 0.94, 1.0), vAlpha);
-    gl_FragColor = vec4(col, a);
+    vec3 col = mix(vec3(1.0, 0.88, 0.72), vec3(0.92, 0.97, 1.0), vAlpha);
+    gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
 
@@ -79,7 +81,8 @@ const SATURN_VERT = `
     float density = w1 * (0.4 + 0.6 * w2) * (0.65 + 0.35 * w3) * gap;
     vAlpha = clamp(density * (0.35 + abs(uTilt) * 2.5), 0.0, 1.0);
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * (550.0 / max(-mv.z, 1.0));
+    float dist = max(-mv.z, 1.0);
+    gl_PointSize = clamp(aSize * (550.0 / dist), aSize * 0.85, aSize * 2.2);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -410,11 +413,11 @@ function StarTrailsSystem() {
         // Size and brightness taper from head to tail
         let sz: number, baseA: number
         if (isH) {
-          sz    = 8.0 - tT * 3.0     // head cluster: 8→5 px
-          baseA = 1.0 - tT * 0.15    // head: 1.0→0.85
+          sz    = 14.0 - tT * 5.0    // head cluster: 14→9 px
+          baseA = 1.5 - tT * 0.25    // head: 1.5→1.25 (env brings it ≤1 during fade edges)
         } else {
-          sz    = 4.5 - tT * 3.8     // body: 4.5→0.7 px
-          baseA = 0.9 - tT * 0.8     // body: 0.9→0.1
+          sz    = 7.0 - tT * 5.8     // body: 7→1.2 px
+          baseA = 1.1 - tT * 1.0     // body: 1.1→0.1
         }
         td.sizeAttr.setX(j, Math.max(0.5, sz))
         td.alphaAttr.setX(j, Math.max(0, baseA) * env)
@@ -491,9 +494,9 @@ function VistaraOrb({
     if (isHovered)      nanoOrb.setSignal('hover')
     else if (isFocused) nanoOrb.setSignal('listening')
     else                nanoOrb.setSignal('idle')
-    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.55)
+    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : isOverview ? 0.82 : 0.55)
 
-    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.3, 1, ZERO)
+    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : isOverview ? 0.55 : 0.3, 1, ZERO)
 
     // On panel open for this orb: fire a sin-bell burst so the node web appears
     // to unfold outward — glass shards are timed to begin assembling at the peak
