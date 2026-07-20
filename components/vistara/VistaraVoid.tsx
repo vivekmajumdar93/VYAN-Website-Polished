@@ -459,50 +459,59 @@ function ScreenTracker({ worldRef, screenRef }: {
 }
 
 // ─── shooting stars ──────────────────────────────────────────────────────────
-// 2 stars · ~45 s cycle · staggered 22.5 s apart · cinematic but not blinding
+// 2 stars · ~45 s cycle · stardust particle style matching Saturn rings
+// Trail = many small discrete glowing dots, NOT a smooth gradient beam
 const SS_N  = 2    // max stars on screen
-const SS_TN = 100  // trail particles per star
+const SS_TN = 280  // particle count per star — density creates the trail shape
 
 const SS_VERT = `
   attribute vec3  aSeedPos;
   attribute vec3  aDir;
+  attribute vec3  aRight;      // perpendicular axis for scatter
   attribute float aSpeed;
   attribute float aPhase;
   attribute float aTrailFrac;
-  attribute float aHeadSz;
+  attribute float aScatter;    // lateral offset (stardust scatter)
+  attribute float aSzJitter;   // per-particle size variation
   attribute vec3  aCol;
   uniform   float uTime;
   varying   float vFrac;
   varying   vec3  vCol;
-  varying   float vFade;
+  varying   float vAlpha;
   void main() {
-    float t    = mod(uTime * aSpeed + aPhase, 1.0);
-    float fade = min(smoothstep(0.0, 0.03, t), smoothstep(1.0, 0.94, t));
-    vec3  head = aSeedPos + aDir * t * 2800.0;
-    vec3  pos  = head - aDir * aTrailFrac * 180.0;
-    vFrac = aTrailFrac;
-    vCol  = aCol;
-    vFade = fade;
+    float t      = mod(uTime * aSpeed + aPhase, 1.0);
+    float fade   = min(smoothstep(0.0, 0.04, t), smoothstep(1.0, 0.93, t));
+    vec3  head   = aSeedPos + aDir * t * 2600.0;
+    // Trail particle: step back along direction + scatter perpendicular
+    float trailD = aTrailFrac * 220.0;
+    vec3  pos    = head - aDir * trailD + aRight * aScatter * trailD * 0.18;
+    vFrac  = aTrailFrac;
+    vCol   = aCol;
+    // Head particles are fully bright; tail fades with trailFrac^2
+    float sf = 1.0 - aTrailFrac;
+    vAlpha = sf * sf * fade;
     vec4  mv   = modelViewMatrix * vec4(pos, 1.0);
     float dist = max(-mv.z, 1.0);
-    float sf   = 1.0 - aTrailFrac;
-    // Hard pixel cap so the head never becomes a screen-filling blob
-    gl_PointSize = clamp(aHeadSz * sf * sf * (500.0 / dist), 0.5, 88.0);
+    // Small discrete dots — head up to ~14px, tail down to sub-pixel
+    float sz = (6.0 + aSzJitter * 10.0) * sf * (400.0 / dist);
+    gl_PointSize = clamp(sz, 0.4, 14.0);
     gl_Position  = projectionMatrix * mv;
   }
 `
 const SS_FRAG = `
   varying float vFrac;
   varying vec3  vCol;
-  varying float vFade;
+  varying float vAlpha;
   void main() {
     float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.0, 0.88, r);
-    float core = exp(-r * r * 4.5);
-    float sf   = 1.0 - vFrac;
-    float a    = (disc * 0.75 + core * 0.85) * sf * sf * vFade;
-    if (a < 0.006) discard;
-    vec3  col  = mix(vCol, vec3(1.0), sf * 0.55);
+    // Soft disc — individual glowing mote, not a solid blob
+    float disc = 1.0 - smoothstep(0.3, 1.0, r);
+    float core = exp(-r * r * 6.0);
+    float a    = (disc * 0.6 + core * 0.9) * vAlpha;
+    if (a < 0.01) discard;
+    // Head particles pure-white core; tail retains colour
+    float sf  = 1.0 - vFrac;
+    vec3  col = mix(vCol, vec3(1.0), sf * 0.7);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
@@ -512,38 +521,57 @@ function ShootingStars() {
   const geo = useMemo(() => {
     const seedPos   = new Float32Array(total * 3)
     const dir       = new Float32Array(total * 3)
+    const right     = new Float32Array(total * 3)
     const speed     = new Float32Array(total)
     const phase     = new Float32Array(total)
     const trailFrac = new Float32Array(total)
-    const headSz    = new Float32Array(total)
+    const scatter   = new Float32Array(total)
+    const szJitter  = new Float32Array(total)
     const col       = new Float32Array(total * 3)
     const palette   = [
       [1.0, 0.96, 0.88], [0.72, 0.88, 1.0],  [1.0, 0.82, 0.40],
       [1.0, 0.50, 0.25], [0.80, 0.55, 1.0],  [0.45, 0.92, 1.0],
       [1.0, 0.65, 0.85], [0.60, 1.0, 0.75],
     ]
-    // Fixed phases: stars are exactly half a cycle apart (22.5 s offset)
     const PHASES = [0.0, 0.50]
     for (let s = 0; s < SS_N; s++) {
+      // Random spawn position on a sphere
       const θ = Math.random() * Math.PI * 2
       const φ = Math.acos(2 * Math.random() - 1)
-      const R = 400 + Math.random() * 500
-      const sp = [R * Math.sin(φ) * Math.cos(θ), R * Math.sin(φ) * Math.sin(θ), (Math.random() * 2 - 1) * 400]
+      const R = 350 + Math.random() * 450
+      const sp = [
+        R * Math.sin(φ) * Math.cos(θ),
+        R * Math.sin(φ) * Math.sin(θ),
+        (Math.random() * 2 - 1) * 350,
+      ]
+      // Random direction
       const dθ = Math.random() * Math.PI * 2
       const dφ = Math.acos(2 * Math.random() - 1)
-      const dp = [Math.sin(dφ) * Math.cos(dθ), Math.sin(dφ) * Math.sin(dθ), Math.cos(dφ)]
-      const spd = 1.0 / 45.0              // 45-second cycle
+      const dp = [Math.sin(dφ)*Math.cos(dθ), Math.sin(dφ)*Math.sin(dθ), Math.cos(dφ)]
+      // Perpendicular axis for lateral scatter (cross with world-up or world-right)
+      const up = Math.abs(dp[1]) < 0.9 ? [0,1,0] : [1,0,0]
+      const rx = dp[1]*up[2] - dp[2]*up[1]
+      const ry = dp[2]*up[0] - dp[0]*up[2]
+      const rz = dp[0]*up[1] - dp[1]*up[0]
+      const rl = Math.sqrt(rx*rx+ry*ry+rz*rz) || 1
+      const rp = [rx/rl, ry/rl, rz/rl]
+
+      const spd = 1.0 / 45.0
       const ph  = PHASES[s]
-      // aHeadSz drives the perspective-scaled size; the 88px clamp is the ceiling
-      const hsz = 175 + Math.random() * 50  // 175–225
       const c   = palette[Math.floor(Math.random() * palette.length)]
+
       for (let t = 0; t < SS_TN; t++) {
         const i = s * SS_TN + t
-        seedPos[i*3]=sp[0]; seedPos[i*3+1]=sp[1]; seedPos[i*3+2]=sp[2]
-        dir[i*3]=dp[0]; dir[i*3+1]=dp[1]; dir[i*3+2]=dp[2]
-        speed[i] = spd; phase[i] = ph
-        trailFrac[i] = t / (SS_TN - 1)
-        headSz[i] = hsz
+        const frac = t / (SS_TN - 1)
+        seedPos[i*3]=sp[0];  seedPos[i*3+1]=sp[1];  seedPos[i*3+2]=sp[2]
+        dir[i*3]=dp[0];      dir[i*3+1]=dp[1];      dir[i*3+2]=dp[2]
+        right[i*3]=rp[0];    right[i*3+1]=rp[1];    right[i*3+2]=rp[2]
+        speed[i]     = spd
+        phase[i]     = ph
+        trailFrac[i] = frac
+        // Signed scatter so particles spread both sides of the trail axis
+        scatter[i]   = (Math.random() * 2 - 1)
+        szJitter[i]  = Math.random()
         col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2]
       }
     }
@@ -551,10 +579,12 @@ function ShootingStars() {
     g.setAttribute('position',   new THREE.BufferAttribute(new Float32Array(total * 3), 3))
     g.setAttribute('aSeedPos',   new THREE.BufferAttribute(seedPos,   3))
     g.setAttribute('aDir',       new THREE.BufferAttribute(dir,       3))
+    g.setAttribute('aRight',     new THREE.BufferAttribute(right,     3))
     g.setAttribute('aSpeed',     new THREE.BufferAttribute(speed,     1))
     g.setAttribute('aPhase',     new THREE.BufferAttribute(phase,     1))
     g.setAttribute('aTrailFrac', new THREE.BufferAttribute(trailFrac, 1))
-    g.setAttribute('aHeadSz',    new THREE.BufferAttribute(headSz,    1))
+    g.setAttribute('aScatter',   new THREE.BufferAttribute(scatter,   1))
+    g.setAttribute('aSzJitter',  new THREE.BufferAttribute(szJitter,  1))
     g.setAttribute('aCol',       new THREE.BufferAttribute(col,       3))
     return g
   }, [])
