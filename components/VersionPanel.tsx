@@ -6,7 +6,10 @@ export default function VersionPanel() {
   const [open, setOpen]         = useState(false)
   // Which version rows have their change-list expanded; current starts open
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([CURRENT_VERSION]))
-  const touchStartY = useRef(0)
+  const touchStartY    = useRef(0)
+  const scrollRef      = useRef<HTMLDivElement>(null)
+  const scrollTouchY   = useRef(0)
+  const scrollTouchTop = useRef(0)
 
   const close = useCallback(() => setOpen(false), [])
 
@@ -113,16 +116,25 @@ export default function VersionPanel() {
               >✕</button>
             </div>
 
-            {/* Version list — touch-action pan-y overrides global touch-action:none */}
-            <div style={{
-              overflowY:'auto', flex:1,
-              padding:'16px 30px 32px',
-              // Override the global html,body { touch-action: none } so this div scrolls on iOS
-              touchAction:'pan-y',
-              WebkitOverflowScrolling:'touch',
-              // Allow text selection for git hashes
-              userSelect:'text', WebkitUserSelect:'text',
-            }}>
+            {/* Version list — JS touch scroll because global touch-action:none prevents CSS override */}
+            <div
+              ref={scrollRef}
+              style={{
+                overflowY:'auto', flex:1,
+                padding:'16px 30px 32px',
+                userSelect:'text', WebkitUserSelect:'text',
+              }}
+              onTouchStart={e => {
+                e.stopPropagation()
+                scrollTouchY.current   = e.touches[0].clientY
+                scrollTouchTop.current = scrollRef.current?.scrollTop ?? 0
+              }}
+              onTouchMove={e => {
+                e.stopPropagation()
+                if (!scrollRef.current) return
+                scrollRef.current.scrollTop = scrollTouchTop.current + (scrollTouchY.current - e.touches[0].clientY)
+              }}
+            >
               {SITE_VERSIONS.map((v, idx) => {
                 const isCurrent  = v.version === CURRENT_VERSION
                 const isExpanded = expanded.has(v.version)

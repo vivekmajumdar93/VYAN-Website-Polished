@@ -259,6 +259,13 @@ export default function SoundConsole() {
   const onLowpass = (v: number) => { setLowpass(v); setPreset(null); const e = getEngine(); if (!e) return; e.applySettings({ lowpassHz: v }); };
   const onReverb = () => { const v = !reverb; setReverb(v); setPreset(null); const e = getEngine(); if (!e) return; e.applySettings({ reverb: v }); };
 
+  // External toggle — dispatched by Vistara's acoustic shortcut button.
+  useEffect(() => {
+    const handler = () => setOpen(o => !o);
+    window.addEventListener('vyan:sound-toggle', handler);
+    return () => window.removeEventListener('vyan:sound-toggle', handler);
+  }, []);
+
   // ESC closes the panel.
   useEffect(() => {
     if (!open) return;

@@ -459,8 +459,9 @@ function ScreenTracker({ worldRef, screenRef }: {
 }
 
 // ─── shooting stars ──────────────────────────────────────────────────────────
-const SS_N  = 10   // number of stars
-const SS_TN = 24   // trail particles per star
+// 2 stars max · ~45 s cycle each · staggered 22.5 s apart · massive scale
+const SS_N  = 2    // max stars on screen
+const SS_TN = 150  // trail particles per star
 
 const SS_VERT = `
   attribute vec3  aSeedPos;
@@ -476,16 +477,16 @@ const SS_VERT = `
   varying   float vFade;
   void main() {
     float t    = mod(uTime * aSpeed + aPhase, 1.0);
-    float fade = min(smoothstep(0.0, 0.05, t), smoothstep(1.0, 0.92, t));
-    vec3  head = aSeedPos + aDir * t * 1600.0;
-    vec3  pos  = head - aDir * aTrailFrac * 88.0;
+    float fade = min(smoothstep(0.0, 0.03, t), smoothstep(1.0, 0.94, t));
+    vec3  head = aSeedPos + aDir * t * 3200.0;
+    vec3  pos  = head - aDir * aTrailFrac * 2400.0;
     vFrac = aTrailFrac;
     vCol  = aCol;
     vFade = fade;
     vec4  mv   = modelViewMatrix * vec4(pos, 1.0);
     float dist = max(-mv.z, 1.0);
     float sf   = 1.0 - aTrailFrac;
-    gl_PointSize = clamp(aHeadSz * sf * sf * (500.0 / dist), 0.5, aHeadSz * 3.0);
+    gl_PointSize = clamp(aHeadSz * sf * sf * (800.0 / dist), 0.5, aHeadSz * 5.0);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -495,12 +496,12 @@ const SS_FRAG = `
   varying float vFade;
   void main() {
     float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.0, 0.9, r);
-    float core = exp(-r * r * 5.0);
+    float disc = 1.0 - smoothstep(0.0, 0.85, r);
+    float core = exp(-r * r * 4.0);
     float sf   = 1.0 - vFrac;
-    float a    = (disc * 0.65 + core * 0.55) * sf * sf * vFade;
-    if (a < 0.008) discard;
-    vec3  col  = mix(vCol, vec3(1.0), sf * 0.5);
+    float a    = (disc * 0.80 + core * 0.90) * sf * sf * vFade;
+    if (a < 0.005) discard;
+    vec3  col  = mix(vCol, vec3(1.0), sf * 0.55);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
@@ -520,17 +521,19 @@ function ShootingStars() {
       [1.0, 0.50, 0.25], [0.80, 0.55, 1.0],  [0.45, 0.92, 1.0],
       [1.0, 0.65, 0.85], [0.60, 1.0, 0.75],
     ]
+    // Fixed phases: stars are exactly half a cycle apart (22.5 s offset)
+    const PHASES = [0.0, 0.50]
     for (let s = 0; s < SS_N; s++) {
       const θ = Math.random() * Math.PI * 2
       const φ = Math.acos(2 * Math.random() - 1)
-      const R = 500 + Math.random() * 650
-      const sp = [R * Math.sin(φ) * Math.cos(θ), R * Math.sin(φ) * Math.sin(θ), (Math.random() * 2 - 1) * 520]
+      const R = 400 + Math.random() * 500
+      const sp = [R * Math.sin(φ) * Math.cos(θ), R * Math.sin(φ) * Math.sin(θ), (Math.random() * 2 - 1) * 400]
       const dθ = Math.random() * Math.PI * 2
       const dφ = Math.acos(2 * Math.random() - 1)
       const dp = [Math.sin(dφ) * Math.cos(dθ), Math.sin(dφ) * Math.sin(dθ), Math.cos(dφ)]
-      const spd = 0.03 + Math.random() * 0.11
-      const ph  = Math.random()
-      const hsz = 13 + Math.random() * 11
+      const spd = 1.0 / 45.0          // 45-second cycle
+      const ph  = PHASES[s]
+      const hsz = 3200 + Math.random() * 800   // 3200–4000 — massive head
       const c   = palette[Math.floor(Math.random() * palette.length)]
       for (let t = 0; t < SS_TN; t++) {
         const i = s * SS_TN + t
@@ -1622,6 +1625,26 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           <span style={{ fontFamily:'var(--font-vyan)', fontSize:11, letterSpacing:'0.2em', color:'rgba(100,160,255,0.70)' }}>ŚŪNYA MAṆḌALA</span>
         </button>
       )}
+
+      {/* Sound console shortcut — opens the global SoundConsole panel */}
+      <button
+        onClick={() => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('vyan:sound-toggle')) }}
+        title="Acoustic Console"
+        style={{
+          position:'fixed', top:'68px', left:'22px', zIndex:40,
+          background:'none', border:'none', cursor:'pointer',
+          display:'flex', alignItems:'center', gap:7, padding:0,
+          opacity:0.55, transition:'opacity 0.2s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.55' }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(100,160,255,0.85)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+        <span style={{ fontFamily:'var(--font-vyan)', fontSize:10, letterSpacing:'0.2em', color:'rgba(100,160,255,0.70)' }}>ACOUSTIC</span>
+      </button>
 
       <p style={{ position:'fixed', bottom:'5%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.25em', color:'rgba(255,255,255,0.10)', textTransform:'uppercase', margin:0, whiteSpace:'nowrap' }}>
         {isOverview ? 'Scroll · Pinch · Drag to explore · Tap an orb to enter' : 'Scroll to traverse · Click focused orb to enter'}
