@@ -459,9 +459,9 @@ function ScreenTracker({ worldRef, screenRef }: {
 }
 
 // ─── shooting stars ──────────────────────────────────────────────────────────
-// 2 stars max · ~45 s cycle each · staggered 22.5 s apart · massive scale
+// 2 stars · ~45 s cycle · staggered 22.5 s apart · cinematic but not blinding
 const SS_N  = 2    // max stars on screen
-const SS_TN = 150  // trail particles per star
+const SS_TN = 100  // trail particles per star
 
 const SS_VERT = `
   attribute vec3  aSeedPos;
@@ -478,15 +478,16 @@ const SS_VERT = `
   void main() {
     float t    = mod(uTime * aSpeed + aPhase, 1.0);
     float fade = min(smoothstep(0.0, 0.03, t), smoothstep(1.0, 0.94, t));
-    vec3  head = aSeedPos + aDir * t * 3200.0;
-    vec3  pos  = head - aDir * aTrailFrac * 2400.0;
+    vec3  head = aSeedPos + aDir * t * 2800.0;
+    vec3  pos  = head - aDir * aTrailFrac * 900.0;
     vFrac = aTrailFrac;
     vCol  = aCol;
     vFade = fade;
     vec4  mv   = modelViewMatrix * vec4(pos, 1.0);
     float dist = max(-mv.z, 1.0);
     float sf   = 1.0 - aTrailFrac;
-    gl_PointSize = clamp(aHeadSz * sf * sf * (800.0 / dist), 0.5, aHeadSz * 5.0);
+    // Hard pixel cap so the head never becomes a screen-filling blob
+    gl_PointSize = clamp(aHeadSz * sf * sf * (500.0 / dist), 0.5, 88.0);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -496,11 +497,11 @@ const SS_FRAG = `
   varying float vFade;
   void main() {
     float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.0, 0.85, r);
-    float core = exp(-r * r * 4.0);
+    float disc = 1.0 - smoothstep(0.0, 0.88, r);
+    float core = exp(-r * r * 4.5);
     float sf   = 1.0 - vFrac;
-    float a    = (disc * 0.80 + core * 0.90) * sf * sf * vFade;
-    if (a < 0.005) discard;
+    float a    = (disc * 0.75 + core * 0.85) * sf * sf * vFade;
+    if (a < 0.006) discard;
     vec3  col  = mix(vCol, vec3(1.0), sf * 0.55);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
@@ -531,9 +532,10 @@ function ShootingStars() {
       const dθ = Math.random() * Math.PI * 2
       const dφ = Math.acos(2 * Math.random() - 1)
       const dp = [Math.sin(dφ) * Math.cos(dθ), Math.sin(dφ) * Math.sin(dθ), Math.cos(dφ)]
-      const spd = 1.0 / 45.0          // 45-second cycle
+      const spd = 1.0 / 45.0              // 45-second cycle
       const ph  = PHASES[s]
-      const hsz = 3200 + Math.random() * 800   // 3200–4000 — massive head
+      // aHeadSz drives the perspective-scaled size; the 88px clamp is the ceiling
+      const hsz = 175 + Math.random() * 50  // 175–225
       const c   = palette[Math.floor(Math.random() * palette.length)]
       for (let t = 0; t < SS_TN; t++) {
         const i = s * SS_TN + t
