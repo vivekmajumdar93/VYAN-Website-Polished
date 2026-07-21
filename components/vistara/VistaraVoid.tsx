@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html, OrbitControls } from '@react-three/drei'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { NanoOrb } from '@/lib/vyan/objects/NanoOrb'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
@@ -106,6 +107,10 @@ const SATURN_FRAG = `
     else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
     else                  { col = mix(purple, red,    cycle - 2.0); }
     col = col * 1.12 + vec3(0.02);
+    // HDR core: pushes only the sparkle centre (sprk≈1 → luminance ≈3) above
+    // the bloom luminanceThreshold (0.85). The disc area (sprk<0.3) stays below
+    // the threshold so the surrounding ring surface never halos. Void stays dark.
+    col += vec3(sprk * vAlpha * 2.5);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
@@ -1617,6 +1622,15 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           overviewZRef={overviewZRef}
         />
         <ShootingStars />
+        <EffectComposer multisampling={0}>
+          <Bloom
+            intensity={0.55}
+            luminanceThreshold={0.85}
+            luminanceSmoothing={0.025}
+            radius={0.35}
+            mipmapBlur
+          />
+        </EffectComposer>
       </Canvas>
 
       {/* Foreground nebula (in front of canvas) */}
