@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html, OrbitControls } from '@react-three/drei'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import {} from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { NanoOrb } from '@/lib/vyan/objects/NanoOrb'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
@@ -94,10 +94,9 @@ const SATURN_FRAG = `
   varying float vAlpha;
   void main() {
     float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.05, 0.88, r);
-    float sprk = exp(-r * r * 6.0);
-    float a    = (disc * 0.72 + sprk * 0.55) * vAlpha;
-    if (a < 0.005) discard;
+    float core = exp(-r * r * 9.0);
+    float a    = core * vAlpha;
+    if (a < 0.006) discard;
     float cycle = mod(uTime * 0.05, 3.0);
     vec3 red    = vec3(1.00, 0.12, 0.06);
     vec3 dblue  = vec3(0.08, 0.28, 1.00);
@@ -107,10 +106,6 @@ const SATURN_FRAG = `
     else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
     else                  { col = mix(purple, red,    cycle - 2.0); }
     col = col * 1.12 + vec3(0.02);
-    // HDR core: pushes only the sparkle centre (sprk≈1 → luminance ≈3) above
-    // the bloom luminanceThreshold (0.85). The disc area (sprk<0.3) stays below
-    // the threshold so the surrounding ring surface never halos. Void stays dark.
-    col += vec3(sprk * vAlpha * 0.9);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
@@ -633,15 +628,23 @@ const CORE_VERT = `
   }
 `
 const CORE_FRAG = `
+  uniform float uTime;
   varying float vAlpha;
   void main() {
     float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.1, 0.85, r);
-    float core = exp(-r * r * 5.0);
-    float a    = (disc * 0.55 + core * 0.7) * vAlpha;
-    if (a < 0.01) discard;
-    // Electric azure → royal blue — matches orb palette, no violet
-    vec3 col = mix(vec3(0.28, 0.72, 1.00), vec3(0.04, 0.12, 0.65), smoothstep(0.0, 1.0, r));
+    float core = exp(-r * r * 9.0);
+    float a    = core * vAlpha;
+    if (a < 0.012) discard;
+    // Same cycling gradient as Saturn rings — core and rings breathe as one system
+    float cycle = mod(uTime * 0.04, 3.0);
+    vec3 red    = vec3(1.00, 0.12, 0.06);
+    vec3 dblue  = vec3(0.08, 0.28, 1.00);
+    vec3 purple = vec3(0.55, 0.05, 0.90);
+    vec3 col;
+    if      (cycle < 1.0) { col = mix(red,    dblue,  cycle);       }
+    else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
+    else                  { col = mix(purple, red,    cycle - 2.0); }
+    col = col * 1.10 + vec3(0.01);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
@@ -1874,15 +1877,6 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           overviewZRef={overviewZRef}
         />
         <ShootingStars />
-        <EffectComposer multisampling={0}>
-          <Bloom
-            intensity={0.55}
-            luminanceThreshold={0.85}
-            luminanceSmoothing={0.025}
-            radius={0.35}
-            mipmapBlur
-          />
-        </EffectComposer>
       </Canvas>
 
       {/* Foreground nebula (in front of canvas) */}
