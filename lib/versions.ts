@@ -15,6 +15,27 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '1.5',
+    date: '2026-07-21',
+    title: 'Vistara — Stardust Meteors, Sound Icon & Universal Footer',
+    summary: 'Shooting stars rebuilt as discrete stardust particle trails matching the Saturn ring language. Legal footer and copyright pill now hover-accessible on every page above all panels.',
+    changes: [
+      'Shooting stars: 2 max, 45-second cycle, staggered 22.5 s apart',
+      'Trail rebuilt as 280 discrete motes with perpendicular scatter — stardust not a beam',
+      'Per-particle size jitter and signed lateral scatter for organic ring-like density',
+      'Hard 14px particle cap prevents any screen-filling blob at any camera distance',
+      'ACOUSTIC shortcut button (top-left, below back) dispatches vyan:sound-toggle to SoundConsole',
+      'SoundConsole gains external event listener for vyan:sound-toggle',
+      'NebulaFooter enabled on all cosmic pages — removed /vyoma+/shunya route gate',
+      'Footer z-index 8→9100, slab dialog 80→9200 — visible and clickable above all panels',
+      'Version history: JS touch-scroll handlers replace broken CSS pan-y override',
+      'Orbital rings: alpha 0.35→0.48, particles 2200→3000, size 1.5-5px→2.2-7px for low-brightness screens',
+      'Ring width narrowed from 44% to 30% of radius — tighter, more defined band',
+    ],
+    gitHash: '156d53e',
+    pages: ['Vistara', 'All pages'],
+  },
+  {
     version: '1.4',
     date: '2026-07-19',
     title: 'Vistara — Side-Sliding Panels & Live App Placeholders',
@@ -121,4 +142,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '1.4'
+export const CURRENT_VERSION = '1.5'
