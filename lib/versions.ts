@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.2',
+    date: '2026-07-21',
+    title: 'Vistara — Core Nebula Particle Disc',
+    summary: 'The central vortex billboard (a solid violet disc) is replaced with a 480-particle accretion disc in the XZ plane using differential rotation — inner particles orbit faster, azure-blue in the same particle language as the Saturn rings.',
+    changes: [
+      'Removed PlaneGeometry billboard vortex (was rendering as opaque violet/pink blob)',
+      '480-particle disc at gyroscope origin, flat in XZ plane with ±3 unit Y scatter',
+      'Differential rotation shader: inner r<10 orbits 3× faster than outer edge',
+      'Density wave modulation (6 arms, 0.7 rad/s) gives natural spiral arm shaping',
+      'Colour: electric azure (#47b8ff) → royal blue (#0a1fa6), matches orb palette',
+      'Max point size 2px hard cap — stays coherent at all camera distances',
+    ],
+    gitHash: '640f918',
+    pages: ['Vistara'],
+  },
+  {
     version: '2.1',
     date: '2026-07-21',
     title: 'Vistara — Orb Throw & Scaled Presence',
@@ -236,4 +252,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.1'
+export const CURRENT_VERSION = '2.2'
