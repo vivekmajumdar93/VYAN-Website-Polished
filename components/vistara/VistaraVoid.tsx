@@ -608,65 +608,75 @@ function ShootingStars() {
   return <points geometry={geo} material={mat} frustumCulled={false} />
 }
 
-// ─── central vortex — glowing billboard disc at gyroscope origin ─────────────
-const VORTEX_VERT = `
-  varying vec2 vUV;
+// ─── core nebula — particle disc at gyroscope origin ─────────────────────────
+// Replaces the billboard disc; uses differential rotation so inner particles
+// orbit faster, giving a natural accretion-disc look in pure particle language.
+const CORE_VERT = `
+  attribute float aSize;
+  attribute float aPhase;
+  uniform   float uTime;
+  varying   float vAlpha;
   void main() {
-    vUV = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    float r   = length(vec2(position.x, position.z));
+    // Differential rotation: inner particles orbit much faster than outer
+    float spd = 0.30 / max(r * 0.022 + 0.08, 0.08);
+    float ang = atan(position.z, position.x) + uTime * spd + aPhase * 0.15;
+    vec3  pos = vec3(r * cos(ang), position.y, r * sin(ang));
+    // Alpha: density wave * radial falloff — barely visible at edge, brighter at core
+    float wave   = 0.45 + 0.55 * sin(ang * 6.0 - uTime * 0.7 + aPhase);
+    float falloff = 1.0 - smoothstep(0.0, 48.0, r);
+    vAlpha = clamp(wave * falloff * 0.65, 0.0, 1.0);
+    vec4  mv   = modelViewMatrix * vec4(pos, 1.0);
+    float dist = max(-mv.z, 1.0);
+    gl_PointSize = clamp(aSize * (260.0 / dist), 0.3, 2.0);
+    gl_Position  = projectionMatrix * mv;
   }
 `
-const VORTEX_FRAG = `
-  uniform float uTime;
-  varying vec2  vUV;
+const CORE_FRAG = `
+  varying float vAlpha;
   void main() {
-    vec2  p     = vUV - 0.5;
-    float r     = length(p);
-    if (r > 0.5) discard;
-    float normR = r * 2.0;
-
-    // Swirl: angle + inward taper rotating over time
-    float ang   = atan(p.y, p.x) + normR * 5.0 - uTime * 0.52;
-    float swirl = 0.5 + 0.5 * sin(ang * 4.0);
-
-    // Concentric outward pulse
-    float pulse = 0.5 + 0.5 * sin(normR * 13.0 - uTime * 2.2);
-
-    // Bright hot core
-    float core  = exp(-normR * normR * 14.0);
-
-    // Colour: violet centre → deep blue edge
-    vec3 violet = vec3(0.78, 0.20, 1.00);
-    vec3 dblue  = vec3(0.18, 0.08, 0.90);
-    vec3 col    = mix(violet, dblue, smoothstep(0.0, 0.9, normR));
-    col        += vec3(0.92, 0.60, 1.0) * core;
-
-    // Alpha: hard edge cutoff, swirl modulation, strong core
-    float edge  = 1.0 - smoothstep(0.36, 0.50, normR);
-    float a     = edge * (0.18 + 0.26 * swirl * pulse + 0.48 * core);
-    if (a < 0.008) discard;
+    float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float disc = 1.0 - smoothstep(0.1, 0.85, r);
+    float core = exp(-r * r * 5.0);
+    float a    = (disc * 0.55 + core * 0.7) * vAlpha;
+    if (a < 0.01) discard;
+    // Electric azure → royal blue — matches orb palette, no violet
+    vec3 col = mix(vec3(0.28, 0.72, 1.00), vec3(0.04, 0.12, 0.65), smoothstep(0.0, 1.0, r));
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
+function createCoreGeo(): THREE.BufferGeometry {
+  const COUNT = 480
+  const pos   = new Float32Array(COUNT * 3)
+  const sz    = new Float32Array(COUNT)
+  const ph    = new Float32Array(COUNT)
+  for (let i = 0; i < COUNT; i++) {
+    const angle = Math.random() * Math.PI * 2
+    // Square-root bias so most particles sit within inner 60% of disc
+    const r     = Math.pow(Math.random(), 0.55) * 48
+    pos[i*3]   = r * Math.cos(angle)
+    pos[i*3+1] = (Math.random() - 0.5) * 6   // thin disc in XZ plane
+    pos[i*3+2] = r * Math.sin(angle)
+    sz[i]      = 0.4 + Math.random() * 1.4
+    ph[i]      = Math.random() * Math.PI * 2
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(sz,  1))
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(ph,  1))
+  return geo
+}
 function CentralVortex() {
-  const meshRef = useRef<THREE.Mesh>(null)
-  const { camera } = useThree()
-  const mat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader:   VORTEX_VERT,
-    fragmentShader: VORTEX_FRAG,
+  const ptsRef = useRef<THREE.Points>(null)
+  const geo    = useMemo(createCoreGeo, [])
+  const mat    = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   CORE_VERT,
+    fragmentShader: CORE_FRAG,
     uniforms: { uTime: { value: 0 } },
-    transparent: true,
-    depthWrite:  false,
-    blending:    THREE.AdditiveBlending,
-    side:        THREE.DoubleSide,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   }), [])
-  const geo = useMemo(() => new THREE.PlaneGeometry(80, 80), [])
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return
-    mat.uniforms.uTime.value = clock.elapsedTime
-    meshRef.current.quaternion.copy(camera.quaternion)
-  })
-  return <mesh ref={meshRef} geometry={geo} material={mat} position={[0, 0, 0]} />
+  useFrame(({ clock }) => { mat.uniforms.uTime.value = clock.elapsedTime })
+  return <points ref={ptsRef} geometry={geo} material={mat} frustumCulled={false} />
 }
 
 // ─── 3D starfield — static sphere of 1500 distant stars for camera parallax ──
