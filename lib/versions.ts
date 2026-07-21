@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '1.8',
+    date: '2026-07-21',
+    title: 'Vistara — Custom Cursor & Per-Gateway Panel Content',
+    summary: 'Custom orbital cursor replaces the default pointer — a lagging ring expands on orb hover. Each gateway\'s side panel now shows three gateway-specific capability cards between the description and the Live Interface slot.',
+    changes: [
+      'Custom cursor: cursor:none on root, lagging ring (14% lerp/frame via rAF) + precision dot',
+      'Ring: 32px idle → 52px on orb hover, spring cubic-bezier expansion, azure blue glow',
+      'Dot: 4px exact-position indicator, brightens on hover',
+      'Per-gateway feature cards: 3 "Core Capabilities" cards for all 8 gateways',
+      'Cards styled with gateway accent colour: tinted background, numbered badge, upper-case title',
+      'Feature cards appear between description and Live Interface placeholder in stagger step 4',
+    ],
+    gitHash: 'b80ad08',
+    pages: ['Vistara'],
+  },
+  {
     version: '1.7',
     date: '2026-07-21',
     title: 'Vistara — 3D Starfield, Central Vortex & Fresnel Rim Glow',
@@ -173,4 +189,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '1.7'
+export const CURRENT_VERSION = '1.8'
