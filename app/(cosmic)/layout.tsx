@@ -3,6 +3,7 @@ import ConciergeOrb from './ConciergeOrb';
 import EdgeSwipeNav from './EdgeSwipeNav';
 import SoundConsole from './SoundConsole';
 import NebulaFooter from './NebulaFooter';
+import AcousticConsole from '@/components/AcousticConsole';
 
 export default function CosmicLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function CosmicLayout({ children }: { children: React.ReactNode }
       <EdgeSwipeNav />
       {children}
       <NebulaFooter />
+      <AcousticConsole />
     </>
   );
 }
