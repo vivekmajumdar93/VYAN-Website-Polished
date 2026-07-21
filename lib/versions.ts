@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.3',
+    date: '2026-07-21',
+    title: 'Vistara — No Halos, Shared Color Cycle',
+    summary: 'Disc/halo component stripped from both the core nebula and Saturn ring fragment shaders — only tight Gaussian point cores remain. Core now cycles the same red→blue→purple gradient as the rings. Bloom pass removed (nothing emits HDR anymore).',
+    changes: [
+      'SATURN_FRAG: removed disc * 0.72 term; pure exp(-r²×9) core only — no soft halo per particle',
+      'SATURN_FRAG: removed HDR boost (col += sprk*vAlpha*0.9) — rings no longer trigger bloom',
+      'CORE_FRAG: removed disc + azure static color; tight exp(-r²×9) core with same red→blue→purple cycle',
+      'Core color slightly offset in cycle speed (0.04 vs 0.05) so core and rings are slightly phase-shifted',
+      'EffectComposer + Bloom removed — was no-op once HDR outputs were eliminated, saves a GPU pass',
+    ],
+    gitHash: 'fdadd4b',
+    pages: ['Vistara'],
+  },
+  {
     version: '2.2',
     date: '2026-07-21',
     title: 'Vistara — Core Nebula Particle Disc',
@@ -252,4 +267,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.2'
+export const CURRENT_VERSION = '2.3'
