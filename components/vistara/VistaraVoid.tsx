@@ -1251,6 +1251,50 @@ function LiveAppPlaceholder({ gateway }: { gateway: Gateway }) {
   )
 }
 
+// ─── per-gateway feature content ─────────────────────────────────────────────
+const GATEWAY_DETAILS: Record<string, { features: { title: string; body: string }[] }> = {
+  rtam: { features: [
+    { title: 'Pravāha Mapping',       body: 'Visualises natural flow patterns in your life to surface hidden rhythms.' },
+    { title: 'Conscious Scheduling',   body: 'Aligns your calendar to cosmic and personal energy cycles for effortless living.' },
+    { title: 'Harmony Score',          body: 'Continuous metric tracking alignment between your intention and daily action.' },
+  ]},
+  ojas: { features: [
+    { title: 'Pranic Rhythm Tracker',  body: 'Measures and charts your vital energy across every hour of the day.' },
+    { title: 'Vitality Insights',      body: 'AI-powered pattern analysis across sleep, food, movement, and mind.' },
+    { title: 'Circulation Dashboard',  body: 'Concentric ring visualisation of multi-dimensional wellness in real time.' },
+  ]},
+  mudra: { features: [
+    { title: 'Global Entity Archive',  body: 'Structured knowledge repository for conscious organisations and individuals.' },
+    { title: 'Permanence Protocol',    body: 'Immutable record system ensuring integrity across time and context.' },
+    { title: 'Kośa Mapping',           body: 'Multi-layer entity profiling aligned with traditional wisdom frameworks.' },
+  ]},
+  netra: { features: [
+    { title: 'Cross-Tantra Vision',    body: 'Observes patterns and anomalies across all VYAN systems simultaneously.' },
+    { title: 'Awareness Engine',       body: 'Intelligent perception layer that surfaces what matters, when it matters.' },
+    { title: 'Astronomical Sensing',   body: 'Real-time monitoring with cosmic-scale perspective on micro-scale events.' },
+  ]},
+  akriti: { features: [
+    { title: 'Drishti-Driven Design',  body: 'Creates digital experiences shaped by your unique perspective and intention.' },
+    { title: 'Prismatic Creation',     body: 'Refracts raw possibility into structured, beautiful digital artefacts.' },
+    { title: 'Anubhava Studio',        body: 'Full-stack creative environment built for conscious digital making.' },
+  ]},
+  sutra: { features: [
+    { title: 'Sangama Weaving',        body: 'Maps and strengthens intentional relationships between people and entities.' },
+    { title: 'Vivek Connections',      body: 'Intelligent discernment layer for building networks that truly resonate.' },
+    { title: 'Thread Intelligence',    body: 'Identifies dormant connections with high resonance potential waiting to unfold.' },
+  ]},
+  'chitra-prana': { features: [
+    { title: 'Imagery Breathwork',     body: 'Infuses static visuals with life, motion, and intentional prāṇic energy.' },
+    { title: 'Cosmic Aperture',        body: 'Wide-angle creative space for multi-modal visual storytelling at any scale.' },
+    { title: 'Prāṇa Visualisation',    body: 'Renders the invisible life-force within imagery as perceptible moving form.' },
+  ]},
+  maya: { features: [
+    { title: 'Reality Manifold',       body: 'Constructs layered digital realities from initial intention to tangible output.' },
+    { title: 'Dynamic Gateway',        body: 'The most versatile portal — its nature adapts to what you need to create.' },
+    { title: 'Manifestation Engine',   body: 'Bridges the gap between possibility-space and expressed digital form.' },
+  ]},
+}
+
 // ─── glass panel (side-sliding) ───────────────────────────────────────────────
 type PanelPhase = 'opening' | 'open' | 'closing'
 
@@ -1396,6 +1440,31 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
             }}>{gateway.description}</p>
           </div>
           <div style={reveal(4)}>
+            {/* Gateway-specific feature cards */}
+            <div style={{ marginBottom:'24px' }}>
+              <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.16)', fontFamily:'var(--font-vyan)', marginBottom:'12px' }}>
+                Core Capabilities
+              </div>
+              {(GATEWAY_DETAILS[gateway.id]?.features ?? []).map((f, i) => (
+                <div key={i} style={{
+                  padding:'11px 14px', marginBottom:'8px', borderRadius:'8px',
+                  background:`linear-gradient(135deg,${c}09 0%,transparent 100%)`,
+                  border:`1px solid ${c}1a`,
+                  display:'flex', alignItems:'flex-start', gap:'12px',
+                }}>
+                  <div style={{
+                    flexShrink:0, width:'20px', height:'20px', borderRadius:'5px',
+                    border:`1px solid ${c}33`, display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:'8px', color:`${c}88`, fontFamily:'var(--font-vyan)', fontWeight:600,
+                  }}>{i + 1}</div>
+                  <div>
+                    <div style={{ fontSize:'10px', letterSpacing:'0.16em', textTransform:'uppercase', color:`${c}cc`, fontFamily:'var(--font-vyan)', marginBottom:'4px' }}>{f.title}</div>
+                    <div style={{ fontSize:'11px', lineHeight:'1.60', color:'rgba(255,255,255,0.36)', fontFamily:'var(--font-vyan)', letterSpacing:'0.02em' }}>{f.body}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Live Interface slot */}
             <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.16)', fontFamily:'var(--font-vyan)', marginBottom:'10px' }}>
               Live Interface
             </div>
