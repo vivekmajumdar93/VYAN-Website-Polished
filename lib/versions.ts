@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.4',
+    date: '2026-07-21',
+    title: 'UX Fixes — One Console, No Phantom Cursor, Scrollable Panel',
+    summary: 'Three UX regressions fixed: AcousticConsole removed from layout (SoundConsole is the single audio panel, already has ✕ close); custom cursor ring/dot hidden on touch/coarse-pointer devices; GlassPanel content area now scrolls on iOS via JS touch handlers.',
+    changes: [
+      'Removed AcousticConsole from cosmic layout — SoundConsole is the only audio panel',
+      'Custom cursor (ring + dot + cursor:none) gated on window.matchMedia("(pointer:fine)") — invisible on mobile',
+      'GlassPanel scrollable content div gets onTouchStart/onTouchMove JS handlers — bypasses global touch-action:none',
+      'Panel Live Interface placeholder is now reachable by scrolling on iPhone',
+    ],
+    gitHash: 'c473821',
+    pages: ['All pages', 'Vistara'],
+  },
+  {
     version: '2.3',
     date: '2026-07-21',
     title: 'Vistara — No Halos, Shared Color Cycle',
@@ -267,4 +281,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.3'
+export const CURRENT_VERSION = '2.4'
