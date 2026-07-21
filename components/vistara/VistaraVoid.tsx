@@ -608,6 +608,72 @@ function ShootingStars() {
   return <points geometry={geo} material={mat} frustumCulled={false} />
 }
 
+// ─── 3D starfield — static sphere of 1500 distant stars for camera parallax ──
+const SF_VERT = `
+  attribute float aSize;
+  attribute vec3  aCol;
+  varying   vec3  vCol;
+  varying   float vA;
+  void main() {
+    vCol = aCol;
+    vec4 mv   = modelViewMatrix * vec4(position, 1.0);
+    float dist = max(-mv.z, 1.0);
+    gl_PointSize = clamp(aSize * (320.0 / dist), 0.4, 3.5);
+    vA = clamp(1.0 - dist * 0.00018, 0.18, 1.0);
+    gl_Position  = projectionMatrix * mv;
+  }
+`
+const SF_FRAG = `
+  varying vec3  vCol;
+  varying float vA;
+  void main() {
+    float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float a = (1.0 - smoothstep(0.1, 1.0, r)) * vA;
+    if (a < 0.015) discard;
+    gl_FragColor = vec4(vCol, a);
+  }
+`
+function StarField3D() {
+  const { geo, mat } = useMemo(() => {
+    const COUNT = 1500
+    const g   = new THREE.BufferGeometry()
+    const pos = new Float32Array(COUNT * 3)
+    const col = new Float32Array(COUNT * 3)
+    const sz  = new Float32Array(COUNT)
+    for (let i = 0; i < COUNT; i++) {
+      // Uniform sphere distribution, radius 900–3600
+      const theta = Math.random() * Math.PI * 2
+      const phi   = Math.acos(2 * Math.random() - 1)
+      const r     = 900 + Math.random() * 2700
+      pos[i*3]   = r * Math.sin(phi) * Math.cos(theta)
+      pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta)
+      pos[i*3+2] = r * Math.cos(phi)
+      // Color: mostly blue-white, some warm yellow, rare lavender
+      const t = Math.random()
+      if (t < 0.62) {
+        col[i*3]=0.82+Math.random()*0.18; col[i*3+1]=0.88+Math.random()*0.12; col[i*3+2]=1.0
+      } else if (t < 0.84) {
+        col[i*3]=1.0; col[i*3+1]=0.93+Math.random()*0.07; col[i*3+2]=0.72+Math.random()*0.18
+      } else {
+        col[i*3]=0.86; col[i*3+1]=0.78; col[i*3+2]=1.0
+      }
+      sz[i] = 1.2 + Math.random() * 3.2
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    g.setAttribute('aCol',     new THREE.BufferAttribute(col, 3))
+    g.setAttribute('aSize',    new THREE.BufferAttribute(sz,  1))
+    const m = new THREE.ShaderMaterial({
+      vertexShader:   SF_VERT,
+      fragmentShader: SF_FRAG,
+      transparent:    true,
+      depthWrite:     false,
+      blending:       THREE.AdditiveBlending,
+    })
+    return { geo: g, mat: m }
+  }, [])
+  return <points geometry={geo} material={mat} frustumCulled={false} />
+}
+
 // ─── vistara orb ─────────────────────────────────────────────────────────────
 interface VistaraOrbProps {
   gateway: Gateway; orbIdx: number; orbSize: number
@@ -967,6 +1033,7 @@ function GyroScene({
         enablePan={false} rotateSpeed={0.55} zoomSpeed={1.1}
       />
       <ambientLight intensity={0.04} />
+      <StarField3D />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
       <StarTrailsSystem />
