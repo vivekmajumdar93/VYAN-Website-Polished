@@ -85,7 +85,7 @@ const SATURN_VERT = `
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
     // Larger min clamp so particles don't shrink to nothing at distance
-    gl_PointSize = clamp(aSize * (580.0 / dist), aSize * 1.1, aSize * 3.0);
+    gl_PointSize = clamp(aSize * (300.0 / dist), 0.3, 2.0);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -110,7 +110,7 @@ const SATURN_FRAG = `
     // HDR core: pushes only the sparkle centre (sprk≈1 → luminance ≈3) above
     // the bloom luminanceThreshold (0.85). The disc area (sprk<0.3) stays below
     // the threshold so the surrounding ring surface never halos. Void stays dark.
-    col += vec3(sprk * vAlpha * 2.5);
+    col += vec3(sprk * vAlpha * 0.9);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
@@ -133,7 +133,7 @@ function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
     pos[i*3]   = r * Math.cos(angle)
     pos[i*3+1] = r * Math.sin(angle)
     pos[i*3+2] = (Math.random() - 0.5) * 4
-    sz[i]      = 2.2 + Math.random() * 4.8   // 2.2–7px (was 1.5–5)
+    sz[i]      = 0.3 + Math.random() * 0.9   // 0.3–1.2px fine stardust
     ph[i]      = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -735,30 +735,6 @@ function StarField3D() {
   return <points geometry={geo} material={mat} frustumCulled={false} />
 }
 
-// ─── orb Fresnel rim shader ──────────────────────────────────────────────────
-const ORB_FRESNEL_VERT = `
-  varying vec3 vN;
-  varying vec3 vV;
-  void main() {
-    vN = normalize(normalMatrix * normal);
-    vV = normalize(-(modelViewMatrix * vec4(position, 1.0)).xyz);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-const ORB_FRESNEL_FRAG = `
-  uniform float uIntensity;
-  varying vec3  vN;
-  varying vec3  vV;
-  void main() {
-    float f = 1.0 - max(0.0, dot(vN, vV));
-    f = pow(f, 2.2) * uIntensity;
-    if (f < 0.006) discard;
-    // Electric azure core → royal blue edge
-    vec3 col = vec3(0.18, 0.58, 1.00) * f + vec3(0.04, 0.16, 0.90) * (1.0 - f) * 0.5;
-    gl_FragColor = vec4(col, f);
-  }
-`
-
 // ─── vistara orb ─────────────────────────────────────────────────────────────
 interface VistaraOrbProps {
   gateway: Gateway; orbIdx: number; orbSize: number
@@ -783,7 +759,6 @@ function VistaraOrb({
 
   const groupRef  = useRef<THREE.Group>(null)
   const ZERO      = useMemo(() => new THREE.Vector3(), [])
-  const fresnelRef = useRef<THREE.Mesh>(null)
   // Animated scale: smoothly grows larger when focused so the orb appears thrown toward the lens
   const scaleRef      = useRef(orbSize * 0.15)
   const burstRef      = useRef(-10)
@@ -798,16 +773,6 @@ function VistaraOrb({
     return inst
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateway.id])
-
-  const fresnelMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader:   ORB_FRESNEL_VERT,
-    fragmentShader: ORB_FRESNEL_FRAG,
-    uniforms: { uIntensity: { value: 0.22 } },
-    transparent: true,
-    depthWrite:  false,
-    blending:    THREE.AdditiveBlending,
-    side:        THREE.FrontSide,
-  }), [])
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -840,14 +805,6 @@ function VistaraOrb({
       }
     }
 
-    // Fresnel rim: scale tracks scaleRef so it wraps the particle cloud,
-    // intensity pulses up on focus/hover and fades to near-invisible at rest.
-    if (fresnelRef.current) {
-      fresnelRef.current.scale.setScalar(scaleRef.current * 5.8)
-      const targetIntensity = isFocused ? 0.88 : isHovered ? 0.52 : 0.18
-      const mat = fresnelRef.current.material as THREE.ShaderMaterial
-      mat.uniforms.uIntensity.value += (targetIntensity - mat.uniforms.uIntensity.value) * 0.08
-    }
   })
 
   const nameChars = Array.from(gateway.name)
@@ -867,10 +824,6 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
-      {/* Fresnel rim — sphere shell that glows brightest at grazing angles */}
-      <mesh ref={fresnelRef} material={fresnelMat}>
-        <sphereGeometry args={[1, 18, 18]} />
-      </mesh>
       {/* φ label — hidden in overview to keep clean; visible in close-up */}
       {!isOverview && <Html center occlude={false} position={[0, 0, 0]}>
         <div
