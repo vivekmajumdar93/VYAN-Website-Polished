@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.0',
+    date: '2026-07-21',
+    title: 'Vistara — Clean Orbs, Fine Stardust Rings',
+    summary: 'Removed Fresnel rim halos that were rendering as visible circle outlines around orbs. Ring particles shrunk from 2.2–7px to 0.3–1.2px fine stardust with a hard 2px screen cap; HDR bloom boost reduced so ring sparkles glint rather than blob.',
+    changes: [
+      'Fresnel rim shader removed entirely — no more teal circle outlines on orbs',
+      'Ring particles: 2.2–7px → 0.3–1.2px (fine stardust language)',
+      'gl_PointSize hard cap 2.0px — prevents any particle blooming into a wide blob',
+      'SATURN_VERT distance scale 580 → 300 — less screen-space magnification at close range',
+      'HDR sparkle boost: sprk * vAlpha * 2.5 → 0.9 — tight star-point bloom, not halos',
+    ],
+    gitHash: 'a969787',
+    pages: ['Vistara'],
+  },
+  {
     version: '1.9',
     date: '2026-07-21',
     title: 'Acoustic Consciousness — Living Sound Interface',
@@ -207,4 +222,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '1.9'
+export const CURRENT_VERSION = '2.0'
