@@ -759,10 +759,11 @@ function VistaraOrb({
 
   const groupRef  = useRef<THREE.Group>(null)
   const ZERO      = useMemo(() => new THREE.Vector3(), [])
-  // Animated scale: smoothly grows larger when focused so the orb appears thrown toward the lens
-  const scaleRef      = useRef(orbSize * 0.15)
-  const burstRef      = useRef(-10)
-  const prevPanelOpen = useRef(false)
+  const scaleRef      = useRef(orbSize * 0.30)
+  // throw state: age counts up from 0 when focus is acquired
+  const throwRef      = useRef({ age: 10, prevFocused: false })
+
+  const { camera } = useThree()
 
   const nanoOrb = useMemo(() => {
     const inst = new NanoOrb({
@@ -774,7 +775,7 @@ function VistaraOrb({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateway.id])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const t = clock.elapsedTime
 
     if (isHovered)      nanoOrb.setSignal('hover')
@@ -784,22 +785,42 @@ function VistaraOrb({
 
     nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : isOverview ? 0.55 : 0.3, 1, ZERO)
 
-    // On panel open for this orb: fire a sin-bell burst so the node web appears
-    // to unfold outward — glass shards are timed to begin assembling at the peak
-    if (isFocused && panelOpen && !prevPanelOpen.current) burstRef.current = t
-    prevPanelOpen.current = isFocused && panelOpen
-    const bp    = Math.min((t - burstRef.current) / 0.65, 1)
-    const burst = isFocused ? Math.sin(Math.PI * bp) * (orbSize * 1.0) : 0
-    const targetScale = orbSize * (isFocused ? 0.22 : 0.15) + burst
-    scaleRef.current += (targetScale - scaleRef.current) * 0.06
+    // Track when focus is acquired and advance throw age
+    if (isFocused !== throwRef.current.prevFocused) {
+      throwRef.current.prevFocused = isFocused
+      if (isFocused) throwRef.current.age = 0
+    }
+    if (throwRef.current.age < 1.0) throwRef.current.age += delta
+
+    // Sin-bell scale spike: peaks at orbSize*2.5 at t=0.3s, gone by t=0.65s
+    const throwAge  = throwRef.current.age
+    const throwBell = isFocused && throwAge < 0.65
+      ? Math.sin(Math.PI * Math.min(throwAge / 0.65, 1)) * (orbSize * 2.5)
+      : 0
+    const restScale    = orbSize * (isFocused ? 0.45 : 0.30)
+    const targetScale  = restScale + throwBell
+    const lerpSpeed    = throwBell > orbSize * 0.4 ? 0.30 : 0.08
+    scaleRef.current  += (targetScale - scaleRef.current) * lerpSpeed
     nanoOrb.group.scale.multiplyScalar(scaleRef.current)
 
     if (groupRef.current) {
       const wp = new THREE.Vector3()
       groupRef.current.getWorldPosition(wp)
       worldPosRef.current[orbIdx] = wp
+
       if (isPulled && pullTarget && pullProgress > 0) {
         groupRef.current.position.lerp(pullTarget, pullProgress * pullProgress * 0.05)
+      } else if (isFocused && throwAge < 0.65) {
+        // Launch the orb toward the camera — compute direction in parent-local space
+        const toCamera = new THREE.Vector3().subVectors(camera.position, wp).normalize()
+        const parent   = groupRef.current.parent
+        if (parent) toCamera.applyQuaternion(parent.quaternion.clone().invert())
+        const throwDist = Math.sin(Math.PI * Math.min(throwAge / 0.65, 1)) * 180
+        groupRef.current.position.set(
+          basePos[0] + toCamera.x * throwDist,
+          basePos[1] + toCamera.y * throwDist,
+          basePos[2] + toCamera.z * throwDist,
+        )
       } else {
         groupRef.current.position.set(...basePos)
       }
@@ -1063,8 +1084,8 @@ function GyroScene({
       prevFocusRef.current = focusedIdx
       throwRef.current.startT = clock.elapsedTime
     }
-    const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.75, 1)
-    const throwZ = Math.sin(Math.PI * tp) * 72
+    const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.55, 1)
+    const throwZ = Math.sin(Math.PI * tp) * 160
 
     const vp = vortexProgressRef.current
     if (vortexTargetIdx !== null && vp > 0) {
@@ -1075,7 +1096,7 @@ function GyroScene({
         camera.lookAt(wp)
       }
     } else {
-      camera.position.lerp(new THREE.Vector3(0, 0, 550 - throwZ), tp < 1 ? 0.18 : 0.04)
+      camera.position.lerp(new THREE.Vector3(0, 0, 550 - throwZ), tp < 1 ? 0.28 : 0.04)
       const wp = worldPosRef.current[focusedIdx]
       if (wp) lookAt.current.lerp(wp, 0.04)
       else lookAt.current.lerp(new THREE.Vector3(), 0.04)
