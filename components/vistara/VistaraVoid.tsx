@@ -608,6 +608,67 @@ function ShootingStars() {
   return <points geometry={geo} material={mat} frustumCulled={false} />
 }
 
+// ─── central vortex — glowing billboard disc at gyroscope origin ─────────────
+const VORTEX_VERT = `
+  varying vec2 vUV;
+  void main() {
+    vUV = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+const VORTEX_FRAG = `
+  uniform float uTime;
+  varying vec2  vUV;
+  void main() {
+    vec2  p     = vUV - 0.5;
+    float r     = length(p);
+    if (r > 0.5) discard;
+    float normR = r * 2.0;
+
+    // Swirl: angle + inward taper rotating over time
+    float ang   = atan(p.y, p.x) + normR * 5.0 - uTime * 0.52;
+    float swirl = 0.5 + 0.5 * sin(ang * 4.0);
+
+    // Concentric outward pulse
+    float pulse = 0.5 + 0.5 * sin(normR * 13.0 - uTime * 2.2);
+
+    // Bright hot core
+    float core  = exp(-normR * normR * 14.0);
+
+    // Colour: violet centre → deep blue edge
+    vec3 violet = vec3(0.78, 0.20, 1.00);
+    vec3 dblue  = vec3(0.18, 0.08, 0.90);
+    vec3 col    = mix(violet, dblue, smoothstep(0.0, 0.9, normR));
+    col        += vec3(0.92, 0.60, 1.0) * core;
+
+    // Alpha: hard edge cutoff, swirl modulation, strong core
+    float edge  = 1.0 - smoothstep(0.36, 0.50, normR);
+    float a     = edge * (0.18 + 0.26 * swirl * pulse + 0.48 * core);
+    if (a < 0.008) discard;
+    gl_FragColor = vec4(col, min(a, 1.0));
+  }
+`
+function CentralVortex() {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const { camera } = useThree()
+  const mat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   VORTEX_VERT,
+    fragmentShader: VORTEX_FRAG,
+    uniforms: { uTime: { value: 0 } },
+    transparent: true,
+    depthWrite:  false,
+    blending:    THREE.AdditiveBlending,
+    side:        THREE.DoubleSide,
+  }), [])
+  const geo = useMemo(() => new THREE.PlaneGeometry(80, 80), [])
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return
+    mat.uniforms.uTime.value = clock.elapsedTime
+    meshRef.current.quaternion.copy(camera.quaternion)
+  })
+  return <mesh ref={meshRef} geometry={geo} material={mat} position={[0, 0, 0]} />
+}
+
 // ─── 3D starfield — static sphere of 1500 distant stars for camera parallax ──
 const SF_VERT = `
   attribute float aSize;
@@ -1034,6 +1095,7 @@ function GyroScene({
       />
       <ambientLight intensity={0.04} />
       <StarField3D />
+      <CentralVortex />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
       <StarTrailsSystem />
