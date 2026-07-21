@@ -1406,7 +1406,17 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
         </div>
 
         {/* Scrollable content — each block reveals in sequence */}
-        <div style={{ flex:1, overflowY:'auto', overflowX:'hidden', padding: isMobile ? '14px 24px 0' : '16px 32px 0' }}>
+        <div
+          style={{ flex:1, overflowY:'auto', overflowX:'hidden', padding: isMobile ? '14px 24px 0' : '16px 32px 0' }}
+          onTouchStart={e => { (e.currentTarget as any)._tsY = e.touches[0].clientY }}
+          onTouchMove={e => {
+            const el = e.currentTarget as HTMLDivElement
+            const dy = (el as any)._tsY - e.touches[0].clientY;
+            (el as any)._tsY = e.touches[0].clientY
+            el.scrollTop += dy
+            e.stopPropagation()
+          }}
+        >
           <div style={reveal(2)}>
             <h2 style={{
               fontFamily:'var(--font-vyan)', fontSize: isMobile ? '24px' : '26px',
@@ -1653,12 +1663,14 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const screenPosRef      = useRef<Record<number, { x: number; y: number }>>({})
   const vortexAnimRef     = useRef<number>(0)
 
-  // ── Custom orbital cursor ──────────────────────────────────────────────────
+  // ── Custom orbital cursor — mouse-only, hidden on touch/coarse devices ───────
+  const hasFinePointer  = typeof window !== 'undefined' && window.matchMedia('(pointer:fine)').matches
   const cursorTargetRef = useRef({ x: -400, y: -400 })
   const cursorRingRef   = useRef({ x: -400, y: -400 })
   const ringDivRef      = useRef<HTMLDivElement>(null)
   const dotDivRef       = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (!hasFinePointer) return
     const onMove = (e: MouseEvent) => { cursorTargetRef.current = { x: e.clientX, y: e.clientY } }
     window.addEventListener('mousemove', onMove)
     let raf: number
@@ -1673,6 +1685,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
     }
     raf = requestAnimationFrame(tick)
     return () => { window.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const vortexStartRef    = useRef(0)
   // vortexProgress as ref — avoids 75+ setState calls per vortex (each was a full React re-render)
@@ -1781,7 +1794,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const passCenter = vortexTargetIdx!==null ? screenPosRef.current[vortexTargetIdx] : null
 
   return (
-    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000005', cursor:'none' }}>
+    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000005', cursor: hasFinePointer ? 'none' : 'auto' }}>
       <style>{`
         @keyframes nebDrift1 {
           0%,100% { transform: translateX(-5%) translateY(8%) scale(1.0) }
@@ -1906,26 +1919,28 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         }} />
       )}
 
-      {/* Custom orbital cursor — ring trails, dot is exact */}
-      <div ref={ringDivRef} style={{
-        position:'fixed', top:0, left:0, pointerEvents:'none', zIndex:9500,
-        width: hoveredId ? 52 : 32, height: hoveredId ? 52 : 32,
-        marginLeft: hoveredId ? -26 : -16, marginTop: hoveredId ? -26 : -16,
-        borderRadius:'50%',
-        border: hoveredId ? '1.5px solid rgba(72,160,255,0.85)' : '1px solid rgba(120,180,255,0.50)',
-        boxShadow: hoveredId ? '0 0 18px rgba(50,130,255,0.50), inset 0 0 8px rgba(80,160,255,0.15)' : '0 0 7px rgba(80,160,255,0.18)',
-        transition:'width 0.24s cubic-bezier(0.34,1.45,0.64,1), height 0.24s cubic-bezier(0.34,1.45,0.64,1), margin 0.24s cubic-bezier(0.34,1.45,0.64,1), border-color 0.22s ease, box-shadow 0.22s ease',
-        willChange:'transform',
-      }} />
-      <div ref={dotDivRef} style={{
-        position:'fixed', top:0, left:0, pointerEvents:'none', zIndex:9501,
-        width:4, height:4, marginLeft:-2, marginTop:-2,
-        borderRadius:'50%',
-        background: hoveredId ? 'rgba(120,200,255,0.92)' : 'rgba(180,210,255,0.62)',
-        boxShadow: hoveredId ? '0 0 6px rgba(80,160,255,0.9)' : 'none',
-        transition:'background 0.22s ease, box-shadow 0.22s ease',
-        willChange:'transform',
-      }} />
+      {/* Custom orbital cursor — mouse only, not rendered on touch devices */}
+      {hasFinePointer && <>
+        <div ref={ringDivRef} style={{
+          position:'fixed', top:0, left:0, pointerEvents:'none', zIndex:9500,
+          width: hoveredId ? 52 : 32, height: hoveredId ? 52 : 32,
+          marginLeft: hoveredId ? -26 : -16, marginTop: hoveredId ? -26 : -16,
+          borderRadius:'50%',
+          border: hoveredId ? '1.5px solid rgba(72,160,255,0.85)' : '1px solid rgba(120,180,255,0.50)',
+          boxShadow: hoveredId ? '0 0 18px rgba(50,130,255,0.50), inset 0 0 8px rgba(80,160,255,0.15)' : '0 0 7px rgba(80,160,255,0.18)',
+          transition:'width 0.24s cubic-bezier(0.34,1.45,0.64,1), height 0.24s cubic-bezier(0.34,1.45,0.64,1), margin 0.24s cubic-bezier(0.34,1.45,0.64,1), border-color 0.22s ease, box-shadow 0.22s ease',
+          willChange:'transform',
+        }} />
+        <div ref={dotDivRef} style={{
+          position:'fixed', top:0, left:0, pointerEvents:'none', zIndex:9501,
+          width:4, height:4, marginLeft:-2, marginTop:-2,
+          borderRadius:'50%',
+          background: hoveredId ? 'rgba(120,200,255,0.92)' : 'rgba(180,210,255,0.62)',
+          boxShadow: hoveredId ? '0 0 6px rgba(80,160,255,0.9)' : 'none',
+          transition:'background 0.22s ease, box-shadow 0.22s ease',
+          willChange:'transform',
+        }} />
+      </>}
 
       <div style={{ position:'fixed', inset:0, zIndex:190, pointerEvents:'none', background:'#4488ff',
         opacity:showFlash?1:0, transition:showFlash?'none':'opacity 80ms' }} />
