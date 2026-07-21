@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.1',
+    date: '2026-07-21',
+    title: 'Vistara — Orb Throw & Scaled Presence',
+    summary: 'Clicking an orb now launches it physically toward the camera: a sin-bell position surge (180 units) + scale spike (2.5× rest) fires over 0.65 s, then settles to the larger focused size. Camera throw deepened from 72 to 160 units.',
+    changes: [
+      'Orb throw: on focus, group position lerps toward camera (parent-local direction) by up to 180 units',
+      'Scale spike: orbSize×2.5 sin-bell over 0.65 s on focus, fast lerp (0.30) during peak',
+      'Rest scale raised 0.15→0.30, focused scale raised 0.22→0.45 — orbs more prominent vs rings',
+      'Camera throw: 72→160 units forward surge, duration 0.75→0.55 s, lerp 0.18→0.28',
+    ],
+    gitHash: '2c8a226',
+    pages: ['Vistara'],
+  },
+  {
     version: '2.0',
     date: '2026-07-21',
     title: 'Vistara — Clean Orbs, Fine Stardust Rings',
@@ -222,4 +236,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.0'
+export const CURRENT_VERSION = '2.1'
