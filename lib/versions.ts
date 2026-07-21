@@ -15,6 +15,24 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '1.9',
+    date: '2026-07-21',
+    title: 'Acoustic Consciousness — Living Sound Interface',
+    summary: 'AcousticConsole is live on all cosmic pages: a full Web Audio synthesis engine with 8 procedural soundscapes, 12-band Neural EQ, spatial audio pad, 5 consciousness modes, plasma ring visualiser, BPM pulse, and spectrogram.',
+    changes: [
+      '8 soundscapes: Void Silence, Neural Drift, Crystal Resonance, Vortex Descent, Cathedral Bloom, Solar Ignition, Deep Current, Prāṇic Pulse',
+      'All audio synthesized procedurally in Web Audio API — no files required',
+      '12-band draggable Neural EQ with bezier curve SVG display',
+      'Spatial audio XY pad with ripple visualiser',
+      '5 consciousness modes (Prājña, Dhyāna, Akṣaya, Javā, Sañcāra) apply preset EQ curves',
+      'Plasma ring visualiser + spectrogram + BPM pulse indicator',
+      'Realm theme auto-detected from pathname: medha → purple, vistara → blue, shunya → violet',
+      'Renders at bottom-right on all cosmic pages (zIndex 9300/9400)',
+    ],
+    gitHash: '54badca',
+    pages: ['All pages'],
+  },
+  {
     version: '1.8',
     date: '2026-07-21',
     title: 'Vistara — Custom Cursor & Per-Gateway Panel Content',
@@ -189,4 +207,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '1.8'
+export const CURRENT_VERSION = '1.9'
