@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '1.6',
+    date: '2026-07-21',
+    title: 'Vistara — HDR Bloom on Ring Particle Cores',
+    summary: 'Each Saturn ring particle now emits a tight star-point glow from its sparkle core. The void and orbs remain completely dark — bloom fires only on the HDR-boosted ring centres.',
+    changes: [
+      'SATURN_FRAG outputs HDR values at sparkle centres (col += sprk * vAlpha * 2.5)',
+      'EffectComposer + Bloom with luminanceThreshold=0.85 — only ring cores qualify',
+      'Disc area (sprk < 0.3) and NanoOrb particles stay below threshold — no halos',
+      'radius=0.35, intensity=0.55, mipmapBlur — tight star-point, not screen-wide glow',
+    ],
+    gitHash: '32b3d66',
+    pages: ['Vistara'],
+  },
+  {
     version: '1.5',
     date: '2026-07-21',
     title: 'Vistara — Stardust Meteors, Sound Icon & Universal Footer',
@@ -142,4 +156,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '1.5'
+export const CURRENT_VERSION = '1.6'
