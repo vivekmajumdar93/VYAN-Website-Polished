@@ -15,6 +15,23 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '1.7',
+    date: '2026-07-21',
+    title: 'Vistara — 3D Starfield, Central Vortex & Fresnel Rim Glow',
+    summary: 'Three depth upgrades: a 1500-star Three.js starfield replaces flat CSS dots for true camera parallax; a billboard vortex disc marks the gyroscope origin; each orb gains a Fresnel azure corona that brightens on focus.',
+    changes: [
+      '3D starfield: 1500 stars in sphere r=900–3600, blue-white/warm-yellow/lavender, sizeAttenuation shader',
+      'Camera parallax: stars shift with zoom between overview and close-up',
+      'Central vortex: billboard PlaneGeometry at (0,0,0) with swirl + concentric-pulse shader',
+      'Vortex: violet→deep-blue gradient, bright white-violet core, always faces camera',
+      'Fresnel rim: transparent sphere shell on every orb, electric azure glow at grazing angles',
+      'Fresnel intensity: 0.18 idle → 0.52 hovered → 0.88 focused, lerped over 8 frames',
+      'Fresnel radius tracks scaleRef×5.8 so the corona wraps the NanoOrb particle cloud',
+    ],
+    gitHash: '9342bff',
+    pages: ['Vistara'],
+  },
+  {
     version: '1.6',
     date: '2026-07-21',
     title: 'Vistara — HDR Bloom on Ring Particle Cores',
@@ -156,4 +173,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '1.6'
+export const CURRENT_VERSION = '1.7'
