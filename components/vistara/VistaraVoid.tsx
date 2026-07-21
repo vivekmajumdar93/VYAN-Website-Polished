@@ -79,10 +79,12 @@ const SATURN_VERT = `
     float w3 = 0.5 + 0.5 * sin(theta * 14.0 + uTime * 0.27 + aPhase * 5.0);
     float gap = 0.75 + 0.25 * sin(theta * 1.5 + uTime * 0.04);
     float density = w1 * (0.4 + 0.6 * w2) * (0.65 + 0.35 * w3) * gap;
-    vAlpha = clamp(density * (0.35 + abs(uTilt) * 2.5), 0.0, 1.0);
+    // Raised base multiplier from 0.35→0.68 so rings glow on low-brightness screens
+    vAlpha = clamp(density * (0.68 + abs(uTilt) * 2.2), 0.0, 1.0);
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
-    gl_PointSize = clamp(aSize * (550.0 / dist), aSize * 0.85, aSize * 2.2);
+    // Larger min clamp so particles don't shrink to nothing at distance
+    gl_PointSize = clamp(aSize * (580.0 / dist), aSize * 1.1, aSize * 3.0);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -91,23 +93,26 @@ const SATURN_FRAG = `
   varying float vAlpha;
   void main() {
     float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.05, 0.9, r);
-    float sprk = exp(-r * r * 7.0);
-    float a    = (disc * 0.6 + sprk * 0.4) * vAlpha;
-    if (a < 0.008) discard;
+    float disc = 1.0 - smoothstep(0.05, 0.88, r);
+    float sprk = exp(-r * r * 6.0);
+    // Boosted fragment alpha: disc 0.6→0.88, sprk 0.4→0.70
+    float a    = (disc * 0.88 + sprk * 0.70) * vAlpha;
+    if (a < 0.005) discard;
     float cycle = mod(uTime * 0.05, 3.0);
-    vec3 red    = vec3(0.95, 0.07, 0.04);
-    vec3 dblue  = vec3(0.02, 0.15, 0.95);
-    vec3 purple = vec3(0.38, 0.02, 0.62);
+    vec3 red    = vec3(1.00, 0.12, 0.06);
+    vec3 dblue  = vec3(0.08, 0.28, 1.00);
+    vec3 purple = vec3(0.55, 0.05, 0.90);
     vec3 col;
     if      (cycle < 1.0) { col = mix(red,    dblue,  cycle);       }
     else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
     else                  { col = mix(purple, red,    cycle - 2.0); }
-    gl_FragColor = vec4(col, a);
+    // Slight brightness lift so colours read on dim screens
+    col = col * 1.35 + vec3(0.04);
+    gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
 function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
-  const COUNT  = 2200
+  const COUNT  = 3000   // more particles = denser, more visible rings
   const geo    = new THREE.BufferGeometry()
   const pos    = new Float32Array(COUNT * 3)
   const sz     = new Float32Array(COUNT)
@@ -125,7 +130,7 @@ function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
     pos[i*3]   = r * Math.cos(angle)
     pos[i*3+1] = r * Math.sin(angle)
     pos[i*3+2] = (Math.random() - 0.5) * 4
-    sz[i]      = 1.5 + Math.random() * 3.5
+    sz[i]      = 2.2 + Math.random() * 4.8   // 2.2–7px (was 1.5–5)
     ph[i]      = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
