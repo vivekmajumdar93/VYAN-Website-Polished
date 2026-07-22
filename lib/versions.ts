@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.7',
+    date: '2026-07-22',
+    title: 'Vistara — Rings Actually Visible',
+    summary: 'Saturn stardust rings were invisible after glow-removal over-correction — 1px particles at 12% alpha. Rebuilt with 7000 particles per ring at 2.5–5px, 70% base alpha, and brighter fragment output.',
+    changes: [
+      'Particle count 3000→7000 per ring for continuous visible arc coverage',
+      'Base aSize 0.8–1.8px→2.5–5px; gl_PointSize max 2.5→9px',
+      'vAlpha base 0.48→0.70 — rings are always bright, density wave modulates ±15%',
+      'Fragment output col*1.2 — clean stardust, no bloom, no halo',
+    ],
+    gitHash: '106d9cc',
+    pages: ['Vistara'],
+  },
+  {
     version: '2.6',
     date: '2026-07-22',
     title: 'Vistara — Camera Arc Traversal',
@@ -308,4 +322,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.6'
+export const CURRENT_VERSION = '2.7'
