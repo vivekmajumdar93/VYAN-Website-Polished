@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.9',
+    date: '2026-07-22',
+    title: 'Vistara — Panel UX + Icons + Sound + Rings + Header',
+    summary: 'Five UX fixes: panel touch-scroll, clickable version/overview icons, sound console visible, Saturn-like ring particles, stark-red name + shimmer tagline in panel header.',
+    changes: [
+      'Panel scroll: pointer/touch stopPropagation on slab + preventDefault on scroll div',
+      'Version badge and Overview button z-index raised to 9200 (above NebulaFooter 9100)',
+      'SoundConsole z-index raised 25→8500 — panel now opens above canvas',
+      'Saturn rings: 14000 particles/ring, 0.4–1.1px, hard step() disc (zero blur)',
+      'Panel header orb name: stark red #e80010',
+      'Panel tagline: deep-blue→purple gradient shimmer, alternating L↔R per orb',
+    ],
+    gitHash: 'd8490b5',
+    pages: ['Vistara', 'All pages'],
+  },
+  {
     version: '2.8',
     date: '2026-07-22',
     title: 'Vistara — v1.9 Ring Shader Restored',
@@ -337,4 +353,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.8'
+export const CURRENT_VERSION = '2.9'
