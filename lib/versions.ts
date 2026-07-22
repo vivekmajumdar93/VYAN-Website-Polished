@@ -31,7 +31,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Overview button extracted from z-index:100 stacking context — now truly above footer',
       'uColorOffset uniform per ring: each ring starts at a different point in red→blue→purple cycle',
     ],
-    gitHash: 'pending',
+    gitHash: 'eb6dd73',
     pages: ['Vistara'],
   },
   {

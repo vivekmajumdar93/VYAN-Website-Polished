@@ -4,7 +4,7 @@
 
 ---
 
-## Current Version: v2.9
+## Current Version: v3.0
 
 ---
 
@@ -23,7 +23,43 @@
 
 ---
 
-## 📋 Batch: July 22 2026 — 5 items
+## 📋 Batch: July 22 2026 — 5 items (v3.0)
+
+### 1. Overview Button Fix — 🔒 LOCKED v3.0
+- Button moved OUTSIDE `position:fixed, zIndex:100` outer wrapper div
+- Return now wraps in `<>...</>` fragment; button is a direct page-level element
+- Now truly at zIndex:9200 above NebulaFooter:9100
+
+### 2. Per-Orb Rings — 🔒 LOCKED v3.0
+- 9 individual rings (one per orb) replacing 3 shared rings
+- Each ring: `createOrbRingGeo(a, b)` — ellipse in XZ plane, 11k particles
+- `ORB_RING_DEFS` array with shape/spinAxis/speed/drift/colorOffset per ring
+- `uColorOffset` uniform per ring shifts where in red→blue→purple gradient it starts
+- Ring groups use `ringGroupsRef` array + callback refs, `spinAnglesRef` array
+- `spinAxis:'X'|'Y'|'Z'` with 2 drift axes each for true gyroscopic motion
+
+### 3. Saṅgraha — 🔒 LOCKED v3.0
+- 9th orb added to `lib/vistara/gateways.ts` (id:'sangraha', color:'#c070ff')
+- `ORB_SIZES[8] = 26`, `ORB_RING_DEFS[8]`: circle a=b=225, Z spin, colorOffset 0.8
+- GATEWAY_DETAILS entry added (3 features)
+- Scroll handler updated from `%8` to `%GATEWAYS.length`
+- ScreenTracker updated from `i<8` to `i<GATEWAYS.length`
+
+### 4. Camera Traversal — 🔒 LOCKED v3.0
+- Duration: `1.35s → 2.5s` (more cinematic arc)
+- Pull-back: `overviewZRef * 0.82 → overviewZRef * 1.05` (full pull-out)
+- Lateral offset: `newWp.x * 0.30 → newWp.x * 0.55` (wider arc path)
+
+### 5. NanoOrb Web Stardust — 🔒 LOCKED v3.0
+- `WEB_DUST_VERT/FRAG` shader: traveling wave along each edge (phase-based alpha)
+- 8 particles per edge, up to 700 edges = ≤5600 particles per orb
+- `webDustMat` uniforms: `uTime`, `uDim`, `uColor` (from colorB)
+- LineSegments opacity reduced 0.42→0.06; stardust is primary visual
+- `update()` animates `webDustMat.uniforms.uTime/uDim`
+
+---
+
+## 📋 Batch: July 22 2026 — 5 items (v2.9)
 
 ### 1. Panel Scroll Fix — 🔒 LOCKED v2.9
 - `onPointerDown/Move stopPropagation` added to panel slab div
