@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.5',
+    date: '2026-07-21',
+    title: 'Vistara — Rings Restored',
+    summary: 'Saturn rings disappeared in v2.3 due to sub-pixel point sizes (0.3px min) and the removal of the disc soft-fill in the fragment shader. Both restored with correct minimums.',
+    changes: [
+      'gl_PointSize minimum raised 0.3→1.0px — WebGL points below 1px are not rendered',
+      'Disc fill restored in SATURN_FRAG (disc*0.55 + core*0.45) so each point has visible area',
+      'Base particle aSize raised 0.3–1.2→0.8–1.8px so sizes are always ≥1px before distance scaling',
+      'No HDR boost — rings remain halo-free at the new visible size',
+    ],
+    gitHash: '38db9ce',
+    pages: ['Vistara'],
+  },
+  {
     version: '2.4',
     date: '2026-07-21',
     title: 'UX Fixes — One Console, No Phantom Cursor, Scrollable Panel',
@@ -281,4 +295,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.4'
+export const CURRENT_VERSION = '2.5'
