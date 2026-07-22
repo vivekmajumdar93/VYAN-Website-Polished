@@ -4,7 +4,7 @@
 
 ---
 
-## Current Version: v2.8
+## Current Version: v2.9
 
 ---
 
@@ -25,37 +25,30 @@
 
 ## 📋 Batch: July 22 2026 — 5 items
 
-### 1. Panel Scroll Fix
-- **Issue**: Scrolling inside GlassPanel scrolls the 3D orbs behind instead of the panel content
-- **Root cause**: `e.stopPropagation()` on `onTouchMove` doesn't prevent R3F/OrbitControls from receiving pointer events; need `e.preventDefault()` and pointer-event blockers on the panel wrapper
-- **Fix**: Add `onPointerDown/Move e.stopPropagation()` + `e.preventDefault()` on scrollable div; block all pointer events on the panel outer wrapper
-- **Status**: ⬜ TODO
+### 1. Panel Scroll Fix — 🔒 LOCKED v2.9
+- `onPointerDown/Move stopPropagation` added to panel slab div
+- `e.stopPropagation()` + `e.preventDefault()` added to scrollable div's onTouchStart/Move
 
-### 2. Version Badge + Overview Button Z-index
-- **Issue**: Both are behind NebulaFooter (z-index 9100), unclickable
-- **Version badge**: currently `zIndex: 9000` in VersionPanel.tsx line 40 → raise to `9200`
-- **Overview button**: standalone fixed button in VistaraVoid.tsx (NOT the one inside GlassPanel) — find and raise
-- **Fix**: Both to `zIndex: 9200`
-- **Status**: ⬜ TODO
+### 2. Version Badge + Overview Button Z-index — 🔒 LOCKED v2.9
+- Version badge: `zIndex: 9000 → 9200` (VersionPanel.tsx)
+- Overview button: `zIndex: 40 → 9200` (VistaraVoid.tsx line ~2045)
+- Both above NebulaFooter's 9100
 
-### 3. Ring Particles — Saturn-like, Crisp, Sub-pixel
-- **Issue**: Particles too large/blurry, not like actual Saturn rings
-- **Target**: 0.4–1.2px particles, hard-edge (sharp `step` disc not soft smoothstep), 12000/ring
-- **Fix**: Update `createSaturnRingGeo` count, sizes; update SATURN_VERT gl_PointSize + SATURN_FRAG to hard disc
-- **Status**: ⬜ TODO
+### 3. Ring Particles — 🔒 LOCKED v2.9
+- 14000 particles/ring, 0.4–1.1px base size
+- `gl_PointSize = clamp(aSize * 480/dist, aSize*0.9, aSize*2.2)` proportional
+- Fragment: `step(r, 0.92)` hard disc — zero blur, zero halo
+- Band edges concentrated (28% inner + 28% outer for banded look)
 
-### 4. Sound Console — Open & Functional
-- **Issue**: Clicking the sound console trigger opens nothing
-- **Root cause**: `.sc-root` z-index is 25 — panel expands but is behind canvas (need to check sc-panel z-index in CSS)
-- **Fix**: Raise `sc-root` and expanded panel z-index above canvas layer
-- **Status**: ⬜ TODO
+### 4. Sound Console — 🔒 LOCKED v2.9
+- `sc-root` z-index raised `25 → 8500` (SoundConsole.css)
+- Panel now opens above canvas, below footer
 
-### 5. Panel Header — Stark Red Name + Shimmer Tagline
-- **Issue**: orb name (h2, line 1463 VistaraVoid) is white; tagline (p, line 1469) is orb color
-- **Fix**:
-  - Name h2: `color: '#ff2020'` (stark red), remove text-shadow
-  - Tagline: deep-blue → dark-purple CSS gradient with left↔right shimmer animation alternating per orb
-- **Status**: ⬜ TODO
+### 5. Panel Header Styling — 🔒 LOCKED v2.9
+- Name h2: `color: '#e80010'` (stark red), text-shadow removed
+- Tagline: `linear-gradient(90deg, #0a2fff → #88aaff → #cc99ff → #6600cc)`, `backgroundClip:text`
+- Shimmer animates `background-position` L→R or R→L alternating by GATEWAYS index (even/odd)
+- Keyframes `@tagShimmerLR` / `@tagShimmerRL` injected via `<style>` in GlassPanel return
 
 ---
 
