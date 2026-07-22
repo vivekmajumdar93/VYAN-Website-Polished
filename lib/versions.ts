@@ -15,6 +15,19 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.6',
+    date: '2026-07-22',
+    title: 'Vistara — Camera Arc Traversal',
+    summary: 'When switching between focused orbs, the camera now arcs through the gyroscope scene: pulling back toward overview distance while panning to the new orb, then swooping back into close-up.',
+    changes: [
+      'Camera traversal: phase 1 pulls back 80% toward overview Z while lookAt pans old→new orb',
+      'Camera traversal: phase 2 swoops back into 550u close-up tracking live orb position as rings rotate',
+      'Duration 1.35s with easeInOutCubic on each half; orb throw animation continues independently',
+    ],
+    gitHash: '4d3a3c1',
+    pages: ['Vistara'],
+  },
+  {
     version: '2.5',
     date: '2026-07-21',
     title: 'Vistara — Rings Restored',
@@ -295,4 +308,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.5'
+export const CURRENT_VERSION = '2.6'
