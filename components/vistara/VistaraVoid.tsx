@@ -3,7 +3,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html, OrbitControls } from '@react-three/drei'
-import {} from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { NanoOrb } from '@/lib/vyan/objects/NanoOrb'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
