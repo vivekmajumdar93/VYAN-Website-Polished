@@ -957,6 +957,12 @@ function GyroScene({
     startTarget: new THREE.Vector3(), endTarget: new THREE.Vector3(),
     startT: 0, duration: 1.4,
   })
+  // Arc traversal state — camera arcs through scene when switching focused orb
+  const camTraverseRef = useRef({
+    active: false, startT: 0, duration: 1.4,
+    startPos: new THREE.Vector3(), midPos: new THREE.Vector3(),
+    startLookAt: new THREE.Vector3(), endLookAt: new THREE.Vector3(),
+  })
 
   // Mount: set camera to the viewport-appropriate overview distance immediately
   useEffect(() => {
@@ -1092,10 +1098,28 @@ function GyroScene({
 
     if (isOverview) return   // OrbitControls drives camera when enabled
 
-    // Camera throw when focus changes — orb appears to jump toward lens
+    // Camera throw + arc traversal when focus changes
     if (prevFocusRef.current !== focusedIdx) {
       prevFocusRef.current = focusedIdx
       throwRef.current.startT = clock.elapsedTime
+
+      // Begin arc traversal: pull back over the gyroscope, swoop to new orb
+      const newWp = worldPosRef.current[focusedIdx]
+      const ct = camTraverseRef.current
+      ct.active = true
+      ct.startT  = clock.elapsedTime
+      ct.duration = 1.35
+      ct.startPos.copy(camera.position)
+      ct.startLookAt.copy(lookAt.current)
+      if (newWp) {
+        ct.endLookAt.copy(newWp)
+        // Midpoint: pull back 80% of overview distance, laterally offset toward target
+        const pullZ = overviewZRef.current * 0.82
+        ct.midPos.set(newWp.x * 0.30, newWp.y * 0.30, pullZ)
+      } else {
+        ct.endLookAt.set(0, 0, 0)
+        ct.midPos.set(0, 0, overviewZRef.current * 0.82)
+      }
     }
     const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.55, 1)
     const throwZ = Math.sin(Math.PI * tp) * 160
@@ -1109,11 +1133,31 @@ function GyroScene({
         camera.lookAt(wp)
       }
     } else {
-      camera.position.lerp(new THREE.Vector3(0, 0, 550 - throwZ), tp < 1 ? 0.28 : 0.04)
-      const wp = worldPosRef.current[focusedIdx]
-      if (wp) lookAt.current.lerp(wp, 0.04)
-      else lookAt.current.lerp(new THREE.Vector3(), 0.04)
-      camera.lookAt(lookAt.current)
+      const ct = camTraverseRef.current
+      if (ct.active) {
+        const raw = Math.min((clock.elapsedTime - ct.startT) / ct.duration, 1)
+        if (raw < 0.44) {
+          // Phase 1 — pull back to midpoint while panning lookAt to new orb
+          const ep = easeInOutCubic(raw / 0.44)
+          camera.position.lerpVectors(ct.startPos, ct.midPos, ep)
+          lookAt.current.lerpVectors(ct.startLookAt, ct.endLookAt, ep)
+        } else {
+          // Phase 2 — swoop into close-up; track live orb position as rings rotate
+          const ep = easeInOutCubic((raw - 0.44) / 0.56)
+          camera.position.lerpVectors(ct.midPos, new THREE.Vector3(0, 0, 550 - throwZ), ep)
+          const liveWp = worldPosRef.current[focusedIdx]
+          if (liveWp) ct.endLookAt.copy(liveWp)
+          lookAt.current.copy(ct.endLookAt)
+        }
+        camera.lookAt(lookAt.current)
+        if (raw >= 1) ct.active = false
+      } else {
+        camera.position.lerp(new THREE.Vector3(0, 0, 550 - throwZ), tp < 1 ? 0.28 : 0.04)
+        const wp = worldPosRef.current[focusedIdx]
+        if (wp) lookAt.current.lerp(wp, 0.04)
+        else lookAt.current.lerp(new THREE.Vector3(), 0.04)
+        camera.lookAt(lookAt.current)
+      }
     }
   })
 
