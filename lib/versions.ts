@@ -13,7 +13,27 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
+export const CURRENT_VERSION = '3.0'
+
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.0',
+    date: '2026-07-22',
+    title: 'Vistara — 9 Orbs, Per-Orb Rings, Stardust Web, Cinematic Camera',
+    summary: 'Nine individual gyroscopic rings (one per orb, each a different ellipse), Saṅgraha as the 9th orb, flowing web stardust replacing line segments, cinematic camera arc (2.5s), and Overview button finally above the footer.',
+    changes: [
+      'Per-orb rings: 9 individual elliptical gyroscopic rings replacing 3 shared rings',
+      'Each ring: distinct ellipse shape, unique color gradient offset, independent spin axis + drift',
+      'Saṅgraha added as 9th orb (purple, Z-spin ring, 225-unit circle)',
+      'Web stardust: flowing particles trace edge paths (opacity 0.55, traveling wave shader)',
+      'LineSegments web opacity reduced 0.42→0.06; stardust carries the visual',
+      'Camera traverse duration 1.35s→2.5s; pull-back to 1.05× overview Z for cinematic arc',
+      'Overview button extracted from z-index:100 stacking context — now truly above footer',
+      'uColorOffset uniform per ring: each ring starts at a different point in red→blue→purple cycle',
+    ],
+    gitHash: 'pending',
+    pages: ['Vistara'],
+  },
   {
     version: '2.9',
     date: '2026-07-22',
@@ -353,4 +373,3 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.9'

@@ -9,23 +9,36 @@ import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 import { BackIcon, SendIcon, CloseIcon } from '@/components/icons/VyanIcons'
 
 // ─── gyroscope constants ──────────────────────────────────────────────────────
-const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34]
+const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34, 26]
 
-const ORB_CFG: { ring: 'A' | 'B' | 'C'; localAngle: number }[] = [
-  { ring: 'A', localAngle: Math.PI / 2 },
-  { ring: 'B', localAngle: Math.PI / 2 },
-  { ring: 'C', localAngle: Math.PI / 2 },
-  { ring: 'A', localAngle: Math.PI / 2 + (2 * Math.PI) / 3 },
-  { ring: 'B', localAngle: Math.PI / 2 + (2 * Math.PI) / 3 },
-  { ring: 'C', localAngle: Math.PI / 2 + Math.PI },
-  { ring: 'B', localAngle: Math.PI / 2 + (4 * Math.PI) / 3 },
-  { ring: 'A', localAngle: Math.PI / 2 + (4 * Math.PI) / 3 },
+interface OrbRingDef {
+  a: number; b: number          // ellipse semi-axes in XZ plane
+  colorOffset: number            // shift in 0–3 color cycle
+  speed: number                  // primary spin speed
+  spinAxis: 'X' | 'Y' | 'Z'
+  df: [number, number, number]   // drift frequencies [x,y,z]
+  da: [number, number, number]   // drift amplitudes  [x,y,z]
+}
+const ORB_RING_DEFS: OrbRingDef[] = [
+  // 0: Ṛtam — wide oval, red start, Y spin
+  { a:280, b:200, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15] },
+  // 1: Ojas — circle, blue start, X spin
+  { a:240, b:240, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20] },
+  // 2: Mudrā — tall portrait oval, purple start, Z spin
+  { a:190, b:270, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00] },
+  // 3: Netra — wide egg, mid-red start, Y spin
+  { a:295, b:210, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12] },
+  // 4: Ākṛti — large circle, mid-blue start, X spin
+  { a:260, b:260, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22] },
+  // 5: Sūtra — squat oval, mid-purple start, Z spin
+  { a:275, b:185, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00] },
+  // 6: Chitra-Prāṇa — diagonal oval, orange-red start, Y spin
+  { a:255, b:170, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16] },
+  // 7: Māyā — widest ring, purple-red start, X spin
+  { a:315, b:235, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18] },
+  // 8: Saṅgraha — circle, warm start, Z spin
+  { a:225, b:225, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18] },
 ]
-
-const RING_RADII = { A: 280, B: 240, C: 200 } as const
-const RING_SPEEDS = { A: 0.0008, B: 0.0006, C: 0.001 } as const
-const FRONT = Math.PI / 2
-const TRAVERSE_MS = 600
 
 // ─── phantom orb configs — distinct non-blue colors, different densities ─────
 // scale must match main orb GYRO_SCALE range (orbSize * 0.15 ≈ 3.3–5.1)
@@ -88,14 +101,14 @@ const SATURN_VERT = `
 `
 const SATURN_FRAG = `
   uniform float uTime;
+  uniform float uColorOffset;
   varying float vAlpha;
   void main() {
     float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    // Hard-edge crisp point — no blur, no soft halo, pure sharp particle
     float disc = step(r, 0.92);
     float a    = disc * vAlpha;
     if (a < 0.01) discard;
-    float cycle = mod(uTime * 0.05, 3.0);
+    float cycle = mod(uTime * 0.05 + uColorOffset, 3.0);
     vec3 red    = vec3(1.00, 0.12, 0.06);
     vec3 dblue  = vec3(0.08, 0.28, 1.00);
     vec3 purple = vec3(0.55, 0.05, 0.90);
@@ -107,27 +120,26 @@ const SATURN_FRAG = `
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
-function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
-  const COUNT  = 14000  // high density — Saturn rings are continuous dust bands
-  const geo    = new THREE.BufferGeometry()
-  const pos    = new Float32Array(COUNT * 3)
-  const sz     = new Float32Array(COUNT)
-  const ph     = new Float32Array(COUNT)
-  const rInner = radius * 0.88
-  const rOuter = radius * 1.12
+function createOrbRingGeo(a: number, b: number): THREE.BufferGeometry {
+  const COUNT = 11000
+  const geo   = new THREE.BufferGeometry()
+  const pos   = new Float32Array(COUNT * 3)
+  const sz    = new Float32Array(COUNT)
+  const ph    = new Float32Array(COUNT)
+  const halfW = a * 0.11  // ring width = 11% of major axis
   for (let i = 0; i < COUNT; i++) {
-    const angle = Math.random() * Math.PI * 2
-    const u     = Math.random()
-    // Concentrate particles at ring edges for the banded look real Saturn has
-    const r     = u < 0.28
-      ? rInner + Math.random() * radius * 0.07
+    const angle  = Math.random() * Math.PI * 2
+    const u      = Math.random()
+    const dw     = u < 0.28
+      ? Math.random() * halfW * 0.55
       : u > 0.72
-        ? rOuter - Math.random() * radius * 0.07
-        : rInner + Math.random() * (rOuter - rInner)
-    pos[i*3]   = r * Math.cos(angle)
-    pos[i*3+1] = r * Math.sin(angle)
-    pos[i*3+2] = (Math.random() - 0.5) * 2.5   // thin disc — Saturn rings are <1km thick
-    sz[i]      = 0.4 + Math.random() * 0.7      // 0.4–1.1px — sub-pixel dust
+        ? halfW - Math.random() * halfW * 0.55
+        : Math.random() * halfW
+    const sc   = 1 + (dw / halfW - 0.5) * 0.22
+    pos[i*3]   = a * sc * Math.cos(angle)
+    pos[i*3+1] = (Math.random() - 0.5) * 2.2   // thin in Y
+    pos[i*3+2] = b * sc * Math.sin(angle)
+    sz[i]      = 0.4 + Math.random() * 0.7
     ph[i]      = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -451,7 +463,7 @@ function ScreenTracker({ worldRef, screenRef }: {
   const { camera, size } = useThree()
   const v = useMemo(() => new THREE.Vector3(), [])
   useFrame(() => {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < GATEWAYS.length; i++) {
       const wp = worldRef.current[i]; if (!wp) continue
       v.copy(wp).project(camera)
       screenRef.current[i] = { x: (v.x+1)/2*size.width, y: (-v.y+1)/2*size.height }
@@ -750,7 +762,7 @@ function StarField3D() {
 // ─── vistara orb ─────────────────────────────────────────────────────────────
 interface VistaraOrbProps {
   gateway: Gateway; orbIdx: number; orbSize: number
-  ringType: 'A' | 'B' | 'C'; localAngle: number; ringRadius: number
+  basePos: [number, number, number]
   isFocused: boolean; isHovered: boolean; panelOpen: boolean
   isPulled: boolean; pullProgress: number; pullTarget: THREE.Vector3 | null
   onHover: (id: string | null) => void
@@ -760,14 +772,10 @@ interface VistaraOrbProps {
 }
 
 function VistaraOrb({
-  gateway, orbIdx, orbSize, ringType, localAngle, ringRadius,
+  gateway, orbIdx, orbSize, basePos,
   isFocused, isHovered, panelOpen, isPulled, pullProgress, pullTarget,
   onHover, onClick, worldPosRef, isOverview,
 }: VistaraOrbProps) {
-  const basePos = useMemo<[number,number,number]>(() => {
-    if (ringType === 'B') return [0, ringRadius*Math.cos(localAngle), ringRadius*Math.sin(localAngle)]
-    return [ringRadius*Math.cos(localAngle), 0, ringRadius*Math.sin(localAngle)]
-  }, [ringType, localAngle, ringRadius])
 
   const groupRef  = useRef<THREE.Group>(null)
   const ZERO      = useMemo(() => new THREE.Vector3(), [])
@@ -939,13 +947,11 @@ function GyroScene({
   worldPosRef, screenPosRef, traverseRef, panelOpen, onPhantomClick,
   isOverview, orbitEnabled, onOverviewAnimDone, overviewZRef,
 }: GyroSceneProps) {
-  const ringARef = useRef<THREE.Group>(null)
-  const ringBRef = useRef<THREE.Group>(null)
-  const ringCRef = useRef<THREE.Group>(null)
+  const ringGroupsRef = useRef<(THREE.Group | null)[]>(new Array(9).fill(null))
   const { camera, size } = useThree()
-  const lookAt       = useRef(new THREE.Vector3())
-  const anglesRef    = useRef({ A: 0, B: 0, C: 0 })
-  const prevFocusRef = useRef(focusedIdx)
+  const lookAt        = useRef(new THREE.Vector3())
+  const spinAnglesRef = useRef<number[]>(new Array(9).fill(0))
+  const prevFocusRef  = useRef(focusedIdx)
   const throwRef     = useRef({ startT: -10 })
   const controlsRef  = useRef<any>(null)
   const prevIsOverviewRef = useRef(isOverview)
@@ -981,71 +987,40 @@ function GyroScene({
     if (isOverview) pendingOverviewZRef.current = newZ
   }, [size])
 
-  // ── Saturn ring materials — one per ring so uniforms are independent ──
-  const ringAMat = useMemo(() => new THREE.ShaderMaterial({
+  // ── Per-orb ring materials and geometries ──
+  const ringMats = useMemo(() => ORB_RING_DEFS.map(def => new THREE.ShaderMaterial({
     vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
-    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 }, uColorOffset: { value: def.colorOffset } },
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  }), [])
-  const ringBMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
-    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 } },
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  }), [])
-  const ringCMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
-    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 } },
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  }), [])
-  const ringAGeo = useMemo(() => createSaturnRingGeo(RING_RADII.A), [])
-  const ringBGeo = useMemo(() => createSaturnRingGeo(RING_RADII.B), [])
-  const ringCGeo = useMemo(() => createSaturnRingGeo(RING_RADII.C), [])
+  })), [])
+  const ringGeos = useMemo(() => ORB_RING_DEFS.map(def => createOrbRingGeo(def.a, def.b)), [])
 
   useFrame(({ clock }, delta) => {
     const t   = clock.elapsedTime
     const tr  = traverseRef.current
     const frac60 = delta * 60
 
-    if (tr.active) {
-      const elapsed = Date.now() - tr.startTime
-      const p = easeInOutCubic(Math.min(elapsed / TRAVERSE_MS, 1))
-      const s = 0.2 * frac60
-      anglesRef.current.A = tr.ringAActive ? tr.ringAStart + (tr.ringATarget - tr.ringAStart)*p : anglesRef.current.A + RING_SPEEDS.A*s
-      anglesRef.current.B = tr.ringBActive ? tr.ringBStart + (tr.ringBTarget - tr.ringBStart)*p : anglesRef.current.B + RING_SPEEDS.B*s
-      anglesRef.current.C = tr.ringCActive ? tr.ringCStart + (tr.ringCTarget - tr.ringCStart)*p : anglesRef.current.C + RING_SPEEDS.C*s
-      if (elapsed >= TRAVERSE_MS) tr.active = false
-    } else {
-      anglesRef.current.A += RING_SPEEDS.A * frac60
-      anglesRef.current.B += RING_SPEEDS.B * frac60
-      anglesRef.current.C += RING_SPEEDS.C * frac60
-    }
+    // Mark traverse done after cooldown (camera arc handles the actual transition)
+    if (tr.active && Date.now() - tr.startTime > 600) tr.active = false
 
-    // Primary spin axes + slow precession drifts → rings sweep through diagonal space
-    // Each ring gets 2 secondary drift axes at incommensurate frequencies so they
-    // never lock into horizontal/vertical planes.
-    if (ringARef.current) ringARef.current.rotation.set(
-      Math.sin(t * 0.17) * 0.22,   // X drift — tilts A's spin axis diagonally
-      anglesRef.current.A,           // primary Y spin
-      Math.cos(t * 0.13) * 0.15,   // Z drift — adds roll precession
-    )
-    if (ringBRef.current) ringBRef.current.rotation.set(
-      anglesRef.current.B,           // primary X spin
-      Math.cos(t * 0.19) * 0.16,   // Y drift — yaw precession
-      Math.sin(t * 0.14) * 0.20,   // Z drift — tilts B's spin axis diagonally
-    )
-    if (ringCRef.current) ringCRef.current.rotation.set(
-      Math.cos(t * 0.22) * 0.10,   // X drift — stacks with inner 45° static tilt
-      Math.sin(t * 0.11) * 0.18,   // Y drift — sweeps C through oblique planes
-      anglesRef.current.C,           // primary Z spin
-    )
-
-    // Saturn ring colour/density — tilt magnitude drives particle visibility
-    ringAMat.uniforms.uTime.value = t
-    ringAMat.uniforms.uTilt.value = Math.abs(Math.sin(t * 0.17) * 0.22) + Math.abs(Math.cos(t * 0.13) * 0.15)
-    ringBMat.uniforms.uTime.value = t
-    ringBMat.uniforms.uTilt.value = Math.abs(Math.cos(t * 0.19) * 0.16) + Math.abs(Math.sin(t * 0.14) * 0.20)
-    ringCMat.uniforms.uTime.value = t
-    ringCMat.uniforms.uTilt.value = Math.abs(Math.cos(t * 0.22) * 0.10) + Math.abs(Math.sin(t * 0.11) * 0.18)
+    // Per-orb ring rotation — each ring spins on its own axis with gyroscopic drift
+    ORB_RING_DEFS.forEach((def, i) => {
+      spinAnglesRef.current[i] += def.speed * frac60
+      const spin = spinAnglesRef.current[i]
+      const grp  = ringGroupsRef.current[i]
+      if (!grp) return
+      const [fx, fy, fz] = def.df
+      const [ax, ay, az] = def.da
+      switch (def.spinAxis) {
+        case 'Y': grp.rotation.set(Math.sin(t*fx)*ax, spin, Math.cos(t*fz)*az); break
+        case 'X': grp.rotation.set(spin, Math.cos(t*fy)*ay, Math.sin(t*fz)*az); break
+        case 'Z': grp.rotation.set(Math.cos(t*fx)*ax, Math.sin(t*fy)*ay, spin); break
+      }
+      ringMats[i].uniforms.uTime.value = t
+      ringMats[i].uniforms.uTilt.value = (
+        Math.abs(grp.rotation.x) + Math.abs(grp.rotation.y) + Math.abs(grp.rotation.z)
+      )
+    })
 
     // ── Orientation / resize repositioning (while in overview) ─────────────
     if (isOverview && !camAnimRef.current.active && pendingOverviewZRef.current !== null) {
@@ -1107,17 +1082,16 @@ function GyroScene({
       const ct = camTraverseRef.current
       ct.active = true
       ct.startT  = clock.elapsedTime
-      ct.duration = 1.35
+      ct.duration = 2.5
       ct.startPos.copy(camera.position)
       ct.startLookAt.copy(lookAt.current)
       if (newWp) {
         ct.endLookAt.copy(newWp)
-        // Midpoint: pull back 80% of overview distance, laterally offset toward target
-        const pullZ = overviewZRef.current * 0.82
-        ct.midPos.set(newWp.x * 0.30, newWp.y * 0.30, pullZ)
+        const pullZ = overviewZRef.current * 1.05
+        ct.midPos.set(newWp.x * 0.55, newWp.y * 0.55, pullZ)
       } else {
         ct.endLookAt.set(0, 0, 0)
-        ct.midPos.set(0, 0, overviewZRef.current * 0.82)
+        ct.midPos.set(0, 0, overviewZRef.current * 1.05)
       }
     }
     const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.55, 1)
@@ -1178,55 +1152,21 @@ function GyroScene({
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
       <StarTrailsSystem />
 
-      <group ref={ringARef}>
-        <points rotation={[Math.PI/2, 0, 0]} geometry={ringAGeo}>
-          <primitive object={ringAMat} attach="material" />
-        </points>
-        {[0, 3, 7].map(idx => (
-          <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
-            ringType="A" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.A}
-            isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
-            panelOpen={panelOpen && focusedIdx===idx}
-            isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
-            pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
+      {ORB_RING_DEFS.map((def, i) => (
+        <group key={i} ref={(el: THREE.Group | null) => { ringGroupsRef.current[i] = el }}>
+          <points geometry={ringGeos[i]} material={ringMats[i]} frustumCulled={false} />
+          <VistaraOrb
+            gateway={GATEWAYS[i]} orbIdx={i} orbSize={ORB_SIZES[i]}
+            basePos={[def.a, 0, 0]}
+            isFocused={focusedIdx===i} isHovered={hoveredId===GATEWAYS[i].id}
+            panelOpen={panelOpen && focusedIdx===i}
+            isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==i}
+            pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==i?vortexProgressRef.current:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
-        ))}
-      </group>
-
-      <group ref={ringBRef}>
-        <points rotation={[0, Math.PI/2, 0]} geometry={ringBGeo}>
-          <primitive object={ringBMat} attach="material" />
-        </points>
-        {[1, 4, 6].map(idx => (
-          <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
-            ringType="B" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.B}
-            isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
-            panelOpen={panelOpen && focusedIdx===idx}
-            isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
-            pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
-            pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
-        ))}
-      </group>
-
-      <group ref={ringCRef}>
-        <group rotation={[Math.PI/4, 0, 0]}>
-          <points rotation={[Math.PI/2, 0, 0]} geometry={ringCGeo}>
-            <primitive object={ringCMat} attach="material" />
-          </points>
-          {[2, 5].map(idx => (
-            <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
-              ringType="C" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.C}
-              isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
-              panelOpen={panelOpen && focusedIdx===idx}
-              isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
-              pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
-              pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-              onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
-          ))}
+            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview}
+          />
         </group>
-      </group>
+      ))}
 
       <ScreenTracker worldRef={worldPosRef} screenRef={screenPosRef} />
     </>
@@ -1322,6 +1262,11 @@ const GATEWAY_DETAILS: Record<string, { features: { title: string; body: string 
     { title: 'Reality Manifold',       body: 'Constructs layered digital realities from initial intention to tangible output.' },
     { title: 'Dynamic Gateway',        body: 'The most versatile portal — its nature adapts to what you need to create.' },
     { title: 'Manifestation Engine',   body: 'Bridges the gap between possibility-space and expressed digital form.' },
+  ]},
+  sangraha: { features: [
+    { title: 'Essence Collection',     body: 'Gathers the most vital insights from all VYAN systems into a unified stream.' },
+    { title: 'Knowledge Synthesis',    body: 'Weaves distributed wisdom threads into coherent, actionable understanding.' },
+    { title: 'Integration Protocol',   body: 'Bridges all gateways so the whole becomes greater than the sum of its parts.' },
   ]},
 }
 
@@ -1703,9 +1648,6 @@ function ComingSoonPanel({ onClose }: { onClose: () => void }) {
 // ─── traversal state ──────────────────────────────────────────────────────────
 interface TraverseState {
   active: boolean; startTime: number
-  ringAActive: boolean; ringAStart: number; ringATarget: number
-  ringBActive: boolean; ringBStart: number; ringBTarget: number
-  ringCActive: boolean; ringCStart: number; ringCTarget: number
 }
 type VortexPhase = 'idle' | 'pull' | 'peak' | 'passage' | 'done'
 
@@ -1760,23 +1702,11 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   // vortexProgress as ref — avoids 75+ setState calls per vortex (each was a full React re-render)
   const vortexProgressRef = useRef(0)
 
-  const traverseRef = useRef<TraverseState>({
-    active:false, startTime:0,
-    ringAActive:false, ringAStart:0, ringATarget:0,
-    ringBActive:false, ringBStart:0, ringBTarget:0,
-    ringCActive:false, ringCStart:0, ringCTarget:0,
-  })
+  const traverseRef = useRef<TraverseState>({ active:false, startTime:0 })
 
-  const triggerTraverse = useCallback((newIdx: number) => {
-    const cfg = ORB_CFG[newIdx]
-    const angles = { A: 0, B: 0, C: 0 }
-    const rawTarget = FRONT - cfg.localAngle
+  const triggerTraverse = useCallback((_newIdx: number) => {
     const tr = traverseRef.current
     tr.active=true; tr.startTime=Date.now()
-    tr.ringAActive=false; tr.ringBActive=false; tr.ringCActive=false
-    if (cfg.ring==='A') { tr.ringAActive=true; tr.ringAStart=angles.A; tr.ringATarget=nearestTarget(angles.A, rawTarget) }
-    else if (cfg.ring==='B') { tr.ringBActive=true; tr.ringBStart=angles.B; tr.ringBTarget=nearestTarget(angles.B, rawTarget) }
-    else { tr.ringCActive=true; tr.ringCStart=angles.C; tr.ringCTarget=nearestTarget(angles.C, rawTarget) }
   }, [])
 
   useEffect(() => {
@@ -1784,7 +1714,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
     const go = (dir: 1 | -1) => {
       if (cooldown || vortexPhase !== 'idle') return
       cooldown = true; setTimeout(() => { cooldown = false }, 700)
-      setFocusedIdx(prev => { const next=(prev+dir+8)%8; triggerTraverse(next); return next })
+      setFocusedIdx(prev => { const next=(prev+dir+GATEWAYS.length)%GATEWAYS.length; triggerTraverse(next); return next })
     }
     const onWheel      = (e: WheelEvent)    => { if (isOverviewRef.current) return; if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
     let tx = 0
@@ -1863,6 +1793,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const passCenter = vortexTargetIdx!==null ? screenPosRef.current[vortexTargetIdx] : null
 
   return (
+    <>
     <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000005', cursor: hasFinePointer ? 'none' : 'auto' }}>
       <style>{`
         @keyframes nebDrift1 {
@@ -2064,32 +1995,6 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         </div>
       )}
 
-      {/* Overview button — bottom-right, only visible in close-up */}
-      {!isOverview && (
-        <button
-          onClick={goToOverview}
-          style={{
-            position:'fixed', bottom:'22px', right:'22px', zIndex:9200,
-            background:'rgba(6,10,28,0.72)', border:'1px solid rgba(55,90,200,0.28)',
-            borderRadius:'8px', padding:'8px 16px', cursor:'pointer',
-            fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.22em',
-            color:'rgba(90,150,255,0.55)', textTransform:'uppercase',
-            backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
-            transition:'color 0.25s, border-color 0.25s, background 0.25s',
-          }}
-          onMouseEnter={e => {
-            const b = e.currentTarget as HTMLButtonElement
-            b.style.color='rgba(150,200,255,0.95)'; b.style.borderColor='rgba(80,140,255,0.55)'; b.style.background='rgba(10,18,50,0.90)'
-          }}
-          onMouseLeave={e => {
-            const b = e.currentTarget as HTMLButtonElement
-            b.style.color='rgba(90,150,255,0.55)'; b.style.borderColor='rgba(55,90,200,0.28)'; b.style.background='rgba(6,10,28,0.72)'
-          }}
-        >
-          Overview
-        </button>
-      )}
-
       {showPanel && panelGateway && (
         <GlassPanel gateway={panelGateway} onClose={handleClose} onBack={handlePanelBack} onEnter={handleEnter} side={panelSide} />
       )}
@@ -2097,5 +2002,32 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         <ComingSoonPanel onClose={() => setShowComingSoon(false)} />
       )}
     </div>
+
+    {/* Overview button — outside stacking context so zIndex:9200 beats NebulaFooter:9100 */}
+    {!isOverview && (
+      <button
+        onClick={goToOverview}
+        style={{
+          position:'fixed', bottom:'22px', right:'22px', zIndex:9200,
+          background:'rgba(6,10,28,0.72)', border:'1px solid rgba(55,90,200,0.28)',
+          borderRadius:'8px', padding:'8px 16px', cursor:'pointer',
+          fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.22em',
+          color:'rgba(90,150,255,0.55)', textTransform:'uppercase',
+          backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+          transition:'color 0.25s, border-color 0.25s, background 0.25s',
+        }}
+        onMouseEnter={e => {
+          const b = e.currentTarget as HTMLButtonElement
+          b.style.color='rgba(150,200,255,0.95)'; b.style.borderColor='rgba(80,140,255,0.55)'; b.style.background='rgba(10,18,50,0.90)'
+        }}
+        onMouseLeave={e => {
+          const b = e.currentTarget as HTMLButtonElement
+          b.style.color='rgba(90,150,255,0.55)'; b.style.borderColor='rgba(55,90,200,0.28)'; b.style.background='rgba(6,10,28,0.72)'
+        }}
+      >
+        Overview
+      </button>
+    )}
+    </>
   )
 }

@@ -3,6 +3,35 @@ import gsap from 'gsap';
 import { OrbDustTrail } from './OrbDustTrail';
 import { SpringV3 } from '../app/Spring';
 
+// Web stardust shaders — particles flow along each edge connection
+const WEB_DUST_VERT = `
+  attribute float aPhase;
+  attribute float aSeed;
+  uniform float uTime;
+  uniform float uDim;
+  varying float vAlpha;
+  void main() {
+    float flow = mod(uTime * 0.40 + aSeed, 1.0);
+    float d = abs(flow - aPhase);
+    if (d > 0.5) d = 1.0 - d;
+    vAlpha = max(0.0, 1.0 - d * 8.0) * uDim;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    float dist = max(-mv.z, 1.0);
+    gl_PointSize = clamp(2.0 * (60.0 / dist), 0.5, 3.5);
+    gl_Position = projectionMatrix * mv;
+  }
+`
+const WEB_DUST_FRAG = `
+  uniform vec3 uColor;
+  varying float vAlpha;
+  void main() {
+    float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float a = (1.0 - smoothstep(0.15, 1.0, r)) * vAlpha;
+    if (a < 0.01) discard;
+    gl_FragColor = vec4(uColor, min(a, 1.0));
+  }
+`
+
 export type NanoOrbData = {
   id: string;
   title: string;
@@ -45,6 +74,8 @@ export class NanoOrb {
   private nodeGeo = new THREE.BufferGeometry();
   private nodeBase: {x: number, y: number, z: number, phase: number}[] = [];
   private web: THREE.LineSegments;
+  private webDust!: THREE.Points;
+  private webDustMat!: THREE.ShaderMaterial;
   private nodeMat: THREE.PointsMaterial;
   private coreDust: THREE.Points;
   private haze: THREE.Points;
@@ -121,11 +152,51 @@ export class NanoOrb {
     const lineMat = new THREE.LineBasicMaterial({
         color: this.data.colorB || "#ff1010",
         transparent: true,
-        opacity: 0.42,
+        opacity: 0.06,
         blending: THREE.AdditiveBlending
     });
     this.web = new THREE.LineSegments(lineGeo, lineMat);
     this.group.add(this.web);
+
+    // WEB STARDUST — flowing particles along each edge give the network a living quality
+    const WD_PER_EDGE = 8
+    const wdEdgeCount = linePoints.length / 2
+    const wdEdges     = Math.min(wdEdgeCount, 700)
+    const wdTotal     = wdEdges * WD_PER_EDGE
+    const wdPos  = new Float32Array(wdTotal * 3)
+    const wdPh   = new Float32Array(wdTotal)
+    const wdSeed = new Float32Array(wdTotal)
+    for (let e = 0; e < wdEdges; e++) {
+        const nodeA = linePoints[e * 2]
+        const nodeB = linePoints[e * 2 + 1]
+        const edgeSeed = Math.random() * 6.283
+        for (let k = 0; k < WD_PER_EDGE; k++) {
+            const frac = (k + 0.5) / WD_PER_EDGE
+            const idx  = e * WD_PER_EDGE + k
+            wdPos[idx * 3 + 0] = nodeA.x + (nodeB.x - nodeA.x) * frac
+            wdPos[idx * 3 + 1] = nodeA.y + (nodeB.y - nodeA.y) * frac
+            wdPos[idx * 3 + 2] = nodeA.z + (nodeB.z - nodeA.z) * frac
+            wdPh[idx]   = frac
+            wdSeed[idx] = edgeSeed
+        }
+    }
+    const wdGeo = new THREE.BufferGeometry()
+    wdGeo.setAttribute('position', new THREE.BufferAttribute(wdPos, 3))
+    wdGeo.setAttribute('aPhase',   new THREE.BufferAttribute(wdPh, 1))
+    wdGeo.setAttribute('aSeed',    new THREE.BufferAttribute(wdSeed, 1))
+    const wdCol = new THREE.Color(this.data.colorB || '#0077ff')
+    this.webDustMat = new THREE.ShaderMaterial({
+        vertexShader: WEB_DUST_VERT,
+        fragmentShader: WEB_DUST_FRAG,
+        uniforms: {
+            uTime:  { value: 0 },
+            uDim:   { value: 1 },
+            uColor: { value: new THREE.Vector3(wdCol.r, wdCol.g, wdCol.b) },
+        },
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    })
+    this.webDust = new THREE.Points(wdGeo, this.webDustMat)
+    this.group.add(this.webDust)
 
     // QUANTUM STARDUST CORE
     const coreDustCount = 2800;
@@ -770,9 +841,15 @@ export class NanoOrb {
     else if (signal === 'interaction'){ signalBoost = 0.06; signalPulse = 0.05; }
     else if (signal === 'decay')    { signalBoost = 0.02; signalPulse = 0.0; }
     const pulseFreq = signal === 'processing' ? 3.8 : signal === 'response' ? 5.2 : 2.4;
-    // INVERT: web fades down as expansion grows, so signals show through.
-    const webBase = 0.30 * (1 - expT2 * 0.68) + signalBoost;
-    (this.web.material as THREE.LineBasicMaterial).opacity = (webBase + Math.sin(t * pulseFreq) * (0.06 + signalPulse * 0.5)) * dim;
+    // Web lines are now very faint — the stardust dust carries the visual weight
+    const webBase = 0.06 * (1 - expT2 * 0.68) + signalBoost * 0.3;
+    (this.web.material as THREE.LineBasicMaterial).opacity = (webBase + Math.sin(t * pulseFreq) * 0.02) * dim;
+    // Stardust: brighter than the line, pulses with signal
+    const dustDim = (0.55 + signalBoost * 2.0 + Math.sin(t * pulseFreq) * signalPulse * 0.8) * dim;
+    if (this.webDustMat) {
+        this.webDustMat.uniforms.uTime.value = t;
+        this.webDustMat.uniforms.uDim.value  = Math.min(dustDim * (1 - expT2 * 0.55), 1.0);
+    }
     // Nodes (the orb's intrinsic web-junctions) also dim.
     this.nodeMat.opacity = (0.82 * (1 - expT2 * 0.55) + Math.sin(t * 1.7) * 0.06 + signalBoost) * dim;
 

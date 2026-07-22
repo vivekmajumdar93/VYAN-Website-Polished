@@ -122,6 +122,18 @@ export const GATEWAYS: Gateway[] = [
     orbitRadius: 10, orbitSpeed: 0.0005, orbitPhase: 5.5,
     color: '#ffd080',
   },
+  {
+    id: 'sangraha',
+    name: 'Saṅgraha',
+    tantra: 'VYAN SAṄGRAHA',
+    tagline: 'Gathering the Essence of All Knowing',
+    description: 'Collection, synthesis, integration. The convergence point where all knowledge flows together into unified understanding.',
+    filename: '1000038785.png',
+    // Center field — between all others
+    x: 52, y: 42, depth: 0.65, scale: 0.13,
+    orbitRadius: 7, orbitSpeed: 0.00035, orbitPhase: 1.8,
+    color: '#c070ff',
+  },
 ]
 
 // Resolve asset path — checks public/ root
