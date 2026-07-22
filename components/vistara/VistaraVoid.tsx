@@ -74,15 +74,15 @@ const SATURN_VERT = `
   varying float vAlpha;
   void main() {
     float theta = atan(position.y, position.x);
-    float w1 = 0.5 + 0.5 * sin(theta *  2.0 + uTime * 0.18 + aPhase);
-    float w2 = 0.5 + 0.5 * sin(theta *  6.0 - uTime * 0.11 + aPhase * 2.3);
-    float w3 = 0.5 + 0.5 * sin(theta * 14.0 + uTime * 0.27 + aPhase * 5.0);
-    float gap = 0.75 + 0.25 * sin(theta * 1.5 + uTime * 0.04);
-    float density = w1 * (0.4 + 0.6 * w2) * (0.65 + 0.35 * w3) * gap;
-    vAlpha = clamp(density * (0.65 + abs(uTilt) * 1.4), 0.0, 1.0);
+    float w1 = 0.5 + 0.5 * sin(theta *  3.0 + uTime * 0.18 + aPhase);
+    float w2 = 0.5 + 0.5 * sin(theta *  9.0 - uTime * 0.11 + aPhase * 2.3);
+    float w3 = 0.5 + 0.5 * sin(theta * 22.0 + uTime * 0.27 + aPhase * 5.0);
+    float gap = 0.68 + 0.32 * sin(theta * 2.5 + uTime * 0.04);
+    float density = w1 * (0.5 + 0.5 * w2) * (0.7 + 0.3 * w3) * gap;
+    vAlpha = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0);
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
-    gl_PointSize = clamp(aSize * (580.0 / dist), aSize * 1.1, aSize * 2.5);
+    gl_PointSize = clamp(aSize * (480.0 / dist), aSize * 0.9, aSize * 2.2);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -90,11 +90,11 @@ const SATURN_FRAG = `
   uniform float uTime;
   varying float vAlpha;
   void main() {
-    float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.05, 0.88, r);
-    float sprk = exp(-r * r * 6.0);
-    float a    = (disc * 0.72 + sprk * 0.55) * vAlpha;
-    if (a < 0.005) discard;
+    float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    // Hard-edge crisp point — no blur, no soft halo, pure sharp particle
+    float disc = step(r, 0.92);
+    float a    = disc * vAlpha;
+    if (a < 0.01) discard;
     float cycle = mod(uTime * 0.05, 3.0);
     vec3 red    = vec3(1.00, 0.12, 0.06);
     vec3 dblue  = vec3(0.08, 0.28, 1.00);
@@ -103,30 +103,31 @@ const SATURN_FRAG = `
     if      (cycle < 1.0) { col = mix(red,    dblue,  cycle);       }
     else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
     else                  { col = mix(purple, red,    cycle - 2.0); }
-    col = col * 1.12 + vec3(0.02);
+    col = col * 1.15 + vec3(0.02);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
 function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
-  const COUNT  = 5000
+  const COUNT  = 14000  // high density — Saturn rings are continuous dust bands
   const geo    = new THREE.BufferGeometry()
   const pos    = new Float32Array(COUNT * 3)
   const sz     = new Float32Array(COUNT)
   const ph     = new Float32Array(COUNT)
-  const rInner = radius * 0.85
-  const rOuter = radius * 1.15
+  const rInner = radius * 0.88
+  const rOuter = radius * 1.12
   for (let i = 0; i < COUNT; i++) {
     const angle = Math.random() * Math.PI * 2
     const u     = Math.random()
-    const r     = u < 0.22
-      ? rInner + Math.random() * radius * 0.12
-      : u > 0.78
-        ? rOuter - Math.random() * radius * 0.12
+    // Concentrate particles at ring edges for the banded look real Saturn has
+    const r     = u < 0.28
+      ? rInner + Math.random() * radius * 0.07
+      : u > 0.72
+        ? rOuter - Math.random() * radius * 0.07
         : rInner + Math.random() * (rOuter - rInner)
     pos[i*3]   = r * Math.cos(angle)
     pos[i*3+1] = r * Math.sin(angle)
-    pos[i*3+2] = (Math.random() - 0.5) * 5
-    sz[i]      = 2.2 + Math.random() * 4.8   // 2.2–7px — v1.9 stardust sizes
+    pos[i*3+2] = (Math.random() - 0.5) * 2.5   // thin disc — Saturn rings are <1km thick
+    sz[i]      = 0.4 + Math.random() * 0.7      // 0.4–1.1px — sub-pixel dust
     ph[i]      = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -1372,7 +1373,22 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
     transition:'opacity 0.38s, transform 0.38s',
   })
 
+  // Shimmer direction alternates per orb: even=L→R, odd=R→L
+  const orbIdx = GATEWAYS.findIndex(g => g.id === gateway.id)
+  const shimmerAnim = orbIdx % 2 === 0 ? 'tagShimmerLR' : 'tagShimmerRL'
+
   return (
+    <>
+    <style>{`
+      @keyframes tagShimmerLR {
+        0%   { background-position: 200% center; }
+        100% { background-position: -200% center; }
+      }
+      @keyframes tagShimmerRL {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+      }
+    `}</style>
     <div style={{
       position:'fixed', inset:0, zIndex:200, display:'flex',
       alignItems:     isMobile ? 'flex-end' : 'stretch',
@@ -1387,7 +1403,12 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
       }} />
 
       {/* Panel — glass: semi-transparent + backdrop-filter so orbs show through */}
-      <div style={{
+      <div
+        onPointerDown={e => e.stopPropagation()}
+        onPointerMove={e => e.stopPropagation()}
+        onTouchStart={e => e.stopPropagation()}
+        onTouchMove={e => e.stopPropagation()}
+        style={{
         position:'relative', zIndex:2,
         width:  isMobile ? '100%' : 'min(500px, 46vw)',
         height: isMobile ? '88vh' : '100vh',
@@ -1450,25 +1471,30 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
         {/* Scrollable content — each block reveals in sequence */}
         <div
           style={{ flex:1, overflowY:'auto', overflowX:'hidden', padding: isMobile ? '14px 24px 0' : '16px 32px 0' }}
-          onTouchStart={e => { (e.currentTarget as any)._tsY = e.touches[0].clientY }}
+          onTouchStart={e => { e.stopPropagation(); (e.currentTarget as any)._tsY = e.touches[0].clientY }}
           onTouchMove={e => {
+            e.stopPropagation()
+            e.preventDefault()
             const el = e.currentTarget as HTMLDivElement
             const dy = (el as any)._tsY - e.touches[0].clientY;
             (el as any)._tsY = e.touches[0].clientY
             el.scrollTop += dy
-            e.stopPropagation()
           }}
         >
           <div style={reveal(2)}>
             <h2 style={{
               fontFamily:'var(--font-vyan)', fontSize: isMobile ? '24px' : '26px',
-              letterSpacing:'0.13em', color:'rgba(255,255,255,0.92)',
+              letterSpacing:'0.13em', color:'#e80010',
               textTransform:'uppercase', margin:'10px 0 6px',
-              textShadow:`0 0 28px ${c}2a`,
             }}>{gateway.name}</h2>
             <p style={{
-              fontSize:'10px', letterSpacing:'0.18em', color:c,
-              textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 18px', opacity:0.72,
+              fontSize:'10px', letterSpacing:'0.18em',
+              textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 18px',
+              background:'linear-gradient(90deg,#0a2fff 0%,#88aaff 30%,#cc99ff 55%,#6600cc 100%)',
+              backgroundSize:'200% auto',
+              WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+              backgroundClip:'text',
+              animation:`${shimmerAnim} 3.5s linear infinite`,
             }}>{gateway.tagline}</p>
           </div>
           <div style={reveal(3)}>
@@ -1564,6 +1590,7 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
@@ -2042,7 +2069,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         <button
           onClick={goToOverview}
           style={{
-            position:'fixed', bottom:'22px', right:'22px', zIndex:40,
+            position:'fixed', bottom:'22px', right:'22px', zIndex:9200,
             background:'rgba(6,10,28,0.72)', border:'1px solid rgba(55,90,200,0.28)',
             borderRadius:'8px', padding:'8px 16px', cursor:'pointer',
             fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.22em',
