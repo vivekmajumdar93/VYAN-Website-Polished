@@ -13,31 +13,34 @@ const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34, 26]
 
 interface OrbRingDef {
   a: number; b: number          // ellipse semi-axes in XZ plane
+  localAngle: number             // starting angle on the ellipse (radians) — spreads orbs around ring
   colorOffset: number            // shift in 0–3 color cycle
   speed: number                  // primary spin speed
   spinAxis: 'X' | 'Y' | 'Z'
   df: [number, number, number]   // drift frequencies [x,y,z]
   da: [number, number, number]   // drift amplitudes  [x,y,z]
 }
+// localAngles spread 9 orbs evenly: π/2 + i*(2π/9) so no two start at same position
+const _A = Math.PI / 2, _S = (2 * Math.PI) / 9
 const ORB_RING_DEFS: OrbRingDef[] = [
   // 0: Ṛtam — wide oval, red start, Y spin
-  { a:280, b:200, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15] },
+  { a:280, b:200, localAngle:_A+0*_S, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15] },
   // 1: Ojas — circle, blue start, X spin
-  { a:240, b:240, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20] },
+  { a:240, b:240, localAngle:_A+1*_S, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20] },
   // 2: Mudrā — tall portrait oval, purple start, Z spin
-  { a:190, b:270, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00] },
+  { a:190, b:270, localAngle:_A+2*_S, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00] },
   // 3: Netra — wide egg, mid-red start, Y spin
-  { a:295, b:210, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12] },
+  { a:295, b:210, localAngle:_A+3*_S, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12] },
   // 4: Ākṛti — large circle, mid-blue start, X spin
-  { a:260, b:260, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22] },
+  { a:260, b:260, localAngle:_A+4*_S, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22] },
   // 5: Sūtra — squat oval, mid-purple start, Z spin
-  { a:275, b:185, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00] },
+  { a:275, b:185, localAngle:_A+5*_S, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00] },
   // 6: Chitra-Prāṇa — diagonal oval, orange-red start, Y spin
-  { a:255, b:170, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16] },
+  { a:255, b:170, localAngle:_A+6*_S, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16] },
   // 7: Māyā — widest ring, purple-red start, X spin
-  { a:315, b:235, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18] },
+  { a:315, b:235, localAngle:_A+7*_S, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18] },
   // 8: Saṅgraha — circle, warm start, Z spin
-  { a:225, b:225, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18] },
+  { a:225, b:225, localAngle:_A+8*_S, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18] },
 ]
 
 // ─── phantom orb configs — distinct non-blue colors, different densities ─────
@@ -1157,7 +1160,7 @@ function GyroScene({
           <points geometry={ringGeos[i]} material={ringMats[i]} frustumCulled={false} />
           <VistaraOrb
             gateway={GATEWAYS[i]} orbIdx={i} orbSize={ORB_SIZES[i]}
-            basePos={[def.a, 0, 0]}
+            basePos={[def.a * Math.cos(def.localAngle), 0, def.b * Math.sin(def.localAngle)]}
             isFocused={focusedIdx===i} isHovered={hoveredId===GATEWAYS[i].id}
             panelOpen={panelOpen && focusedIdx===i}
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==i}
