@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '2.8',
+    date: '2026-07-22',
+    title: 'Vistara — v1.9 Ring Shader Restored',
+    summary: 'Stardust ring particles restored to v1.9 proportional sizing (2.2–7px, aSize-relative min/max). Proportional formula prevents the uniform-blob look caused by fixed pixel clamps.',
+    changes: [
+      'aSize 2.2–7px (v1.9 range restored)',
+      'gl_PointSize: clamp(aSize*580/dist, aSize*1.1, aSize*2.5) — proportional min/max',
+      'Fragment: disc smoothstep(0.05→0.88), disc*0.72 + sprk*0.55',
+      'vAlpha density*(0.65 + uTilt*1.4) — brighter than v1.9 to compensate for no bloom',
+      '5000 particles per ring',
+    ],
+    gitHash: 'e3eb8c0',
+    pages: ['Vistara'],
+  },
+  {
     version: '2.7',
     date: '2026-07-22',
     title: 'Vistara — Rings Actually Visible',
@@ -322,4 +337,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.7'
+export const CURRENT_VERSION = '2.8'
