@@ -85,7 +85,7 @@ const SATURN_VERT = `
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
     // Larger min clamp so particles don't shrink to nothing at distance
-    gl_PointSize = clamp(aSize * (300.0 / dist), 0.3, 2.0);
+    gl_PointSize = clamp(aSize * (320.0 / dist), 1.0, 2.5);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -94,8 +94,9 @@ const SATURN_FRAG = `
   varying float vAlpha;
   void main() {
     float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float core = exp(-r * r * 9.0);
-    float a    = core * vAlpha;
+    float disc = 1.0 - smoothstep(0.10, 0.90, r);
+    float core = exp(-r * r * 7.0);
+    float a    = (disc * 0.55 + core * 0.45) * vAlpha;
     if (a < 0.006) discard;
     float cycle = mod(uTime * 0.05, 3.0);
     vec3 red    = vec3(1.00, 0.12, 0.06);
@@ -128,7 +129,7 @@ function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
     pos[i*3]   = r * Math.cos(angle)
     pos[i*3+1] = r * Math.sin(angle)
     pos[i*3+2] = (Math.random() - 0.5) * 4
-    sz[i]      = 0.3 + Math.random() * 0.9   // 0.3–1.2px fine stardust
+    sz[i]      = 0.8 + Math.random() * 1.0   // 0.8–1.8px fine stardust, always ≥1px rendered
     ph[i]      = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
