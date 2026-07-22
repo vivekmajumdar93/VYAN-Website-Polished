@@ -79,11 +79,10 @@ const SATURN_VERT = `
     float w3 = 0.5 + 0.5 * sin(theta * 14.0 + uTime * 0.27 + aPhase * 5.0);
     float gap = 0.75 + 0.25 * sin(theta * 1.5 + uTime * 0.04);
     float density = w1 * (0.4 + 0.6 * w2) * (0.65 + 0.35 * w3) * gap;
-    // Bright stardust — always visible, density modulates ~15% so structure reads clearly
-    vAlpha = clamp(density * 0.3 + 0.70 + abs(uTilt) * 0.25, 0.0, 1.0);
+    vAlpha = clamp(density * (0.65 + abs(uTilt) * 1.4), 0.0, 1.0);
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
-    gl_PointSize = clamp(aSize * (550.0 / dist), 2.0, 9.0);
+    gl_PointSize = clamp(aSize * (580.0 / dist), aSize * 1.1, aSize * 2.5);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -92,10 +91,10 @@ const SATURN_FRAG = `
   varying float vAlpha;
   void main() {
     float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.10, 0.90, r);
-    float core = exp(-r * r * 7.0);
-    float a    = (disc * 0.65 + core * 0.55) * vAlpha;
-    if (a < 0.008) discard;
+    float disc = 1.0 - smoothstep(0.05, 0.88, r);
+    float sprk = exp(-r * r * 6.0);
+    float a    = (disc * 0.72 + sprk * 0.55) * vAlpha;
+    if (a < 0.005) discard;
     float cycle = mod(uTime * 0.05, 3.0);
     vec3 red    = vec3(1.00, 0.12, 0.06);
     vec3 dblue  = vec3(0.08, 0.28, 1.00);
@@ -104,12 +103,12 @@ const SATURN_FRAG = `
     if      (cycle < 1.0) { col = mix(red,    dblue,  cycle);       }
     else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
     else                  { col = mix(purple, red,    cycle - 2.0); }
-    col = col * 1.2 + vec3(0.03);
+    col = col * 1.12 + vec3(0.02);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
 function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
-  const COUNT  = 7000   // dense stardust ring — needs enough particles to read as a solid arc
+  const COUNT  = 5000
   const geo    = new THREE.BufferGeometry()
   const pos    = new Float32Array(COUNT * 3)
   const sz     = new Float32Array(COUNT)
@@ -127,7 +126,7 @@ function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
     pos[i*3]   = r * Math.cos(angle)
     pos[i*3+1] = r * Math.sin(angle)
     pos[i*3+2] = (Math.random() - 0.5) * 5
-    sz[i]      = 2.5 + Math.random() * 2.5   // 2.5–5px — clearly visible stardust
+    sz[i]      = 2.2 + Math.random() * 4.8   // 2.2–7px — v1.9 stardust sizes
     ph[i]      = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
