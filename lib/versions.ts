@@ -13,9 +13,26 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.3'
+export const CURRENT_VERSION = '3.4'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.4',
+    date: '2026-07-23',
+    title: 'Vistara — Each Orb Owns Its Ring (Depth & Proportion)',
+    summary: 'Each of 9 orbs now sits at a unique fixed 3D world position with its own local ring wrapping it — no more shared-origin stacking. Clear depth, distance and proportion visible from the overview.',
+    changes: [
+      '9 orbs at distinct 3D positions: Z spread +250 to -260 (front-to-back depth), X: ±220, Y: ±160',
+      'Ring wraps its own orb locally (ringA 44-68, ringB 34-52 proportional to orb size) — no overlap with other rings',
+      'Ring group rotates/gyrates around the orb; orb stays fixed at its world position',
+      'Nearest orb appears largest in overview, farthest appears smallest — depth perception restored',
+      'Camera flies to 350 units in front of each orb for close-up; 360° gyroscopic arc traversal between orbs',
+      'Overview camera range 750-1200 units (portrait wider to fit ±220 X spread)',
+      'Per-particle count 4000→1500 (proportional to smaller ring circumference)',
+    ],
+    gitHash: 'bc6a005',
+    pages: ['Vistara'],
+  },
   {
     version: '3.3',
     date: '2026-07-23',
