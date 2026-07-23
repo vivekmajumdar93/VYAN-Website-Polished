@@ -11,40 +11,31 @@ import { BackIcon, SendIcon, CloseIcon } from '@/components/icons/VyanIcons'
 // ─── orb constants ────────────────────────────────────────────────────────────
 const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34, 26]
 
-interface OrbRingDef {
-  worldPos:    [number, number, number]  // orb's fixed 3D position — each orb owns its space
-  ringA:       number   // local ring semi-major axis (wraps this orb only)
-  ringB:       number   // local ring semi-minor axis
-  colorOffset: number
-  speed:       number
-  spinAxis:    'X' | 'Y' | 'Z'
-  df:          [number, number, number]
-  da:          [number, number, number]
-  waveSpeed:   number
-  waveAmp:     number
-  waveFreq:    number
-}
-// 9 orbs spread through 3D space — front-to-back depth gives clear proportion & distance
-const ORB_RING_DEFS: OrbRingDef[] = [
-  // 0: Ṛtam — center-front, closest
-  { worldPos:[   0,   0, 250], ringA:56, ringB:44, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15], waveSpeed: 0.08, waveAmp:2.2, waveFreq:4.0 },
-  // 1: Ojas — left, mid-depth
-  { worldPos:[-210,  55, 150], ringA:48, ringB:38, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20], waveSpeed:-0.13, waveAmp:1.8, waveFreq:6.0 },
-  // 2: Mudrā — right, shallow
-  { worldPos:[ 175,  80,  55], ringA:44, ringB:34, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00], waveSpeed: 0.19, waveAmp:2.8, waveFreq:3.0 },
-  // 3: Netra — left-down, mid
-  { worldPos:[-145,-130, -50], ringA:60, ringB:46, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12], waveSpeed:-0.06, waveAmp:2.0, waveFreq:5.0 },
-  // 4: Ākṛti — right-up, deep
-  { worldPos:[ 135, 125,-130], ringA:64, ringB:50, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22], waveSpeed: 0.15, waveAmp:2.5, waveFreq:4.0 },
-  // 5: Sūtra — center-low, deeper
-  { worldPos:[  15, -85,-195], ringA:52, ringB:40, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00], waveSpeed:-0.22, waveAmp:1.5, waveFreq:7.0 },
-  // 6: Chitra-Prāṇa — far left, mid-deep
-  { worldPos:[-220,  45, -80], ringA:52, ringB:40, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16], waveSpeed: 0.09, waveAmp:2.0, waveFreq:5.0 },
-  // 7: Māyā — right, deepest
-  { worldPos:[  90, -40,-260], ringA:68, ringB:52, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18], waveSpeed:-0.17, waveAmp:3.0, waveFreq:3.0 },
-  // 8: Saṅgraha — left-up, deep
-  { worldPos:[ -70, 155,-220], ringA:52, ringB:40, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18], waveSpeed: 0.24, waveAmp:1.8, waveFreq:6.0 },
+const ORB_POS: [number, number, number][] = [
+  [   0,   0, 250],
+  [-210,  55, 150],
+  [ 175,  80,  55],
+  [-145,-130, -50],
+  [ 135, 125,-130],
+  [  15, -85,-195],
+  [-220,  45, -80],
+  [  90, -40,-260],
+  [ -70, 155,-220],
 ]
+
+// Midpoint bias per string (0→1, 1→2, …, 8→0) — each arc bends in a unique direction
+const STRING_BIASES: [number, number, number][] = [
+  [ 60,  80, -40],
+  [-50, -70,  30],
+  [ 40,  60,  80],
+  [-80,  40, -60],
+  [ 30, -80,  50],
+  [ 70,  50, -30],
+  [-40,  60,  70],
+  [ 55, -40, -80],
+  [-70, -55,  40],
+]
+const STRING_COLOR_OFFSETS = [0.0, 1.0, 2.0, 0.5, 1.5, 2.3, 0.3, 2.7, 0.8]
 
 // ─── phantom orb configs — distinct non-blue colors, different densities ─────
 // scale must match main orb GYRO_SCALE range (orbSize * 0.15 ≈ 3.3–5.1)
@@ -85,53 +76,37 @@ const TRAIL_FRAG = `
 `
 
 // ─── saturn ring shaders ──────────────────────────────────────────────────────
-const SATURN_VERT = `
+const STR_N = 200
+
+const STR_VERT = `
   attribute float aSize;
   attribute float aPhase;
+  attribute float aT;
   uniform float uTime;
-  uniform float uTilt;
-  uniform float uWaveSpeed;
-  uniform float uWaveAmp;
-  uniform float uWaveFreq;
   varying float vAlpha;
   varying float vPhase;
   void main() {
-    // Angular position around the ring (XZ plane)
-    float ringTheta = atan(position.z, position.x);
-
-    // Physical wave: displace ring string perpendicular to its plane (Y axis)
-    // — the string physically ripples as a travelling sine wave
-    float waveY = uWaveAmp * sin(ringTheta * uWaveFreq + uTime * uWaveSpeed);
-    vec3 waved  = vec3(position.x, position.y + waveY, position.z);
-
-    // Existing density variation (drives crystal colour variation in frag)
-    float theta = ringTheta;
-    float w1 = 0.5 + 0.5 * sin(theta *  3.0 + uTime * 0.18 + aPhase);
-    float w2 = 0.5 + 0.5 * sin(theta *  9.0 - uTime * 0.11 + aPhase * 2.3);
-    float w3 = 0.5 + 0.5 * sin(theta * 22.0 + uTime * 0.27 + aPhase * 5.0);
-    float gap = 0.68 + 0.32 * sin(theta * 2.5 + uTime * 0.04);
-    float density = w1 * (0.5 + 0.5 * w2) * (0.7 + 0.3 * w3) * gap;
-    vAlpha = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0) * 0.70;
+    float env     = sin(aT * 3.14159);
+    float flicker = 0.5 + 0.5 * sin(uTime * 4.0 + aPhase * 6.28318);
+    vAlpha = env * (0.55 + 0.45 * flicker);
     vPhase = aPhase;
-
-    vec4 mv = modelViewMatrix * vec4(waved, 1.0);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
-    gl_PointSize = clamp(aSize * (480.0 / dist), aSize * 0.9, aSize * 2.2);
+    gl_PointSize = clamp(aSize * (400.0 / dist), aSize * 0.5, aSize * 3.0);
     gl_Position  = projectionMatrix * mv;
   }
 `
-const SATURN_FRAG = `
+const STR_FRAG = `
   uniform float uTime;
   uniform float uColorOffset;
   varying float vAlpha;
   varying float vPhase;
   void main() {
-    float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = step(r, 0.92);
-    float a    = disc * vAlpha;
+    float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float disc = 1.0 - smoothstep(0.0, 0.92, r);
+    float core = exp(-r * r * 5.0);
+    float a    = (disc * 0.5 + core * 0.8) * vAlpha;
     if (a < 0.01) discard;
-    // Per-particle phase offset: each particle sits in its own colour facet
-    // Quantise into 12 hard bands — prismatic diffraction, no soft blend
     float raw   = mod(uTime * 0.05 + uColorOffset + vPhase * 0.7, 3.0);
     float cycle = floor(raw * 12.0) / 12.0;
     vec3 red    = vec3(1.00, 0.12, 0.06);
@@ -145,23 +120,21 @@ const SATURN_FRAG = `
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
-function createOrbRingGeo(ringA: number, ringB: number): THREE.BufferGeometry {
-  const COUNT = 1500  // proportional to ring circumference (~π×(ringA+ringB)≈314) — visible beads
-  const geo   = new THREE.BufferGeometry()
-  const pos   = new Float32Array(COUNT * 3)
-  const sz    = new Float32Array(COUNT)
-  const ph    = new Float32Array(COUNT)
-  for (let i = 0; i < COUNT; i++) {
-    const angle = Math.random() * Math.PI * 2
-    pos[i*3]   = ringA * Math.cos(angle)
-    pos[i*3+1] = 0
-    pos[i*3+2] = ringB * Math.sin(angle)
-    sz[i]  = 0.8 + Math.random() * 1.2
-    ph[i]  = Math.random() * Math.PI * 2
+function createStringGeo(): THREE.BufferGeometry {
+  const geo = new THREE.BufferGeometry()
+  const pos = new Float32Array(STR_N * 3)
+  const sz  = new Float32Array(STR_N)
+  const ph  = new Float32Array(STR_N)
+  const tA  = new Float32Array(STR_N)
+  for (let i = 0; i < STR_N; i++) {
+    sz[i] = 1.0 + Math.random() * 1.5
+    ph[i] = Math.random() * Math.PI * 2
+    tA[i] = i / (STR_N - 1)
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
   geo.setAttribute('aSize',    new THREE.BufferAttribute(sz,  1))
   geo.setAttribute('aPhase',   new THREE.BufferAttribute(ph,  1))
+  geo.setAttribute('aT',       new THREE.BufferAttribute(tA,  1))
   return geo
 }
 
@@ -777,6 +750,80 @@ function StarField3D() {
 }
 
 // ─── vistara orb ─────────────────────────────────────────────────────────────
+function LightningStrings() {
+  const groupRef = useRef<THREE.Group>(null)
+
+  const strings = useMemo(() => {
+    return Array.from({ length: 9 }, (_, si) => {
+      const geo = createStringGeo()
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: STR_VERT, fragmentShader: STR_FRAG,
+        uniforms: { uTime: { value: 0 }, uColorOffset: { value: STRING_COLOR_OFFSETS[si] } },
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      })
+      return { geo, mat, points: new THREE.Points(geo, mat) }
+    })
+  }, [])
+
+  useEffect(() => {
+    const parent = groupRef.current
+    if (!parent) return
+    strings.forEach(s => parent.add(s.points))
+    return () => { strings.forEach(s => parent.remove(s.points)) }
+  }, [strings])
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    for (let si = 0; si < 9; si++) {
+      const fromPos = ORB_POS[si]
+      const toPos   = ORB_POS[(si + 1) % 9]
+      const bias    = STRING_BIASES[si]
+
+      const mx = (fromPos[0] + toPos[0]) / 2 + bias[0]
+      const my = (fromPos[1] + toPos[1]) / 2 + bias[1]
+      const mz = (fromPos[2] + toPos[2]) / 2 + bias[2]
+
+      const dx = toPos[0] - fromPos[0]
+      const dy = toPos[1] - fromPos[1]
+      const dz = toPos[2] - fromPos[2]
+      const dl = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1
+      const nx = dx/dl, ny = dy/dl, nz = dz/dl
+
+      const upX = Math.abs(ny) < 0.9 ? 0 : 1
+      const upY = Math.abs(ny) < 0.9 ? 1 : 0
+      let prx = ny*0 - nz*upY
+      let pry = nz*upX - nx*0
+      let prz = nx*upY - ny*upX
+      const pl = Math.sqrt(prx*prx + pry*pry + prz*prz) || 1
+      prx /= pl; pry /= pl; prz /= pl
+
+      const qx = ny*prz - nz*pry
+      const qy = nz*prx - nx*prz
+      const qz = nx*pry - ny*prx
+
+      const posAttr = strings[si].geo.attributes.position as THREE.BufferAttribute
+      const phAttr  = strings[si].geo.attributes.aPhase   as THREE.BufferAttribute
+
+      for (let i = 0; i < STR_N; i++) {
+        const u  = i / (STR_N - 1)
+        const om = 1 - u
+        const bx = fromPos[0]*om*om + mx*2*u*om + toPos[0]*u*u
+        const by = fromPos[1]*om*om + my*2*u*om + toPos[1]*u*u
+        const bz = fromPos[2]*om*om + mz*2*u*om + toPos[2]*u*u
+        const ph = phAttr.getX(i)
+        const ja = 12.0 * Math.sin(u * Math.PI)
+        const jx = Math.sin(t * 3.5 + ph * 5.0 + u * 18.0) * ja
+        const jy = Math.cos(t * 2.8 + ph * 4.0 + u * 14.0) * ja
+        posAttr.setXYZ(i, bx + prx*jx + qx*jy, by + pry*jx + qy*jy, bz + prz*jx + qz*jy)
+      }
+      posAttr.needsUpdate = true
+      strings[si].mat.uniforms.uTime.value = t
+    }
+  })
+
+  return <group ref={groupRef} />
+}
+
 interface VistaraOrbProps {
   gateway: Gateway; orbIdx: number; orbSize: number
   basePos: [number, number, number]
@@ -964,10 +1011,8 @@ function GyroScene({
   worldPosRef, screenPosRef, traverseRef, panelOpen, onPhantomClick,
   isOverview, orbitEnabled, onOverviewAnimDone, overviewZRef,
 }: GyroSceneProps) {
-  const ringGroupsRef = useRef<(THREE.Group | null)[]>(new Array(9).fill(null))
   const { camera, size } = useThree()
   const lookAt        = useRef(new THREE.Vector3())
-  const spinAnglesRef = useRef<number[]>(new Array(9).fill(0))
   const prevFocusRef  = useRef(focusedIdx)
   const throwRef     = useRef({ startT: -10 })
   const controlsRef  = useRef<any>(null)
@@ -983,8 +1028,9 @@ function GyroScene({
   const camTraverseRef = useRef({
     active: false, startT: 0, duration: 2.5,
     startPos:    new THREE.Vector3(),
-    midPos:      new THREE.Vector3(),   // random point on orbit shell — changes every traversal
-    endPos:      new THREE.Vector3(),   // close-up position in target orb's direction
+    midPos:      new THREE.Vector3(),
+    midLookAt:   new THREE.Vector3(),
+    endPos:      new THREE.Vector3(),
     startLookAt: new THREE.Vector3(),
     endLookAt:   new THREE.Vector3(),
   })
@@ -1007,14 +1053,6 @@ function GyroScene({
     if (isOverview) pendingOverviewZRef.current = newZ
   }, [size])
 
-  // ── Per-orb ring materials and geometries ──
-  const ringMats = useMemo(() => ORB_RING_DEFS.map(def => new THREE.ShaderMaterial({
-    vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
-    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 }, uColorOffset: { value: def.colorOffset }, uWaveSpeed: { value: def.waveSpeed }, uWaveAmp: { value: def.waveAmp }, uWaveFreq: { value: def.waveFreq } },
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  })), [])
-  const ringGeos = useMemo(() => ORB_RING_DEFS.map(def => createOrbRingGeo(def.ringA, def.ringB)), [])
-
   useFrame(({ clock }, delta) => {
     const t   = clock.elapsedTime
     const tr  = traverseRef.current
@@ -1022,25 +1060,6 @@ function GyroScene({
 
     // Mark traverse done after cooldown (camera arc handles the actual transition)
     if (tr.active && Date.now() - tr.startTime > 600) tr.active = false
-
-    // Per-orb ring rotation — each ring spins on its own axis with gyroscopic drift
-    ORB_RING_DEFS.forEach((def, i) => {
-      spinAnglesRef.current[i] += def.speed * frac60
-      const spin = spinAnglesRef.current[i]
-      const grp  = ringGroupsRef.current[i]
-      if (!grp) return
-      const [fx, fy, fz] = def.df
-      const [ax, ay, az] = def.da
-      switch (def.spinAxis) {
-        case 'Y': grp.rotation.set(Math.sin(t*fx)*ax, spin, Math.cos(t*fz)*az); break
-        case 'X': grp.rotation.set(spin, Math.cos(t*fy)*ay, Math.sin(t*fz)*az); break
-        case 'Z': grp.rotation.set(Math.cos(t*fx)*ax, Math.sin(t*fy)*ay, spin); break
-      }
-      ringMats[i].uniforms.uTime.value = t
-      ringMats[i].uniforms.uTilt.value = (
-        Math.abs(grp.rotation.x) + Math.abs(grp.rotation.y) + Math.abs(grp.rotation.z)
-      )
-    })
 
     // ── Orientation / resize repositioning (while in overview) ─────────────
     if (isOverview && !camAnimRef.current.active && pendingOverviewZRef.current !== null) {
@@ -1108,8 +1127,9 @@ function GyroScene({
 
     if (isOverview) return   // OrbitControls drives camera when enabled
 
-    // Camera throw + gyroscopic arc traversal when focus changes
+    // Camera throw + arc traversal when focus changes
     if (prevFocusRef.current !== focusedIdx) {
+      const prevFocus = prevFocusRef.current
       prevFocusRef.current = focusedIdx
       throwRef.current.startT = clock.elapsedTime
 
@@ -1121,20 +1141,34 @@ function GyroScene({
       ct.startPos.copy(camera.position)
       ct.startLookAt.copy(lookAt.current)
 
-      // Random waypoint on orbit shell — full 360° azimuth, ±72° elevation
-      // This makes every traversal arc from a different direction around the gyroscope
-      const R     = overviewZRef.current * 1.2
-      const theta = Math.random() * Math.PI * 2
-      const phi   = (Math.random() - 0.5) * (Math.PI * 0.8)
-      ct.midPos.set(
-        R * Math.cos(phi) * Math.sin(theta),
-        R * Math.sin(phi),
-        R * Math.cos(phi) * Math.cos(theta)
-      )
+      // Adjacent orbs → follow the connecting string's bezier arc
+      const isFwd = (focusedIdx - prevFocus + 9) % 9 === 1
+      const isBwd = (prevFocus - focusedIdx + 9) % 9 === 1
+      if (isFwd || isBwd) {
+        const strIdx = isFwd ? prevFocus : focusedIdx
+        const fp = ORB_POS[strIdx]
+        const tp = ORB_POS[(strIdx + 1) % 9]
+        const bs = STRING_BIASES[strIdx]
+        const mx = (fp[0] + tp[0]) / 2 + bs[0]
+        const my = (fp[1] + tp[1]) / 2 + bs[1]
+        const mz = (fp[2] + tp[2]) / 2 + bs[2]
+        ct.midPos.set(mx, my, mz + 350)
+        ct.midLookAt.set(mx, my, mz)
+      } else {
+        // Non-adjacent → random orbit-shell waypoint
+        const R     = overviewZRef.current * 1.2
+        const theta = Math.random() * Math.PI * 2
+        const phi   = (Math.random() - 0.5) * (Math.PI * 0.8)
+        ct.midPos.set(
+          R * Math.cos(phi) * Math.sin(theta),
+          R * Math.sin(phi),
+          R * Math.cos(phi) * Math.cos(theta)
+        )
+        ct.midLookAt.set(0, 0, 0)
+      }
 
       if (newWp) {
         ct.endLookAt.copy(newWp)
-        // Camera arrives 350 units in +Z from the orb — same depth axis, clear framing
         ct.endPos.set(newWp.x, newWp.y, newWp.z + 350)
       } else {
         ct.endLookAt.set(0, 0, 0)
@@ -1157,17 +1191,17 @@ function GyroScene({
       if (ct.active) {
         const raw = Math.min((clock.elapsedTime - ct.startT) / ct.duration, 1)
         if (raw < 0.45) {
-          // Phase 1 — swing to random orbit-shell point, lookAt drifts to centre
+          // Phase 1 — swing to waypoint (string midpoint or orbit shell)
           const ep = easeInOutCubic(raw / 0.45)
           camera.position.lerpVectors(ct.startPos, ct.midPos, ep)
-          lookAt.current.lerpVectors(ct.startLookAt, new THREE.Vector3(0, 0, 0), ep)
+          lookAt.current.lerpVectors(ct.startLookAt, ct.midLookAt, ep)
         } else {
-          // Phase 2 — swoop from orbit shell into close-up behind target orb
+          // Phase 2 — swoop from waypoint into close-up behind target orb
           const ep = easeInOutCubic((raw - 0.45) / 0.55)
           camera.position.lerpVectors(ct.midPos, ct.endPos, ep)
           const liveWp = worldPosRef.current[focusedIdx]
           if (liveWp) ct.endLookAt.copy(liveWp)
-          lookAt.current.lerpVectors(new THREE.Vector3(0, 0, 0), ct.endLookAt, ep)
+          lookAt.current.lerpVectors(ct.midLookAt, ct.endLookAt, ep)
         }
         camera.lookAt(lookAt.current)
         if (raw >= 1) ct.active = false
@@ -1199,16 +1233,12 @@ function GyroScene({
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
       <StarTrailsSystem />
 
-      {ORB_RING_DEFS.map((def, i) => (
-        <group key={`ring-${i}`} position={def.worldPos} ref={(el: THREE.Group | null) => { ringGroupsRef.current[i] = el }}>
-          <points geometry={ringGeos[i]} material={ringMats[i]} frustumCulled={false} />
-        </group>
-      ))}
-      {ORB_RING_DEFS.map((def, i) => (
+      <LightningStrings />
+      {ORB_POS.map((pos, i) => (
         <VistaraOrb
           key={`orb-${i}`}
           gateway={GATEWAYS[i]} orbIdx={i} orbSize={ORB_SIZES[i]}
-          basePos={def.worldPos}
+          basePos={pos}
           isFocused={focusedIdx===i} isHovered={hoveredId===GATEWAYS[i].id}
           panelOpen={panelOpen && focusedIdx===i}
           isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==i}
