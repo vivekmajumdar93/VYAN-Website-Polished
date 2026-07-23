@@ -111,7 +111,7 @@ const SATURN_VERT = `
     float w3 = 0.5 + 0.5 * sin(theta * 22.0 + uTime * 0.27 + aPhase * 5.0);
     float gap = 0.68 + 0.32 * sin(theta * 2.5 + uTime * 0.04);
     float density = w1 * (0.5 + 0.5 * w2) * (0.7 + 0.3 * w3) * gap;
-    vAlpha = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0);
+    vAlpha = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0) * 0.22;
     vPhase = aPhase;
 
     vec4 mv = modelViewMatrix * vec4(waved, 1.0);
@@ -146,26 +146,19 @@ const SATURN_FRAG = `
   }
 `
 function createOrbRingGeo(a: number, b: number): THREE.BufferGeometry {
-  const COUNT = 11000
+  const COUNT = 4000  // sparse — visible gaps between beads = nano-particle string
   const geo   = new THREE.BufferGeometry()
   const pos   = new Float32Array(COUNT * 3)
   const sz    = new Float32Array(COUNT)
   const ph    = new Float32Array(COUNT)
-  const halfW = a * 0.015  // ring width = 1.5% of major axis — true string of nano-particles
   for (let i = 0; i < COUNT; i++) {
-    const angle  = Math.random() * Math.PI * 2
-    const u      = Math.random()
-    const dw     = u < 0.28
-      ? Math.random() * halfW * 0.55
-      : u > 0.72
-        ? halfW - Math.random() * halfW * 0.55
-        : Math.random() * halfW
-    const sc   = 1 + (dw / halfW - 0.5) * 0.22
-    pos[i*3]   = a * sc * Math.cos(angle)
-    pos[i*3+1] = (Math.random() - 0.5) * 2.2   // thin in Y
-    pos[i*3+2] = b * sc * Math.sin(angle)
-    sz[i]      = 0.4 + Math.random() * 0.7
-    ph[i]      = Math.random() * Math.PI * 2
+    const angle = Math.random() * Math.PI * 2
+    // Particles exactly ON the ellipse curve — wave displacement provides all 3D motion
+    pos[i*3]   = a * Math.cos(angle)
+    pos[i*3+1] = 0
+    pos[i*3+2] = b * Math.sin(angle)
+    sz[i]  = 0.5 + Math.random() * 0.8
+    ph[i]  = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
   geo.setAttribute('aSize',    new THREE.BufferAttribute(sz,  1))
