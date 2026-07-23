@@ -140,7 +140,7 @@ export function HangingOrbs({
         <motion.div
           animate={{ x: NAV_DRIFT[0].x, y: NAV_DRIFT[0].y }}
           transition={{ x: driftTx(NAV_DRIFT[0].xDur, NAV_DRIFT[0].xPause), y: driftTx(NAV_DRIFT[0].yDur, NAV_DRIFT[0].yPause) }}
-          style={{ position: 'fixed', left: 'clamp(14px, 3.5vw, 28px)', top: 'clamp(14px, 3.5vh, 26px)', zIndex: 70 }}
+          style={{ position: 'fixed', left: 'clamp(14px, 3.5vw, 28px)', top: '72px', zIndex: 70 }}
         >
           <button
             onClick={onBack}
