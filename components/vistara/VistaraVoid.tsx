@@ -6,7 +6,7 @@ import { Html, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { NanoOrb } from '@/lib/vyan/objects/NanoOrb'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
-import { BackIcon, SendIcon, CloseIcon } from '@/components/icons/VyanIcons'
+import { BackIcon, SendIcon, CloseIcon, SpeakIcon, FacultyIcon } from '@/components/icons/VyanIcons'
 
 // ─── orb constants ────────────────────────────────────────────────────────────
 const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34, 26]
@@ -198,7 +198,7 @@ function ParticleField({ spiralTarget, spiralT }: { spiralTarget: THREE.Vector3 
   })
   return (
     <points ref={ptsRef} geometry={geo}>
-      <pointsMaterial color="#3344aa" size={1.2} transparent opacity={0.4} sizeAttenuation depthWrite={false} />
+      <pointsMaterial color="#4466cc" size={1.4} transparent opacity={0.65} sizeAttenuation depthWrite={false} />
     </points>
   )
 }
@@ -253,8 +253,8 @@ function PhantomOrbsSystem({ onPhantomClick }: { onPhantomClick: () => void }) {
         if (t >= pd.nextT) {
           randomPhantomPath(pd)
           pd.startT = t
-          pd.duration = 14 + Math.random() * 10   // 14–24 s slow cross
-          pd.nextT = t + pd.duration + 8 + Math.random() * 12
+          pd.duration = 32 + Math.random() * 18   // 32–50 s very slow — clickable
+          pd.nextT = t + pd.duration + 12 + Math.random() * 16
           pd.active = true
           pd.nanoOrb.group.visible = true
           pd.nanoOrb.setSignal('idle')
@@ -426,11 +426,11 @@ function StarTrailsSystem() {
         // Size and brightness taper from head to tail
         let sz: number, baseA: number
         if (isH) {
-          sz    = 14.0 - tT * 5.0    // head cluster: 14→9 px
-          baseA = 1.5 - tT * 0.25    // head: 1.5→1.25 (env brings it ≤1 during fade edges)
+          sz    = 16.0 - tT * 5.0    // head cluster: 16→11 px
+          baseA = 2.2 - tT * 0.35    // head: 2.2→1.85
         } else {
-          sz    = 7.0 - tT * 5.8     // body: 7→1.2 px
-          baseA = 1.1 - tT * 1.0     // body: 1.1→0.1
+          sz    = 9.0 - tT * 7.2     // body: 9→1.8 px
+          baseA = 1.6 - tT * 1.4     // body: 1.6→0.2
         }
         td.sizeAttr.setX(j, Math.max(0.5, sz))
         td.alphaAttr.setX(j, Math.max(0, baseA) * env)
@@ -865,9 +865,17 @@ function VistaraOrb({
     if (isHovered)      nanoOrb.setSignal('hover')
     else if (isFocused) nanoOrb.setSignal('listening')
     else                nanoOrb.setSignal('idle')
-    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : isOverview ? 0.82 : 0.55)
 
-    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : isOverview ? 0.55 : 0.3, 1, ZERO)
+    // Per-orb lightning pulse — unique frequency and phase per orbIdx
+    const pulseFreq  = 1.6 + orbIdx * 0.28
+    const pulsePhase = orbIdx * 1.17
+    const raw  = Math.abs(Math.sin(t * pulseFreq + pulsePhase))
+    const raw2 = Math.abs(Math.sin(t * pulseFreq * 2.7 + pulsePhase + 1.5))
+    const pulse = 0.72 + 0.28 * Math.max(Math.pow(raw, 1.5), raw2 * 0.6)
+    const baseDim = isFocused || isHovered ? 1 : isOverview ? 0.94 : 0.76
+    nanoOrb.setVisualDim(baseDim * pulse)
+
+    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : isOverview ? 0.65 : 0.42, 1, ZERO)
 
     // Track when focus is acquired and advance throw age
     if (isFocused !== throwRef.current.prevFocused) {
@@ -1486,9 +1494,9 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
           <div style={reveal(1)}>
             <span style={{
               display:'inline-block', padding:'2px 9px',
-              border:`1px solid ${c}30`, borderRadius:'3px',
+              border:`1px solid ${c}55`, borderRadius:'3px',
               fontSize:'7px', letterSpacing:'0.38em', textTransform:'uppercase',
-              color:`${c}77`, fontFamily:'var(--font-vyan)',
+              color:`${c}cc`, fontFamily:'var(--font-vyan)',
             }}>{gateway.tantra}</span>
           </div>
         </div>
@@ -1496,6 +1504,7 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
         {/* Scrollable content — each block reveals in sequence */}
         <div
           style={{ flex:1, overflowY:'auto', overflowX:'hidden', padding: isMobile ? '14px 24px 0' : '16px 32px 0' }}
+          onWheel={e => e.stopPropagation()}
           onTouchStart={e => { e.stopPropagation(); (e.currentTarget as any)._tsY = e.touches[0].clientY }}
           onTouchMove={e => {
             e.stopPropagation()
@@ -1525,38 +1534,36 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
           <div style={reveal(3)}>
             <div style={{ height:'1px', marginBottom:'18px', background:`linear-gradient(90deg,${c}55,transparent)` }} />
             <p style={{
-              fontSize:'13px', lineHeight:'1.78', color:'rgba(255,255,255,0.50)',
+              fontSize:'13px', lineHeight:'1.78', color:'rgba(255,255,255,0.82)',
               fontFamily:'var(--font-vyan)', letterSpacing:'0.03em', margin:'0 0 26px',
             }}>{gateway.description}</p>
           </div>
           <div style={reveal(4)}>
             {/* Gateway-specific feature cards */}
             <div style={{ marginBottom:'24px' }}>
-              <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.16)', fontFamily:'var(--font-vyan)', marginBottom:'12px' }}>
-                Core Capabilities
+              <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.45)', fontFamily:'var(--font-vyan)', marginBottom:'12px', display:'flex', alignItems:'center', gap:6 }}>
+                <FacultyIcon size={14} /><span>Core Capabilities</span>
               </div>
               {(GATEWAY_DETAILS[gateway.id]?.features ?? []).map((f, i) => (
                 <div key={i} style={{
                   padding:'11px 14px', marginBottom:'8px', borderRadius:'8px',
-                  background:`linear-gradient(135deg,${c}09 0%,transparent 100%)`,
-                  border:`1px solid ${c}1a`,
+                  background:`linear-gradient(135deg,${c}12 0%,transparent 100%)`,
+                  border:`1px solid ${c}2a`,
                   display:'flex', alignItems:'flex-start', gap:'12px',
                 }}>
-                  <div style={{
-                    flexShrink:0, width:'20px', height:'20px', borderRadius:'5px',
-                    border:`1px solid ${c}33`, display:'flex', alignItems:'center', justifyContent:'center',
-                    fontSize:'8px', color:`${c}88`, fontFamily:'var(--font-vyan)', fontWeight:600,
-                  }}>{i + 1}</div>
+                  <div style={{ flexShrink:0, marginTop:1 }}>
+                    <SendIcon size={16} />
+                  </div>
                   <div>
-                    <div style={{ fontSize:'10px', letterSpacing:'0.16em', textTransform:'uppercase', color:`${c}cc`, fontFamily:'var(--font-vyan)', marginBottom:'4px' }}>{f.title}</div>
-                    <div style={{ fontSize:'11px', lineHeight:'1.60', color:'rgba(255,255,255,0.36)', fontFamily:'var(--font-vyan)', letterSpacing:'0.02em' }}>{f.body}</div>
+                    <div style={{ fontSize:'10px', letterSpacing:'0.16em', textTransform:'uppercase', color:`${c}ff`, fontFamily:'var(--font-vyan)', marginBottom:'4px' }}>{f.title}</div>
+                    <div style={{ fontSize:'11px', lineHeight:'1.65', color:'rgba(255,255,255,0.72)', fontFamily:'var(--font-vyan)', letterSpacing:'0.02em' }}>{f.body}</div>
                   </div>
                 </div>
               ))}
             </div>
             {/* Live Interface slot */}
-            <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.16)', fontFamily:'var(--font-vyan)', marginBottom:'10px' }}>
-              Live Interface
+            <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.45)', fontFamily:'var(--font-vyan)', marginBottom:'10px', display:'flex', alignItems:'center', gap:6 }}>
+              <SpeakIcon size={14} /><span>Live Interface</span>
             </div>
             {gateway.appUrl ? (
               <div style={{ marginBottom:'24px', borderRadius:'10px', overflow:'hidden', border:`1px solid ${c}20`, background:'rgba(0,2,18,0.70)' }}>
@@ -2026,36 +2033,16 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
         opacity:showFlash?1:0, transition:showFlash?'none':'opacity 80ms' }} />
 
       <div style={{ position:'fixed', top:'22px', right:'24px', zIndex:40, pointerEvents:'none', textAlign:'right' }}>
-        <div style={{ fontFamily:'var(--font-vyan)', fontSize:'11px', letterSpacing:'0.40em', color:'rgba(212,180,80,0.55)', textTransform:'uppercase' }}>Vistāra</div>
-        <div style={{ fontFamily:'var(--font-vyan)', fontSize:'8px', letterSpacing:'0.22em', color:'rgba(255,255,255,0.18)', textTransform:'uppercase', marginTop:'3px' }}>The Manifestations</div>
+        <div style={{ fontFamily:'var(--font-vyan)', fontSize:'11px', letterSpacing:'0.40em', color:'rgba(230,210,120,0.95)', textTransform:'uppercase' }}>Vistāra</div>
+        <div style={{ fontFamily:'var(--font-vyan)', fontSize:'8px', letterSpacing:'0.22em', color:'rgba(255,255,255,0.60)', textTransform:'uppercase', marginTop:'3px' }}>The Manifestations</div>
       </div>
 
       {onBack && (
-        <button onClick={onBack} style={{ position:'fixed', top:'22px', left:'22px', zIndex:40, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
+        <button onClick={onBack} style={{ position:'fixed', top:'70px', left:'22px', zIndex:40, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:8 }}>
           <BackIcon size={28} />
-          <span style={{ fontFamily:'var(--font-vyan)', fontSize:11, letterSpacing:'0.2em', color:'rgba(100,160,255,0.70)' }}>ŚŪNYA MAṆḌALA</span>
+          <span style={{ fontFamily:'var(--font-vyan)', fontSize:11, letterSpacing:'0.2em', color:'rgba(100,160,255,0.85)' }}>ŚŪNYA MAṆḌALA</span>
         </button>
       )}
-
-      {/* Sound console shortcut — opens the global SoundConsole panel */}
-      <button
-        onClick={() => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('vyan:sound-toggle')) }}
-        title="Acoustic Console"
-        style={{
-          position:'fixed', top:'68px', left:'22px', zIndex:40,
-          background:'none', border:'none', cursor:'pointer',
-          display:'flex', alignItems:'center', gap:7, padding:0,
-          opacity:0.55, transition:'opacity 0.2s',
-        }}
-        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.55' }}
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(100,160,255,0.85)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-        </svg>
-        <span style={{ fontFamily:'var(--font-vyan)', fontSize:10, letterSpacing:'0.2em', color:'rgba(100,160,255,0.70)' }}>ACOUSTIC</span>
-      </button>
 
       <p style={{ position:'fixed', bottom:'5%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.25em', color:'rgba(255,255,255,0.10)', textTransform:'uppercase', margin:0, whiteSpace:'nowrap' }}>
         {isOverview ? 'Scroll · Pinch · Drag to explore · Tap an orb to enter' : 'Scroll to traverse · Click focused orb to enter'}
