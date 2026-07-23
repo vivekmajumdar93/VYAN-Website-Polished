@@ -1035,6 +1035,8 @@ function GyroScene({
   // Arc traversal state — camera arcs gyroscopically through scene when switching focused orb
   const camTraverseRef = useRef({
     active: false, startT: 0, duration: 2.5,
+    style: 0,                              // 0=arc 1=cross-through 2=deep-bypass 3=direct
+    approachDir: new THREE.Vector3(0,0,1), // approach direction to target orb
     startPos:    new THREE.Vector3(),
     midPos:      new THREE.Vector3(),
     midLookAt:   new THREE.Vector3(),
@@ -1042,6 +1044,8 @@ function GyroScene({
     startLookAt: new THREE.Vector3(),
     endLookAt:   new THREE.Vector3(),
   })
+  // Gyroscopic idle orbit — camera slowly revolves around the focused orb when settled
+  const idleOrbitRef = useRef({ angle: Math.PI * 0.5 })
 
   // Mount: set camera to the viewport-appropriate overview distance immediately
   useEffect(() => {
@@ -1128,6 +1132,13 @@ function GyroScene({
         if (isOverview) {
           if (controlsRef.current) { controlsRef.current.target.set(0,0,0); controlsRef.current.update() }
           onOverviewAnimDone()
+        } else {
+          // Seed idle orbit from landing position so camera doesn't drift on arrival
+          const wp = worldPosRef.current[focusedIdx]
+          if (wp) idleOrbitRef.current.angle = Math.atan2(
+            camera.position.x - wp.x,
+            camera.position.z - wp.z
+          )
         }
       }
       return
@@ -1143,44 +1154,82 @@ function GyroScene({
 
       const newWp = worldPosRef.current[focusedIdx]
       const ct = camTraverseRef.current
-      ct.active = true
-      ct.startT    = clock.elapsedTime
-      ct.duration  = 3.0
+
+      // Pick traversal style randomly: 0=arc, 1=cross-through, 2=deep-bypass, 3=direct
+      const style = Math.floor(Math.random() * 4)
+      ct.style    = style
+      ct.active   = true
+      ct.startT   = clock.elapsedTime
+      ct.duration = style === 3 ? 1.8 : 2.2 + Math.random() * 1.2
       ct.startPos.copy(camera.position)
       ct.startLookAt.copy(lookAt.current)
 
-      // Adjacent orbs → follow the connecting string's bezier arc
-      const isFwd = (focusedIdx - prevFocus + 9) % 9 === 1
-      const isBwd = (prevFocus - focusedIdx + 9) % 9 === 1
-      if (isFwd || isBwd) {
-        const strIdx = isFwd ? prevFocus : focusedIdx
-        const fp = ORB_POS[strIdx]
-        const tp = ORB_POS[(strIdx + 1) % 9]
-        const bs = STRING_BIASES[strIdx]
-        const mx = (fp[0] + tp[0]) / 2 + bs[0]
-        const my = (fp[1] + tp[1]) / 2 + bs[1]
-        const mz = (fp[2] + tp[2]) / 2 + bs[2]
-        ct.midPos.set(mx, my, mz + 350)
-        ct.midLookAt.set(mx, my, mz)
-      } else {
-        // Non-adjacent → random orbit-shell waypoint
-        const R     = overviewZRef.current * 1.2
-        const theta = Math.random() * Math.PI * 2
-        const phi   = (Math.random() - 0.5) * (Math.PI * 0.8)
-        ct.midPos.set(
-          R * Math.cos(phi) * Math.sin(theta),
-          R * Math.sin(phi),
-          R * Math.cos(phi) * Math.cos(theta)
-        )
-        ct.midLookAt.set(0, 0, 0)
-      }
+      // Approach direction: random hemisphere — camera arrives from any angle, not always +Z
+      const aTheta = Math.random() * Math.PI * 2
+      const aPhi   = (Math.random() - 0.5) * Math.PI * 0.65  // ±58° from horizontal
+      ct.approachDir.set(
+        Math.cos(aPhi) * Math.sin(aTheta),
+        Math.sin(aPhi),
+        Math.cos(aPhi) * Math.cos(aTheta)
+      )
 
+      // End position: 350 units from target along approach direction
       if (newWp) {
         ct.endLookAt.copy(newWp)
-        ct.endPos.set(newWp.x, newWp.y, newWp.z + 350)
+        ct.endPos.copy(newWp).addScaledVector(ct.approachDir, 350)
       } else {
         ct.endLookAt.set(0, 0, 0)
-        ct.endPos.set(0, 0, 350)
+        ct.endPos.copy(ct.approachDir).multiplyScalar(350)
+      }
+
+      // Mid waypoint: depends on traversal style
+      if (style === 1) {
+        // Cross-through: camera clips through the cluster interior
+        ct.midPos.set(
+          (Math.random() - 0.5) * 120,
+          (Math.random() - 0.5) * 80,
+          (Math.random() - 0.5) * 100
+        )
+        ct.midLookAt.set(0, 0, 0)
+      } else if (style === 2) {
+        // Deep bypass: swing to opposite hemisphere, travel around the far side
+        const oppDir = camera.position.clone().normalize().negate()
+        const R = overviewZRef.current * 1.5
+        ct.midPos.copy(oppDir).multiplyScalar(R)
+        ct.midLookAt.set(0, 0, 0)
+      } else if (style === 3) {
+        // Direct: minimal arc, gentle S-curve between start and end
+        ct.midPos.set(
+          (ct.startPos.x + ct.endPos.x) / 2 + (Math.random() - 0.5) * 100,
+          (ct.startPos.y + ct.endPos.y) / 2 + (Math.random() - 0.5) * 80,
+          (ct.startPos.z + ct.endPos.z) / 2 + (Math.random() - 0.5) * 80,
+        )
+        ct.midLookAt.lerpVectors(ct.startLookAt, ct.endLookAt, 0.5)
+      } else {
+        // Style 0 (arc): adjacent → string midpoint; non-adjacent → orbit shell
+        const isFwd = (focusedIdx - prevFocus + 9) % 9 === 1
+        const isBwd = (prevFocus - focusedIdx + 9) % 9 === 1
+        if (isFwd || isBwd) {
+          const strIdx = isFwd ? prevFocus : focusedIdx
+          const fp = ORB_POS[strIdx]
+          const tp = ORB_POS[(strIdx + 1) % 9]
+          const bs = STRING_BIASES[strIdx]
+          const mx = (fp[0] + tp[0]) / 2 + bs[0]
+          const my = (fp[1] + tp[1]) / 2 + bs[1]
+          const mz = (fp[2] + tp[2]) / 2 + bs[2]
+          ct.midPos.set(mx + ct.approachDir.x * 200, my + ct.approachDir.y * 200, mz + ct.approachDir.z * 200)
+          ct.midLookAt.set(mx, my, mz)
+        } else {
+          const R     = overviewZRef.current * 1.2
+          const theta = Math.random() * Math.PI * 2
+          const phi   = (Math.random() - 0.5) * Math.PI * 0.8
+          ct.midPos.set(
+            R * Math.cos(phi) * Math.sin(theta),
+            R * Math.sin(phi),
+            R * Math.cos(phi) * Math.cos(theta)
+          )
+          ct.midLookAt.set(0, 0, 0)
+        }
       }
     }
     const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.55, 1)
@@ -1199,12 +1248,12 @@ function GyroScene({
       if (ct.active) {
         const raw = Math.min((clock.elapsedTime - ct.startT) / ct.duration, 1)
         if (raw < 0.45) {
-          // Phase 1 — swing to waypoint (string midpoint or orbit shell)
+          // Phase 1 — swing to mid waypoint
           const ep = easeInOutCubic(raw / 0.45)
           camera.position.lerpVectors(ct.startPos, ct.midPos, ep)
           lookAt.current.lerpVectors(ct.startLookAt, ct.midLookAt, ep)
         } else {
-          // Phase 2 — swoop from waypoint into close-up behind target orb
+          // Phase 2 — swoop from mid waypoint to target orb along approach direction
           const ep = easeInOutCubic((raw - 0.45) / 0.55)
           camera.position.lerpVectors(ct.midPos, ct.endPos, ep)
           const liveWp = worldPosRef.current[focusedIdx]
@@ -1212,10 +1261,25 @@ function GyroScene({
           lookAt.current.lerpVectors(ct.midLookAt, ct.endLookAt, ep)
         }
         camera.lookAt(lookAt.current)
-        if (raw >= 1) ct.active = false
+        if (raw >= 1) {
+          ct.active = false
+          // Seed idle orbit angle from the approach direction so orbit starts seamlessly
+          idleOrbitRef.current.angle = Math.atan2(ct.approachDir.x, ct.approachDir.z)
+        }
       } else {
-        camera.position.lerp(ct.endPos.clone().add(new THREE.Vector3(0, 0, throwZ > 0 ? -throwZ : 0)), tp < 1 ? 0.28 : 0.04)
+        // Gyroscopic idle: camera slowly revolves around the focused orb
+        const io = idleOrbitRef.current
+        io.angle += delta * 0.065  // ~3.7 deg/s — one full revolution in ~97s
+        const el = Math.sin(io.angle * 0.31) * 0.35  // ±20° elevation wave
+        const ORBIT_R = 350
         const wp = worldPosRef.current[focusedIdx]
+        const cx = wp?.x ?? 0; const cy = wp?.y ?? 0; const cz = wp?.z ?? 0
+        const orbitPos = new THREE.Vector3(
+          cx + ORBIT_R * Math.cos(el) * Math.sin(io.angle),
+          cy + ORBIT_R * Math.sin(el),
+          cz + ORBIT_R * Math.cos(el) * Math.cos(io.angle),
+        )
+        camera.position.lerp(orbitPos, tp < 1 ? 0.25 : 0.018)
         if (wp) lookAt.current.lerp(wp, 0.04)
         else lookAt.current.lerp(new THREE.Vector3(), 0.04)
         camera.lookAt(lookAt.current)

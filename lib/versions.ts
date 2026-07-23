@@ -13,9 +13,27 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.8'
+export const CURRENT_VERSION = '3.9'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.9',
+    date: '2026-07-23',
+    title: 'Vistara — gyroscopic camera traversal',
+    summary: 'Camera now revolves around the orb system from any direction, with 4 traversal styles. Approach is freed from the +Z lock. Idle camera slowly orbits the focused orb.',
+    changes: [
+      'Approach direction randomised — camera arrives from any hemisphere, not always from +Z',
+      'Style 0 (arc): existing string-midpoint / orbit-shell arc, but with random approach direction',
+      'Style 1 (cross-through): camera clips through the cluster interior before arriving',
+      'Style 2 (deep bypass): camera swings to the opposite hemisphere, travels the long way round',
+      'Style 3 (direct): fast 1.8s S-curve straight to target',
+      'Traversal duration varies by style (1.8–3.4s)',
+      'Idle gyroscopic orbit: when settled, camera slowly revolves around the focused orb at ±20° elevation wave',
+      'Idle seeded from approach direction so orbit starts without a jump',
+    ],
+    gitHash: 'pending',
+    pages: ['Vistara'],
+  },
   {
     version: '3.8',
     date: '2026-07-23',
