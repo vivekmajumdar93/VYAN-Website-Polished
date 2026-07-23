@@ -19,28 +19,30 @@ interface OrbRingDef {
   spinAxis: 'X' | 'Y' | 'Z'
   df: [number, number, number]   // drift frequencies [x,y,z]
   da: [number, number, number]   // drift amplitudes  [x,y,z]
+  waveSpeed: number              // arc travel speed (+/- = direction); fraction of ring per second
+  waveCrest: number              // arc width as fraction of full ring (0–1)
 }
 // localAngles spread 9 orbs evenly: π/2 + i*(2π/9) so no two start at same position
 const _A = Math.PI / 2, _S = (2 * Math.PI) / 9
 const ORB_RING_DEFS: OrbRingDef[] = [
-  // 0: Ṛtam — wide oval, red start, Y spin
-  { a:280, b:200, localAngle:_A+0*_S, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15] },
-  // 1: Ojas — circle, blue start, X spin
-  { a:240, b:240, localAngle:_A+1*_S, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20] },
-  // 2: Mudrā — tall portrait oval, purple start, Z spin
-  { a:190, b:270, localAngle:_A+2*_S, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00] },
-  // 3: Netra — wide egg, mid-red start, Y spin
-  { a:295, b:210, localAngle:_A+3*_S, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12] },
-  // 4: Ākṛti — large circle, mid-blue start, X spin
-  { a:260, b:260, localAngle:_A+4*_S, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22] },
-  // 5: Sūtra — squat oval, mid-purple start, Z spin
-  { a:275, b:185, localAngle:_A+5*_S, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00] },
-  // 6: Chitra-Prāṇa — diagonal oval, orange-red start, Y spin
-  { a:255, b:170, localAngle:_A+6*_S, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16] },
-  // 7: Māyā — widest ring, purple-red start, X spin
-  { a:315, b:235, localAngle:_A+7*_S, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18] },
-  // 8: Saṅgraha — circle, warm start, Z spin
-  { a:225, b:225, localAngle:_A+8*_S, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18] },
+  // 0: Ṛtam
+  { a:280, b:200, localAngle:_A+0*_S, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15], waveSpeed: 0.08,  waveCrest:0.07 },
+  // 1: Ojas — counter-clockwise, narrow
+  { a:240, b:240, localAngle:_A+1*_S, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20], waveSpeed:-0.13,  waveCrest:0.05 },
+  // 2: Mudrā — fast, wider crest
+  { a:190, b:270, localAngle:_A+2*_S, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00], waveSpeed: 0.19,  waveCrest:0.10 },
+  // 3: Netra — slow, counter-clockwise
+  { a:295, b:210, localAngle:_A+3*_S, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12], waveSpeed:-0.06,  waveCrest:0.08 },
+  // 4: Ākṛti — medium, widest crest
+  { a:260, b:260, localAngle:_A+4*_S, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22], waveSpeed: 0.15,  waveCrest:0.12 },
+  // 5: Sūtra — fastest, counter-clockwise, narrow
+  { a:275, b:185, localAngle:_A+5*_S, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00], waveSpeed:-0.22,  waveCrest:0.05 },
+  // 6: Chitra-Prāṇa — slow, medium
+  { a:255, b:170, localAngle:_A+6*_S, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16], waveSpeed: 0.09,  waveCrest:0.07 },
+  // 7: Māyā — counter-clockwise, wide
+  { a:315, b:235, localAngle:_A+7*_S, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18], waveSpeed:-0.17,  waveCrest:0.11 },
+  // 8: Saṅgraha — fastest of all, narrow
+  { a:225, b:225, localAngle:_A+8*_S, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18], waveSpeed: 0.24,  waveCrest:0.06 },
 ]
 
 // ─── phantom orb configs — distinct non-blue colors, different densities ─────
@@ -87,7 +89,10 @@ const SATURN_VERT = `
   attribute float aPhase;
   uniform float uTime;
   uniform float uTilt;
+  uniform float uWaveSpeed;
+  uniform float uWaveCrest;
   varying float vAlpha;
+  varying float vPhase;
   void main() {
     float theta = atan(position.y, position.x);
     float w1 = 0.5 + 0.5 * sin(theta *  3.0 + uTime * 0.18 + aPhase);
@@ -95,7 +100,14 @@ const SATURN_VERT = `
     float w3 = 0.5 + 0.5 * sin(theta * 22.0 + uTime * 0.27 + aPhase * 5.0);
     float gap = 0.68 + 0.32 * sin(theta * 2.5 + uTime * 0.04);
     float density = w1 * (0.5 + 0.5 * w2) * (0.7 + 0.3 * w3) * gap;
-    vAlpha = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0);
+    float base = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0);
+    // Traveling arc: sharp bright crescent orbiting the ring in XZ plane
+    float ringTheta = atan(position.z, position.x);
+    float ringPos   = fract(ringTheta / 6.2832 + 0.5);
+    float wavePos   = fract(ringPos + uTime * uWaveSpeed);
+    float arc       = step(wavePos, uWaveCrest);
+    vAlpha = base * (0.18 + 0.82 * arc);
+    vPhase = aPhase;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
     gl_PointSize = clamp(aSize * (480.0 / dist), aSize * 0.9, aSize * 2.2);
@@ -106,12 +118,16 @@ const SATURN_FRAG = `
   uniform float uTime;
   uniform float uColorOffset;
   varying float vAlpha;
+  varying float vPhase;
   void main() {
     float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
     float disc = step(r, 0.92);
     float a    = disc * vAlpha;
     if (a < 0.01) discard;
-    float cycle = mod(uTime * 0.05 + uColorOffset, 3.0);
+    // Per-particle phase offset: each particle sits in its own colour facet
+    // Quantise into 12 hard bands — prismatic diffraction, no soft blend
+    float raw   = mod(uTime * 0.05 + uColorOffset + vPhase * 0.7, 3.0);
+    float cycle = floor(raw * 12.0) / 12.0;
     vec3 red    = vec3(1.00, 0.12, 0.06);
     vec3 dblue  = vec3(0.08, 0.28, 1.00);
     vec3 purple = vec3(0.55, 0.05, 0.90);
@@ -129,7 +145,7 @@ function createOrbRingGeo(a: number, b: number): THREE.BufferGeometry {
   const pos   = new Float32Array(COUNT * 3)
   const sz    = new Float32Array(COUNT)
   const ph    = new Float32Array(COUNT)
-  const halfW = a * 0.11  // ring width = 11% of major axis
+  const halfW = a * 0.032  // ring width = 3.2% of major axis — crisp thin band
   for (let i = 0; i < COUNT; i++) {
     const angle  = Math.random() * Math.PI * 2
     const u      = Math.random()
@@ -993,7 +1009,7 @@ function GyroScene({
   // ── Per-orb ring materials and geometries ──
   const ringMats = useMemo(() => ORB_RING_DEFS.map(def => new THREE.ShaderMaterial({
     vertexShader: SATURN_VERT, fragmentShader: SATURN_FRAG,
-    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 }, uColorOffset: { value: def.colorOffset } },
+    uniforms: { uTime: { value: 0 }, uTilt: { value: 0 }, uColorOffset: { value: def.colorOffset }, uWaveSpeed: { value: def.waveSpeed }, uWaveCrest: { value: def.waveCrest } },
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   })), [])
   const ringGeos = useMemo(() => ORB_RING_DEFS.map(def => createOrbRingGeo(def.a, def.b)), [])
