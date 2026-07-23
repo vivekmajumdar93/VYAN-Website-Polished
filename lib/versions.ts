@@ -13,9 +13,25 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.0'
+export const CURRENT_VERSION = '3.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.1',
+    date: '2026-07-23',
+    title: 'Vistara — Thin Rings, Traveling Arc Wave, Crystal Diffraction',
+    summary: 'Rings thinned 3.5×, a sharp arc of light orbits each ring at unique speeds, and prismatic crystal diffraction gives every particle a distinct hard-edged colour facet.',
+    changes: [
+      'Ring width reduced from 11% to 3.2% of major axis — crisp thin band, future-proof for more orbs',
+      'Traveling arc wave: sharp-fronted crescent sweeps each ring in XZ plane via fract()+step()',
+      '9 unique wave speeds (±0.06–0.24) and crest widths — some clockwise, some counter-clockwise',
+      'Crystal diffraction: per-particle vPhase offsets colour cycle, quantised into 12 hard bands',
+      'Zero glow, zero white, zero blur — pure prismatic colour-faceting on hard disc particles',
+      'Orb spread fix: 9 localAngles at π/2 + i×(2π/9) so no clustering on page load',
+    ],
+    gitHash: '41757e7',
+    pages: ['Vistara'],
+  },
   {
     version: '3.0',
     date: '2026-07-22',
