@@ -152,7 +152,7 @@ export class NanoOrb {
     const lineMat = new THREE.LineBasicMaterial({
         color: this.data.colorB || "#ff1010",
         transparent: true,
-        opacity: 0.06,
+        opacity: 0.42,
         blending: THREE.AdditiveBlending
     });
     this.web = new THREE.LineSegments(lineGeo, lineMat);
@@ -841,9 +841,9 @@ export class NanoOrb {
     else if (signal === 'interaction'){ signalBoost = 0.06; signalPulse = 0.05; }
     else if (signal === 'decay')    { signalBoost = 0.02; signalPulse = 0.0; }
     const pulseFreq = signal === 'processing' ? 3.8 : signal === 'response' ? 5.2 : 2.4;
-    // Web lines are now very faint — the stardust dust carries the visual weight
-    const webBase = 0.06 * (1 - expT2 * 0.68) + signalBoost * 0.3;
-    (this.web.material as THREE.LineBasicMaterial).opacity = (webBase + Math.sin(t * pulseFreq) * 0.02) * dim;
+    // INVERT: web fades down as expansion grows, so signals show through.
+    const webBase = 0.30 * (1 - expT2 * 0.68) + signalBoost;
+    (this.web.material as THREE.LineBasicMaterial).opacity = (webBase + Math.sin(t * pulseFreq) * (0.06 + signalPulse * 0.5)) * dim;
     // Stardust: brighter than the line, pulses with signal
     const dustDim = (0.55 + signalBoost * 2.0 + Math.sin(t * pulseFreq) * signalPulse * 0.8) * dim;
     if (this.webDustMat) {
