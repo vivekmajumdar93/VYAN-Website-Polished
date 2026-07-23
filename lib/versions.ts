@@ -13,9 +13,26 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.4'
+export const CURRENT_VERSION = '3.5'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.5',
+    date: '2026-07-23',
+    title: 'Vistara — Lightning Strings Connect Orb Cores',
+    summary: 'Saturn rings replaced with 9 glowing particle strings forming a closed loop between orb cores. Camera traversal follows string arcs between adjacent orbs.',
+    changes: [
+      'All Saturn rings removed — no more per-orb ring geometry, shaders, or rotation logic',
+      '9 crystal-prismatic particle strings connect orbs in a closed loop: 0→1→2→…→8→0',
+      'Each string arcs via quadratic bezier with unique midpoint bias — distinct direction per arc',
+      'Per-particle lightning jitter: transverse displacement oscillates in time, max at string midpoint',
+      'Crystal prismatic diffraction coloring preserved (red→blue→purple, 12 quantised bands)',
+      'Camera traversal for adjacent orbs follows the connecting string bezier arc (midpoint waypoint)',
+      'Non-adjacent orb traversal uses random orbit-shell waypoint as before',
+    ],
+    gitHash: '2845cdf',
+    pages: ['Vistara'],
+  },
   {
     version: '3.4',
     date: '2026-07-23',
