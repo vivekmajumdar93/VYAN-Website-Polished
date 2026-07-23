@@ -26,24 +26,24 @@ interface OrbRingDef {
 // localAngles spread 9 orbs evenly: π/2 + i*(2π/9) so no two start at same position
 const _A = Math.PI / 2, _S = (2 * Math.PI) / 9
 const ORB_RING_DEFS: OrbRingDef[] = [
-  // 0: Ṛtam — 4 crests, moderate amp
-  { a:280, b:200, localAngle:_A+0*_S, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15], waveSpeed: 0.08, waveAmp:42, waveFreq:4.0 },
+  // 0: Ṛtam — 4 crests
+  { a:280, b:200, localAngle:_A+0*_S, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15], waveSpeed: 0.08, waveAmp: 9, waveFreq:4.0 },
   // 1: Ojas — 6 crests, counter-clockwise
-  { a:240, b:240, localAngle:_A+1*_S, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20], waveSpeed:-0.13, waveAmp:35, waveFreq:6.0 },
-  // 2: Mudrā — 3 crests, large amp, fast
-  { a:190, b:270, localAngle:_A+2*_S, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00], waveSpeed: 0.19, waveAmp:52, waveFreq:3.0 },
+  { a:240, b:240, localAngle:_A+1*_S, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20], waveSpeed:-0.13, waveAmp: 7, waveFreq:6.0 },
+  // 2: Mudrā — 3 crests, fast
+  { a:190, b:270, localAngle:_A+2*_S, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00], waveSpeed: 0.19, waveAmp:11, waveFreq:3.0 },
   // 3: Netra — 5 crests, counter-clockwise slow
-  { a:295, b:210, localAngle:_A+3*_S, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12], waveSpeed:-0.06, waveAmp:38, waveFreq:5.0 },
-  // 4: Ākṛti — 4 crests, medium amp
-  { a:260, b:260, localAngle:_A+4*_S, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22], waveSpeed: 0.15, waveAmp:48, waveFreq:4.0 },
-  // 5: Sūtra — 7 crests, fast counter-clockwise, tight amp
-  { a:275, b:185, localAngle:_A+5*_S, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00], waveSpeed:-0.22, waveAmp:28, waveFreq:7.0 },
+  { a:295, b:210, localAngle:_A+3*_S, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12], waveSpeed:-0.06, waveAmp: 8, waveFreq:5.0 },
+  // 4: Ākṛti — 4 crests
+  { a:260, b:260, localAngle:_A+4*_S, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22], waveSpeed: 0.15, waveAmp:10, waveFreq:4.0 },
+  // 5: Sūtra — 7 crests, fast counter-clockwise
+  { a:275, b:185, localAngle:_A+5*_S, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00], waveSpeed:-0.22, waveAmp: 6, waveFreq:7.0 },
   // 6: Chitra-Prāṇa — 5 crests, slow
-  { a:255, b:170, localAngle:_A+6*_S, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16], waveSpeed: 0.09, waveAmp:40, waveFreq:5.0 },
-  // 7: Māyā — 3 crests, largest amp, counter-clockwise
-  { a:315, b:235, localAngle:_A+7*_S, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18], waveSpeed:-0.17, waveAmp:58, waveFreq:3.0 },
+  { a:255, b:170, localAngle:_A+6*_S, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16], waveSpeed: 0.09, waveAmp: 8, waveFreq:5.0 },
+  // 7: Māyā — 3 crests, counter-clockwise
+  { a:315, b:235, localAngle:_A+7*_S, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18], waveSpeed:-0.17, waveAmp:12, waveFreq:3.0 },
   // 8: Saṅgraha — 6 crests, fastest
-  { a:225, b:225, localAngle:_A+8*_S, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18], waveSpeed: 0.24, waveAmp:32, waveFreq:6.0 },
+  { a:225, b:225, localAngle:_A+8*_S, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18], waveSpeed: 0.24, waveAmp: 7, waveFreq:6.0 },
 ]
 
 // ─── phantom orb configs — distinct non-blue colors, different densities ─────
@@ -804,7 +804,7 @@ function VistaraOrb({
 
   const groupRef  = useRef<THREE.Group>(null)
   const ZERO      = useMemo(() => new THREE.Vector3(), [])
-  const scaleRef      = useRef(orbSize * 0.60)
+  const scaleRef      = useRef(orbSize * 0.40)
   // throw state: age counts up from 0 when focus is acquired
   const throwRef      = useRef({ age: 10, prevFocused: false })
 
@@ -842,7 +842,7 @@ function VistaraOrb({
     const throwBell = isFocused && throwAge < 0.65
       ? Math.sin(Math.PI * Math.min(throwAge / 0.65, 1)) * (orbSize * 2.5)
       : 0
-    const restScale    = orbSize * (isFocused ? 0.85 : 0.60)
+    const restScale    = orbSize * (isFocused ? 0.60 : 0.40)
     const targetScale  = restScale + throwBell
     const lerpSpeed    = throwBell > orbSize * 0.4 ? 0.30 : 0.08
     scaleRef.current  += (targetScale - scaleRef.current) * lerpSpeed
