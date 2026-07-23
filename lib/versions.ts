@@ -13,9 +13,23 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.2'
+export const CURRENT_VERSION = '3.3'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.3',
+    date: '2026-07-23',
+    title: 'Vistara — Nano-Particle String Rings (No Donut)',
+    summary: 'Rings are now true sparse strings of individual nano-particles visible from any angle — eliminated the solid-donut artifact caused by 9 rings × AdditiveBlending stacking at origin.',
+    changes: [
+      'Particle count per ring reduced 11000→4000 — visible gaps between beads, genuine nano-string look',
+      'Particles placed exactly on the ellipse curve (zero radial spread, zero Y jitter) — ring appears as a thin line of beads from any viewing angle',
+      'Per-particle alpha ×0.22 to compensate for 9 rings additively stacking at the same origin — prevents saturation into a solid donut while keeping crystal colour bands vivid',
+      'Wave displacement is the sole source of 3D motion — string physically ripples without thickening',
+    ],
+    gitHash: '0e0d0db',
+    pages: ['Vistara'],
+  },
   {
     version: '3.1',
     date: '2026-07-23',
