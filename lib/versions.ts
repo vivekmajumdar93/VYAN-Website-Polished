@@ -13,9 +13,22 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.7'
+export const CURRENT_VERSION = '3.8'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.8',
+    date: '2026-07-23',
+    title: 'Śūnya Maṇḍala — neural web restored',
+    summary: 'NanoOrb web lines (the red neural network) were accidentally dimmed 5× in an earlier commit. Restored to v2.9 opacity values.',
+    changes: [
+      'NanoOrb initial line opacity restored: 0.06 → 0.42',
+      'NanoOrb webBase restored: 0.06 → 0.30 (the bright red neural-web look)',
+      'Signal pulse amplitude restored: 0.02 → 0.06 + signalPulse×0.5',
+    ],
+    gitHash: '717fc82',
+    pages: ['Śūnya Maṇḍala', 'Medhā', 'All NanoOrb instances'],
+  },
   {
     version: '3.7',
     date: '2026-07-23',
