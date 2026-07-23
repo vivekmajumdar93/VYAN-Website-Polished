@@ -13,9 +13,30 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.5'
+export const CURRENT_VERSION = '3.6'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.6',
+    date: '2026-07-23',
+    title: 'Vistara — UX Polish: Scroll, Brightness, Pulse, Icons',
+    summary: 'Panel scroll no longer navigates orbs. Brighter text across the panel. Each orb now pulses like lightning individually. VyanIcons used throughout. Button overlap fixed.',
+    changes: [
+      'Panel scroll isolated — wheel events no longer traverse orbs behind the panel',
+      'Śūnya Maṇḍala back button moved to top:70px to stop overlapping SoundConsole trigger',
+      'Duplicate Acoustic shortcut button removed — SoundConsole trigger is the single entry point',
+      'Vistara title text: gold 55%→95% opacity; subtitle 18%→60%',
+      'Panel description text 50%→82%; feature body 36%→72%; section labels 16%→45%',
+      'Feature card bullets replaced with SendIcon; section headers use FacultyIcon + SpeakIcon',
+      'Per-orb lightning pulse: unique frequency + phase per orb (abs-sin combination)',
+      'Orb base visibility: overview 0.82→0.94, close-up 0.55→0.76',
+      'Phantom orbs: duration 14–24s → 32–50s; now slow enough to click',
+      'Stardust trail: head size 14→16px, baseA 1.5→2.2; body brighter throughout',
+      'Particle field opacity 0.4→0.65',
+    ],
+    gitHash: '3bb78dc',
+    pages: ['Vistara'],
+  },
   {
     version: '3.5',
     date: '2026-07-23',
