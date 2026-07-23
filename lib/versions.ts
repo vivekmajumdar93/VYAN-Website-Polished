@@ -13,7 +13,7 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.1'
+export const CURRENT_VERSION = '3.2'
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
