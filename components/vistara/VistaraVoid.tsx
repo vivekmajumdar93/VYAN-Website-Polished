@@ -145,7 +145,7 @@ function createOrbRingGeo(a: number, b: number): THREE.BufferGeometry {
   const pos   = new Float32Array(COUNT * 3)
   const sz    = new Float32Array(COUNT)
   const ph    = new Float32Array(COUNT)
-  const halfW = a * 0.032  // ring width = 3.2% of major axis — crisp thin band
+  const halfW = a * 0.055  // ring width = 5.5% of major axis — visible band, stays separate with many orbs
   for (let i = 0; i < COUNT; i++) {
     const angle  = Math.random() * Math.PI * 2
     const u      = Math.random()
