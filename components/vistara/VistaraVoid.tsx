@@ -804,7 +804,7 @@ function VistaraOrb({
 
   const groupRef  = useRef<THREE.Group>(null)
   const ZERO      = useMemo(() => new THREE.Vector3(), [])
-  const scaleRef      = useRef(orbSize * 1.2)
+  const scaleRef      = useRef(orbSize * 0.60)
   // throw state: age counts up from 0 when focus is acquired
   const throwRef      = useRef({ age: 10, prevFocused: false })
 
@@ -842,7 +842,7 @@ function VistaraOrb({
     const throwBell = isFocused && throwAge < 0.65
       ? Math.sin(Math.PI * Math.min(throwAge / 0.65, 1)) * (orbSize * 2.5)
       : 0
-    const restScale    = orbSize * (isFocused ? 1.6 : 1.2)
+    const restScale    = orbSize * (isFocused ? 0.85 : 0.60)
     const targetScale  = restScale + throwBell
     const lerpSpeed    = throwBell > orbSize * 0.4 ? 0.30 : 0.08
     scaleRef.current  += (targetScale - scaleRef.current) * lerpSpeed
