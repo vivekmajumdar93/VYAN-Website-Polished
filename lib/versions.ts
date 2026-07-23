@@ -31,7 +31,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Idle gyroscopic orbit: when settled, camera slowly revolves around the focused orb at ±20° elevation wave',
       'Idle seeded from approach direction so orbit starts without a jump',
     ],
-    gitHash: 'pending',
+    gitHash: 'd33e885',
     pages: ['Vistara'],
   },
   {
