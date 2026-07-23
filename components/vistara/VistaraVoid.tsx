@@ -987,11 +987,14 @@ function GyroScene({
     startTarget: new THREE.Vector3(), endTarget: new THREE.Vector3(),
     startT: 0, duration: 1.4,
   })
-  // Arc traversal state — camera arcs through scene when switching focused orb
+  // Arc traversal state — camera arcs gyroscopically through scene when switching focused orb
   const camTraverseRef = useRef({
-    active: false, startT: 0, duration: 1.4,
-    startPos: new THREE.Vector3(), midPos: new THREE.Vector3(),
-    startLookAt: new THREE.Vector3(), endLookAt: new THREE.Vector3(),
+    active: false, startT: 0, duration: 2.5,
+    startPos:    new THREE.Vector3(),
+    midPos:      new THREE.Vector3(),   // random point on orbit shell — changes every traversal
+    endPos:      new THREE.Vector3(),   // close-up position in target orb's direction
+    startLookAt: new THREE.Vector3(),
+    endLookAt:   new THREE.Vector3(),
   })
 
   // Mount: set camera to the viewport-appropriate overview distance immediately
@@ -1097,26 +1100,39 @@ function GyroScene({
 
     if (isOverview) return   // OrbitControls drives camera when enabled
 
-    // Camera throw + arc traversal when focus changes
+    // Camera throw + gyroscopic arc traversal when focus changes
     if (prevFocusRef.current !== focusedIdx) {
       prevFocusRef.current = focusedIdx
       throwRef.current.startT = clock.elapsedTime
 
-      // Begin arc traversal: pull back over the gyroscope, swoop to new orb
       const newWp = worldPosRef.current[focusedIdx]
       const ct = camTraverseRef.current
       ct.active = true
-      ct.startT  = clock.elapsedTime
-      ct.duration = 2.5
+      ct.startT    = clock.elapsedTime
+      ct.duration  = 3.0
       ct.startPos.copy(camera.position)
       ct.startLookAt.copy(lookAt.current)
-      if (newWp) {
+
+      // Random waypoint on orbit shell — full 360° azimuth, ±72° elevation
+      // This makes every traversal arc from a different direction around the gyroscope
+      const R     = overviewZRef.current * 1.2
+      const theta = Math.random() * Math.PI * 2
+      const phi   = (Math.random() - 0.5) * (Math.PI * 0.8)
+      ct.midPos.set(
+        R * Math.cos(phi) * Math.sin(theta),
+        R * Math.sin(phi),
+        R * Math.cos(phi) * Math.cos(theta)
+      )
+
+      if (newWp && newWp.length() > 0.1) {
         ct.endLookAt.copy(newWp)
-        const pullZ = overviewZRef.current * 1.05
-        ct.midPos.set(newWp.x * 0.55, newWp.y * 0.55, pullZ)
+        // End pos: 520 units from centre in the target orb's own direction
+        // — camera arrives from the orb's "outside" regardless of where it is on its ring
+        const endDir = newWp.clone().normalize()
+        ct.endPos.copy(endDir.multiplyScalar(520))
       } else {
         ct.endLookAt.set(0, 0, 0)
-        ct.midPos.set(0, 0, overviewZRef.current * 1.05)
+        ct.endPos.set(0, 0, 520)
       }
     }
     const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.55, 1)
@@ -1134,23 +1150,23 @@ function GyroScene({
       const ct = camTraverseRef.current
       if (ct.active) {
         const raw = Math.min((clock.elapsedTime - ct.startT) / ct.duration, 1)
-        if (raw < 0.44) {
-          // Phase 1 — pull back to midpoint while panning lookAt to new orb
-          const ep = easeInOutCubic(raw / 0.44)
+        if (raw < 0.45) {
+          // Phase 1 — swing to random orbit-shell point, lookAt drifts to centre
+          const ep = easeInOutCubic(raw / 0.45)
           camera.position.lerpVectors(ct.startPos, ct.midPos, ep)
-          lookAt.current.lerpVectors(ct.startLookAt, ct.endLookAt, ep)
+          lookAt.current.lerpVectors(ct.startLookAt, new THREE.Vector3(0, 0, 0), ep)
         } else {
-          // Phase 2 — swoop into close-up; track live orb position as rings rotate
-          const ep = easeInOutCubic((raw - 0.44) / 0.56)
-          camera.position.lerpVectors(ct.midPos, new THREE.Vector3(0, 0, 550 - throwZ), ep)
+          // Phase 2 — swoop from orbit shell into close-up behind target orb
+          const ep = easeInOutCubic((raw - 0.45) / 0.55)
+          camera.position.lerpVectors(ct.midPos, ct.endPos, ep)
           const liveWp = worldPosRef.current[focusedIdx]
           if (liveWp) ct.endLookAt.copy(liveWp)
-          lookAt.current.copy(ct.endLookAt)
+          lookAt.current.lerpVectors(new THREE.Vector3(0, 0, 0), ct.endLookAt, ep)
         }
         camera.lookAt(lookAt.current)
         if (raw >= 1) ct.active = false
       } else {
-        camera.position.lerp(new THREE.Vector3(0, 0, 550 - throwZ), tp < 1 ? 0.28 : 0.04)
+        camera.position.lerp(ct.endPos.clone().add(new THREE.Vector3(0, 0, throwZ > 0 ? -throwZ : 0)), tp < 1 ? 0.28 : 0.04)
         const wp = worldPosRef.current[focusedIdx]
         if (wp) lookAt.current.lerp(wp, 0.04)
         else lookAt.current.lerp(new THREE.Vector3(), 0.04)
