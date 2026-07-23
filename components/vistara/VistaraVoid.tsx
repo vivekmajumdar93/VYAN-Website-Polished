@@ -8,42 +8,42 @@ import { NanoOrb } from '@/lib/vyan/objects/NanoOrb'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 import { BackIcon, SendIcon, CloseIcon } from '@/components/icons/VyanIcons'
 
-// ─── gyroscope constants ──────────────────────────────────────────────────────
+// ─── orb constants ────────────────────────────────────────────────────────────
 const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34, 26]
 
 interface OrbRingDef {
-  a: number; b: number          // ellipse semi-axes in XZ plane
-  localAngle: number             // starting angle on the ellipse (radians) — spreads orbs around ring
-  colorOffset: number            // shift in 0–3 color cycle
-  speed: number                  // primary spin speed
-  spinAxis: 'X' | 'Y' | 'Z'
-  df: [number, number, number]   // drift frequencies [x,y,z]
-  da: [number, number, number]   // drift amplitudes  [x,y,z]
-  waveSpeed: number              // wave travel speed around ring (+/- = direction)
-  waveAmp:   number              // wave displacement amplitude in units (out-of-plane Y)
-  waveFreq:  number              // number of sine crests around full ring circumference
+  worldPos:    [number, number, number]  // orb's fixed 3D position — each orb owns its space
+  ringA:       number   // local ring semi-major axis (wraps this orb only)
+  ringB:       number   // local ring semi-minor axis
+  colorOffset: number
+  speed:       number
+  spinAxis:    'X' | 'Y' | 'Z'
+  df:          [number, number, number]
+  da:          [number, number, number]
+  waveSpeed:   number
+  waveAmp:     number
+  waveFreq:    number
 }
-// localAngles spread 9 orbs evenly: π/2 + i*(2π/9) so no two start at same position
-const _A = Math.PI / 2, _S = (2 * Math.PI) / 9
+// 9 orbs spread through 3D space — front-to-back depth gives clear proportion & distance
 const ORB_RING_DEFS: OrbRingDef[] = [
-  // 0: Ṛtam — 4 crests
-  { a:280, b:200, localAngle:_A+0*_S, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15], waveSpeed: 0.08, waveAmp: 9, waveFreq:4.0 },
-  // 1: Ojas — 6 crests, counter-clockwise
-  { a:240, b:240, localAngle:_A+1*_S, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20], waveSpeed:-0.13, waveAmp: 7, waveFreq:6.0 },
-  // 2: Mudrā — 3 crests, fast
-  { a:190, b:270, localAngle:_A+2*_S, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00], waveSpeed: 0.19, waveAmp:11, waveFreq:3.0 },
-  // 3: Netra — 5 crests, counter-clockwise slow
-  { a:295, b:210, localAngle:_A+3*_S, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12], waveSpeed:-0.06, waveAmp: 8, waveFreq:5.0 },
-  // 4: Ākṛti — 4 crests
-  { a:260, b:260, localAngle:_A+4*_S, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22], waveSpeed: 0.15, waveAmp:10, waveFreq:4.0 },
-  // 5: Sūtra — 7 crests, fast counter-clockwise
-  { a:275, b:185, localAngle:_A+5*_S, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00], waveSpeed:-0.22, waveAmp: 6, waveFreq:7.0 },
-  // 6: Chitra-Prāṇa — 5 crests, slow
-  { a:255, b:170, localAngle:_A+6*_S, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16], waveSpeed: 0.09, waveAmp: 8, waveFreq:5.0 },
-  // 7: Māyā — 3 crests, counter-clockwise
-  { a:315, b:235, localAngle:_A+7*_S, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18], waveSpeed:-0.17, waveAmp:12, waveFreq:3.0 },
-  // 8: Saṅgraha — 6 crests, fastest
-  { a:225, b:225, localAngle:_A+8*_S, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18], waveSpeed: 0.24, waveAmp: 7, waveFreq:6.0 },
+  // 0: Ṛtam — center-front, closest
+  { worldPos:[   0,   0, 250], ringA:56, ringB:44, colorOffset:0.0, speed:0.00080, spinAxis:'Y', df:[0.17,0.00,0.13], da:[0.22,0.00,0.15], waveSpeed: 0.08, waveAmp:2.2, waveFreq:4.0 },
+  // 1: Ojas — left, mid-depth
+  { worldPos:[-210,  55, 150], ringA:48, ringB:38, colorOffset:1.0, speed:0.00060, spinAxis:'X', df:[0.00,0.19,0.14], da:[0.00,0.16,0.20], waveSpeed:-0.13, waveAmp:1.8, waveFreq:6.0 },
+  // 2: Mudrā — right, shallow
+  { worldPos:[ 175,  80,  55], ringA:44, ringB:34, colorOffset:2.0, speed:0.00100, spinAxis:'Z', df:[0.22,0.11,0.00], da:[0.10,0.18,0.00], waveSpeed: 0.19, waveAmp:2.8, waveFreq:3.0 },
+  // 3: Netra — left-down, mid
+  { worldPos:[-145,-130, -50], ringA:60, ringB:46, colorOffset:0.5, speed:0.00070, spinAxis:'Y', df:[0.15,0.00,0.18], da:[0.20,0.00,0.12], waveSpeed:-0.06, waveAmp:2.0, waveFreq:5.0 },
+  // 4: Ākṛti — right-up, deep
+  { worldPos:[ 135, 125,-130], ringA:64, ringB:50, colorOffset:1.5, speed:0.00090, spinAxis:'X', df:[0.00,0.21,0.16], da:[0.00,0.14,0.22], waveSpeed: 0.15, waveAmp:2.5, waveFreq:4.0 },
+  // 5: Sūtra — center-low, deeper
+  { worldPos:[  15, -85,-195], ringA:52, ringB:40, colorOffset:2.3, speed:0.00065, spinAxis:'Z', df:[0.18,0.12,0.00], da:[0.12,0.20,0.00], waveSpeed:-0.22, waveAmp:1.5, waveFreq:7.0 },
+  // 6: Chitra-Prāṇa — far left, mid-deep
+  { worldPos:[-220,  45, -80], ringA:52, ringB:40, colorOffset:0.3, speed:0.00085, spinAxis:'Y', df:[0.14,0.00,0.20], da:[0.18,0.00,0.16], waveSpeed: 0.09, waveAmp:2.0, waveFreq:5.0 },
+  // 7: Māyā — right, deepest
+  { worldPos:[  90, -40,-260], ringA:68, ringB:52, colorOffset:2.7, speed:0.00075, spinAxis:'X', df:[0.00,0.16,0.13], da:[0.00,0.20,0.18], waveSpeed:-0.17, waveAmp:3.0, waveFreq:3.0 },
+  // 8: Saṅgraha — left-up, deep
+  { worldPos:[ -70, 155,-220], ringA:52, ringB:40, colorOffset:0.8, speed:0.00095, spinAxis:'Z', df:[0.20,0.00,0.15], da:[0.15,0.00,0.18], waveSpeed: 0.24, waveAmp:1.8, waveFreq:6.0 },
 ]
 
 // ─── phantom orb configs — distinct non-blue colors, different densities ─────
@@ -111,7 +111,7 @@ const SATURN_VERT = `
     float w3 = 0.5 + 0.5 * sin(theta * 22.0 + uTime * 0.27 + aPhase * 5.0);
     float gap = 0.68 + 0.32 * sin(theta * 2.5 + uTime * 0.04);
     float density = w1 * (0.5 + 0.5 * w2) * (0.7 + 0.3 * w3) * gap;
-    vAlpha = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0) * 0.22;
+    vAlpha = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0) * 0.70;
     vPhase = aPhase;
 
     vec4 mv = modelViewMatrix * vec4(waved, 1.0);
@@ -145,19 +145,18 @@ const SATURN_FRAG = `
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
-function createOrbRingGeo(a: number, b: number): THREE.BufferGeometry {
-  const COUNT = 4000  // sparse — visible gaps between beads = nano-particle string
+function createOrbRingGeo(ringA: number, ringB: number): THREE.BufferGeometry {
+  const COUNT = 1500  // proportional to ring circumference (~π×(ringA+ringB)≈314) — visible beads
   const geo   = new THREE.BufferGeometry()
   const pos   = new Float32Array(COUNT * 3)
   const sz    = new Float32Array(COUNT)
   const ph    = new Float32Array(COUNT)
   for (let i = 0; i < COUNT; i++) {
     const angle = Math.random() * Math.PI * 2
-    // Particles exactly ON the ellipse curve — wave displacement provides all 3D motion
-    pos[i*3]   = a * Math.cos(angle)
+    pos[i*3]   = ringA * Math.cos(angle)
     pos[i*3+1] = 0
-    pos[i*3+2] = b * Math.sin(angle)
-    sz[i]  = 0.5 + Math.random() * 0.8
+    pos[i*3+2] = ringB * Math.sin(angle)
+    sz[i]  = 0.8 + Math.random() * 1.2
     ph[i]  = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -171,12 +170,12 @@ function easeInExpo(t: number) { return t <= 0 ? 0 : Math.pow(2, 10 * t - 10) }
 function easeInOutCubic(t: number) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
 
 // Returns the ideal overview camera Z for the current viewport aspect ratio.
-// Portrait phones (narrow) need a farther camera so the ring system fits horizontally.
-// Wide desktop screens need a closer camera so the system fills the screen meaningfully.
+// Orbs span X:±220, Y:±160, Z:±260 centred at origin — portrait needs farther camera
+// because horizontal FOV = 50°×aspect is narrow, so ±220 needs more distance.
 function computeOverviewZ(aspect: number): number {
   // t=0 at aspect≤0.5 (tall portrait), t=1 at aspect≥2.0 (ultra-wide)
   const t = Math.max(0, Math.min(1, (aspect - 0.5) / 1.5))
-  return Math.max(550, Math.min(1100, Math.round(900 - 350 * t)))
+  return Math.max(750, Math.min(1200, Math.round(1100 - 350 * t)))
 }
 function nearestTarget(current: number, raw: number): number {
   let d = (raw - current) % (2 * Math.PI)
@@ -1014,7 +1013,7 @@ function GyroScene({
     uniforms: { uTime: { value: 0 }, uTilt: { value: 0 }, uColorOffset: { value: def.colorOffset }, uWaveSpeed: { value: def.waveSpeed }, uWaveAmp: { value: def.waveAmp }, uWaveFreq: { value: def.waveFreq } },
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   })), [])
-  const ringGeos = useMemo(() => ORB_RING_DEFS.map(def => createOrbRingGeo(def.a, def.b)), [])
+  const ringGeos = useMemo(() => ORB_RING_DEFS.map(def => createOrbRingGeo(def.ringA, def.ringB)), [])
 
   useFrame(({ clock }, delta) => {
     const t   = clock.elapsedTime
@@ -1063,15 +1062,31 @@ function GyroScene({
     if (prevIsOverviewRef.current !== isOverview) {
       prevIsOverviewRef.current = isOverview
       const ca = camAnimRef.current
-      ca.active    = true
+      ca.active = true
       ca.startPos.copy(camera.position)
-      ca.endPos.set(0, 0, isOverview ? overviewZRef.current : 550)
       ca.startTarget.copy(lookAt.current)
-      ca.endTarget.set(0, 0, 0)
-      ca.startT    = clock.elapsedTime
-      ca.duration  = isOverview ? 1.4 : 0.9
-      // Sync prevFocusRef so no throw fires when landing in close-up
-      if (!isOverview) prevFocusRef.current = focusedIdx
+      ca.startT   = clock.elapsedTime
+      if (isOverview) {
+        ca.endPos.set(0, 0, overviewZRef.current)
+        ca.endTarget.set(0, 0, 0)
+        ca.duration = 1.4
+      } else {
+        const wp = worldPosRef.current[focusedIdx]
+        if (wp) {
+          ca.endPos.set(wp.x, wp.y, wp.z + 350)
+          ca.endTarget.copy(wp)
+          // Pre-seed camTraverseRef so settled camera holds position after anim
+          camTraverseRef.current.endPos.set(wp.x, wp.y, wp.z + 350)
+          camTraverseRef.current.endLookAt.copy(wp)
+        } else {
+          ca.endPos.set(0, 0, 350)
+          ca.endTarget.set(0, 0, 0)
+          camTraverseRef.current.endPos.set(0, 0, 350)
+        }
+        ca.duration = 0.9
+        // Sync prevFocusRef so no throw fires when landing in close-up
+        prevFocusRef.current = focusedIdx
+      }
     }
 
     const ca = camAnimRef.current
@@ -1117,15 +1132,13 @@ function GyroScene({
         R * Math.cos(phi) * Math.cos(theta)
       )
 
-      if (newWp && newWp.length() > 0.1) {
+      if (newWp) {
         ct.endLookAt.copy(newWp)
-        // End pos: 520 units from centre in the target orb's own direction
-        // — camera arrives from the orb's "outside" regardless of where it is on its ring
-        const endDir = newWp.clone().normalize()
-        ct.endPos.copy(endDir.multiplyScalar(520))
+        // Camera arrives 350 units in +Z from the orb — same depth axis, clear framing
+        ct.endPos.set(newWp.x, newWp.y, newWp.z + 350)
       } else {
         ct.endLookAt.set(0, 0, 0)
-        ct.endPos.set(0, 0, 520)
+        ct.endPos.set(0, 0, 350)
       }
     }
     const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.55, 1)
@@ -1187,19 +1200,22 @@ function GyroScene({
       <StarTrailsSystem />
 
       {ORB_RING_DEFS.map((def, i) => (
-        <group key={i} ref={(el: THREE.Group | null) => { ringGroupsRef.current[i] = el }}>
+        <group key={`ring-${i}`} position={def.worldPos} ref={(el: THREE.Group | null) => { ringGroupsRef.current[i] = el }}>
           <points geometry={ringGeos[i]} material={ringMats[i]} frustumCulled={false} />
-          <VistaraOrb
-            gateway={GATEWAYS[i]} orbIdx={i} orbSize={ORB_SIZES[i]}
-            basePos={[def.a * Math.cos(def.localAngle), 0, def.b * Math.sin(def.localAngle)]}
-            isFocused={focusedIdx===i} isHovered={hoveredId===GATEWAYS[i].id}
-            panelOpen={panelOpen && focusedIdx===i}
-            isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==i}
-            pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==i?vortexProgressRef.current:0}
-            pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview}
-          />
         </group>
+      ))}
+      {ORB_RING_DEFS.map((def, i) => (
+        <VistaraOrb
+          key={`orb-${i}`}
+          gateway={GATEWAYS[i]} orbIdx={i} orbSize={ORB_SIZES[i]}
+          basePos={def.worldPos}
+          isFocused={focusedIdx===i} isHovered={hoveredId===GATEWAYS[i].id}
+          panelOpen={panelOpen && focusedIdx===i}
+          isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==i}
+          pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==i?vortexProgressRef.current:0}
+          pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
+          onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview}
+        />
       ))}
 
       <ScreenTracker worldRef={worldPosRef} screenRef={screenPosRef} />
@@ -1701,7 +1717,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const [isOverview,      setIsOverview]      = useState(true)
   const [orbitEnabled,    setOrbitEnabled]    = useState(true)   // camera already at z=1300 on load
   const isOverviewRef  = useRef(true)
-  const overviewZRef   = useRef(750)
+  const overviewZRef   = useRef(950)
   useEffect(() => { isOverviewRef.current = isOverview }, [isOverview])
 
   const worldPosRef       = useRef<Record<number, THREE.Vector3>>({})
