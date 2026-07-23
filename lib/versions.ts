@@ -13,9 +13,20 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '3.6'
+export const CURRENT_VERSION = '3.7'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '3.7',
+    date: '2026-07-23',
+    title: 'Medhā — Back button restored',
+    summary: 'The Back button in the Medhā HangingOrbs interface was hidden behind the SoundConsole trigger. Moved to top:72px so it is always visible.',
+    changes: [
+      'HangingOrbs Back pill moved from top:clamp(14px,3.5vh,26px) to top:72px — no longer hidden by the ACOUSTIC button',
+    ],
+    gitHash: 'c86fecb',
+    pages: ['Medhā'],
+  },
   {
     version: '3.6',
     date: '2026-07-23',
