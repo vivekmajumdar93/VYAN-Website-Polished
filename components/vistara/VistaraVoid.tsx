@@ -144,11 +144,6 @@ function easeInOutCubic(t: number) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*
 // Returns the ideal overview camera Z for the current viewport aspect ratio.
 // Portrait phones (narrow) need a farther camera so the ring system fits horizontally.
 // Wide desktop screens need a closer camera so the system fills the screen meaningfully.
-function computeOverviewZ(aspect: number): number {
-  // t=0 at aspect≤0.5 (tall portrait), t=1 at aspect≥2.0 (ultra-wide)
-  const t = Math.max(0, Math.min(1, (aspect - 0.5) / 1.5))
-  return Math.max(550, Math.min(1100, Math.round(900 - 350 * t)))
-}
 function nearestTarget(current: number, raw: number): number {
   let d = (raw - current) % (2 * Math.PI)
   if (d > Math.PI)  d -= 2 * Math.PI
@@ -612,13 +607,12 @@ interface VistaraOrbProps {
   onHover: (id: string | null) => void
   onClick: (idx: number, id: string) => void
   worldPosRef: React.MutableRefObject<Record<number, THREE.Vector3>>
-  isOverview: boolean
 }
 
 function VistaraOrb({
   gateway, orbIdx, orbSize, ringType, localAngle, ringRadius,
   isFocused, isHovered, panelOpen, isPulled, pullProgress, pullTarget,
-  onHover, onClick, worldPosRef, isOverview,
+  onHover, onClick, worldPosRef,
 }: VistaraOrbProps) {
   const basePos = useMemo<[number,number,number]>(() => {
     if (ringType === 'B') return [0, ringRadius*Math.cos(localAngle), ringRadius*Math.sin(localAngle)]
@@ -648,9 +642,9 @@ function VistaraOrb({
     if (isHovered)      nanoOrb.setSignal('hover')
     else if (isFocused) nanoOrb.setSignal('listening')
     else                nanoOrb.setSignal('idle')
-    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : isOverview ? 0.82 : 0.55)
+    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.55)
 
-    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : isOverview ? 0.55 : 0.3, 1, ZERO)
+    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.3, 1, ZERO)
 
     // On panel open for this orb: fire a sin-bell burst so the node web appears
     // to unfold outward — glass shards are timed to begin assembling at the peak
@@ -691,8 +685,7 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
-      {/* φ label — hidden in overview to keep clean; visible in close-up */}
-      {!isOverview && <Html center occlude={false} position={[0, 0, 0]}>
+      <Html center occlude={false} position={[0, 0, 0]}>
         <div
           onClick={e => { e.stopPropagation(); onClick(orbIdx, gateway.id) }}
           onMouseEnter={() => onHover(gateway.id)}
@@ -742,7 +735,7 @@ function VistaraOrb({
             transition: 'opacity 0.4s',
           }}>{gateway.tagline}</div>
         </div>
-      </Html>}
+      </Html>
     </group>
   )
 }
@@ -975,12 +968,6 @@ function OrbNeuralLinks({ worldPosRef, focusedIdx }: OrbNeuralLinksProps) {
 }
 
 // ─── gyroscope scene ─────────────────────────────────────────────────────────
-interface CamAnimState {
-  active: boolean; startPos: THREE.Vector3; endPos: THREE.Vector3
-  startTarget: THREE.Vector3; endTarget: THREE.Vector3
-  startT: number; duration: number
-}
-
 interface GyroSceneProps {
   focusedIdx: number; hoveredId: string | null
   onHover: (id: string | null) => void; onOrbClick: (idx: number, id: string) => void
@@ -990,51 +977,21 @@ interface GyroSceneProps {
   traverseRef: React.MutableRefObject<TraverseState>
   panelOpen: boolean
   onPhantomClick: () => void
-  isOverview: boolean; orbitEnabled: boolean; onOverviewAnimDone: () => void
-  overviewZRef: React.MutableRefObject<number>
 }
 
 function GyroScene({
   focusedIdx, hoveredId, onHover, onOrbClick,
   vortexTargetIdx, vortexProgressRef, vortexPhase,
   worldPosRef, screenPosRef, traverseRef, panelOpen, onPhantomClick,
-  isOverview, orbitEnabled, onOverviewAnimDone, overviewZRef,
 }: GyroSceneProps) {
   const ringARef = useRef<THREE.Group>(null)
   const ringBRef = useRef<THREE.Group>(null)
   const ringCRef = useRef<THREE.Group>(null)
-  const { camera, size } = useThree()
+  const { camera } = useThree()
   const lookAt       = useRef(new THREE.Vector3())
   const anglesRef    = useRef({ A: 0, B: 0, C: 0 })
   const prevFocusRef = useRef(focusedIdx)
   const throwRef     = useRef({ startT: -10 })
-  const controlsRef  = useRef<any>(null)
-  const prevIsOverviewRef = useRef(isOverview)
-  const pendingOverviewZRef = useRef<number | null>(null)
-  const camAnimRef = useRef<CamAnimState>({
-    active: false,
-    startPos: new THREE.Vector3(), endPos: new THREE.Vector3(),
-    startTarget: new THREE.Vector3(), endTarget: new THREE.Vector3(),
-    startT: 0, duration: 1.4,
-  })
-
-  // Mount: set camera to the viewport-appropriate overview distance immediately
-  useEffect(() => {
-    const z = computeOverviewZ((camera as THREE.PerspectiveCamera).aspect)
-    overviewZRef.current = z
-    if (isOverview) {
-      camera.position.set(0, 0, z)
-      if (controlsRef.current) { controlsRef.current.target.set(0, 0, 0); controlsRef.current.update() }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Resize / orientation change: recompute and queue a smooth camera move
-  useEffect(() => {
-    const newZ = computeOverviewZ(size.width / size.height)
-    overviewZRef.current = newZ
-    if (isOverview) pendingOverviewZRef.current = newZ
-  }, [size])
 
   // ── Saturn ring materials — one per ring so uniforms are independent ──
   const ringAMat = useMemo(() => new THREE.ShaderMaterial({
@@ -1102,56 +1059,6 @@ function GyroScene({
     ringCMat.uniforms.uTime.value = t
     ringCMat.uniforms.uTilt.value = Math.abs(Math.cos(t * 0.22) * 0.10) + Math.abs(Math.sin(t * 0.11) * 0.18)
 
-    // ── Orientation / resize repositioning (while in overview) ─────────────
-    if (isOverview && !camAnimRef.current.active && pendingOverviewZRef.current !== null) {
-      const newZ = pendingOverviewZRef.current
-      pendingOverviewZRef.current = null
-      if (Math.abs(newZ - camera.position.z) > 25) {
-        const ca = camAnimRef.current
-        ca.active = true
-        ca.startPos.copy(camera.position)
-        ca.endPos.set(0, 0, newZ)
-        ca.startTarget.copy(lookAt.current)
-        ca.endTarget.set(0, 0, 0)
-        ca.startT = clock.elapsedTime
-        ca.duration = 0.7
-      }
-    }
-
-    // ── Overview ↔ close-up camera animation ──────────────────────────────
-    if (prevIsOverviewRef.current !== isOverview) {
-      prevIsOverviewRef.current = isOverview
-      const ca = camAnimRef.current
-      ca.active    = true
-      ca.startPos.copy(camera.position)
-      ca.endPos.set(0, 0, isOverview ? overviewZRef.current : 550)
-      ca.startTarget.copy(lookAt.current)
-      ca.endTarget.set(0, 0, 0)
-      ca.startT    = clock.elapsedTime
-      ca.duration  = isOverview ? 1.4 : 0.9
-      // Sync prevFocusRef so no throw fires when landing in close-up
-      if (!isOverview) prevFocusRef.current = focusedIdx
-    }
-
-    const ca = camAnimRef.current
-    if (ca.active) {
-      const tp = Math.min((clock.elapsedTime - ca.startT) / ca.duration, 1)
-      const te = easeInOutCubic(tp)
-      camera.position.lerpVectors(ca.startPos, ca.endPos, te)
-      lookAt.current.lerpVectors(ca.startTarget, ca.endTarget, te)
-      camera.lookAt(lookAt.current)
-      if (tp >= 1) {
-        ca.active = false
-        if (isOverview) {
-          if (controlsRef.current) { controlsRef.current.target.set(0,0,0); controlsRef.current.update() }
-          onOverviewAnimDone()
-        }
-      }
-      return
-    }
-
-    if (isOverview) return   // OrbitControls drives camera when enabled
-
     // Camera throw when focus changes — orb appears to jump toward lens
     if (prevFocusRef.current !== focusedIdx) {
       prevFocusRef.current = focusedIdx
@@ -1183,11 +1090,6 @@ function GyroScene({
 
   return (
     <>
-      <OrbitControls ref={controlsRef} makeDefault enabled={orbitEnabled}
-        enableDamping dampingFactor={0.07}
-        minDistance={200} maxDistance={1600}
-        enablePan={false} rotateSpeed={0.55} zoomSpeed={1.1}
-      />
       <ambientLight intensity={0.04} />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
@@ -1205,7 +1107,7 @@ function GyroScene({
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
             pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
+            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
         ))}
       </group>
 
@@ -1221,7 +1123,7 @@ function GyroScene({
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
             pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
+            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
         ))}
       </group>
 
@@ -1238,7 +1140,7 @@ function GyroScene({
               isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
               pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
               pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-              onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
+              onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
           ))}
         </group>
       </group>
@@ -1624,7 +1526,7 @@ type VortexPhase = 'idle' | 'pull' | 'peak' | 'passage' | 'done'
 export function VistaraVoid({ onBack, onGatewayEnter }: {
   onBack?: () => void; onGatewayEnter?: (gateway: Gateway) => void
 }) {
-  const [focusedIdx,      setFocusedIdx]      = useState(-1)
+  const [focusedIdx,      setFocusedIdx]      = useState(0)
   const [hoveredId,       setHoveredId]       = useState<string | null>(null)
   const [vortexPhase,     setVortexPhase]     = useState<VortexPhase>('idle')
   const [vortexTargetIdx, setVortexTargetIdx] = useState<number | null>(null)
@@ -1633,17 +1535,11 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const [panelGateway,    setPanelGateway]    = useState<Gateway | null>(null)
   const [panelSide,       setPanelSide]       = useState<'left' | 'right'>('left')
   const [showComingSoon,  setShowComingSoon]  = useState(false)
-  const [isOverview,      setIsOverview]      = useState(true)
-  const [orbitEnabled,    setOrbitEnabled]    = useState(true)   // camera already at z=1300 on load
-  const isOverviewRef  = useRef(true)
-  const overviewZRef   = useRef(750)
-  useEffect(() => { isOverviewRef.current = isOverview }, [isOverview])
 
   const worldPosRef       = useRef<Record<number, THREE.Vector3>>({})
   const screenPosRef      = useRef<Record<number, { x: number; y: number }>>({})
   const vortexAnimRef     = useRef<number>(0)
   const vortexStartRef    = useRef(0)
-  // vortexProgress as ref — avoids 75+ setState calls per vortex (each was a full React re-render)
   const vortexProgressRef = useRef(0)
 
   const traverseRef = useRef<TraverseState>({
@@ -1672,10 +1568,10 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       cooldown = true; setTimeout(() => { cooldown = false }, 700)
       setFocusedIdx(prev => { const next=(prev+dir+8)%8; triggerTraverse(next); return next })
     }
-    const onWheel      = (e: WheelEvent)    => { if (isOverviewRef.current) return; if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
+    const onWheel      = (e: WheelEvent)    => { if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
     let tx = 0
     const onTouchStart = (e: TouchEvent)    => { tx = e.touches[0].clientX }
-    const onTouchEnd   = (e: TouchEvent)    => { if (isOverviewRef.current) return; const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
+    const onTouchEnd   = (e: TouchEvent)    => { const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
     window.addEventListener('wheel',      onWheel,      { passive:true })
     window.addEventListener('touchstart', onTouchStart, { passive:true })
     window.addEventListener('touchend',   onTouchEnd,   { passive:true })
@@ -1687,14 +1583,6 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   }, [vortexPhase, triggerTraverse])
 
   const handleOrbClick = useCallback((idx: number, id: string) => {
-    // From overview: fly camera into close-up of this orb
-    if (isOverview) {
-      setIsOverview(false)
-      setOrbitEnabled(false)
-      setFocusedIdx(idx)
-      triggerTraverse(idx)
-      return
-    }
     if (vortexPhase !== 'idle') return
     if (idx !== focusedIdx) { triggerTraverse(idx); setFocusedIdx(idx); return }
     setVortexTargetIdx(idx); setVortexPhase('pull')
@@ -1724,7 +1612,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       }
     }
     vortexAnimRef.current = requestAnimationFrame(tick)
-  }, [isOverview, vortexPhase, focusedIdx, triggerTraverse])
+  }, [vortexPhase, focusedIdx, triggerTraverse])
 
   useEffect(() => () => cancelAnimationFrame(vortexAnimRef.current), [])
 
@@ -1732,18 +1620,6 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const handleEnter = useCallback(() => {
     const gw = panelGateway; handleClose(); if (gw) onGatewayEnter?.(gw)
   }, [panelGateway, handleClose, onGatewayEnter])
-  // Panel "Overview" button — dismiss panel and fly camera out to overview
-  const handlePanelBack = useCallback(() => {
-    setShowPanel(false); setPanelGateway(null)
-    setIsOverview(true); setOrbitEnabled(false); setFocusedIdx(-1)
-  }, [])
-
-  const goToOverview = useCallback(() => {
-    setIsOverview(true)
-    setOrbitEnabled(false)
-    setFocusedIdx(-1)
-  }, [])
-  const onOverviewAnimDone = useCallback(() => { setOrbitEnabled(true) }, [])
 
   const vig = vortexPhase==='pull' ? 0.28 : vortexPhase==='peak' ? 0.72 : vortexPhase==='passage' ? 1 : 0
   const passCenter = vortexTargetIdx!==null ? screenPosRef.current[vortexTargetIdx] : null
@@ -1829,7 +1705,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 
       {/* Canvas — transparent so background nebula shows through */}
       <Canvas
-        camera={{ position:[0,0,750], fov:60, near:1, far:4000 }}
+        camera={{ position:[0,0,550], fov:60, near:1, far:3000 }}
         style={{ position:'absolute', inset:0, zIndex:2 }}
         gl={{ antialias:true, alpha:true, toneMapping:THREE.ACESFilmicToneMapping, toneMappingExposure:1.1 }}
         dpr={[1, 1.5]}
@@ -1841,8 +1717,6 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           vortexTargetIdx={vortexTargetIdx} vortexProgressRef={vortexProgressRef} vortexPhase={vortexPhase}
           worldPosRef={worldPosRef} screenPosRef={screenPosRef} traverseRef={traverseRef}
           panelOpen={showPanel} onPhantomClick={() => setShowComingSoon(true)}
-          isOverview={isOverview} orbitEnabled={orbitEnabled} onOverviewAnimDone={onOverviewAnimDone}
-          overviewZRef={overviewZRef}
         />
         <ShootingStars />
       </Canvas>
@@ -1910,51 +1784,23 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       </button>
 
       <p style={{ position:'fixed', bottom:'5%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.25em', color:'rgba(255,255,255,0.10)', textTransform:'uppercase', margin:0, whiteSpace:'nowrap' }}>
-        {isOverview ? 'Scroll · Pinch · Drag to explore · Tap an orb to enter' : 'Scroll to traverse · Click focused orb to enter'}
+        Scroll to traverse · Click focused orb to enter
       </p>
 
-      {!isOverview && (
-        <div style={{ position:'fixed', bottom:'12%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', textAlign:'center' }}>
-          <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-            {GATEWAYS.map((_, i) => (
-              <div key={i} style={{
-                width: i===focusedIdx?18:5, height:3, borderRadius:2,
-                background: i===focusedIdx?'rgba(140,160,255,0.7)':'rgba(100,120,200,0.25)',
-                transition:'all 0.4s',
-              }} />
-            ))}
-          </div>
+      <div style={{ position:'fixed', bottom:'12%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', textAlign:'center' }}>
+        <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
+          {GATEWAYS.map((_, i) => (
+            <div key={i} style={{
+              width: i===focusedIdx?18:5, height:3, borderRadius:2,
+              background: i===focusedIdx?'rgba(140,160,255,0.7)':'rgba(100,120,200,0.25)',
+              transition:'all 0.4s',
+            }} />
+          ))}
         </div>
-      )}
-
-      {/* Overview button — bottom-right, only visible in close-up */}
-      {!isOverview && (
-        <button
-          onClick={goToOverview}
-          style={{
-            position:'fixed', bottom:'22px', right:'22px', zIndex:40,
-            background:'rgba(6,10,28,0.72)', border:'1px solid rgba(55,90,200,0.28)',
-            borderRadius:'8px', padding:'8px 16px', cursor:'pointer',
-            fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.22em',
-            color:'rgba(90,150,255,0.55)', textTransform:'uppercase',
-            backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
-            transition:'color 0.25s, border-color 0.25s, background 0.25s',
-          }}
-          onMouseEnter={e => {
-            const b = e.currentTarget as HTMLButtonElement
-            b.style.color='rgba(150,200,255,0.95)'; b.style.borderColor='rgba(80,140,255,0.55)'; b.style.background='rgba(10,18,50,0.90)'
-          }}
-          onMouseLeave={e => {
-            const b = e.currentTarget as HTMLButtonElement
-            b.style.color='rgba(90,150,255,0.55)'; b.style.borderColor='rgba(55,90,200,0.28)'; b.style.background='rgba(6,10,28,0.72)'
-          }}
-        >
-          Overview
-        </button>
-      )}
+      </div>
 
       {showPanel && panelGateway && (
-        <GlassPanel gateway={panelGateway} onClose={handleClose} onBack={handlePanelBack} onEnter={handleEnter} side={panelSide} />
+        <GlassPanel gateway={panelGateway} onClose={handleClose} onBack={handleClose} onEnter={handleEnter} side={panelSide} />
       )}
       {showComingSoon && (
         <ComingSoonPanel onClose={() => setShowComingSoon(false)} />
