@@ -138,12 +138,8 @@ function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-function easeInExpo(t: number) { return t <= 0 ? 0 : Math.pow(2, 10 * t - 10) }
 function easeInOutCubic(t: number) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
 
-// Returns the ideal overview camera Z for the current viewport aspect ratio.
-// Portrait phones (narrow) need a farther camera so the ring system fits horizontally.
-// Wide desktop screens need a closer camera so the system fills the screen meaningfully.
 function nearestTarget(current: number, raw: number): number {
   let d = (raw - current) % (2 * Math.PI)
   if (d > Math.PI)  d -= 2 * Math.PI
@@ -987,11 +983,7 @@ function GyroScene({
   const ringARef = useRef<THREE.Group>(null)
   const ringBRef = useRef<THREE.Group>(null)
   const ringCRef = useRef<THREE.Group>(null)
-  const { camera } = useThree()
-  const lookAt       = useRef(new THREE.Vector3())
   const anglesRef    = useRef({ A: 0, B: 0, C: 0 })
-  const prevFocusRef = useRef(focusedIdx)
-  const throwRef     = useRef({ startT: -10 })
 
   // ── Saturn ring materials — one per ring so uniforms are independent ──
   const ringAMat = useMemo(() => new THREE.ShaderMaterial({
@@ -1059,29 +1051,6 @@ function GyroScene({
     ringCMat.uniforms.uTime.value = t
     ringCMat.uniforms.uTilt.value = Math.abs(Math.cos(t * 0.22) * 0.10) + Math.abs(Math.sin(t * 0.11) * 0.18)
 
-    // Camera throw when focus changes — orb appears to jump toward lens
-    if (prevFocusRef.current !== focusedIdx) {
-      prevFocusRef.current = focusedIdx
-      throwRef.current.startT = clock.elapsedTime
-    }
-    const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.75, 1)
-    const throwZ = Math.sin(Math.PI * tp) * 72
-
-    const vp = vortexProgressRef.current
-    if (vortexTargetIdx !== null && vp > 0) {
-      const wp = worldPosRef.current[vortexTargetIdx]
-      if (wp) {
-        const t2 = easeInExpo(Math.min(vp, 1))
-        camera.position.lerp(new THREE.Vector3(wp.x*0.3, wp.y*0.2, 550 - t2*350), t2*0.12)
-        camera.lookAt(wp)
-      }
-    } else {
-      camera.position.lerp(new THREE.Vector3(0, 0, 550 - throwZ), tp < 1 ? 0.18 : 0.04)
-      const wp = worldPosRef.current[focusedIdx]
-      if (wp) lookAt.current.lerp(wp, 0.04)
-      else lookAt.current.lerp(new THREE.Vector3(), 0.04)
-      camera.lookAt(lookAt.current)
-    }
   })
 
   const spiralTarget = vortexTargetIdx !== null ? (worldPosRef.current[vortexTargetIdx] ?? null) : null
@@ -1090,6 +1059,7 @@ function GyroScene({
 
   return (
     <>
+      <OrbitControls enableDamping dampingFactor={0.08} />
       <ambientLight intensity={0.04} />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
@@ -1202,8 +1172,8 @@ function LiveAppPlaceholder({ gateway }: { gateway: Gateway }) {
 // ─── glass panel (side-sliding) ───────────────────────────────────────────────
 type PanelPhase = 'opening' | 'open' | 'closing'
 
-function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
-  gateway: Gateway; onClose: () => void; onBack: () => void; onEnter: () => void; side: 'left' | 'right'
+function GlassPanel({ gateway, onClose, onEnter, side }: {
+  gateway: Gateway; onClose: () => void; onEnter: () => void; side: 'left' | 'right'
 }) {
   const [phase, setPhase] = useState<PanelPhase>('opening')
   const [step,  setStep]  = useState(0)   // stagger index: 0=hidden, 1..5=each section
@@ -1226,10 +1196,6 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
     setStep(0); setPhase('closing')
     setTimeout(onClose, CLOSE_MS)
   }, [onClose])
-  const handleBack = useCallback(() => {
-    setStep(0); setPhase('closing')
-    setTimeout(onBack, CLOSE_MS)
-  }, [onBack])
 
   const isLeft = side === 'left'
   const c      = gateway.color
@@ -1371,27 +1337,13 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
           ...reveal(5),
         }}>
           <div style={{ display:'flex', gap:'10px' }}>
-            {/* Overview — close panel and zoom out to see all 8 orbs */}
-            <button onClick={handleBack} title="Return to Overview" style={{
-              flex:1, padding:'11px 0',
-              background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)',
-              borderRadius:'8px', color:'rgba(255,255,255,0.38)', fontSize:'9px',
-              letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
-              cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'7px',
-              transition:'color 0.2s, border-color 0.2s, background 0.2s',
-            }}
-            onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.70)'; b.style.borderColor='rgba(255,255,255,0.14)'; b.style.background='rgba(255,255,255,0.07)' }}
-            onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.38)'; b.style.borderColor='rgba(255,255,255,0.07)'; b.style.background='rgba(255,255,255,0.04)' }}
-            >
-              <BackIcon size={15} />Overview
-            </button>
             {/* Enter — launch this gateway's app */}
             <button onClick={onEnter} title="Enter gateway" style={{
-              padding:'11px 24px',
+              flex:1, padding:'11px 0',
               background:`${c}1a`, border:`1px solid ${c}55`,
               borderRadius:'8px', color:c, fontSize:'9px',
               letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
-              cursor:'pointer', display:'flex', alignItems:'center', gap:'7px',
+              cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'7px',
               boxShadow:`0 0 16px ${c}14`,
               transition:'background 0.2s, box-shadow 0.2s',
             }}
@@ -1561,26 +1513,6 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
     else { tr.ringCActive=true; tr.ringCStart=angles.C; tr.ringCTarget=nearestTarget(angles.C, rawTarget) }
   }, [])
 
-  useEffect(() => {
-    let cooldown = false
-    const go = (dir: 1 | -1) => {
-      if (cooldown || vortexPhase !== 'idle') return
-      cooldown = true; setTimeout(() => { cooldown = false }, 700)
-      setFocusedIdx(prev => { const next=(prev+dir+8)%8; triggerTraverse(next); return next })
-    }
-    const onWheel      = (e: WheelEvent)    => { if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
-    let tx = 0
-    const onTouchStart = (e: TouchEvent)    => { tx = e.touches[0].clientX }
-    const onTouchEnd   = (e: TouchEvent)    => { const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
-    window.addEventListener('wheel',      onWheel,      { passive:true })
-    window.addEventListener('touchstart', onTouchStart, { passive:true })
-    window.addEventListener('touchend',   onTouchEnd,   { passive:true })
-    return () => {
-      window.removeEventListener('wheel',      onWheel)
-      window.removeEventListener('touchstart', onTouchStart)
-      window.removeEventListener('touchend',   onTouchEnd)
-    }
-  }, [vortexPhase, triggerTraverse])
 
   const handleOrbClick = useCallback((idx: number, id: string) => {
     if (vortexPhase !== 'idle') return
@@ -1705,7 +1637,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 
       {/* Canvas — transparent so background nebula shows through */}
       <Canvas
-        camera={{ position:[0,0,550], fov:60, near:1, far:3000 }}
+        camera={{ position:[0,0,1300], fov:60, near:1, far:3000 }}
         style={{ position:'absolute', inset:0, zIndex:2 }}
         gl={{ antialias:true, alpha:true, toneMapping:THREE.ACESFilmicToneMapping, toneMappingExposure:1.1 }}
         dpr={[1, 1.5]}
@@ -1784,7 +1716,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       </button>
 
       <p style={{ position:'fixed', bottom:'5%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.25em', color:'rgba(255,255,255,0.10)', textTransform:'uppercase', margin:0, whiteSpace:'nowrap' }}>
-        Scroll to traverse · Click focused orb to enter
+        Scroll · Pinch · Drag to explore · Click an orb to enter
       </p>
 
       <div style={{ position:'fixed', bottom:'12%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', textAlign:'center' }}>
@@ -1800,7 +1732,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       </div>
 
       {showPanel && panelGateway && (
-        <GlassPanel gateway={panelGateway} onClose={handleClose} onBack={handleClose} onEnter={handleEnter} side={panelSide} />
+        <GlassPanel gateway={panelGateway} onClose={handleClose} onEnter={handleEnter} side={panelSide} />
       )}
       {showComingSoon && (
         <ComingSoonPanel onClose={() => setShowComingSoon(false)} />
