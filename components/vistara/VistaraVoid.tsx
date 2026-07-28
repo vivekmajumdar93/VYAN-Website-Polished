@@ -147,6 +147,18 @@ function nearestTarget(current: number, raw: number): number {
   return current + d
 }
 
+// Returns true when el (or an ancestor) can scroll vertically — used to let the
+// wheel event reach a panel's scroll container instead of triggering traverse.
+function isInsideScrollable(target: EventTarget | null): boolean {
+  let el = target as HTMLElement | null
+  while (el && el !== document.documentElement) {
+    const oy = window.getComputedStyle(el).overflowY
+    if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return true
+    el = el.parentElement
+  }
+  return false
+}
+
 // ─── shard generation ─────────────────────────────────────────────────────────
 const PANEL_W = 440
 const PANEL_H = 360
@@ -1522,10 +1534,12 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       setFocusedIdx(prev => { const next=(prev+dir+8)%8; triggerTraverse(next); return next })
     }
     // Capture phase — fires before OrbitControls sees the event on the canvas.
-    // Ctrl/Cmd+scroll and trackpad pinch (ctrlKey=true) pass through untouched → OrbitControls zooms.
-    // Plain scroll is consumed here for traverse so OrbitControls never zooms on it.
+    // Ctrl/Cmd+scroll and trackpad pinch (ctrlKey=true) → pass through to OrbitControls zoom.
+    // Wheel inside a scrollable panel (e.g. version history) → pass through so the panel scrolls.
+    // Plain scroll elsewhere → consumed here for traverse.
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) return
+      if (isInsideScrollable(e.target)) return
       e.stopPropagation()
       if (Math.abs(e.deltaY) > 5) go(e.deltaY > 0 ? 1 : -1)
     }
