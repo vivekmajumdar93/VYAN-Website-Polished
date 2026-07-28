@@ -1059,7 +1059,7 @@ function GyroScene({
 
   return (
     <>
-      <OrbitControls enableDamping dampingFactor={0.08} enableZoom={false} enablePan={false} />
+      <OrbitControls enableDamping dampingFactor={0.08} enablePan={false} minDistance={220} maxDistance={1400} />
       <ambientLight intensity={0.04} />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
@@ -1521,15 +1521,22 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       cooldown = true; setTimeout(() => { cooldown = false }, 700)
       setFocusedIdx(prev => { const next=(prev+dir+8)%8; triggerTraverse(next); return next })
     }
-    const onWheel      = (e: WheelEvent)    => { if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
+    // Capture phase — fires before OrbitControls sees the event on the canvas.
+    // Ctrl/Cmd+scroll and trackpad pinch (ctrlKey=true) pass through untouched → OrbitControls zooms.
+    // Plain scroll is consumed here for traverse so OrbitControls never zooms on it.
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return
+      e.stopPropagation()
+      if (Math.abs(e.deltaY) > 5) go(e.deltaY > 0 ? 1 : -1)
+    }
     let tx = 0
-    const onTouchStart = (e: TouchEvent)    => { tx = e.touches[0].clientX }
+    const onTouchStart = (e: TouchEvent)    => { if (e.touches.length === 1) tx = e.touches[0].clientX }
     const onTouchEnd   = (e: TouchEvent)    => { const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
-    window.addEventListener('wheel',      onWheel,      { passive:true })
+    window.addEventListener('wheel',      onWheel,      { capture:true, passive:false })
     window.addEventListener('touchstart', onTouchStart, { passive:true })
     window.addEventListener('touchend',   onTouchEnd,   { passive:true })
     return () => {
-      window.removeEventListener('wheel',      onWheel)
+      window.removeEventListener('wheel',      onWheel,      { capture:true })
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchend',   onTouchEnd)
     }
@@ -1737,7 +1744,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       </button>
 
       <p style={{ position:'fixed', bottom:'5%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.25em', color:'rgba(255,255,255,0.10)', textTransform:'uppercase', margin:0, whiteSpace:'nowrap' }}>
-        Scroll to traverse · Drag to rotate · Click an orb to enter
+        Scroll to traverse · Pinch to zoom · Drag to rotate · Click an orb to enter
       </p>
 
       <div style={{ position:'fixed', bottom:'12%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', textAlign:'center' }}>
