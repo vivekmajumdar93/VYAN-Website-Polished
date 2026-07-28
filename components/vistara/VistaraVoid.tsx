@@ -1059,7 +1059,7 @@ function GyroScene({
 
   return (
     <>
-      <OrbitControls enableDamping dampingFactor={0.08} />
+      <OrbitControls enableDamping dampingFactor={0.08} enableZoom={false} enablePan={false} />
       <ambientLight intensity={0.04} />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
@@ -1514,6 +1514,27 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   }, [])
 
 
+  useEffect(() => {
+    let cooldown = false
+    const go = (dir: 1 | -1) => {
+      if (cooldown || vortexPhase !== 'idle') return
+      cooldown = true; setTimeout(() => { cooldown = false }, 700)
+      setFocusedIdx(prev => { const next=(prev+dir+8)%8; triggerTraverse(next); return next })
+    }
+    const onWheel      = (e: WheelEvent)    => { if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
+    let tx = 0
+    const onTouchStart = (e: TouchEvent)    => { tx = e.touches[0].clientX }
+    const onTouchEnd   = (e: TouchEvent)    => { const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
+    window.addEventListener('wheel',      onWheel,      { passive:true })
+    window.addEventListener('touchstart', onTouchStart, { passive:true })
+    window.addEventListener('touchend',   onTouchEnd,   { passive:true })
+    return () => {
+      window.removeEventListener('wheel',      onWheel)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, [vortexPhase, triggerTraverse])
+
   const handleOrbClick = useCallback((idx: number, id: string) => {
     if (vortexPhase !== 'idle') return
     if (idx !== focusedIdx) { triggerTraverse(idx); setFocusedIdx(idx); return }
@@ -1637,7 +1658,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 
       {/* Canvas — transparent so background nebula shows through */}
       <Canvas
-        camera={{ position:[0,0,1300], fov:60, near:1, far:3000 }}
+        camera={{ position:[0,0,550], fov:60, near:1, far:3000 }}
         style={{ position:'absolute', inset:0, zIndex:2 }}
         gl={{ antialias:true, alpha:true, toneMapping:THREE.ACESFilmicToneMapping, toneMappingExposure:1.1 }}
         dpr={[1, 1.5]}
@@ -1716,7 +1737,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       </button>
 
       <p style={{ position:'fixed', bottom:'5%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.25em', color:'rgba(255,255,255,0.10)', textTransform:'uppercase', margin:0, whiteSpace:'nowrap' }}>
-        Scroll · Pinch · Drag to explore · Click an orb to enter
+        Scroll to traverse · Drag to rotate · Click an orb to enter
       </p>
 
       <div style={{ position:'fixed', bottom:'12%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', textAlign:'center' }}>
