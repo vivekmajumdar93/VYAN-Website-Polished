@@ -635,7 +635,7 @@ function VistaraOrb({
   const nanoOrb = useMemo(() => {
     const inst = new NanoOrb({
       id: gateway.id, title: gateway.name, subtitle: gateway.tagline,
-      description: gateway.description, colorA: '#0033ff', colorB: '#0077ff',
+      description: gateway.description, colorA: '#0014ff', colorB: '#5600ff',
     })
     inst.setVisible(true)
     return inst
@@ -745,6 +745,289 @@ function VistaraOrb({
       </Html>}
     </group>
   )
+}
+
+// ─── neural links ─────────────────────────────────────────────────────────────
+const NL_LINKS = [
+  {a:0,b:1},{a:1,b:2},{a:2,b:3},{a:3,b:4},{a:4,b:5},{a:5,b:6},{a:6,b:7},{a:7,b:0},
+  {a:0,b:3},{a:0,b:5},{a:1,b:4},{a:2,b:6},
+]
+const NL_NF  = 28   // gossamer fibers per link
+const NL_NE  = 8    // electric fibers per link
+const NL_SEG = 32   // bezier subdivision steps
+const NL_SPREAD = Math.PI * 65 / 180  // ±65° angular spread
+
+// NanoOrb palette: t=0 → #0014ff, t=1 → #5600ff
+function nlElecColor(t: number): THREE.Color {
+  return new THREE.Color(
+    Math.round(t * 86)  / 255,
+    Math.round(20 - t * 20) / 255,
+    1,
+  )
+}
+
+// Orthogonal unit vector to dir (in XZ plane or XY if dir is vertical)
+function perpVec(dir: THREE.Vector3): THREE.Vector3 {
+  const up = Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(1,0,0)
+  return new THREE.Vector3().crossVectors(dir, up).normalize()
+}
+
+interface OrbNeuralLinksProps {
+  worldPosRef: React.MutableRefObject<Record<number, THREE.Vector3>>
+  focusedIdx: number
+}
+
+function OrbNeuralLinks({ worldPosRef, focusedIdx }: OrbNeuralLinksProps) {
+  // ── geometry refs (rebuilt when orb positions stabilise) ──────────────────
+  const gossGeoRef  = useRef<THREE.BufferGeometry[]>([])
+  const elecGeoRef  = useRef<THREE.BufferGeometry[]>([])
+  const pulseGeoRef = useRef<THREE.BufferGeometry[]>([])
+  const gossMatRef  = useRef<THREE.LineBasicMaterial[]>([])
+  const elecMatRef  = useRef<THREE.LineBasicMaterial[]>([])
+  const pulseMatRef = useRef<THREE.PointsMaterial[]>([])
+  const groupRef    = useRef<THREE.Group>(null)
+
+  // ── activation state ──────────────────────────────────────────────────────
+  const actRef    = useRef<number[]>(NL_LINKS.map(() => 0))   // 0..1 activity level
+  const pulseRef  = useRef<{ t: number; link: number }[]>([]) // travelling pulses
+  const lastCycle = useRef(0)
+  const initDone  = useRef(false)
+  const rng       = useRef(0.618)  // deterministic pseudo-random state
+
+  function prng() {
+    rng.current = (rng.current * 1.618033 + 0.314159) % 1
+    return rng.current
+  }
+
+  // Build bezier curves for one link given two world positions
+  function buildCurves(pA: THREE.Vector3, pB: THREE.Vector3) {
+    const dir   = new THREE.Vector3().subVectors(pB, pA).normalize()
+    const len   = pA.distanceTo(pB)
+    const perp  = perpVec(dir)
+    const perp2 = new THREE.Vector3().crossVectors(dir, perp).normalize()
+
+    const gossPoints: THREE.Vector3[][] = []
+    const elecPoints: THREE.Vector3[][] = []
+
+    for (let f = 0; f < NL_NF; f++) {
+      const ang1 = (prng() - 0.5) * 2 * NL_SPREAD
+      const ang2 = (prng() - 0.5) * 2 * NL_SPREAD
+      const r1   = (prng() * 0.5 + 0.5) * len * 0.42
+      const r2   = (prng() * 0.5 + 0.5) * len * 0.42
+      const ax1  = Math.cos(ang1) * perp.x + Math.sin(ang1) * perp2.x
+      const ay1  = Math.cos(ang1) * perp.y + Math.sin(ang1) * perp2.y
+      const az1  = Math.cos(ang1) * perp.z + Math.sin(ang1) * perp2.z
+      const ax2  = Math.cos(ang2) * perp.x - Math.sin(ang2) * perp2.x
+      const ay2  = Math.cos(ang2) * perp.y - Math.sin(ang2) * perp2.y
+      const az2  = Math.cos(ang2) * perp.z - Math.sin(ang2) * perp2.z
+      const c1   = new THREE.Vector3(
+        pA.x + dir.x * len * 0.3 + ax1 * r1,
+        pA.y + dir.y * len * 0.3 + ay1 * r1,
+        pA.z + dir.z * len * 0.3 + az1 * r1,
+      )
+      const c2   = new THREE.Vector3(
+        pB.x - dir.x * len * 0.3 + ax2 * r2,
+        pB.y - dir.y * len * 0.3 + ay2 * r2,
+        pB.z - dir.z * len * 0.3 + az2 * r2,
+      )
+      const curve = new THREE.CubicBezierCurve3(pA, c1, c2, pB)
+      gossPoints.push(curve.getPoints(NL_SEG))
+    }
+
+    for (let e = 0; e < NL_NE; e++) {
+      const ang1 = (prng() - 0.5) * 2 * (NL_SPREAD * 0.45)
+      const ang2 = (prng() - 0.5) * 2 * (NL_SPREAD * 0.45)
+      const r1   = (prng() * 0.3 + 0.2) * len * 0.38
+      const r2   = (prng() * 0.3 + 0.2) * len * 0.38
+      const ax1  = Math.cos(ang1) * perp.x + Math.sin(ang1) * perp2.x
+      const ay1  = Math.cos(ang1) * perp.y + Math.sin(ang1) * perp2.y
+      const az1  = Math.cos(ang1) * perp.z + Math.sin(ang1) * perp2.z
+      const ax2  = Math.cos(ang2) * perp.x - Math.sin(ang2) * perp2.x
+      const ay2  = Math.cos(ang2) * perp.y - Math.sin(ang2) * perp2.y
+      const az2  = Math.cos(ang2) * perp.z - Math.sin(ang2) * perp2.z
+      const c1   = new THREE.Vector3(
+        pA.x + dir.x * len * 0.28 + ax1 * r1,
+        pA.y + dir.y * len * 0.28 + ay1 * r1,
+        pA.z + dir.z * len * 0.28 + az1 * r1,
+      )
+      const c2   = new THREE.Vector3(
+        pB.x - dir.x * len * 0.28 + ax2 * r2,
+        pB.y - dir.y * len * 0.28 + ay2 * r2,
+        pB.z - dir.z * len * 0.28 + az2 * r2,
+      )
+      const curve = new THREE.CubicBezierCurve3(pA, c1, c2, pB)
+      elecPoints.push(curve.getPoints(NL_SEG))
+    }
+
+    return { gossPoints, elecPoints }
+  }
+
+  // Flatten polyline array to Float32Array for BufferGeometry
+  function linesToBuffer(lines: THREE.Vector3[][]): Float32Array {
+    const segs = NL_SEG  // NL_SEG+1 points = NL_SEG segments, each needs 2 verts
+    const buf = new Float32Array(lines.length * segs * 6)
+    let i = 0
+    for (const pts of lines) {
+      for (let s = 0; s < segs; s++) {
+        buf[i++] = pts[s].x;   buf[i++] = pts[s].y;   buf[i++] = pts[s].z
+        buf[i++] = pts[s+1].x; buf[i++] = pts[s+1].y; buf[i++] = pts[s+1].z
+      }
+    }
+    return buf
+  }
+
+  // Build (or rebuild) all geometries from current world positions
+  function buildGeometries() {
+    const pos = worldPosRef.current
+    if (Object.keys(pos).length < 8) return
+
+    // Dispose old
+    gossGeoRef.current.forEach(g => g.dispose())
+    elecGeoRef.current.forEach(g => g.dispose())
+    pulseGeoRef.current.forEach(g => g.dispose())
+    gossMatRef.current.forEach(m => m.dispose())
+    elecMatRef.current.forEach(m => m.dispose())
+    pulseMatRef.current.forEach(m => m.dispose())
+
+    gossGeoRef.current  = []
+    elecGeoRef.current  = []
+    pulseGeoRef.current = []
+    gossMatRef.current  = []
+    elecMatRef.current  = []
+    pulseMatRef.current = []
+
+    // Rebuild scene graph inside group
+    if (!groupRef.current) return
+    while (groupRef.current.children.length > 0) {
+      groupRef.current.remove(groupRef.current.children[0])
+    }
+
+    for (let li = 0; li < NL_LINKS.length; li++) {
+      const { a, b } = NL_LINKS[li]
+      const pA = pos[a]?.clone()
+      const pB = pos[b]?.clone()
+      if (!pA || !pB) continue
+
+      const { gossPoints, elecPoints } = buildCurves(pA, pB)
+
+      // Gossamer geometry
+      const gGeo = new THREE.BufferGeometry()
+      gGeo.setAttribute('position', new THREE.BufferAttribute(linesToBuffer(gossPoints), 3))
+      const gMat = new THREE.LineBasicMaterial({
+        color: 0xb4c8ff, transparent: true, opacity: 0.055,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      })
+      const gLines = new THREE.LineSegments(gGeo, gMat)
+      groupRef.current.add(gLines)
+      gossGeoRef.current.push(gGeo)
+      gossMatRef.current.push(gMat)
+
+      // Electric geometry — NanoOrb palette
+      const eGeo = new THREE.BufferGeometry()
+      eGeo.setAttribute('position', new THREE.BufferAttribute(linesToBuffer(elecPoints), 3))
+      const eMat = new THREE.LineBasicMaterial({
+        color: nlElecColor(li / NL_LINKS.length),
+        transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      })
+      const eLines = new THREE.LineSegments(eGeo, eMat)
+      groupRef.current.add(eLines)
+      elecGeoRef.current.push(eGeo)
+      elecMatRef.current.push(eMat)
+
+      // Pulse particles (one moving dot per link, hidden when inactive)
+      const pGeo = new THREE.BufferGeometry()
+      pGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3))
+      const pMat = new THREE.PointsMaterial({
+        color: nlElecColor(li / NL_LINKS.length),
+        size: 5, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+        sizeAttenuation: true,
+      })
+      const pts = new THREE.Points(pGeo, pMat)
+      groupRef.current.add(pts)
+      pulseGeoRef.current.push(pGeo)
+      pulseMatRef.current.push(pMat)
+    }
+
+    initDone.current = true
+  }
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+
+    // One-time build once all 8 orb positions are populated
+    if (!initDone.current) {
+      if (Object.keys(worldPosRef.current).length >= 8) buildGeometries()
+      return
+    }
+
+    // Active link cycling every 6–9 s
+    if (t - lastCycle.current > 6 + prng() * 3) {
+      lastCycle.current = t
+      // Decay all
+      for (let i = 0; i < actRef.current.length; i++) actRef.current[i] *= 0.3
+      // Activate 2-4 random links
+      const n = 2 + Math.floor(prng() * 3)
+      const shuffled = [...Array(NL_LINKS.length).keys()].sort(() => prng() - 0.5)
+      for (let i = 0; i < n; i++) actRef.current[shuffled[i]] = 0.6 + prng() * 0.4
+      // Force-activate links touching the focused orb
+      NL_LINKS.forEach(({ a, b }, li) => {
+        if (a === focusedIdx || b === focusedIdx) actRef.current[li] = Math.max(actRef.current[li], 0.80)
+      })
+      // Spawn pulses on active links
+      NL_LINKS.forEach((_, li) => {
+        if (actRef.current[li] > 0.3) pulseRef.current.push({ t: t + prng() * 2, link: li })
+      })
+    }
+
+    // Always force-activate focused orb links
+    NL_LINKS.forEach(({ a, b }, li) => {
+      if (a === focusedIdx || b === focusedIdx) {
+        actRef.current[li] = Math.max(actRef.current[li], 0.55)
+      }
+    })
+
+    // Update material opacities
+    for (let li = 0; li < NL_LINKS.length; li++) {
+      const act = actRef.current[li]
+      if (gossMatRef.current[li]) {
+        gossMatRef.current[li].opacity = 0.03 + act * 0.09
+      }
+      if (elecMatRef.current[li]) {
+        elecMatRef.current[li].opacity = act * 0.72
+      }
+    }
+
+    // Animate pulse particles
+    const pos = worldPosRef.current
+    const alive: typeof pulseRef.current = []
+    for (const p of pulseRef.current) {
+      const elapsed = t - p.t
+      if (elapsed < 0) { alive.push(p); continue }
+      const duration = 1.6 + prng() * 0.8
+      if (elapsed > duration) continue
+      alive.push(p)
+      const frac = elapsed / duration
+      const { a, b } = NL_LINKS[p.link]
+      const pA = pos[a]; const pB = pos[b]
+      if (!pA || !pB) continue
+      const geo = pulseGeoRef.current[p.link]
+      const mat = pulseMatRef.current[p.link]
+      if (!geo || !mat) continue
+      const px = pA.x + (pB.x - pA.x) * frac
+      const py = pA.y + (pB.y - pA.y) * frac
+      const pz = pA.z + (pB.z - pA.z) * frac
+      const posArr = (geo.attributes.position as THREE.BufferAttribute).array as Float32Array
+      posArr[0] = px; posArr[1] = py; posArr[2] = pz
+      geo.attributes.position.needsUpdate = true
+      const fade = Math.sin(frac * Math.PI)
+      mat.opacity = actRef.current[p.link] * fade * 0.9
+    }
+    pulseRef.current = alive
+  })
+
+  return <group ref={groupRef} />
 }
 
 // ─── gyroscope scene ─────────────────────────────────────────────────────────
@@ -1017,6 +1300,7 @@ function GyroScene({
       </group>
 
       <ScreenTracker worldRef={worldPosRef} screenRef={screenPosRef} />
+      <OrbNeuralLinks worldPosRef={worldPosRef} focusedIdx={focusedIdx} />
     </>
   )
 }

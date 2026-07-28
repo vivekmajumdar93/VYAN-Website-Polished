@@ -15,6 +15,23 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '1.6',
+    date: '2026-07-28',
+    title: 'Vistara — Neural Link Fiber Bundles',
+    summary: 'Organic gossamer + electric fiber bundles connect the 8 orbs in 3D space, with animated pulse particles and active-link cycling.',
+    changes: [
+      'OrbNeuralLinks R3F component: 12 links across all 8 orbs (ring chain + hub spokes)',
+      '28 gossamer fibers per link — cubic bezier S-curves, ±65° angular spread, additive blending',
+      '8 electric fibers per link — NanoOrb deep blue→dark purple palette, high opacity on activation',
+      'Active link cycling: 2-4 random links fire every 6-9 s; focused orb links forced to 0.80',
+      'Pulse particles travel along each active link with sin-bell fade',
+      'NanoOrb color palette updated: deep blue #0014ff → dark purple #5600ff',
+      'Geometry built lazily once all 8 orb world positions are populated',
+    ],
+    gitHash: '0000000',
+    pages: ['Vistara'],
+  },
+  {
     version: '1.5',
     date: '2026-07-21',
     title: 'Vistara — Stardust Meteors, Sound Icon & Universal Footer',
@@ -142,4 +159,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '1.5'
+export const CURRENT_VERSION = '1.6'
