@@ -83,8 +83,8 @@ const SATURN_VERT = `
     vAlpha = clamp(density * (0.48 + abs(uTilt) * 1.8), 0.0, 1.0);
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
-    // Larger min clamp so particles don't shrink to nothing at distance
-    gl_PointSize = clamp(aSize * (580.0 / dist), aSize * 1.1, aSize * 3.0);
+    // Fine dust — stays tiny at all distances
+    gl_PointSize = clamp(aSize * (320.0 / dist), aSize * 0.5, aSize * 1.5);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -128,7 +128,7 @@ function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
     pos[i*3]   = r * Math.cos(angle)
     pos[i*3+1] = r * Math.sin(angle)
     pos[i*3+2] = (Math.random() - 0.5) * 4
-    sz[i]      = 2.2 + Math.random() * 4.8   // 2.2–7px (was 1.5–5)
+    sz[i]      = 0.55 + Math.random() * 1.10  // 0.55–1.65px fine dust
     ph[i]      = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -755,15 +755,13 @@ const NL_LINKS = [
 ]
 const NL_NF     = 24   // gossamer fibers per link
 const NL_NE     = 7    // electric fibers per link
-const NL_SEG    = 22   // bezier subdivision steps
+const NL_SEG    = 22   // path subdivision steps
 const NL_SPREAD = Math.PI * 65 / 180
 
-// NanoOrb palette: t=0 → #0014ff, t=1 → #5600ff
 function nlElecColor(t: number): THREE.Color {
   return new THREE.Color(Math.round(t*86)/255, Math.round(20-t*20)/255, 1)
 }
 
-// Pre-seed fiber shape params once at module load (no per-frame allocation)
 type FParams = { a1: number; a2: number; r1: number; r2: number }
 const NL_GOSS_PARAMS: FParams[][] = NL_LINKS.map(() =>
   Array.from({ length: NL_NF }, () => ({
@@ -782,7 +780,6 @@ const NL_ELEC_PARAMS: FParams[][] = NL_LINKS.map(() =>
   }))
 )
 
-// Write one cubic bezier as line-segment pairs into a Float32Array (zero allocation)
 function fillBezier(
   arr: Float32Array, off: number, nSeg: number,
   p0x:number, p0y:number, p0z:number,
@@ -804,6 +801,63 @@ function fillBezier(
   }
 }
 
+// ── Per-link lifecycle — each link animates independently ────────────────────
+interface LinkCycle {
+  birthT: number        // clock time this instance was born
+  drawDur: number       // seconds to grow from pA → pB
+  holdDur: number       // seconds at peak brightness
+  fadeDur: number       // seconds to dissolve
+  isWave: boolean       // sinusoidal path instead of bezier fan
+  waveFreq: number      // # of oscillations along the link
+  waveAmpFrac: number   // wave amplitude as fraction of link length
+  nextBirth: number     // clock time to spawn the next instance
+}
+
+function makeLinkCycle(li: number): LinkCycle {
+  const isQuick = Math.random() < 0.38  // 38% flash on instantly
+  return {
+    birthT: -999,
+    drawDur: isQuick ? 0.04 + Math.random() * 0.12 : 0.28 + Math.random() * 0.44,
+    holdDur: 0.50 + Math.random() * 1.90,
+    fadeDur: 0.32 + Math.random() * 0.60,
+    isWave: Math.random() < 0.35,
+    waveFreq: 2 + Math.floor(Math.random() * 3),
+    waveAmpFrac: 0.04 + Math.random() * 0.10,
+    nextBirth: 0.8 + li * 0.48 + Math.random() * 0.7,
+  }
+}
+
+// Cinematic opacity: ramp-in → dim-bright-dim breathe → fade-out with flicker
+function linkAlpha(cycle: LinkCycle, t: number, li: number): number {
+  const el = t - cycle.birthT
+  if (el < 0) return 0
+  const { drawDur, holdDur, fadeDur } = cycle
+  if (el < drawDur) {
+    const p = el / drawDur
+    return (1 - Math.pow(1 - p, 1.7)) * (0.82 + 0.18 * Math.sin(t * 26 + li * 2.1))
+  }
+  const holdEl = el - drawDur
+  if (holdEl < holdDur) {
+    const st = holdEl / holdDur
+    const breathe = 0.58 + 0.42 * Math.sin(st * Math.PI)          // dim → bright → dim arc
+    const flutter = 0.80 + 0.20 * Math.sin(t * 6.8 + li * 2.4) * Math.sin(t * 13.9 + li * 5.2)
+    return breathe * flutter
+  }
+  const fadeEl = el - drawDur - holdDur
+  if (fadeEl >= fadeDur) return 0
+  const p = 1 - fadeEl / fadeDur
+  return Math.max(0, p * p) * (0.52 + 0.48 * Math.sin(t * 9.1 + li * 3.7))
+}
+
+// Draw progress 0→1: fraction of the A→B path that's currently visible
+function linkDrawProg(cycle: LinkCycle, t: number): number {
+  const el = t - cycle.birthT
+  if (el <= 0) return 0
+  if (el >= cycle.drawDur) return 1
+  const p = el / cycle.drawDur
+  return 1 - Math.pow(1 - p, 2.5)  // ease-out: fast at source, slows at target
+}
+
 interface OrbNeuralLinksProps {
   worldPosRef: React.MutableRefObject<Record<number, THREE.Vector3>>
   focusedIdx: number
@@ -819,28 +873,21 @@ function OrbNeuralLinks({ worldPosRef, focusedIdx }: OrbNeuralLinksProps) {
   const pulseMatRef = useRef<THREE.PointsMaterial[]>([])
   const geoReady    = useRef(false)
   const frameIdx    = useRef(0)
-  const actRef      = useRef<number[]>(NL_LINKS.map(()=>0))
-  const pulseList   = useRef<{t:number;link:number}[]>([])
-  const lastCycle   = useRef(0)
-  const rngState    = useRef(0.7182818)
-  // scratch vectors reused across frames — no per-frame allocation
+  const cycleRef    = useRef<LinkCycle[]>([])
   const _dir  = useRef(new THREE.Vector3())
   const _perp = useRef(new THREE.Vector3())
   const _pr2  = useRef(new THREE.Vector3())
   const _tmp  = useRef(new THREE.Vector3())
-
-  function rng() { rngState.current=(rngState.current*1.6180339+0.5772156)%1; return rngState.current }
 
   function initGeo() {
     if (!groupRef.current) return
     while (groupRef.current.children.length) groupRef.current.remove(groupRef.current.children[0])
     gossGeoRef.current=[]; elecGeoRef.current=[]; pulseGeoRef.current=[]
     gossMatRef.current=[]; elecMatRef.current=[]; pulseMatRef.current=[]
-
     for (let li=0; li<NL_LINKS.length; li++) {
       const gGeo = new THREE.BufferGeometry()
       gGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NL_NF*NL_SEG*6), 3))
-      const gMat = new THREE.LineBasicMaterial({ color:0xb4c8ff, transparent:true, opacity:0.025, blending:THREE.AdditiveBlending, depthWrite:false })
+      const gMat = new THREE.LineBasicMaterial({ color:0xb4c8ff, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false })
       groupRef.current.add(new THREE.LineSegments(gGeo, gMat))
       gossGeoRef.current.push(gGeo); gossMatRef.current.push(gMat)
 
@@ -852,63 +899,130 @@ function OrbNeuralLinks({ worldPosRef, focusedIdx }: OrbNeuralLinksProps) {
 
       const pGeo = new THREE.BufferGeometry()
       pGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3))
-      const pMat = new THREE.PointsMaterial({ color:nlElecColor(li/NL_LINKS.length), size:7, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true })
+      const pMat = new THREE.PointsMaterial({ color:nlElecColor(li/NL_LINKS.length), size:5, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true })
       groupRef.current.add(new THREE.Points(pGeo, pMat))
       pulseGeoRef.current.push(pGeo); pulseMatRef.current.push(pMat)
     }
     geoReady.current = true
   }
 
-  // Update all link vertex positions from current orb world positions (zero allocation)
-  function updatePositions(pos: Record<number, THREE.Vector3>) {
+  // Writes geometry for all links, clamping invisible segments to the draw tip
+  function updatePositions(
+    pos: Record<number, THREE.Vector3>,
+    drawProgs: number[],
+    cycles: LinkCycle[],
+  ) {
     const dir=_dir.current, perp=_perp.current, pr2=_pr2.current, tmp=_tmp.current
     for (let li=0; li<NL_LINKS.length; li++) {
       const {a,b}=NL_LINKS[li]
       const pA=pos[a], pB=pos[b]; if (!pA||!pB) continue
-      dir.subVectors(pB,pA).normalize()
-      const len=pA.distanceTo(pB)
+      dir.subVectors(pB,pA)
+      const len=dir.length(); dir.normalize()
       if (Math.abs(dir.y)<0.9) tmp.set(0,1,0); else tmp.set(1,0,0)
       perp.crossVectors(dir,tmp).normalize()
       pr2.crossVectors(dir,perp).normalize()
 
-      // Gossamer
+      const dp = drawProgs[li]
+      const visSeg = Math.min(Math.floor(dp * NL_SEG), NL_SEG)
+      // Collapse point — invisible segments degenerate here (no rendering artifact)
+      const ef = visSeg / NL_SEG
+      const epx=pA.x+(pB.x-pA.x)*ef, epy=pA.y+(pB.y-pA.y)*ef, epz=pA.z+(pB.z-pA.z)*ef
+
+      const cycle = cycles[li]
+      const isWave = cycle.isWave
+      const waveAmp = Math.min(cycle.waveAmpFrac * len, 18)  // cap at 18 world units
+      const waveFreq = cycle.waveFreq
+
+      // ── Gossamer fibers ────────────────────────────────────────────────────
       const gArr=(gossGeoRef.current[li].attributes.position as THREE.BufferAttribute).array as Float32Array
-      let gi=0
       for (let f=0; f<NL_NF; f++) {
-        const {a1,a2,r1,r2}=NL_GOSS_PARAMS[li][f]
-        const ar1=r1*len*0.42, ar2=r2*len*0.42
-        const ca1=Math.cos(a1),sa1=Math.sin(a1),ca2=Math.cos(a2),sa2=Math.sin(a2)
-        fillBezier(gArr,gi,NL_SEG,
-          pA.x,pA.y,pA.z,
-          pA.x+dir.x*len*0.3+(ca1*perp.x+sa1*pr2.x)*ar1,
-          pA.y+dir.y*len*0.3+(ca1*perp.y+sa1*pr2.y)*ar1,
-          pA.z+dir.z*len*0.3+(ca1*perp.z+sa1*pr2.z)*ar1,
-          pB.x-dir.x*len*0.3+(ca2*perp.x-sa2*pr2.x)*ar2,
-          pB.y-dir.y*len*0.3+(ca2*perp.y-sa2*pr2.y)*ar2,
-          pB.z-dir.z*len*0.3+(ca2*perp.z-sa2*pr2.z)*ar2,
-          pB.x,pB.y,pB.z)
-        gi+=NL_SEG*6
+        const fOff = f * NL_SEG * 6
+        if (isWave) {
+          // Sinusoidal wave path — fibers spread thin across perpendicular axis
+          const spread = (f/NL_NF - 0.5) * len * 0.020
+          let px=pA.x, py=pA.y, pz=pA.z
+          for (let s=1; s<=NL_SEG; s++) {
+            const tt=s/NL_SEG
+            const wave=Math.sin(tt*waveFreq*Math.PI*2)*waveAmp
+            const nx=pA.x+(pB.x-pA.x)*tt+perp.x*wave+pr2.x*spread
+            const ny=pA.y+(pB.y-pA.y)*tt+perp.y*wave+pr2.y*spread
+            const nz=pA.z+(pB.z-pA.z)*tt+perp.z*wave+pr2.z*spread
+            const base=fOff+(s-1)*6
+            if (s<=visSeg) {
+              gArr[base]=px; gArr[base+1]=py; gArr[base+2]=pz
+              gArr[base+3]=nx; gArr[base+4]=ny; gArr[base+5]=nz
+            } else {
+              gArr[base]=epx; gArr[base+1]=epy; gArr[base+2]=epz
+              gArr[base+3]=epx; gArr[base+4]=epy; gArr[base+5]=epz
+            }
+            px=nx; py=ny; pz=nz
+          }
+        } else {
+          // Bezier fan — existing path, then clamp invisible segs to tip
+          const {a1,a2,r1,r2}=NL_GOSS_PARAMS[li][f]
+          const ar1=r1*len*0.42, ar2=r2*len*0.42
+          const ca1=Math.cos(a1),sa1=Math.sin(a1),ca2=Math.cos(a2),sa2=Math.sin(a2)
+          fillBezier(gArr,fOff,NL_SEG,
+            pA.x,pA.y,pA.z,
+            pA.x+dir.x*len*0.3+(ca1*perp.x+sa1*pr2.x)*ar1,
+            pA.y+dir.y*len*0.3+(ca1*perp.y+sa1*pr2.y)*ar1,
+            pA.z+dir.z*len*0.3+(ca1*perp.z+sa1*pr2.z)*ar1,
+            pB.x-dir.x*len*0.3+(ca2*perp.x-sa2*pr2.x)*ar2,
+            pB.y-dir.y*len*0.3+(ca2*perp.y-sa2*pr2.y)*ar2,
+            pB.z-dir.z*len*0.3+(ca2*perp.z-sa2*pr2.z)*ar2,
+            pB.x,pB.y,pB.z)
+          for (let s=visSeg; s<NL_SEG; s++) {
+            const base=fOff+s*6
+            gArr[base]=epx; gArr[base+1]=epy; gArr[base+2]=epz
+            gArr[base+3]=epx; gArr[base+4]=epy; gArr[base+5]=epz
+          }
+        }
       }
       gossGeoRef.current[li].attributes.position.needsUpdate=true
       gossGeoRef.current[li].computeBoundingSphere()
 
-      // Electric
+      // ── Electric fibers ────────────────────────────────────────────────────
       const eArr=(elecGeoRef.current[li].attributes.position as THREE.BufferAttribute).array as Float32Array
-      let ei=0
       for (let f=0; f<NL_NE; f++) {
-        const {a1,a2,r1,r2}=NL_ELEC_PARAMS[li][f]
-        const ar1=r1*len*0.38, ar2=r2*len*0.38
-        const ca1=Math.cos(a1),sa1=Math.sin(a1),ca2=Math.cos(a2),sa2=Math.sin(a2)
-        fillBezier(eArr,ei,NL_SEG,
-          pA.x,pA.y,pA.z,
-          pA.x+dir.x*len*0.28+(ca1*perp.x+sa1*pr2.x)*ar1,
-          pA.y+dir.y*len*0.28+(ca1*perp.y+sa1*pr2.y)*ar1,
-          pA.z+dir.z*len*0.28+(ca1*perp.z+sa1*pr2.z)*ar1,
-          pB.x-dir.x*len*0.28+(ca2*perp.x-sa2*pr2.x)*ar2,
-          pB.y-dir.y*len*0.28+(ca2*perp.y-sa2*pr2.y)*ar2,
-          pB.z-dir.z*len*0.28+(ca2*perp.z-sa2*pr2.z)*ar2,
-          pB.x,pB.y,pB.z)
-        ei+=NL_SEG*6
+        const fOff = f * NL_SEG * 6
+        if (isWave) {
+          const spread = (f/NL_NE - 0.5) * len * 0.006
+          let px=pA.x, py=pA.y, pz=pA.z
+          for (let s=1; s<=NL_SEG; s++) {
+            const tt=s/NL_SEG
+            const wave=Math.sin(tt*waveFreq*Math.PI*2)*waveAmp*0.40
+            const nx=pA.x+(pB.x-pA.x)*tt+perp.x*wave+pr2.x*spread
+            const ny=pA.y+(pB.y-pA.y)*tt+perp.y*wave+pr2.y*spread
+            const nz=pA.z+(pB.z-pA.z)*tt+perp.z*wave+pr2.z*spread
+            const base=fOff+(s-1)*6
+            if (s<=visSeg) {
+              eArr[base]=px; eArr[base+1]=py; eArr[base+2]=pz
+              eArr[base+3]=nx; eArr[base+4]=ny; eArr[base+5]=nz
+            } else {
+              eArr[base]=epx; eArr[base+1]=epy; eArr[base+2]=epz
+              eArr[base+3]=epx; eArr[base+4]=epy; eArr[base+5]=epz
+            }
+            px=nx; py=ny; pz=nz
+          }
+        } else {
+          const {a1,a2,r1,r2}=NL_ELEC_PARAMS[li][f]
+          const ar1=r1*len*0.38, ar2=r2*len*0.38
+          const ca1=Math.cos(a1),sa1=Math.sin(a1),ca2=Math.cos(a2),sa2=Math.sin(a2)
+          fillBezier(eArr,fOff,NL_SEG,
+            pA.x,pA.y,pA.z,
+            pA.x+dir.x*len*0.28+(ca1*perp.x+sa1*pr2.x)*ar1,
+            pA.y+dir.y*len*0.28+(ca1*perp.y+sa1*pr2.y)*ar1,
+            pA.z+dir.z*len*0.28+(ca1*perp.z+sa1*pr2.z)*ar1,
+            pB.x-dir.x*len*0.28+(ca2*perp.x-sa2*pr2.x)*ar2,
+            pB.y-dir.y*len*0.28+(ca2*perp.y-sa2*pr2.y)*ar2,
+            pB.z-dir.z*len*0.28+(ca2*perp.z-sa2*pr2.z)*ar2,
+            pB.x,pB.y,pB.z)
+          for (let s=visSeg; s<NL_SEG; s++) {
+            const base=fOff+s*6
+            eArr[base]=epx; eArr[base+1]=epy; eArr[base+2]=epz
+            eArr[base+3]=epx; eArr[base+4]=epy; eArr[base+5]=epz
+          }
+        }
       }
       elecGeoRef.current[li].attributes.position.needsUpdate=true
       elecGeoRef.current[li].computeBoundingSphere()
@@ -919,57 +1033,68 @@ function OrbNeuralLinks({ worldPosRef, focusedIdx }: OrbNeuralLinksProps) {
     const t = clock.elapsedTime
     const pos = worldPosRef.current
     if (Object.keys(pos).length < 8) return
-    // Wait until orbs are actually spread out in world space (not all at origin)
     const avgDist = Object.values(pos).reduce((s,p)=>s+p.length(),0)/8
     if (avgDist < 60) return
+    if (!geoReady.current) { initGeo(); return }
 
-    if (!geoReady.current) initGeo()
+    // Lazy-init per-link cycles after geometry is ready
+    if (cycleRef.current.length === 0) {
+      cycleRef.current = NL_LINKS.map((_, li) => makeLinkCycle(li))
+    }
 
-    // Update vertex positions every 4 frames (rings rotate slowly — minimal drift)
+    const drawProgs: number[] = []
+    let needsPos = false   // position update needed if any link is mid-draw
+
+    for (let li=0; li<NL_LINKS.length; li++) {
+      const cycle = cycleRef.current[li]
+      const el = t - cycle.birthT
+      const total = cycle.drawDur + cycle.holdDur + cycle.fadeDur
+
+      // Respawn when dead and timer has elapsed
+      if (t >= cycle.nextBirth && el >= total) {
+        cycle.birthT     = t
+        const isQuick    = Math.random() < 0.38
+        cycle.drawDur    = isQuick ? 0.04 + Math.random() * 0.12 : 0.28 + Math.random() * 0.44
+        cycle.holdDur    = 0.50 + Math.random() * 1.90
+        cycle.fadeDur    = 0.32 + Math.random() * 0.60
+        cycle.isWave     = Math.random() < 0.35
+        cycle.waveFreq   = 2 + Math.floor(Math.random() * 3)
+        cycle.waveAmpFrac= 0.04 + Math.random() * 0.10
+        cycle.nextBirth  = t + cycle.drawDur + cycle.holdDur + cycle.fadeDur + 1.5 + Math.random() * 4.5
+      }
+
+      const dp = linkDrawProg(cycle, t)
+      drawProgs.push(dp)
+      if (dp < 1.0) needsPos = true
+
+      const alpha = linkAlpha(cycle, t, li)
+      const isFocused = NL_LINKS[li].a===focusedIdx || NL_LINKS[li].b===focusedIdx
+      // Keep focused orb's links at least dimly visible while alive
+      const isAlive = cycle.birthT > 0 && el >= 0 && el < total
+      const fa = (isFocused && isAlive) ? Math.max(alpha, 0.45) : alpha
+
+      if (gossMatRef.current[li]) gossMatRef.current[li].opacity = fa * 0.10
+      if (elecMatRef.current[li]) elecMatRef.current[li].opacity = fa * 0.76
+
+      // Pulse dot: rides the draw tip during draw phase, disappears after
+      const {a: lA, b: lB} = NL_LINKS[li]
+      const pA=pos[lA], pB=pos[lB]
+      if (pA && pB && pulseGeoRef.current[li] && pulseMatRef.current[li]) {
+        const pa=(pulseGeoRef.current[li].attributes.position as THREE.BufferAttribute).array as Float32Array
+        pa[0]=pA.x+(pB.x-pA.x)*dp; pa[1]=pA.y+(pB.y-pA.y)*dp; pa[2]=pA.z+(pB.z-pA.z)*dp
+        pulseGeoRef.current[li].attributes.position.needsUpdate=true
+        const inDraw = el >= 0 && el < cycle.drawDur
+        pulseMatRef.current[li].opacity = inDraw
+          ? Math.sin((el/cycle.drawDur)*Math.PI) * fa * 0.95
+          : 0
+      }
+    }
+
+    // Positions update: always when mid-draw (dp<1), otherwise every 4 frames for ring drift
     frameIdx.current++
-    if (frameIdx.current % 4 === 0) updatePositions(pos)
-
-    // Active link cycling
-    if (t - lastCycle.current > 6+rng()*3) {
-      lastCycle.current = t
-      for (let i=0;i<actRef.current.length;i++) actRef.current[i]*=0.2
-      const n=2+Math.floor(rng()*3)
-      const idxs=[...Array(NL_LINKS.length).keys()].sort(()=>rng()-0.5)
-      for (let i=0;i<n;i++) actRef.current[idxs[i]]=0.6+rng()*0.4
-      NL_LINKS.forEach(({a,b},li)=>{
-        if (a===focusedIdx||b===focusedIdx) actRef.current[li]=Math.max(actRef.current[li],0.80)
-      })
-      NL_LINKS.forEach((_,li)=>{ if(actRef.current[li]>0.3) pulseList.current.push({t:t+rng()*2,link:li}) })
+    if (needsPos || frameIdx.current % 4 === 0) {
+      updatePositions(pos, drawProgs, cycleRef.current)
     }
-
-    // Keep focused orb's links lit
-    NL_LINKS.forEach(({a,b},li)=>{
-      if (a===focusedIdx||b===focusedIdx) actRef.current[li]=Math.max(actRef.current[li],0.50)
-    })
-
-    // Material opacities
-    for (let li=0;li<NL_LINKS.length;li++) {
-      const act=actRef.current[li]
-      if (gossMatRef.current[li]) gossMatRef.current[li].opacity=0.018+act*0.07
-      if (elecMatRef.current[li]) elecMatRef.current[li].opacity=act*0.70
-    }
-
-    // Animate pulses
-    const alive: typeof pulseList.current = []
-    for (const p of pulseList.current) {
-      const el=t-p.t; if(el<0){alive.push(p);continue}
-      const dur=1.8; if(el>dur) continue
-      alive.push(p)
-      const frac=el/dur
-      const {a,b}=NL_LINKS[p.link]
-      const pA=pos[a],pB=pos[b]; if(!pA||!pB) continue
-      const geo=pulseGeoRef.current[p.link],mat=pulseMatRef.current[p.link]; if(!geo||!mat) continue
-      const pa=(geo.attributes.position as THREE.BufferAttribute).array as Float32Array
-      pa[0]=pA.x+(pB.x-pA.x)*frac; pa[1]=pA.y+(pB.y-pA.y)*frac; pa[2]=pA.z+(pB.z-pA.z)*frac
-      geo.attributes.position.needsUpdate=true
-      mat.opacity=actRef.current[p.link]*Math.sin(frac*Math.PI)*0.9
-    }
-    pulseList.current=alive
   })
 
   return <group ref={groupRef} />
