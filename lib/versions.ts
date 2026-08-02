@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.5',
+    date: '2026-08-02',
+    title: 'Quantum Grid — True Glass & Nav Lock',
+    summary: 'Focused panel moved to DOM so Shunya-style backdrop-filter works correctly. Scrolling and swiping no longer changes the active square while the experience overlay is open.',
+    changes: [
+      'Focused panel is now a regular DOM overlay (not inside R3F Html transform), enabling backdrop-filter to composite against the canvas',
+      'Glass recipe matches Shunya realm: dark-blue gradient 52%→28% opacity + blur(8px) saturate(120%)',
+      'Wheel and touch nav blocked while experience overlay is open',
+      'expIdRef tracks overlay state without stale closure issues',
+    ],
+    gitHash: 'a7f1977',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.4.1',
     date: '2026-08-02',
     title: 'Quantum Grid — Fix experience overlay purple bleed',
@@ -438,4 +452,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.4.1'
+export const CURRENT_VERSION = '3.5'
