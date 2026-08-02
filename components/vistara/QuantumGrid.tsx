@@ -137,8 +137,8 @@ function DepthGrid() {
 
 // ─── Major rect ───────────────────────────────────────────────────────────────
 
-function MajorRect({ def, focused, onClick }: {
-  def: Gateway; focused: boolean; onClick: () => void
+function MajorRect({ def, focused, onClick, onExperience }: {
+  def: Gateway; focused: boolean; onClick: () => void; onExperience: () => void
 }) {
   const frameGeo  = useMemo(() => makeRectGeo(def.w, def.h),         [def.w, def.h])
   const cornerGeo = useMemo(() => makeCornerGeo(def.w, def.h, 0.13), [def.w, def.h])
@@ -168,7 +168,7 @@ function MajorRect({ def, focused, onClick }: {
         <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
-      {/* Label — always dim, hidden when focused */}
+      {/* Label — hidden when focused */}
       {!focused && (
         <Html position={[0, def.h / 2 + 0.65, 0]} center style={{ pointerEvents: 'none', userSelect: 'none' }}>
           <div style={{
@@ -177,6 +177,47 @@ function MajorRect({ def, focused, onClick }: {
             fontFamily: 'var(--font-vyan)', whiteSpace: 'nowrap',
           }}>
             {def.name.toUpperCase()}
+          </div>
+        </Html>
+      )}
+
+      {/* Focused glass panel — inside the 3D frame */}
+      {focused && (
+        <Html position={[0, 0, 0.1]} center transform
+          style={{ width: `${Math.round(def.w * 44)}px`, pointerEvents: 'auto' }}>
+          <div className="qg-panel" style={{
+            padding: '24px 20px 20px',
+            fontFamily: 'var(--font-vyan)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', gap: 10,
+            boxSizing: 'border-box', width: '100%',
+          }}>
+            <img src="/logo-symbol.png" alt="VYAN"
+              style={{ width: 38, height: 38, objectFit: 'contain', opacity: 0.88 }} />
+            <div style={{
+              color: '#ff2a4a', fontSize: '26px', letterSpacing: '0.08em',
+              textAlign: 'center', textShadow: '0 0 18px rgba(255,42,74,0.45)',
+            }}>
+              {def.name}
+            </div>
+            <div style={{
+              color: 'rgba(255,42,74,0.42)', fontSize: '8px',
+              letterSpacing: '0.5em', marginTop: -6,
+            }}>
+              {def.tantra}
+            </div>
+            <div style={{
+              color: 'rgba(200,212,255,0.62)', fontSize: '11px',
+              lineHeight: 1.72, textAlign: 'center', padding: '2px 6px',
+            }}>
+              {def.description || def.tagline || 'Coming soon.'}
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); onExperience() }}
+              className="qg-exp-btn"
+            >
+              EXPERIENCE
+            </button>
           </div>
         </Html>
       )}
@@ -272,10 +313,11 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
-function QuantumScene({ focusId, focusDef, setFocusId }: {
+function QuantumScene({ focusId, focusDef, setFocusId, onExperience }: {
   focusId: number | null
   focusDef: Gateway | null
   setFocusId: (id: number | null) => void
+  onExperience: (idx: number) => void
 }) {
   return (
     <>
@@ -288,7 +330,8 @@ function QuantumScene({ focusId, focusDef, setFocusId }: {
       {GATEWAYS.map((def, idx) => (
         <MajorRect key={def.id} def={def}
           focused={focusId === idx}
-          onClick={() => setFocusId(focusId === idx ? null : idx)} />
+          onClick={() => setFocusId(focusId === idx ? null : idx)}
+          onExperience={() => onExperience(idx)} />
       ))}
     </>
   )
@@ -341,19 +384,26 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
-      .qg-border {
+      /* Gradient ONLY on border — pseudo-element mask cuts out the interior */
+      .qg-panel {
+        position: relative;
+        background: rgba(4, 8, 48, 0.18);
+        border-radius: 2px;
+        isolation: isolate;
+      }
+      .qg-panel::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 2px;
+        padding: 3px;
         background: linear-gradient(120deg, #1a40ff 0%, #6b25ff 25%, #9c2fff 50%, #6b25ff 75%, #1a40ff 100%);
         background-size: 400% 400%;
         animation: qg-border-travel 3s linear infinite;
-        padding: 3px;
-        border-radius: 2px;
-      }
-      .qg-glass {
-        background: linear-gradient(180deg, rgba(4, 8, 48, 0.52) 0%, rgba(2, 4, 28, 0.28) 100%);
-        backdrop-filter: blur(8px) saturate(120%);
-        -webkit-backdrop-filter: blur(8px) saturate(120%);
-        border-radius: 1px;
-        box-shadow: 0 0 60px rgba(40, 80, 255, 0.10), inset 0 0 0 1px rgba(255,255,255,0.02);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: destination-out;
+        mask-composite: exclude;
+        z-index: -1;
       }
       .qg-exp-btn {
         margin-top: 6px;
@@ -457,7 +507,8 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         gl={{ antialias: true, alpha: false }}
       >
         <Suspense fallback={null}>
-          <QuantumScene focusId={focusId} focusDef={focusDef} setFocusId={setFocusId} />
+          <QuantumScene focusId={focusId} focusDef={focusDef} setFocusId={setFocusId}
+            onExperience={(idx) => setExpId(idx)} />
         </Suspense>
       </Canvas>
 
@@ -524,51 +575,6 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
             : 'SCROLL OR ‹ › TO NAVIGATE · CLICK TO FOCUS'}
         </div>
       </div>
-
-      {/* ── Focused product panel — DOM element so backdrop-filter works ─── */}
-      {focusDef && !expDef && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 20,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none',
-        }}>
-          <div style={{ pointerEvents: 'auto', width: 'min(480px, 80vw)' }}>
-            <div className="qg-border">
-              <div className="qg-glass" style={{
-                padding: '28px 24px 24px',
-                fontFamily: 'var(--font-vyan)',
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 12,
-                boxSizing: 'border-box', width: '100%',
-              }}>
-                <img src="/logo-symbol.png" alt="VYAN"
-                  style={{ width: 40, height: 40, objectFit: 'contain', opacity: 0.88 }} />
-                <div style={{
-                  color: '#ff2a4a', fontSize: '28px', letterSpacing: '0.08em',
-                  textAlign: 'center', textShadow: '0 0 20px rgba(255,42,74,0.45)',
-                }}>
-                  {focusDef.name}
-                </div>
-                <div style={{
-                  color: 'rgba(255,42,74,0.42)', fontSize: '8px',
-                  letterSpacing: '0.5em', marginTop: -8,
-                }}>
-                  {focusDef.tantra}
-                </div>
-                <div style={{
-                  color: 'rgba(200,212,255,0.62)', fontSize: '12px',
-                  lineHeight: 1.72, textAlign: 'center', padding: '0 8px',
-                }}>
-                  {focusDef.description || focusDef.tagline || 'Coming soon.'}
-                </div>
-                <button className="qg-exp-btn" onClick={() => setExpId(focusId!)}>
-                  EXPERIENCE
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Experience overlay ────────────────────────────────────────────── */}
       {expDef && (
