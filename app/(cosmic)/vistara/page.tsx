@@ -1,8 +1,8 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import { VistaraVoid } from '@/components/vistara/VistaraVoid'
+import { QuantumGrid } from '@/components/vistara/QuantumGrid'
 
 export default function VistaraPage() {
   const router = useRouter()
-  return <VistaraVoid onBack={() => router.push('/shunya')} />
+  return <QuantumGrid onBack={() => router.push('/shunya')} />
 }
