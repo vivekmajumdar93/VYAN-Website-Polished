@@ -137,8 +137,8 @@ function DepthGrid() {
 
 // ─── Major rect ───────────────────────────────────────────────────────────────
 
-function MajorRect({ def, focused, onClick, onExperience }: {
-  def: Gateway; focused: boolean; onClick: () => void; onExperience: () => void
+function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
+  def: Gateway; focused: boolean; expOpen: boolean; onClick: () => void; onExperience: () => void
 }) {
   const frameGeo  = useMemo(() => makeRectGeo(def.w, def.h),         [def.w, def.h])
   const cornerGeo = useMemo(() => makeCornerGeo(def.w, def.h, 0.13), [def.w, def.h])
@@ -181,8 +181,8 @@ function MajorRect({ def, focused, onClick, onExperience }: {
         </Html>
       )}
 
-      {/* Focused glass panel — inside the 3D frame */}
-      {focused && (
+      {/* Focused glass panel — hidden when experience overlay is open */}
+      {focused && !expOpen && (
         <Html position={[0, 0, 0.1]} center transform
           style={{ width: `${Math.round(def.w * 44)}px`, pointerEvents: 'auto' }}>
           <div className="qg-panel" style={{
@@ -313,11 +313,12 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
-function QuantumScene({ focusId, focusDef, setFocusId, onExperience }: {
+function QuantumScene({ focusId, focusDef, setFocusId, onExperience, expOpen }: {
   focusId: number | null
   focusDef: Gateway | null
   setFocusId: (id: number | null) => void
   onExperience: (idx: number) => void
+  expOpen: boolean
 }) {
   return (
     <>
@@ -330,6 +331,7 @@ function QuantumScene({ focusId, focusDef, setFocusId, onExperience }: {
       {GATEWAYS.map((def, idx) => (
         <MajorRect key={def.id} def={def}
           focused={focusId === idx}
+          expOpen={expOpen}
           onClick={() => setFocusId(focusId === idx ? null : idx)}
           onExperience={() => onExperience(idx)} />
       ))}
@@ -516,7 +518,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       >
         <Suspense fallback={null}>
           <QuantumScene focusId={focusId} focusDef={focusDef} setFocusId={setFocusId}
-            onExperience={(idx) => setExpId(idx)} />
+            onExperience={(idx) => setExpId(idx)} expOpen={expId !== null} />
         </Suspense>
       </Canvas>
 
