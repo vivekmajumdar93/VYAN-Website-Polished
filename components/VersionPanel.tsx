@@ -58,8 +58,8 @@ export default function VersionPanel() {
         onClick={() => setOpen(true)}
         aria-label="Open version history"
         style={{
-          position:'fixed', bottom:'18px', left:'18px', zIndex:9000,
-          background:'rgba(6,10,28,0.80)', border:'1px solid rgba(80,130,255,0.35)',
+          position:'fixed', bottom:'18px', left:'18px', zIndex:9200,
+          background:'rgba(6,10,28,0.72)', border:'1px solid rgba(55,90,200,0.28)',
           borderRadius:'6px', padding:'5px 11px', cursor:'pointer',
           fontFamily:'var(--font-vyan)', fontSize:'10px', letterSpacing:'0.20em',
           color:'rgba(130,180,255,0.80)',
