@@ -15,6 +15,19 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.6',
+    date: '2026-08-02',
+    title: 'Quantum Grid — Restored 3D panels, border-only gradient',
+    summary: 'Panel restored inside the 3D frame. Gradient border uses CSS mask-composite so the animated gradient shows only on the 3px border, not the panel fill.',
+    changes: [
+      'Panel back inside <Html transform> — sits inside the 3D wireframe as before',
+      'CSS ::before pseudo-element + mask-composite:exclude: gradient travels only along the border edge',
+      'Panel interior: rgba(4,8,48,0.18) transparent deep blue — 3D scene visible through it',
+    ],
+    gitHash: '1109c37',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.5',
     date: '2026-08-02',
     title: 'Quantum Grid — True Glass & Nav Lock',
@@ -452,4 +465,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.5'
+export const CURRENT_VERSION = '3.6'
