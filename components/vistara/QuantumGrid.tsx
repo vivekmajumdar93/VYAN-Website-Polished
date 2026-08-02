@@ -4,14 +4,15 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
+import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 
 // ─── Scene parameters ─────────────────────────────────────────────────────────
 
-const CAM_R       = 32
-const DRIFT_SPD   = 0.016
-const CHANGE_MIN  = 9
-const CHANGE_MAX  = 22
-const FLY_DUR     = 2.5
+const CAM_R        = 32
+const DRIFT_SPD    = 0.016
+const CHANGE_MIN   = 9
+const CHANGE_MAX   = 22
+const FLY_DUR      = 2.5
 const PARTICLE_CNT = 2200
 const BG_RECT_CNT  = 80
 
@@ -19,72 +20,7 @@ function eioC(t: number) {
   return t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
-// ─── Product definitions — mirrors lib/vistara/gateways.ts ───────────────────
-
-interface MajorDef {
-  id: number
-  pos: [number, number, number]
-  w: number; h: number
-  name: string        // Sanskrit name
-  tantra: string      // Full VYAN product name
-  tagline: string
-  description: string
-  color: string
-  rotX: number; rotY: number
-}
-
-const MAJOR_DEFS: MajorDef[] = [
-  {
-    id: 0, pos: [  0,   0,   0], w: 14, h:  9.5, rotX:  0.00, rotY:  0.00,
-    name: 'Ṛtam',        tantra: 'VYAN ṚTAM',         color: '#d4a853',
-    tagline: 'Conscious Living Through Pravāha',
-    description: 'Harmony, flow, progression. The cosmic order underlying all conscious systems.',
-  },
-  {
-    id: 1, pos: [ 22,   5, -14], w: 11, h:  7.5, rotX:  0.06, rotY: -0.28,
-    name: 'Ojas',        tantra: 'VYAN OJAS',          color: '#e8c87a',
-    tagline: 'Tracking Your Pranic Rhythm',
-    description: 'Rhythm, vitality, circulation. Concentric energy rings measuring the pulse of existence.',
-  },
-  {
-    id: 2, pos: [-20,  -4, -10], w: 12, h:  8.0, rotX: -0.05, rotY:  0.22,
-    name: 'Mudrā',       tantra: 'VYAN MUDRĀ',         color: '#c4924a',
-    tagline: 'The Kośa of Global Entities',
-    description: 'Knowledge, preservation, permanence. The obsidian archive of all that exists.',
-  },
-  {
-    id: 3, pos: [  9, -11, -22], w: 10, h:  7.0, rotX:  0.08, rotY: -0.18,
-    name: 'Netra',       tantra: 'VYAN NETRA',         color: '#f0d080',
-    tagline: 'The Conscious Eye Across Tantras',
-    description: 'Observation, awareness, perception. The astronomical eye that sees all.',
-  },
-  {
-    id: 4, pos: [-14,   9, -28], w: 11, h:  7.5, rotX: -0.04, rotY:  0.30,
-    name: 'Ākṛti',       tantra: 'VYAN ĀKṚTI',         color: '#e8f0ff',
-    tagline: 'Creating Digital Anubhava Through Your Drishti',
-    description: 'Design, creation, transformation. Prismatic crystal formations refracting possibility.',
-  },
-  {
-    id: 5, pos: [ 28,  -7, -32], w: 12, h:  8.0, rotX:  0.06, rotY: -0.25,
-    name: 'Sūtra',       tantra: 'VYAN SŪTRA',         color: '#d4c070',
-    tagline: 'Weaving Sangama Through Vivek',
-    description: 'Connection, relationships, intentional networks. Luminous threads weaving consciousness.',
-  },
-  {
-    id: 6, pos: [-10,  14, -42], w: 11, h:  8.0, rotX: -0.08, rotY:  0.15,
-    name: 'Chitra-Prāṇa', tantra: 'VYAN CHITRA-PRĀṆA', color: '#a0c8e8',
-    tagline: 'Breathing Life Into Imagery',
-    description: 'Creation, motion, imagination. The cosmic aperture where imagery comes alive.',
-  },
-  {
-    id: 7, pos: [ 18,  -8, -52], w: 13, h:  9.0, rotX:  0.05, rotY: -0.20,
-    name: 'Māyā',        tantra: 'VYAN MĀYĀ',          color: '#ffd080',
-    tagline: 'Manifesting Digital Realities',
-    description: 'Manifestation, possibility, digital worlds. The most dynamic gateway — where realities are made.',
-  },
-]
-
-const N = MAJOR_DEFS.length  // 8
+const N = GATEWAYS.length
 
 // ─── Geometry builders ────────────────────────────────────────────────────────
 
@@ -202,7 +138,7 @@ function DepthGrid() {
 // ─── Major rect ───────────────────────────────────────────────────────────────
 
 function MajorRect({ def, focused, onClick }: {
-  def: MajorDef; focused: boolean; onClick: () => void
+  def: Gateway; focused: boolean; onClick: () => void
 }) {
   const frameGeo  = useMemo(() => makeRectGeo(def.w, def.h),         [def.w, def.h])
   const cornerGeo = useMemo(() => makeCornerGeo(def.w, def.h, 0.13), [def.w, def.h])
@@ -288,14 +224,14 @@ interface FlyState {
   elapsed: number; dur: number
 }
 
-function CameraController({ focusDef }: { focusDef: MajorDef | null }) {
+function CameraController({ focusDef }: { focusDef: Gateway | null }) {
   const { camera } = useThree()
   const sphereRef  = useRef({ theta: Math.PI / 2, phi: Math.PI / 2 })
   const velRef     = useRef({ dTheta: DRIFT_SPD, dPhi: DRIFT_SPD * 0.28 })
   const nextChgRef = useRef(CHANGE_MIN + Math.random() * (CHANGE_MAX - CHANGE_MIN))
   const elapsedRef = useRef(0)
   const flyRef     = useRef<FlyState | null>(null)
-  const prevFocRef = useRef<MajorDef | null>(null)
+  const prevFocRef = useRef<Gateway | null>(null)
 
   useFrame((_, delta) => {
     elapsedRef.current += delta
@@ -370,7 +306,7 @@ function CameraController({ focusDef }: { focusDef: MajorDef | null }) {
 
 function QuantumScene({ focusId, focusDef, setFocusId }: {
   focusId: number | null
-  focusDef: MajorDef | null
+  focusDef: Gateway | null
   setFocusId: (id: number | null) => void
 }) {
   return (
@@ -381,10 +317,10 @@ function QuantumScene({ focusId, focusDef, setFocusId }: {
       <BackgroundRects />
       <Particles />
       <DepthGrid />
-      {MAJOR_DEFS.map(def => (
+      {GATEWAYS.map((def, idx) => (
         <MajorRect key={def.id} def={def}
-          focused={focusId === def.id}
-          onClick={() => setFocusId(focusId === def.id ? null : def.id)} />
+          focused={focusId === idx}
+          onClick={() => setFocusId(focusId === idx ? null : idx)} />
       ))}
     </>
   )
@@ -420,7 +356,7 @@ function NavBtn({ onClick, children, style }: {
 
 export function QuantumGrid({ onBack }: { onBack?: () => void }) {
   const [focusId, setFocusId] = useState<number | null>(null)
-  const focusDef = focusId !== null ? (MAJOR_DEFS[focusId] ?? null) : null
+  const focusDef = focusId !== null ? (GATEWAYS[focusId] ?? null) : null
 
   const goNext = useCallback(() =>
     setFocusId(p => p === null ? 0 : (p + 1) % N), [])
@@ -514,11 +450,11 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         )}
         {/* Dot indicator */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {MAJOR_DEFS.map(d => (
+          {GATEWAYS.map((d, idx) => (
             <div key={d.id} style={{
-              width: focusId === d.id ? 18 : 6,
+              width: focusId === idx ? 18 : 6,
               height: 2,
-              background: focusId === d.id ? (currentDef?.color ?? '#c4d4f8') : 'rgba(148,176,255,0.28)',
+              background: focusId === idx ? (currentDef?.color ?? '#c4d4f8') : 'rgba(148,176,255,0.28)',
               transition: 'width 0.3s, background 0.3s',
               borderRadius: 1,
             }} />
