@@ -157,10 +157,10 @@ function MajorRect({ def, focused, onClick }: {
   return (
     <group position={def.pos} rotation={[def.rotX, def.rotY, 0]}>
       <lineSegments geometry={frameGeo}>
-        <lineBasicMaterial ref={frameMat} color="#c4d4f8" transparent opacity={0.52} />
+        <lineBasicMaterial ref={frameMat} color="#ffffff" transparent opacity={0.48} />
       </lineSegments>
       <lineSegments geometry={cornerGeo}>
-        <lineBasicMaterial ref={cornerMat} color="#dde8ff" transparent opacity={0.36} />
+        <lineBasicMaterial ref={cornerMat} color="#ff2a4a" transparent opacity={0.32} />
       </lineSegments>
 
       {/* Invisible hit surface */}
@@ -172,11 +172,11 @@ function MajorRect({ def, focused, onClick }: {
       {/* Label — always faces camera */}
       <Html position={[0, def.h / 2 + 0.65, 0]} center style={{ pointerEvents: 'none', userSelect: 'none' }}>
         <div style={{
-          color: focused ? def.color : '#96aee0',
-          fontSize: '10px', letterSpacing: '0.44em',
-          fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap',
-          opacity: focused ? 1 : 0.45, transition: 'opacity 0.5s, color 0.5s',
-          textShadow: focused ? `0 0 18px ${def.color}` : 'none',
+          color: focused ? '#ff2a4a' : 'rgba(255,42,74,0.38)',
+          fontSize: '11px', letterSpacing: '0.44em',
+          fontFamily: 'var(--font-vyan)', whiteSpace: 'nowrap',
+          opacity: focused ? 1 : 0.7, transition: 'opacity 0.5s, color 0.5s',
+          textShadow: focused ? '0 0 22px rgba(255,42,74,0.7)' : 'none',
         }}>
           {def.name.toUpperCase()}
         </div>
@@ -188,25 +188,25 @@ function MajorRect({ def, focused, onClick }: {
           style={{ width: `${Math.round(def.w * 44)}px`, pointerEvents: 'auto' }}>
           <div style={{
             width: '100%', boxSizing: 'border-box',
-            border: `1px solid ${def.color}28`,
-            borderLeft: `2px solid ${def.color}80`,
-            background: 'rgba(2,5,18,0.92)',
+            border: '1px solid rgba(255,42,74,0.18)',
+            borderLeft: '2px solid rgba(255,42,74,0.55)',
+            background: 'rgba(2,3,10,0.94)',
             padding: '22px 24px',
-            fontFamily: 'ui-monospace, monospace', color: '#96aee0',
+            fontFamily: 'var(--font-vyan)',
           }}>
-            <div style={{ fontSize: '8px', letterSpacing: '0.5em', opacity: 0.35, marginBottom: 6 }}>
+            <div style={{ fontSize: '8px', letterSpacing: '0.55em', color: 'rgba(255,42,74,0.35)', marginBottom: 6 }}>
               VYAN GATEWAY
             </div>
-            <div style={{ fontSize: '26px', letterSpacing: '0.06em', marginBottom: 4, color: def.color }}>
+            <div style={{ fontSize: '28px', letterSpacing: '0.06em', marginBottom: 4, color: '#ff2a4a' }}>
               {def.name}
             </div>
-            <div style={{ fontSize: '9px', letterSpacing: '0.32em', opacity: 0.5, marginBottom: 14 }}>
+            <div style={{ fontSize: '9px', letterSpacing: '0.36em', color: 'rgba(255,42,74,0.55)', marginBottom: 14 }}>
               {def.tantra}
             </div>
-            <div style={{ fontSize: '12px', lineHeight: 1.55, marginBottom: 12, color: '#b8ccee' }}>
+            <div style={{ fontSize: '12px', lineHeight: 1.6, marginBottom: 12, color: 'rgba(255,255,255,0.75)' }}>
               {def.tagline}
             </div>
-            <div style={{ fontSize: '10px', lineHeight: 1.75, opacity: 0.38 }}>
+            <div style={{ fontSize: '10px', lineHeight: 1.8, color: 'rgba(255,255,255,0.32)' }}>
               {def.description}
             </div>
           </div>
@@ -335,17 +335,17 @@ function NavBtn({ onClick, children, style }: {
   return (
     <button onClick={onClick} style={{
       background: 'transparent',
-      border: '1px solid rgba(148,176,255,0.22)',
-      color: '#7890c8', width: 44, height: 44,
-      fontFamily: 'ui-monospace, monospace',
-      fontSize: '16px', cursor: 'pointer',
+      border: '1px solid rgba(255,42,74,0.22)',
+      color: 'rgba(255,42,74,0.55)', width: 44, height: 44,
+      fontFamily: 'var(--font-vyan)',
+      fontSize: '20px', cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       transition: 'border-color 0.2s, color 0.2s',
       outline: 'none',
       ...style,
     }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(148,176,255,0.55)'; (e.currentTarget as HTMLElement).style.color = '#b0c8f0' }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(148,176,255,0.22)'; (e.currentTarget as HTMLElement).style.color = '#7890c8' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,42,74,0.6)'; (e.currentTarget as HTMLElement).style.color = '#ff2a4a' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,42,74,0.22)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,42,74,0.55)' }}
     >
       {children}
     </button>
@@ -411,10 +411,10 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       {onBack && (
         <button onClick={onBack} style={{
           position: 'fixed', top: 24, left: 24, zIndex: 10,
-          background: 'transparent', border: '1px solid rgba(148,176,255,0.28)',
-          color: '#7890c8', padding: '8px 18px',
-          fontFamily: 'ui-monospace, monospace',
-          fontSize: '10px', letterSpacing: '0.38em', cursor: 'pointer', outline: 'none',
+          background: 'transparent', border: '1px solid rgba(255,42,74,0.25)',
+          color: 'rgba(255,42,74,0.55)', padding: '8px 18px',
+          fontFamily: 'var(--font-vyan)',
+          fontSize: '11px', letterSpacing: '0.38em', cursor: 'pointer', outline: 'none',
         }}>
           ← BACK
         </button>
@@ -442,8 +442,8 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       }}>
         {currentDef && (
           <div style={{
-            color: currentDef.color, fontSize: '10px', letterSpacing: '0.4em',
-            fontFamily: 'ui-monospace, monospace', opacity: 0.75,
+            color: '#ff2a4a', fontSize: '10px', letterSpacing: '0.44em',
+            fontFamily: 'var(--font-vyan)', opacity: 0.8,
           }}>
             {currentDef.tantra}
           </div>
@@ -452,17 +452,17 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {GATEWAYS.map((d, idx) => (
             <div key={d.id} style={{
-              width: focusId === idx ? 18 : 6,
+              width: focusId === idx ? 18 : 5,
               height: 2,
-              background: focusId === idx ? (currentDef?.color ?? '#c4d4f8') : 'rgba(148,176,255,0.28)',
+              background: focusId === idx ? '#ff2a4a' : 'rgba(255,42,74,0.20)',
               transition: 'width 0.3s, background 0.3s',
               borderRadius: 1,
             }} />
           ))}
         </div>
         <div style={{
-          color: 'rgba(148,176,255,0.25)', fontSize: '9px',
-          letterSpacing: '0.4em', fontFamily: 'ui-monospace, monospace',
+          color: 'rgba(255,42,74,0.22)', fontSize: '9px',
+          letterSpacing: '0.42em', fontFamily: 'var(--font-vyan)',
           marginTop: 2,
         }}>
           {focusId !== null
