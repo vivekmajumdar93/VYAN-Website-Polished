@@ -15,6 +15,25 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.0',
+    date: '2026-08-02',
+    title: 'Vistara — Quantum Grid',
+    summary: 'Replaces the 3D orb system with a wireframe quantum grid: 9 VYAN gateways as interactive frames floating in deep 3D space with looping scroll/arrow navigation and camera fly-to.',
+    changes: [
+      'New QuantumGrid component — 80 background wireframe rects + nested pairs, 2200 dot particles, perspective floor grid',
+      '9 major gateway frames (Ṛtam, Ojas, Mudrā, Netra, Ākṛti, Sūtra, Chitra-Prāṇa, Māyā, Saṅgraha) with corner brackets and accent colors',
+      'Camera continuously drifts in spherical orbit, changing direction every 9–22 s',
+      'Click-to-fly: easeInOutCubic arc to selected gateway (2.5 s), click again to release',
+      'Looping navigation: scroll wheel, ‹ › buttons, arrow keys — last → first loops back',
+      'Bottom strip: product tantra name, 9-dot progress indicator, hint text',
+      'gateways.ts rewritten with quantum grid schema (pos, w, h, rotX, rotY); orb fields removed',
+      'Deleted orphaned VistaraVoid scene components (GatewayOrbs, KnowledgeStreams, SacredGeometry, VistaraScene, VoidAtmosphere, CameraRig)',
+      'Saṅgraha added as 9th gateway (tagline/description pending)',
+    ],
+    gitHash: 'b0f89ee',
+    pages: ['Vistara', 'Gateways'],
+  },
+  {
     version: '2.9',
     date: '2026-07-22',
     title: 'Vistara — Panel UX + Icons + Sound + Rings + Header',
@@ -353,4 +372,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '2.9'
+export const CURRENT_VERSION = '3.0'
