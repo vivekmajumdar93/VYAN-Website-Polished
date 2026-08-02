@@ -571,9 +571,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
           onClick={() => setExpId(null)}
           style={{
             position: 'fixed', inset: 0, zIndex: 50,
-            background: 'rgba(0,4,20,0.72)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
+            background: 'rgba(0,2,12,0.90)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
