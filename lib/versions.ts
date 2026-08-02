@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.6.1',
+    date: '2026-08-02',
+    title: 'Quantum Grid — Fix invisible experience overlay',
+    summary: 'Experience panel was invisible after CSS class rename. Restored proper opaque glass with backdrop-filter for the experience overlay.',
+    changes: [
+      'Added .qg-exp-glass: deep-blue gradient 88%→80% opacity + backdrop-filter blur(8px) saturate(120%)',
+      'Experience overlay uses qg-panel for gradient border + qg-exp-glass for the panel fill',
+    ],
+    gitHash: 'f922d55',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.6',
     date: '2026-08-02',
     title: 'Quantum Grid — Restored 3D panels, border-only gradient',
@@ -465,4 +477,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.6'
+export const CURRENT_VERSION = '3.6.1'
