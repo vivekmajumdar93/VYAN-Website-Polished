@@ -368,13 +368,19 @@ function NavBtn({ onClick, children, style }: {
 // ─── QuantumGrid ─────────────────────────────────────────────────────────────
 
 export function QuantumGrid({ onBack }: { onBack?: () => void }) {
-  const [focusId, setFocusId] = useState<number | null>(null)
-  const [expId,   setExpId]   = useState<number | null>(null)
+  const [focusId,    setFocusId]    = useState<number | null>(null)
+  const [expId,      setExpId]      = useState<number | null>(null)
+  const [expClosing, setExpClosing] = useState(false)
   const focusDef = focusId !== null ? (GATEWAYS[focusId] ?? null) : null
   const expDef   = expId   !== null ? (GATEWAYS[expId]   ?? null) : null
   // Ref so event-handler closures always see current expId without re-registering
   const expIdRef = useRef<number | null>(null)
   useEffect(() => { expIdRef.current = expId }, [expId])
+
+  const closeExp = useCallback(() => {
+    setExpClosing(true)
+    setTimeout(() => { setExpId(null); setExpClosing(false) }, 520)
+  }, [])
 
   // Inject animated glass + gradient border CSS once
   useEffect(() => {
@@ -385,6 +391,34 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         0%   { background-position: 0% 50%; }
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
+      }
+      @keyframes qg-slide-in-right {
+        from { transform: translateX(110%); opacity: 0.4; }
+        to   { transform: translateX(0);    opacity: 1; }
+      }
+      @keyframes qg-slide-out-right {
+        from { transform: translateX(0);    opacity: 1; }
+        to   { transform: translateX(110%); opacity: 0.4; }
+      }
+      @keyframes qg-slide-in-left {
+        from { transform: translateX(-110%); opacity: 0.4; }
+        to   { transform: translateX(0);     opacity: 1; }
+      }
+      @keyframes qg-slide-out-left {
+        from { transform: translateX(0);     opacity: 1; }
+        to   { transform: translateX(-110%); opacity: 0.4; }
+      }
+      @keyframes qg-dim-in {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes qg-dim-out {
+        from { opacity: 1; }
+        to   { opacity: 0; }
+      }
+      @keyframes qg-edge-travel {
+        0%   { background-position: 0% 0%; }
+        100% { background-position: 0% 100%; }
       }
       /* Gradient border via pseudo-element mask — interior punched out */
       .qg-panel {
@@ -409,11 +443,41 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       }
       /* Solid glass for DOM overlays — backdrop-filter works here */
       .qg-exp-glass {
-        background: linear-gradient(180deg, rgba(4, 8, 48, 0.88) 0%, rgba(2, 4, 28, 0.80) 100%);
-        backdrop-filter: blur(8px) saturate(120%);
-        -webkit-backdrop-filter: blur(8px) saturate(120%);
-        border-radius: 1px;
-        box-shadow: 0 0 60px rgba(40,80,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.02);
+        background: linear-gradient(160deg, rgba(4,8,52,0.94) 0%, rgba(2,4,32,0.90) 100%);
+        backdrop-filter: blur(14px) saturate(130%);
+        -webkit-backdrop-filter: blur(14px) saturate(130%);
+      }
+      /* Side panel container */
+      .qg-side-panel {
+        width: clamp(300px, 52vw, 900px);
+        height: 100%;
+        position: relative;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      @media (max-width: 640px) {
+        .qg-side-panel { width: 92vw; }
+      }
+      /* Animated gradient line on the inner edge */
+      .qg-side-edge {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: linear-gradient(
+          to bottom,
+          transparent 0%,
+          #1a40ff 15%,
+          #6b25ff 35%,
+          #9c2fff 50%,
+          #6b25ff 65%,
+          #1a40ff 85%,
+          transparent 100%
+        );
+        background-size: 100% 300%;
+        animation: qg-edge-travel 2.8s ease-in-out infinite alternate;
+        z-index: 10;
+        pointer-events: none;
       }
       .qg-exp-btn {
         margin-top: 6px;
@@ -432,14 +496,6 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         background: rgba(255,42,74,0.18);
         border-color: rgba(255,42,74,0.75);
       }
-      .qg-overlay-close {
-        position: absolute; top: 16px; right: 18px;
-        background: transparent; border: none;
-        color: rgba(255,42,74,0.55); font-size: 22px;
-        cursor: pointer; font-family: var(--font-vyan);
-        line-height: 1; padding: 4px 8px;
-      }
-      .qg-overlay-close:hover { color: #ff2a4a; }
     `
     if (!document.getElementById('qg-styles')) document.head.appendChild(s)
     return () => { document.getElementById('qg-styles')?.remove() }
@@ -453,13 +509,17 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
   // Keyboard navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (expIdRef.current !== null) {
+        if (e.key === 'Escape') { e.preventDefault(); closeExp() }
+        return
+      }
       if (e.key === 'ArrowRight') { e.preventDefault(); goNext() }
       if (e.key === 'ArrowLeft')  { e.preventDefault(); goPrev() }
       if (e.key === 'Escape')     setFocusId(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [goNext, goPrev])
+  }, [goNext, goPrev, closeExp])
 
   // Scroll + touch navigation with shared cooldown
   const navCooldown = useRef(false)
@@ -507,6 +567,17 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
   }, [goNext, goPrev])
 
   const currentDef = focusDef
+
+  // Derive side panel animation values
+  const isRight   = expDef ? expDef.pos[0] >= 0 : true
+  const panelAnim = expDef
+    ? expClosing
+      ? `${isRight ? 'qg-slide-out-right' : 'qg-slide-out-left'} 0.50s cubic-bezier(0.4,0,0.8,0.85) both`
+      : `${isRight ? 'qg-slide-in-right'  : 'qg-slide-in-left'}  0.65s cubic-bezier(0.16,1,0.3,1) both`
+    : ''
+  const dimAnim = expDef
+    ? expClosing ? 'qg-dim-out 0.42s ease both' : 'qg-dim-in 0.38s ease both'
+    : ''
 
   return (
     <div ref={containerRef} style={{ position: 'fixed', inset: 0, background: '#020509' }}>
@@ -586,77 +657,136 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         </div>
       </div>
 
-      {/* ── Experience overlay ────────────────────────────────────────────── */}
+      {/* ── Experience side panel ──────────────────────────────────────────── */}
       {expDef && (
-        <div
-          onClick={() => setExpId(null)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 50,
-            background: 'rgba(0,2,12,0.90)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          display: 'flex',
+          flexDirection: isRight ? 'row' : 'row-reverse',
+        }}>
+          {/* Dim backdrop — shows 3D scene through it, click to close */}
           <div
-            onClick={e => e.stopPropagation()}
-            style={{ position: 'relative', width: '82vw', height: '80vh', maxWidth: 1280 }}
-          >
-            <div className="qg-panel" style={{ width: '100%', height: '100%' }}>
-              <div className="qg-exp-glass" style={{
-                width: '100%', height: '100%', boxSizing: 'border-box',
-                display: 'flex', flexDirection: 'column',
+            onClick={closeExp}
+            style={{
+              flex: 1,
+              background: 'rgba(0,2,14,0.68)',
+              animation: dimAnim,
+              cursor: 'pointer',
+            }}
+          />
+
+          {/* Side panel */}
+          <div className="qg-side-panel" style={{ animation: panelAnim }}>
+            {/* Animated gradient line on the inner edge */}
+            <div className="qg-side-edge" style={{
+              [isRight ? 'left' : 'right']: 0,
+            }} />
+
+            {/* Glass fill */}
+            <div className="qg-exp-glass" style={{
+              width: '100%', height: '100%',
+              boxSizing: 'border-box',
+              display: 'flex', flexDirection: 'column',
+            }}>
+
+              {/* Header */}
+              <div style={{
+                padding: '22px 28px 18px',
+                borderBottom: '1px solid rgba(26,64,255,0.16)',
+                flexShrink: 0,
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between', gap: 14,
               }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '18px 24px 14px',
-                  borderBottom: '1px solid rgba(26,64,255,0.18)',
-                  flexShrink: 0,
-                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
                   <img src="/logo-symbol.png" alt="VYAN"
-                    style={{ width: 28, height: 28, objectFit: 'contain', opacity: 0.85 }} />
-                  <div>
+                    style={{ width: 30, height: 30, objectFit: 'contain', opacity: 0.85, flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
                     <div style={{
                       color: '#ff2a4a', fontFamily: 'var(--font-vyan)',
-                      fontSize: '20px', letterSpacing: '0.08em',
-                      textShadow: '0 0 14px rgba(255,42,74,0.4)',
+                      fontSize: '22px', letterSpacing: '0.08em',
+                      textShadow: '0 0 20px rgba(255,42,74,0.40)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     }}>
                       {expDef.name}
                     </div>
                     <div style={{
-                      color: 'rgba(255,42,74,0.4)', fontFamily: 'var(--font-vyan)',
-                      fontSize: '8px', letterSpacing: '0.5em', marginTop: 2,
+                      color: 'rgba(255,42,74,0.38)', fontFamily: 'var(--font-vyan)',
+                      fontSize: '8px', letterSpacing: '0.52em', marginTop: 3,
                     }}>
                       {expDef.tantra}
                     </div>
                   </div>
-                  <button className="qg-overlay-close" onClick={() => setExpId(null)}>✕</button>
                 </div>
-                <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-                  {expDef.appUrl ? (
-                    <iframe src={expDef.appUrl}
-                      style={{ width: '100%', height: '100%', border: 'none' }}
-                      allow="fullscreen" />
-                  ) : (
-                    <div style={{
-                      width: '100%', height: '100%',
-                      display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center', gap: 16,
-                      fontFamily: 'var(--font-vyan)',
-                    }}>
-                      <img src="/logo-symbol.png" alt="VYAN"
-                        style={{ width: 64, opacity: 0.25 }} />
-                      <div style={{ color: '#ff2a4a', fontSize: '22px', letterSpacing: '0.1em', opacity: 0.7 }}>
-                        {expDef.name}
-                      </div>
-                      <div style={{
-                        color: 'rgba(200,212,255,0.35)', fontSize: '11px',
-                        letterSpacing: '0.3em', textAlign: 'center', maxWidth: 320,
-                      }}>
-                        {expDef.tagline || 'Experience coming soon.'}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <button
+                  onClick={closeExp}
+                  style={{
+                    background: 'none', border: '1px solid rgba(255,42,74,0.28)',
+                    color: 'rgba(255,42,74,0.55)', fontSize: '15px',
+                    cursor: 'pointer', fontFamily: 'var(--font-vyan)',
+                    padding: '5px 9px', lineHeight: 1, flexShrink: 0,
+                    transition: 'color 0.2s, border-color 0.2s',
+                  }}
+                  onMouseEnter={e => {
+                    const b = e.currentTarget as HTMLButtonElement
+                    b.style.color = '#ff2a4a'; b.style.borderColor = 'rgba(255,42,74,0.65)'
+                  }}
+                  onMouseLeave={e => {
+                    const b = e.currentTarget as HTMLButtonElement
+                    b.style.color = 'rgba(255,42,74,0.55)'; b.style.borderColor = 'rgba(255,42,74,0.28)'
+                  }}
+                >✕</button>
               </div>
+
+              {/* Tagline strip */}
+              {expDef.tagline ? (
+                <div style={{
+                  padding: '10px 28px 9px',
+                  flexShrink: 0,
+                  color: 'rgba(180,200,255,0.32)',
+                  fontFamily: 'var(--font-vyan)',
+                  fontSize: '9px', letterSpacing: '0.30em',
+                  borderBottom: '1px solid rgba(26,64,255,0.08)',
+                  textTransform: 'uppercase',
+                }}>
+                  {expDef.tagline}
+                </div>
+              ) : null}
+
+              {/* Content */}
+              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                {expDef.appUrl ? (
+                  <iframe
+                    src={expDef.appUrl}
+                    style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                    allow="fullscreen"
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%', height: '100%',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: 20,
+                    fontFamily: 'var(--font-vyan)',
+                  }}>
+                    <img src="/logo-symbol.png" alt="VYAN"
+                      style={{ width: 54, opacity: 0.20 }} />
+                    <div style={{
+                      color: '#ff2a4a', fontSize: '20px',
+                      letterSpacing: '0.10em', opacity: 0.55,
+                    }}>
+                      {expDef.name}
+                    </div>
+                    <div style={{
+                      color: 'rgba(190,205,255,0.28)',
+                      fontSize: '10px', letterSpacing: '0.28em',
+                      textAlign: 'center', maxWidth: 260, lineHeight: 2.0,
+                      textTransform: 'uppercase',
+                    }}>
+                      {expDef.description || expDef.tagline || 'Experience coming soon.'}
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
           </div>
         </div>
