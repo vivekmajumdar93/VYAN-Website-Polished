@@ -74,17 +74,15 @@ const SATURN_VERT = `
   varying float vAlpha;
   void main() {
     float theta = atan(position.y, position.x);
-    float w1 = 0.5 + 0.5 * sin(theta *  2.0 + uTime * 0.18 + aPhase);
-    float w2 = 0.5 + 0.5 * sin(theta *  6.0 - uTime * 0.11 + aPhase * 2.3);
-    float w3 = 0.5 + 0.5 * sin(theta * 14.0 + uTime * 0.27 + aPhase * 5.0);
-    float gap = 0.75 + 0.25 * sin(theta * 1.5 + uTime * 0.04);
-    float density = w1 * (0.4 + 0.6 * w2) * (0.65 + 0.35 * w3) * gap;
-    // Balanced: visible on low brightness but subordinate to the orbs
-    vAlpha = clamp(density * (0.48 + abs(uTilt) * 1.8), 0.0, 1.0);
+    float w1 = 0.5 + 0.5 * sin(theta *  3.0 + uTime * 0.18 + aPhase);
+    float w2 = 0.5 + 0.5 * sin(theta *  9.0 - uTime * 0.11 + aPhase * 2.3);
+    float w3 = 0.5 + 0.5 * sin(theta * 22.0 + uTime * 0.27 + aPhase * 5.0);
+    float gap = 0.68 + 0.32 * sin(theta * 2.5 + uTime * 0.04);
+    float density = w1 * (0.5 + 0.5 * w2) * (0.7 + 0.3 * w3) * gap;
+    vAlpha = clamp(density * (0.78 + abs(uTilt) * 1.1), 0.0, 1.0);
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     float dist = max(-mv.z, 1.0);
-    // Fine dust — stays tiny at all distances
-    gl_PointSize = clamp(aSize * (320.0 / dist), aSize * 0.5, aSize * 1.5);
+    gl_PointSize = clamp(aSize * (480.0 / dist), aSize * 0.9, aSize * 2.2);
     gl_Position  = projectionMatrix * mv;
   }
 `
@@ -92,11 +90,11 @@ const SATURN_FRAG = `
   uniform float uTime;
   varying float vAlpha;
   void main() {
-    float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float disc = 1.0 - smoothstep(0.05, 0.88, r);
-    float sprk = exp(-r * r * 6.0);
-    float a    = (disc * 0.72 + sprk * 0.55) * vAlpha;
-    if (a < 0.005) discard;
+    float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    // Hard-edge crisp point — no blur, no soft halo, pure sharp particle
+    float disc = step(r, 0.92);
+    float a    = disc * vAlpha;
+    if (a < 0.01) discard;
     float cycle = mod(uTime * 0.05, 3.0);
     vec3 red    = vec3(1.00, 0.12, 0.06);
     vec3 dblue  = vec3(0.08, 0.28, 1.00);
@@ -105,30 +103,31 @@ const SATURN_FRAG = `
     if      (cycle < 1.0) { col = mix(red,    dblue,  cycle);       }
     else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
     else                  { col = mix(purple, red,    cycle - 2.0); }
-    col = col * 1.12 + vec3(0.02);
+    col = col * 1.15 + vec3(0.02);
     gl_FragColor = vec4(col, min(a, 1.0));
   }
 `
 function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
-  const COUNT  = 3000   // more particles = denser, more visible rings
+  const COUNT  = 14000  // high density — Saturn rings are continuous dust bands
   const geo    = new THREE.BufferGeometry()
   const pos    = new Float32Array(COUNT * 3)
   const sz     = new Float32Array(COUNT)
   const ph     = new Float32Array(COUNT)
-  const rInner = radius * 0.85
-  const rOuter = radius * 1.15
+  const rInner = radius * 0.88
+  const rOuter = radius * 1.12
   for (let i = 0; i < COUNT; i++) {
     const angle = Math.random() * Math.PI * 2
     const u     = Math.random()
-    const r     = u < 0.22
-      ? rInner + Math.random() * radius * 0.12
-      : u > 0.78
-        ? rOuter - Math.random() * radius * 0.12
+    // Concentrate particles at ring edges for the banded look real Saturn has
+    const r     = u < 0.28
+      ? rInner + Math.random() * radius * 0.07
+      : u > 0.72
+        ? rOuter - Math.random() * radius * 0.07
         : rInner + Math.random() * (rOuter - rInner)
     pos[i*3]   = r * Math.cos(angle)
     pos[i*3+1] = r * Math.sin(angle)
-    pos[i*3+2] = (Math.random() - 0.5) * 4
-    sz[i]      = 0.55 + Math.random() * 1.10  // 0.55–1.65px fine dust
+    pos[i*3+2] = (Math.random() - 0.5) * 2.5   // thin disc — Saturn rings are <1km thick
+    sz[i]      = 0.4 + Math.random() * 0.7      // 0.4–1.1px — sub-pixel dust
     ph[i]      = Math.random() * Math.PI * 2
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -138,25 +137,22 @@ function createSaturnRingGeo(radius: number): THREE.BufferGeometry {
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+function easeInExpo(t: number) { return t <= 0 ? 0 : Math.pow(2, 10 * t - 10) }
 function easeInOutCubic(t: number) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2 }
 
+// Returns the ideal overview camera Z for the current viewport aspect ratio.
+// Portrait phones (narrow) need a farther camera so the ring system fits horizontally.
+// Wide desktop screens need a closer camera so the system fills the screen meaningfully.
+function computeOverviewZ(aspect: number): number {
+  // t=0 at aspect≤0.5 (tall portrait), t=1 at aspect≥2.0 (ultra-wide)
+  const t = Math.max(0, Math.min(1, (aspect - 0.5) / 1.5))
+  return Math.max(550, Math.min(1100, Math.round(900 - 350 * t)))
+}
 function nearestTarget(current: number, raw: number): number {
   let d = (raw - current) % (2 * Math.PI)
   if (d > Math.PI)  d -= 2 * Math.PI
   if (d < -Math.PI) d += 2 * Math.PI
   return current + d
-}
-
-// Returns true when el (or an ancestor) can scroll vertically — used to let the
-// wheel event reach a panel's scroll container instead of triggering traverse.
-function isInsideScrollable(target: EventTarget | null): boolean {
-  let el = target as HTMLElement | null
-  while (el && el !== document.documentElement) {
-    const oy = window.getComputedStyle(el).overflowY
-    if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return true
-    el = el.parentElement
-  }
-  return false
 }
 
 // ─── shard generation ─────────────────────────────────────────────────────────
@@ -606,6 +602,151 @@ function ShootingStars() {
   return <points geometry={geo} material={mat} frustumCulled={false} />
 }
 
+// ─── core nebula — particle disc at gyroscope origin ─────────────────────────
+// Replaces the billboard disc; uses differential rotation so inner particles
+// orbit faster, giving a natural accretion-disc look in pure particle language.
+const CORE_VERT = `
+  attribute float aSize;
+  attribute float aPhase;
+  uniform   float uTime;
+  varying   float vAlpha;
+  void main() {
+    float r   = length(vec2(position.x, position.z));
+    // Differential rotation: inner particles orbit much faster than outer
+    float spd = 0.30 / max(r * 0.022 + 0.08, 0.08);
+    float ang = atan(position.z, position.x) + uTime * spd + aPhase * 0.15;
+    vec3  pos = vec3(r * cos(ang), position.y, r * sin(ang));
+    // Alpha: density wave * radial falloff — barely visible at edge, brighter at core
+    float wave   = 0.45 + 0.55 * sin(ang * 6.0 - uTime * 0.7 + aPhase);
+    float falloff = 1.0 - smoothstep(0.0, 48.0, r);
+    vAlpha = clamp(wave * falloff * 0.65, 0.0, 1.0);
+    vec4  mv   = modelViewMatrix * vec4(pos, 1.0);
+    float dist = max(-mv.z, 1.0);
+    gl_PointSize = clamp(aSize * (260.0 / dist), 0.3, 2.0);
+    gl_Position  = projectionMatrix * mv;
+  }
+`
+const CORE_FRAG = `
+  uniform float uTime;
+  varying float vAlpha;
+  void main() {
+    float r    = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float core = exp(-r * r * 9.0);
+    float a    = core * vAlpha;
+    if (a < 0.012) discard;
+    // Same cycling gradient as Saturn rings — core and rings breathe as one system
+    float cycle = mod(uTime * 0.04, 3.0);
+    vec3 red    = vec3(1.00, 0.12, 0.06);
+    vec3 dblue  = vec3(0.08, 0.28, 1.00);
+    vec3 purple = vec3(0.55, 0.05, 0.90);
+    vec3 col;
+    if      (cycle < 1.0) { col = mix(red,    dblue,  cycle);       }
+    else if (cycle < 2.0) { col = mix(dblue,  purple, cycle - 1.0); }
+    else                  { col = mix(purple, red,    cycle - 2.0); }
+    col = col * 1.10 + vec3(0.01);
+    gl_FragColor = vec4(col, min(a, 1.0));
+  }
+`
+function createCoreGeo(): THREE.BufferGeometry {
+  const COUNT = 480
+  const pos   = new Float32Array(COUNT * 3)
+  const sz    = new Float32Array(COUNT)
+  const ph    = new Float32Array(COUNT)
+  for (let i = 0; i < COUNT; i++) {
+    const angle = Math.random() * Math.PI * 2
+    // Square-root bias so most particles sit within inner 60% of disc
+    const r     = Math.pow(Math.random(), 0.55) * 48
+    pos[i*3]   = r * Math.cos(angle)
+    pos[i*3+1] = (Math.random() - 0.5) * 6   // thin disc in XZ plane
+    pos[i*3+2] = r * Math.sin(angle)
+    sz[i]      = 0.4 + Math.random() * 1.4
+    ph[i]      = Math.random() * Math.PI * 2
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(sz,  1))
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(ph,  1))
+  return geo
+}
+function CentralVortex() {
+  const ptsRef = useRef<THREE.Points>(null)
+  const geo    = useMemo(createCoreGeo, [])
+  const mat    = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   CORE_VERT,
+    fragmentShader: CORE_FRAG,
+    uniforms: { uTime: { value: 0 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }), [])
+  useFrame(({ clock }) => { mat.uniforms.uTime.value = clock.elapsedTime })
+  return <points ref={ptsRef} geometry={geo} material={mat} frustumCulled={false} />
+}
+
+// ─── 3D starfield — static sphere of 1500 distant stars for camera parallax ──
+const SF_VERT = `
+  attribute float aSize;
+  attribute vec3  aCol;
+  varying   vec3  vCol;
+  varying   float vA;
+  void main() {
+    vCol = aCol;
+    vec4 mv   = modelViewMatrix * vec4(position, 1.0);
+    float dist = max(-mv.z, 1.0);
+    gl_PointSize = clamp(aSize * (320.0 / dist), 0.4, 3.5);
+    vA = clamp(1.0 - dist * 0.00018, 0.18, 1.0);
+    gl_Position  = projectionMatrix * mv;
+  }
+`
+const SF_FRAG = `
+  varying vec3  vCol;
+  varying float vA;
+  void main() {
+    float r = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float a = (1.0 - smoothstep(0.1, 1.0, r)) * vA;
+    if (a < 0.015) discard;
+    gl_FragColor = vec4(vCol, a);
+  }
+`
+function StarField3D() {
+  const { geo, mat } = useMemo(() => {
+    const COUNT = 1500
+    const g   = new THREE.BufferGeometry()
+    const pos = new Float32Array(COUNT * 3)
+    const col = new Float32Array(COUNT * 3)
+    const sz  = new Float32Array(COUNT)
+    for (let i = 0; i < COUNT; i++) {
+      // Uniform sphere distribution, radius 900–3600
+      const theta = Math.random() * Math.PI * 2
+      const phi   = Math.acos(2 * Math.random() - 1)
+      const r     = 900 + Math.random() * 2700
+      pos[i*3]   = r * Math.sin(phi) * Math.cos(theta)
+      pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta)
+      pos[i*3+2] = r * Math.cos(phi)
+      // Color: mostly blue-white, some warm yellow, rare lavender
+      const t = Math.random()
+      if (t < 0.62) {
+        col[i*3]=0.82+Math.random()*0.18; col[i*3+1]=0.88+Math.random()*0.12; col[i*3+2]=1.0
+      } else if (t < 0.84) {
+        col[i*3]=1.0; col[i*3+1]=0.93+Math.random()*0.07; col[i*3+2]=0.72+Math.random()*0.18
+      } else {
+        col[i*3]=0.86; col[i*3+1]=0.78; col[i*3+2]=1.0
+      }
+      sz[i] = 1.2 + Math.random() * 3.2
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    g.setAttribute('aCol',     new THREE.BufferAttribute(col, 3))
+    g.setAttribute('aSize',    new THREE.BufferAttribute(sz,  1))
+    const m = new THREE.ShaderMaterial({
+      vertexShader:   SF_VERT,
+      fragmentShader: SF_FRAG,
+      transparent:    true,
+      depthWrite:     false,
+      blending:       THREE.AdditiveBlending,
+    })
+    return { geo: g, mat: m }
+  }, [])
+  return <points geometry={geo} material={mat} frustumCulled={false} />
+}
+
 // ─── vistara orb ─────────────────────────────────────────────────────────────
 interface VistaraOrbProps {
   gateway: Gateway; orbIdx: number; orbSize: number
@@ -615,12 +756,13 @@ interface VistaraOrbProps {
   onHover: (id: string | null) => void
   onClick: (idx: number, id: string) => void
   worldPosRef: React.MutableRefObject<Record<number, THREE.Vector3>>
+  isOverview: boolean
 }
 
 function VistaraOrb({
   gateway, orbIdx, orbSize, ringType, localAngle, ringRadius,
   isFocused, isHovered, panelOpen, isPulled, pullProgress, pullTarget,
-  onHover, onClick, worldPosRef,
+  onHover, onClick, worldPosRef, isOverview,
 }: VistaraOrbProps) {
   const basePos = useMemo<[number,number,number]>(() => {
     if (ringType === 'B') return [0, ringRadius*Math.cos(localAngle), ringRadius*Math.sin(localAngle)]
@@ -629,51 +771,73 @@ function VistaraOrb({
 
   const groupRef  = useRef<THREE.Group>(null)
   const ZERO      = useMemo(() => new THREE.Vector3(), [])
-  // Animated scale: smoothly grows larger when focused so the orb appears thrown toward the lens
-  const scaleRef      = useRef(orbSize * 0.15)
-  const burstRef      = useRef(-10)
-  const prevPanelOpen = useRef(false)
+  const scaleRef      = useRef(orbSize * 0.30)
+  // throw state: age counts up from 0 when focus is acquired
+  const throwRef      = useRef({ age: 10, prevFocused: false })
+
+  const { camera } = useThree()
 
   const nanoOrb = useMemo(() => {
     const inst = new NanoOrb({
       id: gateway.id, title: gateway.name, subtitle: gateway.tagline,
-      description: gateway.description, colorA: '#0014ff', colorB: '#5600ff',
+      description: gateway.description, colorA: '#0033ff', colorB: '#0077ff',
     })
     inst.setVisible(true)
     return inst
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateway.id])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const t = clock.elapsedTime
 
     if (isHovered)      nanoOrb.setSignal('hover')
     else if (isFocused) nanoOrb.setSignal('listening')
     else                nanoOrb.setSignal('idle')
-    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : 0.55)
+    nanoOrb.setVisualDim(isFocused || isHovered ? 1 : isOverview ? 0.82 : 0.55)
 
-    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : 0.3, 1, ZERO)
+    nanoOrb.update(t, isHovered ? 0.5 : 0, isFocused, false, isFocused ? 1 : isOverview ? 0.55 : 0.3, 1, ZERO)
 
-    // On panel open for this orb: fire a sin-bell burst so the node web appears
-    // to unfold outward — glass shards are timed to begin assembling at the peak
-    if (isFocused && panelOpen && !prevPanelOpen.current) burstRef.current = t
-    prevPanelOpen.current = isFocused && panelOpen
-    const bp    = Math.min((t - burstRef.current) / 0.65, 1)
-    const burst = isFocused ? Math.sin(Math.PI * bp) * (orbSize * 1.0) : 0
-    const targetScale = orbSize * (isFocused ? 0.22 : 0.15) + burst
-    scaleRef.current += (targetScale - scaleRef.current) * 0.06
+    // Track when focus is acquired and advance throw age
+    if (isFocused !== throwRef.current.prevFocused) {
+      throwRef.current.prevFocused = isFocused
+      if (isFocused) throwRef.current.age = 0
+    }
+    if (throwRef.current.age < 1.0) throwRef.current.age += delta
+
+    // Sin-bell scale spike: peaks at orbSize*2.5 at t=0.3s, gone by t=0.65s
+    const throwAge  = throwRef.current.age
+    const throwBell = isFocused && throwAge < 0.65
+      ? Math.sin(Math.PI * Math.min(throwAge / 0.65, 1)) * (orbSize * 2.5)
+      : 0
+    const restScale    = orbSize * (isFocused ? 0.45 : 0.30)
+    const targetScale  = restScale + throwBell
+    const lerpSpeed    = throwBell > orbSize * 0.4 ? 0.30 : 0.08
+    scaleRef.current  += (targetScale - scaleRef.current) * lerpSpeed
     nanoOrb.group.scale.multiplyScalar(scaleRef.current)
 
     if (groupRef.current) {
       const wp = new THREE.Vector3()
       groupRef.current.getWorldPosition(wp)
       worldPosRef.current[orbIdx] = wp
+
       if (isPulled && pullTarget && pullProgress > 0) {
         groupRef.current.position.lerp(pullTarget, pullProgress * pullProgress * 0.05)
+      } else if (isFocused && throwAge < 0.65) {
+        // Launch the orb toward the camera — compute direction in parent-local space
+        const toCamera = new THREE.Vector3().subVectors(camera.position, wp).normalize()
+        const parent   = groupRef.current.parent
+        if (parent) toCamera.applyQuaternion(parent.quaternion.clone().invert())
+        const throwDist = Math.sin(Math.PI * Math.min(throwAge / 0.65, 1)) * 180
+        groupRef.current.position.set(
+          basePos[0] + toCamera.x * throwDist,
+          basePos[1] + toCamera.y * throwDist,
+          basePos[2] + toCamera.z * throwDist,
+        )
       } else {
         groupRef.current.position.set(...basePos)
       }
     }
+
   })
 
   const nameChars = Array.from(gateway.name)
@@ -693,7 +857,8 @@ function VistaraOrb({
         <meshBasicMaterial visible={false} />
       </mesh>
       <primitive object={nanoOrb.group} />
-      <Html center occlude={false} position={[0, 0, 0]}>
+      {/* φ label — hidden in overview to keep clean; visible in close-up */}
+      {!isOverview && <Html center occlude={false} position={[0, 0, 0]}>
         <div
           onClick={e => { e.stopPropagation(); onClick(orbIdx, gateway.id) }}
           onMouseEnter={() => onHover(gateway.id)}
@@ -743,364 +908,18 @@ function VistaraOrb({
             transition: 'opacity 0.4s',
           }}>{gateway.tagline}</div>
         </div>
-      </Html>
+      </Html>}
     </group>
   )
 }
 
-// ─── neural links ─────────────────────────────────────────────────────────────
-const NL_LINKS = [
-  {a:0,b:1},{a:1,b:2},{a:2,b:3},{a:3,b:4},{a:4,b:5},{a:5,b:6},{a:6,b:7},{a:7,b:0},
-  {a:0,b:3},{a:0,b:5},{a:1,b:4},{a:2,b:6},
-]
-const NL_NF     = 24   // gossamer fibers per link
-const NL_NE     = 7    // electric fibers per link
-const NL_SEG    = 22   // path subdivision steps
-const NL_SPREAD = Math.PI * 65 / 180
-
-function nlElecColor(t: number): THREE.Color {
-  return new THREE.Color(Math.round(t*86)/255, Math.round(20-t*20)/255, 1)
-}
-
-type FParams = { a1: number; a2: number; r1: number; r2: number }
-const NL_GOSS_PARAMS: FParams[][] = NL_LINKS.map(() =>
-  Array.from({ length: NL_NF }, () => ({
-    a1: (Math.random()-0.5)*2*NL_SPREAD,
-    a2: (Math.random()-0.5)*2*NL_SPREAD,
-    r1: Math.random()*0.5+0.5,
-    r2: Math.random()*0.5+0.5,
-  }))
-)
-const NL_ELEC_PARAMS: FParams[][] = NL_LINKS.map(() =>
-  Array.from({ length: NL_NE }, () => ({
-    a1: (Math.random()-0.5)*2*NL_SPREAD*0.45,
-    a2: (Math.random()-0.5)*2*NL_SPREAD*0.45,
-    r1: Math.random()*0.3+0.2,
-    r2: Math.random()*0.3+0.2,
-  }))
-)
-
-function fillBezier(
-  arr: Float32Array, off: number, nSeg: number,
-  p0x:number, p0y:number, p0z:number,
-  c1x:number, c1y:number, c1z:number,
-  c2x:number, c2y:number, c2z:number,
-  p1x:number, p1y:number, p1z:number,
-) {
-  let i = off
-  let px = p0x, py = p0y, pz = p0z
-  for (let s = 1; s <= nSeg; s++) {
-    const t = s/nSeg, mt=1-t, mt2=mt*mt, mt3=mt2*mt, t2=t*t, t3=t2*t
-    const a=mt3, b=3*mt2*t, c=3*mt*t2, d=t3
-    const nx=a*p0x+b*c1x+c*c2x+d*p1x
-    const ny=a*p0y+b*c1y+c*c2y+d*p1y
-    const nz=a*p0z+b*c1z+c*c2z+d*p1z
-    arr[i++]=px; arr[i++]=py; arr[i++]=pz
-    arr[i++]=nx; arr[i++]=ny; arr[i++]=nz
-    px=nx; py=ny; pz=nz
-  }
-}
-
-// ── Per-link lifecycle — each link animates independently ────────────────────
-interface LinkCycle {
-  birthT: number        // clock time this instance was born
-  drawDur: number       // seconds to grow from pA → pB
-  holdDur: number       // seconds at peak brightness
-  fadeDur: number       // seconds to dissolve
-  isWave: boolean       // sinusoidal path instead of bezier fan
-  waveFreq: number      // # of oscillations along the link
-  waveAmpFrac: number   // wave amplitude as fraction of link length
-  nextBirth: number     // clock time to spawn the next instance
-}
-
-function makeLinkCycle(li: number): LinkCycle {
-  const isQuick = Math.random() < 0.38  // 38% flash on instantly
-  return {
-    birthT: -999,
-    drawDur: isQuick ? 0.04 + Math.random() * 0.12 : 0.28 + Math.random() * 0.44,
-    holdDur: 0.50 + Math.random() * 1.90,
-    fadeDur: 0.32 + Math.random() * 0.60,
-    isWave: Math.random() < 0.35,
-    waveFreq: 2 + Math.floor(Math.random() * 3),
-    waveAmpFrac: 0.04 + Math.random() * 0.10,
-    nextBirth: 0.8 + li * 0.48 + Math.random() * 0.7,
-  }
-}
-
-// Cinematic opacity: ramp-in → dim-bright-dim breathe → fade-out with flicker
-function linkAlpha(cycle: LinkCycle, t: number, li: number): number {
-  const el = t - cycle.birthT
-  if (el < 0) return 0
-  const { drawDur, holdDur, fadeDur } = cycle
-  if (el < drawDur) {
-    const p = el / drawDur
-    return (1 - Math.pow(1 - p, 1.7)) * (0.82 + 0.18 * Math.sin(t * 26 + li * 2.1))
-  }
-  const holdEl = el - drawDur
-  if (holdEl < holdDur) {
-    const st = holdEl / holdDur
-    const breathe = 0.58 + 0.42 * Math.sin(st * Math.PI)          // dim → bright → dim arc
-    const flutter = 0.80 + 0.20 * Math.sin(t * 6.8 + li * 2.4) * Math.sin(t * 13.9 + li * 5.2)
-    return breathe * flutter
-  }
-  const fadeEl = el - drawDur - holdDur
-  if (fadeEl >= fadeDur) return 0
-  const p = 1 - fadeEl / fadeDur
-  return Math.max(0, p * p) * (0.52 + 0.48 * Math.sin(t * 9.1 + li * 3.7))
-}
-
-// Draw progress 0→1: fraction of the A→B path that's currently visible
-function linkDrawProg(cycle: LinkCycle, t: number): number {
-  const el = t - cycle.birthT
-  if (el <= 0) return 0
-  if (el >= cycle.drawDur) return 1
-  const p = el / cycle.drawDur
-  return 1 - Math.pow(1 - p, 2.5)  // ease-out: fast at source, slows at target
-}
-
-interface OrbNeuralLinksProps {
-  worldPosRef: React.MutableRefObject<Record<number, THREE.Vector3>>
-  focusedIdx: number
-}
-
-function OrbNeuralLinks({ worldPosRef, focusedIdx }: OrbNeuralLinksProps) {
-  const groupRef    = useRef<THREE.Group>(null)
-  const gossGeoRef  = useRef<THREE.BufferGeometry[]>([])
-  const elecGeoRef  = useRef<THREE.BufferGeometry[]>([])
-  const pulseGeoRef = useRef<THREE.BufferGeometry[]>([])
-  const gossMatRef  = useRef<THREE.LineBasicMaterial[]>([])
-  const elecMatRef  = useRef<THREE.LineBasicMaterial[]>([])
-  const pulseMatRef = useRef<THREE.PointsMaterial[]>([])
-  const geoReady    = useRef(false)
-  const frameIdx    = useRef(0)
-  const cycleRef    = useRef<LinkCycle[]>([])
-  const _dir  = useRef(new THREE.Vector3())
-  const _perp = useRef(new THREE.Vector3())
-  const _pr2  = useRef(new THREE.Vector3())
-  const _tmp  = useRef(new THREE.Vector3())
-
-  function initGeo() {
-    if (!groupRef.current) return
-    while (groupRef.current.children.length) groupRef.current.remove(groupRef.current.children[0])
-    gossGeoRef.current=[]; elecGeoRef.current=[]; pulseGeoRef.current=[]
-    gossMatRef.current=[]; elecMatRef.current=[]; pulseMatRef.current=[]
-    for (let li=0; li<NL_LINKS.length; li++) {
-      const gGeo = new THREE.BufferGeometry()
-      gGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NL_NF*NL_SEG*6), 3))
-      const gMat = new THREE.LineBasicMaterial({ color:0xb4c8ff, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false })
-      groupRef.current.add(new THREE.LineSegments(gGeo, gMat))
-      gossGeoRef.current.push(gGeo); gossMatRef.current.push(gMat)
-
-      const eGeo = new THREE.BufferGeometry()
-      eGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NL_NE*NL_SEG*6), 3))
-      const eMat = new THREE.LineBasicMaterial({ color:nlElecColor(li/NL_LINKS.length), transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false })
-      groupRef.current.add(new THREE.LineSegments(eGeo, eMat))
-      elecGeoRef.current.push(eGeo); elecMatRef.current.push(eMat)
-
-      const pGeo = new THREE.BufferGeometry()
-      pGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3))
-      const pMat = new THREE.PointsMaterial({ color:nlElecColor(li/NL_LINKS.length), size:5, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true })
-      groupRef.current.add(new THREE.Points(pGeo, pMat))
-      pulseGeoRef.current.push(pGeo); pulseMatRef.current.push(pMat)
-    }
-    geoReady.current = true
-  }
-
-  // Writes geometry for all links, clamping invisible segments to the draw tip
-  function updatePositions(
-    pos: Record<number, THREE.Vector3>,
-    drawProgs: number[],
-    cycles: LinkCycle[],
-  ) {
-    const dir=_dir.current, perp=_perp.current, pr2=_pr2.current, tmp=_tmp.current
-    for (let li=0; li<NL_LINKS.length; li++) {
-      const {a,b}=NL_LINKS[li]
-      const pA=pos[a], pB=pos[b]; if (!pA||!pB) continue
-      dir.subVectors(pB,pA)
-      const len=dir.length(); dir.normalize()
-      if (Math.abs(dir.y)<0.9) tmp.set(0,1,0); else tmp.set(1,0,0)
-      perp.crossVectors(dir,tmp).normalize()
-      pr2.crossVectors(dir,perp).normalize()
-
-      const dp = drawProgs[li]
-      const visSeg = Math.min(Math.floor(dp * NL_SEG), NL_SEG)
-      // Collapse point — invisible segments degenerate here (no rendering artifact)
-      const ef = visSeg / NL_SEG
-      const epx=pA.x+(pB.x-pA.x)*ef, epy=pA.y+(pB.y-pA.y)*ef, epz=pA.z+(pB.z-pA.z)*ef
-
-      const cycle = cycles[li]
-      const isWave = cycle.isWave
-      const waveAmp = Math.min(cycle.waveAmpFrac * len, 18)  // cap at 18 world units
-      const waveFreq = cycle.waveFreq
-
-      // ── Gossamer fibers ────────────────────────────────────────────────────
-      const gArr=(gossGeoRef.current[li].attributes.position as THREE.BufferAttribute).array as Float32Array
-      for (let f=0; f<NL_NF; f++) {
-        const fOff = f * NL_SEG * 6
-        if (isWave) {
-          // Sinusoidal wave path — fibers spread thin across perpendicular axis
-          const spread = (f/NL_NF - 0.5) * len * 0.020
-          let px=pA.x, py=pA.y, pz=pA.z
-          for (let s=1; s<=NL_SEG; s++) {
-            const tt=s/NL_SEG
-            const wave=Math.sin(tt*waveFreq*Math.PI*2)*waveAmp
-            const nx=pA.x+(pB.x-pA.x)*tt+perp.x*wave+pr2.x*spread
-            const ny=pA.y+(pB.y-pA.y)*tt+perp.y*wave+pr2.y*spread
-            const nz=pA.z+(pB.z-pA.z)*tt+perp.z*wave+pr2.z*spread
-            const base=fOff+(s-1)*6
-            if (s<=visSeg) {
-              gArr[base]=px; gArr[base+1]=py; gArr[base+2]=pz
-              gArr[base+3]=nx; gArr[base+4]=ny; gArr[base+5]=nz
-            } else {
-              gArr[base]=epx; gArr[base+1]=epy; gArr[base+2]=epz
-              gArr[base+3]=epx; gArr[base+4]=epy; gArr[base+5]=epz
-            }
-            px=nx; py=ny; pz=nz
-          }
-        } else {
-          // Bezier fan — existing path, then clamp invisible segs to tip
-          const {a1,a2,r1,r2}=NL_GOSS_PARAMS[li][f]
-          const ar1=r1*len*0.42, ar2=r2*len*0.42
-          const ca1=Math.cos(a1),sa1=Math.sin(a1),ca2=Math.cos(a2),sa2=Math.sin(a2)
-          fillBezier(gArr,fOff,NL_SEG,
-            pA.x,pA.y,pA.z,
-            pA.x+dir.x*len*0.3+(ca1*perp.x+sa1*pr2.x)*ar1,
-            pA.y+dir.y*len*0.3+(ca1*perp.y+sa1*pr2.y)*ar1,
-            pA.z+dir.z*len*0.3+(ca1*perp.z+sa1*pr2.z)*ar1,
-            pB.x-dir.x*len*0.3+(ca2*perp.x-sa2*pr2.x)*ar2,
-            pB.y-dir.y*len*0.3+(ca2*perp.y-sa2*pr2.y)*ar2,
-            pB.z-dir.z*len*0.3+(ca2*perp.z-sa2*pr2.z)*ar2,
-            pB.x,pB.y,pB.z)
-          for (let s=visSeg; s<NL_SEG; s++) {
-            const base=fOff+s*6
-            gArr[base]=epx; gArr[base+1]=epy; gArr[base+2]=epz
-            gArr[base+3]=epx; gArr[base+4]=epy; gArr[base+5]=epz
-          }
-        }
-      }
-      gossGeoRef.current[li].attributes.position.needsUpdate=true
-      gossGeoRef.current[li].computeBoundingSphere()
-
-      // ── Electric fibers ────────────────────────────────────────────────────
-      const eArr=(elecGeoRef.current[li].attributes.position as THREE.BufferAttribute).array as Float32Array
-      for (let f=0; f<NL_NE; f++) {
-        const fOff = f * NL_SEG * 6
-        if (isWave) {
-          const spread = (f/NL_NE - 0.5) * len * 0.006
-          let px=pA.x, py=pA.y, pz=pA.z
-          for (let s=1; s<=NL_SEG; s++) {
-            const tt=s/NL_SEG
-            const wave=Math.sin(tt*waveFreq*Math.PI*2)*waveAmp*0.40
-            const nx=pA.x+(pB.x-pA.x)*tt+perp.x*wave+pr2.x*spread
-            const ny=pA.y+(pB.y-pA.y)*tt+perp.y*wave+pr2.y*spread
-            const nz=pA.z+(pB.z-pA.z)*tt+perp.z*wave+pr2.z*spread
-            const base=fOff+(s-1)*6
-            if (s<=visSeg) {
-              eArr[base]=px; eArr[base+1]=py; eArr[base+2]=pz
-              eArr[base+3]=nx; eArr[base+4]=ny; eArr[base+5]=nz
-            } else {
-              eArr[base]=epx; eArr[base+1]=epy; eArr[base+2]=epz
-              eArr[base+3]=epx; eArr[base+4]=epy; eArr[base+5]=epz
-            }
-            px=nx; py=ny; pz=nz
-          }
-        } else {
-          const {a1,a2,r1,r2}=NL_ELEC_PARAMS[li][f]
-          const ar1=r1*len*0.38, ar2=r2*len*0.38
-          const ca1=Math.cos(a1),sa1=Math.sin(a1),ca2=Math.cos(a2),sa2=Math.sin(a2)
-          fillBezier(eArr,fOff,NL_SEG,
-            pA.x,pA.y,pA.z,
-            pA.x+dir.x*len*0.28+(ca1*perp.x+sa1*pr2.x)*ar1,
-            pA.y+dir.y*len*0.28+(ca1*perp.y+sa1*pr2.y)*ar1,
-            pA.z+dir.z*len*0.28+(ca1*perp.z+sa1*pr2.z)*ar1,
-            pB.x-dir.x*len*0.28+(ca2*perp.x-sa2*pr2.x)*ar2,
-            pB.y-dir.y*len*0.28+(ca2*perp.y-sa2*pr2.y)*ar2,
-            pB.z-dir.z*len*0.28+(ca2*perp.z-sa2*pr2.z)*ar2,
-            pB.x,pB.y,pB.z)
-          for (let s=visSeg; s<NL_SEG; s++) {
-            const base=fOff+s*6
-            eArr[base]=epx; eArr[base+1]=epy; eArr[base+2]=epz
-            eArr[base+3]=epx; eArr[base+4]=epy; eArr[base+5]=epz
-          }
-        }
-      }
-      elecGeoRef.current[li].attributes.position.needsUpdate=true
-      elecGeoRef.current[li].computeBoundingSphere()
-    }
-  }
-
-  useFrame(({clock}) => {
-    const t = clock.elapsedTime
-    const pos = worldPosRef.current
-    if (Object.keys(pos).length < 8) return
-    const avgDist = Object.values(pos).reduce((s,p)=>s+p.length(),0)/8
-    if (avgDist < 60) return
-    if (!geoReady.current) { initGeo(); return }
-
-    // Lazy-init per-link cycles after geometry is ready
-    if (cycleRef.current.length === 0) {
-      cycleRef.current = NL_LINKS.map((_, li) => makeLinkCycle(li))
-    }
-
-    const drawProgs: number[] = []
-    let needsPos = false   // position update needed if any link is mid-draw
-
-    for (let li=0; li<NL_LINKS.length; li++) {
-      const cycle = cycleRef.current[li]
-      const el = t - cycle.birthT
-      const total = cycle.drawDur + cycle.holdDur + cycle.fadeDur
-
-      // Respawn when dead and timer has elapsed
-      if (t >= cycle.nextBirth && el >= total) {
-        cycle.birthT     = t
-        const isQuick    = Math.random() < 0.38
-        cycle.drawDur    = isQuick ? 0.04 + Math.random() * 0.12 : 0.28 + Math.random() * 0.44
-        cycle.holdDur    = 0.50 + Math.random() * 1.90
-        cycle.fadeDur    = 0.32 + Math.random() * 0.60
-        cycle.isWave     = Math.random() < 0.35
-        cycle.waveFreq   = 2 + Math.floor(Math.random() * 3)
-        cycle.waveAmpFrac= 0.04 + Math.random() * 0.10
-        cycle.nextBirth  = t + cycle.drawDur + cycle.holdDur + cycle.fadeDur + 1.5 + Math.random() * 4.5
-      }
-
-      const dp = linkDrawProg(cycle, t)
-      drawProgs.push(dp)
-      if (dp < 1.0) needsPos = true
-
-      const alpha = linkAlpha(cycle, t, li)
-      const isFocused = NL_LINKS[li].a===focusedIdx || NL_LINKS[li].b===focusedIdx
-      // Keep focused orb's links at least dimly visible while alive
-      const isAlive = cycle.birthT > 0 && el >= 0 && el < total
-      const fa = (isFocused && isAlive) ? Math.max(alpha, 0.45) : alpha
-
-      if (gossMatRef.current[li]) gossMatRef.current[li].opacity = fa * 0.10
-      if (elecMatRef.current[li]) elecMatRef.current[li].opacity = fa * 0.76
-
-      // Pulse dot: rides the draw tip during draw phase, disappears after
-      const {a: lA, b: lB} = NL_LINKS[li]
-      const pA=pos[lA], pB=pos[lB]
-      if (pA && pB && pulseGeoRef.current[li] && pulseMatRef.current[li]) {
-        const pa=(pulseGeoRef.current[li].attributes.position as THREE.BufferAttribute).array as Float32Array
-        pa[0]=pA.x+(pB.x-pA.x)*dp; pa[1]=pA.y+(pB.y-pA.y)*dp; pa[2]=pA.z+(pB.z-pA.z)*dp
-        pulseGeoRef.current[li].attributes.position.needsUpdate=true
-        const inDraw = el >= 0 && el < cycle.drawDur
-        pulseMatRef.current[li].opacity = inDraw
-          ? Math.sin((el/cycle.drawDur)*Math.PI) * fa * 0.95
-          : 0
-      }
-    }
-
-    // Positions update: always when mid-draw (dp<1), otherwise every 4 frames for ring drift
-    frameIdx.current++
-    if (needsPos || frameIdx.current % 4 === 0) {
-      updatePositions(pos, drawProgs, cycleRef.current)
-    }
-  })
-
-  return <group ref={groupRef} />
-}
-
 // ─── gyroscope scene ─────────────────────────────────────────────────────────
+interface CamAnimState {
+  active: boolean; startPos: THREE.Vector3; endPos: THREE.Vector3
+  startTarget: THREE.Vector3; endTarget: THREE.Vector3
+  startT: number; duration: number
+}
+
 interface GyroSceneProps {
   focusedIdx: number; hoveredId: string | null
   onHover: (id: string | null) => void; onOrbClick: (idx: number, id: string) => void
@@ -1110,17 +929,57 @@ interface GyroSceneProps {
   traverseRef: React.MutableRefObject<TraverseState>
   panelOpen: boolean
   onPhantomClick: () => void
+  isOverview: boolean; orbitEnabled: boolean; onOverviewAnimDone: () => void
+  overviewZRef: React.MutableRefObject<number>
 }
 
 function GyroScene({
   focusedIdx, hoveredId, onHover, onOrbClick,
   vortexTargetIdx, vortexProgressRef, vortexPhase,
   worldPosRef, screenPosRef, traverseRef, panelOpen, onPhantomClick,
+  isOverview, orbitEnabled, onOverviewAnimDone, overviewZRef,
 }: GyroSceneProps) {
   const ringARef = useRef<THREE.Group>(null)
   const ringBRef = useRef<THREE.Group>(null)
   const ringCRef = useRef<THREE.Group>(null)
+  const { camera, size } = useThree()
+  const lookAt       = useRef(new THREE.Vector3())
   const anglesRef    = useRef({ A: 0, B: 0, C: 0 })
+  const prevFocusRef = useRef(focusedIdx)
+  const throwRef     = useRef({ startT: -10 })
+  const controlsRef  = useRef<any>(null)
+  const prevIsOverviewRef = useRef(isOverview)
+  const pendingOverviewZRef = useRef<number | null>(null)
+  const camAnimRef = useRef<CamAnimState>({
+    active: false,
+    startPos: new THREE.Vector3(), endPos: new THREE.Vector3(),
+    startTarget: new THREE.Vector3(), endTarget: new THREE.Vector3(),
+    startT: 0, duration: 1.4,
+  })
+  // Arc traversal state — camera arcs through scene when switching focused orb
+  const camTraverseRef = useRef({
+    active: false, startT: 0, duration: 1.4,
+    startPos: new THREE.Vector3(), midPos: new THREE.Vector3(),
+    startLookAt: new THREE.Vector3(), endLookAt: new THREE.Vector3(),
+  })
+
+  // Mount: set camera to the viewport-appropriate overview distance immediately
+  useEffect(() => {
+    const z = computeOverviewZ((camera as THREE.PerspectiveCamera).aspect)
+    overviewZRef.current = z
+    if (isOverview) {
+      camera.position.set(0, 0, z)
+      if (controlsRef.current) { controlsRef.current.target.set(0, 0, 0); controlsRef.current.update() }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Resize / orientation change: recompute and queue a smooth camera move
+  useEffect(() => {
+    const newZ = computeOverviewZ(size.width / size.height)
+    overviewZRef.current = newZ
+    if (isOverview) pendingOverviewZRef.current = newZ
+  }, [size])
 
   // ── Saturn ring materials — one per ring so uniforms are independent ──
   const ringAMat = useMemo(() => new THREE.ShaderMaterial({
@@ -1188,6 +1047,117 @@ function GyroScene({
     ringCMat.uniforms.uTime.value = t
     ringCMat.uniforms.uTilt.value = Math.abs(Math.cos(t * 0.22) * 0.10) + Math.abs(Math.sin(t * 0.11) * 0.18)
 
+    // ── Orientation / resize repositioning (while in overview) ─────────────
+    if (isOverview && !camAnimRef.current.active && pendingOverviewZRef.current !== null) {
+      const newZ = pendingOverviewZRef.current
+      pendingOverviewZRef.current = null
+      if (Math.abs(newZ - camera.position.z) > 25) {
+        const ca = camAnimRef.current
+        ca.active = true
+        ca.startPos.copy(camera.position)
+        ca.endPos.set(0, 0, newZ)
+        ca.startTarget.copy(lookAt.current)
+        ca.endTarget.set(0, 0, 0)
+        ca.startT = clock.elapsedTime
+        ca.duration = 0.7
+      }
+    }
+
+    // ── Overview ↔ close-up camera animation ──────────────────────────────
+    if (prevIsOverviewRef.current !== isOverview) {
+      prevIsOverviewRef.current = isOverview
+      const ca = camAnimRef.current
+      ca.active    = true
+      ca.startPos.copy(camera.position)
+      ca.endPos.set(0, 0, isOverview ? overviewZRef.current : 550)
+      ca.startTarget.copy(lookAt.current)
+      ca.endTarget.set(0, 0, 0)
+      ca.startT    = clock.elapsedTime
+      ca.duration  = isOverview ? 1.4 : 0.9
+      // Sync prevFocusRef so no throw fires when landing in close-up
+      if (!isOverview) prevFocusRef.current = focusedIdx
+    }
+
+    const ca = camAnimRef.current
+    if (ca.active) {
+      const tp = Math.min((clock.elapsedTime - ca.startT) / ca.duration, 1)
+      const te = easeInOutCubic(tp)
+      camera.position.lerpVectors(ca.startPos, ca.endPos, te)
+      lookAt.current.lerpVectors(ca.startTarget, ca.endTarget, te)
+      camera.lookAt(lookAt.current)
+      if (tp >= 1) {
+        ca.active = false
+        if (isOverview) {
+          if (controlsRef.current) { controlsRef.current.target.set(0,0,0); controlsRef.current.update() }
+          onOverviewAnimDone()
+        }
+      }
+      return
+    }
+
+    if (isOverview) return   // OrbitControls drives camera when enabled
+
+    // Camera throw + arc traversal when focus changes
+    if (prevFocusRef.current !== focusedIdx) {
+      prevFocusRef.current = focusedIdx
+      throwRef.current.startT = clock.elapsedTime
+
+      // Begin arc traversal: pull back over the gyroscope, swoop to new orb
+      const newWp = worldPosRef.current[focusedIdx]
+      const ct = camTraverseRef.current
+      ct.active = true
+      ct.startT  = clock.elapsedTime
+      ct.duration = 1.35
+      ct.startPos.copy(camera.position)
+      ct.startLookAt.copy(lookAt.current)
+      if (newWp) {
+        ct.endLookAt.copy(newWp)
+        // Midpoint: pull back 80% of overview distance, laterally offset toward target
+        const pullZ = overviewZRef.current * 0.82
+        ct.midPos.set(newWp.x * 0.30, newWp.y * 0.30, pullZ)
+      } else {
+        ct.endLookAt.set(0, 0, 0)
+        ct.midPos.set(0, 0, overviewZRef.current * 0.82)
+      }
+    }
+    const tp     = Math.min((clock.elapsedTime - throwRef.current.startT) / 0.55, 1)
+    const throwZ = Math.sin(Math.PI * tp) * 160
+
+    const vp = vortexProgressRef.current
+    if (vortexTargetIdx !== null && vp > 0) {
+      const wp = worldPosRef.current[vortexTargetIdx]
+      if (wp) {
+        const t2 = easeInExpo(Math.min(vp, 1))
+        camera.position.lerp(new THREE.Vector3(wp.x*0.3, wp.y*0.2, 550 - t2*350), t2*0.12)
+        camera.lookAt(wp)
+      }
+    } else {
+      const ct = camTraverseRef.current
+      if (ct.active) {
+        const raw = Math.min((clock.elapsedTime - ct.startT) / ct.duration, 1)
+        if (raw < 0.44) {
+          // Phase 1 — pull back to midpoint while panning lookAt to new orb
+          const ep = easeInOutCubic(raw / 0.44)
+          camera.position.lerpVectors(ct.startPos, ct.midPos, ep)
+          lookAt.current.lerpVectors(ct.startLookAt, ct.endLookAt, ep)
+        } else {
+          // Phase 2 — swoop into close-up; track live orb position as rings rotate
+          const ep = easeInOutCubic((raw - 0.44) / 0.56)
+          camera.position.lerpVectors(ct.midPos, new THREE.Vector3(0, 0, 550 - throwZ), ep)
+          const liveWp = worldPosRef.current[focusedIdx]
+          if (liveWp) ct.endLookAt.copy(liveWp)
+          lookAt.current.copy(ct.endLookAt)
+        }
+        camera.lookAt(lookAt.current)
+        if (raw >= 1) ct.active = false
+      } else {
+        camera.position.lerp(new THREE.Vector3(0, 0, 550 - throwZ), tp < 1 ? 0.28 : 0.04)
+        const wp = worldPosRef.current[focusedIdx]
+        if (wp) lookAt.current.lerp(wp, 0.04)
+        else lookAt.current.lerp(new THREE.Vector3(), 0.04)
+        camera.lookAt(lookAt.current)
+      }
+    }
   })
 
   const spiralTarget = vortexTargetIdx !== null ? (worldPosRef.current[vortexTargetIdx] ?? null) : null
@@ -1196,8 +1166,14 @@ function GyroScene({
 
   return (
     <>
-      <OrbitControls enableDamping dampingFactor={0.08} enablePan={false} minDistance={220} maxDistance={1400} />
+      <OrbitControls ref={controlsRef} makeDefault enabled={orbitEnabled}
+        enableDamping dampingFactor={0.07}
+        minDistance={200} maxDistance={1600}
+        enablePan={false} rotateSpeed={0.55} zoomSpeed={1.1}
+      />
       <ambientLight intensity={0.04} />
+      <StarField3D />
+      <CentralVortex />
       <ParticleField spiralTarget={spiralTarget} spiralT={spiralT} />
       <PhantomOrbsSystem onPhantomClick={onPhantomClick} />
       <StarTrailsSystem />
@@ -1214,7 +1190,7 @@ function GyroScene({
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
             pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
+            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
         ))}
       </group>
 
@@ -1230,7 +1206,7 @@ function GyroScene({
             isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
             pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
             pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
+            onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
         ))}
       </group>
 
@@ -1247,13 +1223,12 @@ function GyroScene({
               isPulled={vortexTargetIdx!==null&&vortexTargetIdx!==idx}
               pullProgress={vortexTargetIdx!==null&&vortexTargetIdx!==idx?vortexProgressRef.current:0}
               pullTarget={vortexTargetIdx!==null?(worldPosRef.current[vortexTargetIdx]??null):null}
-              onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} />
+              onHover={onHover} onClick={onOrbClick} worldPosRef={worldPosRef} isOverview={isOverview} />
           ))}
         </group>
       </group>
 
       <ScreenTracker worldRef={worldPosRef} screenRef={screenPosRef} />
-      <OrbNeuralLinks worldPosRef={worldPosRef} focusedIdx={focusedIdx} />
     </>
   )
 }
@@ -1306,11 +1281,55 @@ function LiveAppPlaceholder({ gateway }: { gateway: Gateway }) {
   )
 }
 
+// ─── per-gateway feature content ─────────────────────────────────────────────
+const GATEWAY_DETAILS: Record<string, { features: { title: string; body: string }[] }> = {
+  rtam: { features: [
+    { title: 'Pravāha Mapping',       body: 'Visualises natural flow patterns in your life to surface hidden rhythms.' },
+    { title: 'Conscious Scheduling',   body: 'Aligns your calendar to cosmic and personal energy cycles for effortless living.' },
+    { title: 'Harmony Score',          body: 'Continuous metric tracking alignment between your intention and daily action.' },
+  ]},
+  ojas: { features: [
+    { title: 'Pranic Rhythm Tracker',  body: 'Measures and charts your vital energy across every hour of the day.' },
+    { title: 'Vitality Insights',      body: 'AI-powered pattern analysis across sleep, food, movement, and mind.' },
+    { title: 'Circulation Dashboard',  body: 'Concentric ring visualisation of multi-dimensional wellness in real time.' },
+  ]},
+  mudra: { features: [
+    { title: 'Global Entity Archive',  body: 'Structured knowledge repository for conscious organisations and individuals.' },
+    { title: 'Permanence Protocol',    body: 'Immutable record system ensuring integrity across time and context.' },
+    { title: 'Kośa Mapping',           body: 'Multi-layer entity profiling aligned with traditional wisdom frameworks.' },
+  ]},
+  netra: { features: [
+    { title: 'Cross-Tantra Vision',    body: 'Observes patterns and anomalies across all VYAN systems simultaneously.' },
+    { title: 'Awareness Engine',       body: 'Intelligent perception layer that surfaces what matters, when it matters.' },
+    { title: 'Astronomical Sensing',   body: 'Real-time monitoring with cosmic-scale perspective on micro-scale events.' },
+  ]},
+  akriti: { features: [
+    { title: 'Drishti-Driven Design',  body: 'Creates digital experiences shaped by your unique perspective and intention.' },
+    { title: 'Prismatic Creation',     body: 'Refracts raw possibility into structured, beautiful digital artefacts.' },
+    { title: 'Anubhava Studio',        body: 'Full-stack creative environment built for conscious digital making.' },
+  ]},
+  sutra: { features: [
+    { title: 'Sangama Weaving',        body: 'Maps and strengthens intentional relationships between people and entities.' },
+    { title: 'Vivek Connections',      body: 'Intelligent discernment layer for building networks that truly resonate.' },
+    { title: 'Thread Intelligence',    body: 'Identifies dormant connections with high resonance potential waiting to unfold.' },
+  ]},
+  'chitra-prana': { features: [
+    { title: 'Imagery Breathwork',     body: 'Infuses static visuals with life, motion, and intentional prāṇic energy.' },
+    { title: 'Cosmic Aperture',        body: 'Wide-angle creative space for multi-modal visual storytelling at any scale.' },
+    { title: 'Prāṇa Visualisation',    body: 'Renders the invisible life-force within imagery as perceptible moving form.' },
+  ]},
+  maya: { features: [
+    { title: 'Reality Manifold',       body: 'Constructs layered digital realities from initial intention to tangible output.' },
+    { title: 'Dynamic Gateway',        body: 'The most versatile portal — its nature adapts to what you need to create.' },
+    { title: 'Manifestation Engine',   body: 'Bridges the gap between possibility-space and expressed digital form.' },
+  ]},
+}
+
 // ─── glass panel (side-sliding) ───────────────────────────────────────────────
 type PanelPhase = 'opening' | 'open' | 'closing'
 
-function GlassPanel({ gateway, onClose, onEnter, side }: {
-  gateway: Gateway; onClose: () => void; onEnter: () => void; side: 'left' | 'right'
+function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
+  gateway: Gateway; onClose: () => void; onBack: () => void; onEnter: () => void; side: 'left' | 'right'
 }) {
   const [phase, setPhase] = useState<PanelPhase>('opening')
   const [step,  setStep]  = useState(0)   // stagger index: 0=hidden, 1..5=each section
@@ -1333,6 +1352,10 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
     setStep(0); setPhase('closing')
     setTimeout(onClose, CLOSE_MS)
   }, [onClose])
+  const handleBack = useCallback(() => {
+    setStep(0); setPhase('closing')
+    setTimeout(onBack, CLOSE_MS)
+  }, [onBack])
 
   const isLeft = side === 'left'
   const c      = gateway.color
@@ -1350,7 +1373,22 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
     transition:'opacity 0.38s, transform 0.38s',
   })
 
+  // Shimmer direction alternates per orb: even=L→R, odd=R→L
+  const orbIdx = GATEWAYS.findIndex(g => g.id === gateway.id)
+  const shimmerAnim = orbIdx % 2 === 0 ? 'tagShimmerLR' : 'tagShimmerRL'
+
   return (
+    <>
+    <style>{`
+      @keyframes tagShimmerLR {
+        0%   { background-position: 200% center; }
+        100% { background-position: -200% center; }
+      }
+      @keyframes tagShimmerRL {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+      }
+    `}</style>
     <div style={{
       position:'fixed', inset:0, zIndex:200, display:'flex',
       alignItems:     isMobile ? 'flex-end' : 'stretch',
@@ -1365,7 +1403,12 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
       }} />
 
       {/* Panel — glass: semi-transparent + backdrop-filter so orbs show through */}
-      <div style={{
+      <div
+        onPointerDown={e => e.stopPropagation()}
+        onPointerMove={e => e.stopPropagation()}
+        onTouchStart={e => e.stopPropagation()}
+        onTouchMove={e => e.stopPropagation()}
+        style={{
         position:'relative', zIndex:2,
         width:  isMobile ? '100%' : 'min(500px, 46vw)',
         height: isMobile ? '88vh' : '100vh',
@@ -1426,17 +1469,32 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
         </div>
 
         {/* Scrollable content — each block reveals in sequence */}
-        <div style={{ flex:1, overflowY:'auto', overflowX:'hidden', padding: isMobile ? '14px 24px 0' : '16px 32px 0' }}>
+        <div
+          style={{ flex:1, overflowY:'auto', overflowX:'hidden', padding: isMobile ? '14px 24px 0' : '16px 32px 0' }}
+          onTouchStart={e => { e.stopPropagation(); (e.currentTarget as any)._tsY = e.touches[0].clientY }}
+          onTouchMove={e => {
+            e.stopPropagation()
+            e.preventDefault()
+            const el = e.currentTarget as HTMLDivElement
+            const dy = (el as any)._tsY - e.touches[0].clientY;
+            (el as any)._tsY = e.touches[0].clientY
+            el.scrollTop += dy
+          }}
+        >
           <div style={reveal(2)}>
             <h2 style={{
               fontFamily:'var(--font-vyan)', fontSize: isMobile ? '24px' : '26px',
-              letterSpacing:'0.13em', color:'rgba(255,255,255,0.92)',
+              letterSpacing:'0.13em', color:'#e80010',
               textTransform:'uppercase', margin:'10px 0 6px',
-              textShadow:`0 0 28px ${c}2a`,
             }}>{gateway.name}</h2>
             <p style={{
-              fontSize:'10px', letterSpacing:'0.18em', color:c,
-              textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 18px', opacity:0.72,
+              fontSize:'10px', letterSpacing:'0.18em',
+              textTransform:'uppercase', fontFamily:'var(--font-vyan)', margin:'0 0 18px',
+              background:'linear-gradient(90deg,#0a2fff 0%,#88aaff 30%,#cc99ff 55%,#6600cc 100%)',
+              backgroundSize:'200% auto',
+              WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+              backgroundClip:'text',
+              animation:`${shimmerAnim} 3.5s linear infinite`,
             }}>{gateway.tagline}</p>
           </div>
           <div style={reveal(3)}>
@@ -1447,6 +1505,31 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
             }}>{gateway.description}</p>
           </div>
           <div style={reveal(4)}>
+            {/* Gateway-specific feature cards */}
+            <div style={{ marginBottom:'24px' }}>
+              <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.16)', fontFamily:'var(--font-vyan)', marginBottom:'12px' }}>
+                Core Capabilities
+              </div>
+              {(GATEWAY_DETAILS[gateway.id]?.features ?? []).map((f, i) => (
+                <div key={i} style={{
+                  padding:'11px 14px', marginBottom:'8px', borderRadius:'8px',
+                  background:`linear-gradient(135deg,${c}09 0%,transparent 100%)`,
+                  border:`1px solid ${c}1a`,
+                  display:'flex', alignItems:'flex-start', gap:'12px',
+                }}>
+                  <div style={{
+                    flexShrink:0, width:'20px', height:'20px', borderRadius:'5px',
+                    border:`1px solid ${c}33`, display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:'8px', color:`${c}88`, fontFamily:'var(--font-vyan)', fontWeight:600,
+                  }}>{i + 1}</div>
+                  <div>
+                    <div style={{ fontSize:'10px', letterSpacing:'0.16em', textTransform:'uppercase', color:`${c}cc`, fontFamily:'var(--font-vyan)', marginBottom:'4px' }}>{f.title}</div>
+                    <div style={{ fontSize:'11px', lineHeight:'1.60', color:'rgba(255,255,255,0.36)', fontFamily:'var(--font-vyan)', letterSpacing:'0.02em' }}>{f.body}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Live Interface slot */}
             <div style={{ fontSize:'7px', letterSpacing:'0.32em', textTransform:'uppercase', color:'rgba(255,255,255,0.16)', fontFamily:'var(--font-vyan)', marginBottom:'10px' }}>
               Live Interface
             </div>
@@ -1474,13 +1557,27 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
           ...reveal(5),
         }}>
           <div style={{ display:'flex', gap:'10px' }}>
+            {/* Overview — close panel and zoom out to see all 8 orbs */}
+            <button onClick={handleBack} title="Return to Overview" style={{
+              flex:1, padding:'11px 0',
+              background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)',
+              borderRadius:'8px', color:'rgba(255,255,255,0.38)', fontSize:'9px',
+              letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
+              cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'7px',
+              transition:'color 0.2s, border-color 0.2s, background 0.2s',
+            }}
+            onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.70)'; b.style.borderColor='rgba(255,255,255,0.14)'; b.style.background='rgba(255,255,255,0.07)' }}
+            onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.color='rgba(255,255,255,0.38)'; b.style.borderColor='rgba(255,255,255,0.07)'; b.style.background='rgba(255,255,255,0.04)' }}
+            >
+              <BackIcon size={15} />Overview
+            </button>
             {/* Enter — launch this gateway's app */}
             <button onClick={onEnter} title="Enter gateway" style={{
-              flex:1, padding:'11px 0',
+              padding:'11px 24px',
               background:`${c}1a`, border:`1px solid ${c}55`,
               borderRadius:'8px', color:c, fontSize:'9px',
               letterSpacing:'0.2em', textTransform:'uppercase', fontFamily:'var(--font-vyan)',
-              cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'7px',
+              cursor:'pointer', display:'flex', alignItems:'center', gap:'7px',
               boxShadow:`0 0 16px ${c}14`,
               transition:'background 0.2s, box-shadow 0.2s',
             }}
@@ -1493,6 +1590,7 @@ function GlassPanel({ gateway, onClose, onEnter, side }: {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
@@ -1615,7 +1713,7 @@ type VortexPhase = 'idle' | 'pull' | 'peak' | 'passage' | 'done'
 export function VistaraVoid({ onBack, onGatewayEnter }: {
   onBack?: () => void; onGatewayEnter?: (gateway: Gateway) => void
 }) {
-  const [focusedIdx,      setFocusedIdx]      = useState(0)
+  const [focusedIdx,      setFocusedIdx]      = useState(-1)
   const [hoveredId,       setHoveredId]       = useState<string | null>(null)
   const [vortexPhase,     setVortexPhase]     = useState<VortexPhase>('idle')
   const [vortexTargetIdx, setVortexTargetIdx] = useState<number | null>(null)
@@ -1624,11 +1722,42 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const [panelGateway,    setPanelGateway]    = useState<Gateway | null>(null)
   const [panelSide,       setPanelSide]       = useState<'left' | 'right'>('left')
   const [showComingSoon,  setShowComingSoon]  = useState(false)
+  const [isOverview,      setIsOverview]      = useState(true)
+  const [orbitEnabled,    setOrbitEnabled]    = useState(true)   // camera already at z=1300 on load
+  const isOverviewRef  = useRef(true)
+  const overviewZRef   = useRef(750)
+  useEffect(() => { isOverviewRef.current = isOverview }, [isOverview])
 
   const worldPosRef       = useRef<Record<number, THREE.Vector3>>({})
   const screenPosRef      = useRef<Record<number, { x: number; y: number }>>({})
   const vortexAnimRef     = useRef<number>(0)
+
+  // ── Custom orbital cursor — mouse-only, hidden on touch/coarse devices ───────
+  const hasFinePointer  = typeof window !== 'undefined' && window.matchMedia('(pointer:fine)').matches
+  const cursorTargetRef = useRef({ x: -400, y: -400 })
+  const cursorRingRef   = useRef({ x: -400, y: -400 })
+  const ringDivRef      = useRef<HTMLDivElement>(null)
+  const dotDivRef       = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!hasFinePointer) return
+    const onMove = (e: MouseEvent) => { cursorTargetRef.current = { x: e.clientX, y: e.clientY } }
+    window.addEventListener('mousemove', onMove)
+    let raf: number
+    const tick = () => {
+      const t = cursorTargetRef.current
+      const r = cursorRingRef.current
+      r.x += (t.x - r.x) * 0.14
+      r.y += (t.y - r.y) * 0.14
+      if (ringDivRef.current) ringDivRef.current.style.transform = `translate(${r.x}px,${r.y}px)`
+      if (dotDivRef.current)  dotDivRef.current.style.transform  = `translate(${t.x}px,${t.y}px)`
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => { window.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const vortexStartRef    = useRef(0)
+  // vortexProgress as ref — avoids 75+ setState calls per vortex (each was a full React re-render)
   const vortexProgressRef = useRef(0)
 
   const traverseRef = useRef<TraverseState>({
@@ -1650,7 +1779,6 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
     else { tr.ringCActive=true; tr.ringCStart=angles.C; tr.ringCTarget=nearestTarget(angles.C, rawTarget) }
   }, [])
 
-
   useEffect(() => {
     let cooldown = false
     const go = (dir: 1 | -1) => {
@@ -1658,30 +1786,29 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       cooldown = true; setTimeout(() => { cooldown = false }, 700)
       setFocusedIdx(prev => { const next=(prev+dir+8)%8; triggerTraverse(next); return next })
     }
-    // Capture phase — fires before OrbitControls sees the event on the canvas.
-    // Ctrl/Cmd+scroll and trackpad pinch (ctrlKey=true) → pass through to OrbitControls zoom.
-    // Wheel inside a scrollable panel (e.g. version history) → pass through so the panel scrolls.
-    // Plain scroll elsewhere → consumed here for traverse.
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) return
-      if (isInsideScrollable(e.target)) return
-      e.stopPropagation()
-      if (Math.abs(e.deltaY) > 5) go(e.deltaY > 0 ? 1 : -1)
-    }
+    const onWheel      = (e: WheelEvent)    => { if (isOverviewRef.current) return; if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
     let tx = 0
-    const onTouchStart = (e: TouchEvent)    => { if (e.touches.length === 1) tx = e.touches[0].clientX }
-    const onTouchEnd   = (e: TouchEvent)    => { const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
-    window.addEventListener('wheel',      onWheel,      { capture:true, passive:false })
+    const onTouchStart = (e: TouchEvent)    => { tx = e.touches[0].clientX }
+    const onTouchEnd   = (e: TouchEvent)    => { if (isOverviewRef.current) return; const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
+    window.addEventListener('wheel',      onWheel,      { passive:true })
     window.addEventListener('touchstart', onTouchStart, { passive:true })
     window.addEventListener('touchend',   onTouchEnd,   { passive:true })
     return () => {
-      window.removeEventListener('wheel',      onWheel,      { capture:true })
+      window.removeEventListener('wheel',      onWheel)
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchend',   onTouchEnd)
     }
   }, [vortexPhase, triggerTraverse])
 
   const handleOrbClick = useCallback((idx: number, id: string) => {
+    // From overview: fly camera into close-up of this orb
+    if (isOverview) {
+      setIsOverview(false)
+      setOrbitEnabled(false)
+      setFocusedIdx(idx)
+      triggerTraverse(idx)
+      return
+    }
     if (vortexPhase !== 'idle') return
     if (idx !== focusedIdx) { triggerTraverse(idx); setFocusedIdx(idx); return }
     setVortexTargetIdx(idx); setVortexPhase('pull')
@@ -1711,7 +1838,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       }
     }
     vortexAnimRef.current = requestAnimationFrame(tick)
-  }, [vortexPhase, focusedIdx, triggerTraverse])
+  }, [isOverview, vortexPhase, focusedIdx, triggerTraverse])
 
   useEffect(() => () => cancelAnimationFrame(vortexAnimRef.current), [])
 
@@ -1719,12 +1846,24 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const handleEnter = useCallback(() => {
     const gw = panelGateway; handleClose(); if (gw) onGatewayEnter?.(gw)
   }, [panelGateway, handleClose, onGatewayEnter])
+  // Panel "Overview" button — dismiss panel and fly camera out to overview
+  const handlePanelBack = useCallback(() => {
+    setShowPanel(false); setPanelGateway(null)
+    setIsOverview(true); setOrbitEnabled(false); setFocusedIdx(-1)
+  }, [])
+
+  const goToOverview = useCallback(() => {
+    setIsOverview(true)
+    setOrbitEnabled(false)
+    setFocusedIdx(-1)
+  }, [])
+  const onOverviewAnimDone = useCallback(() => { setOrbitEnabled(true) }, [])
 
   const vig = vortexPhase==='pull' ? 0.28 : vortexPhase==='peak' ? 0.72 : vortexPhase==='passage' ? 1 : 0
   const passCenter = vortexTargetIdx!==null ? screenPosRef.current[vortexTargetIdx] : null
 
   return (
-    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000005' }}>
+    <div style={{ position:'fixed', inset:0, overflow:'hidden', zIndex:100, background:'#000005', cursor: hasFinePointer ? 'none' : 'auto' }}>
       <style>{`
         @keyframes nebDrift1 {
           0%,100% { transform: translateX(-5%) translateY(8%) scale(1.0) }
@@ -1804,7 +1943,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 
       {/* Canvas — transparent so background nebula shows through */}
       <Canvas
-        camera={{ position:[0,0,550], fov:60, near:1, far:3000 }}
+        camera={{ position:[0,0,750], fov:60, near:1, far:4000 }}
         style={{ position:'absolute', inset:0, zIndex:2 }}
         gl={{ antialias:true, alpha:true, toneMapping:THREE.ACESFilmicToneMapping, toneMappingExposure:1.1 }}
         dpr={[1, 1.5]}
@@ -1816,6 +1955,8 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           vortexTargetIdx={vortexTargetIdx} vortexProgressRef={vortexProgressRef} vortexPhase={vortexPhase}
           worldPosRef={worldPosRef} screenPosRef={screenPosRef} traverseRef={traverseRef}
           panelOpen={showPanel} onPhantomClick={() => setShowComingSoon(true)}
+          isOverview={isOverview} orbitEnabled={orbitEnabled} onOverviewAnimDone={onOverviewAnimDone}
+          overviewZRef={overviewZRef}
         />
         <ShootingStars />
       </Canvas>
@@ -1846,6 +1987,29 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
           animation:'passageExpand 400ms linear forwards',
         }} />
       )}
+
+      {/* Custom orbital cursor — mouse only, not rendered on touch devices */}
+      {hasFinePointer && <>
+        <div ref={ringDivRef} style={{
+          position:'fixed', top:0, left:0, pointerEvents:'none', zIndex:9500,
+          width: hoveredId ? 52 : 32, height: hoveredId ? 52 : 32,
+          marginLeft: hoveredId ? -26 : -16, marginTop: hoveredId ? -26 : -16,
+          borderRadius:'50%',
+          border: hoveredId ? '1.5px solid rgba(72,160,255,0.85)' : '1px solid rgba(120,180,255,0.50)',
+          boxShadow: hoveredId ? '0 0 18px rgba(50,130,255,0.50), inset 0 0 8px rgba(80,160,255,0.15)' : '0 0 7px rgba(80,160,255,0.18)',
+          transition:'width 0.24s cubic-bezier(0.34,1.45,0.64,1), height 0.24s cubic-bezier(0.34,1.45,0.64,1), margin 0.24s cubic-bezier(0.34,1.45,0.64,1), border-color 0.22s ease, box-shadow 0.22s ease',
+          willChange:'transform',
+        }} />
+        <div ref={dotDivRef} style={{
+          position:'fixed', top:0, left:0, pointerEvents:'none', zIndex:9501,
+          width:4, height:4, marginLeft:-2, marginTop:-2,
+          borderRadius:'50%',
+          background: hoveredId ? 'rgba(120,200,255,0.92)' : 'rgba(180,210,255,0.62)',
+          boxShadow: hoveredId ? '0 0 6px rgba(80,160,255,0.9)' : 'none',
+          transition:'background 0.22s ease, box-shadow 0.22s ease',
+          willChange:'transform',
+        }} />
+      </>}
 
       <div style={{ position:'fixed', inset:0, zIndex:190, pointerEvents:'none', background:'#4488ff',
         opacity:showFlash?1:0, transition:showFlash?'none':'opacity 80ms' }} />
@@ -1883,23 +2047,51 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       </button>
 
       <p style={{ position:'fixed', bottom:'5%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.25em', color:'rgba(255,255,255,0.10)', textTransform:'uppercase', margin:0, whiteSpace:'nowrap' }}>
-        Scroll to traverse · Pinch to zoom · Drag to rotate · Click an orb to enter
+        {isOverview ? 'Scroll · Pinch · Drag to explore · Tap an orb to enter' : 'Scroll to traverse · Click focused orb to enter'}
       </p>
 
-      <div style={{ position:'fixed', bottom:'12%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', textAlign:'center' }}>
-        <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-          {GATEWAYS.map((_, i) => (
-            <div key={i} style={{
-              width: i===focusedIdx?18:5, height:3, borderRadius:2,
-              background: i===focusedIdx?'rgba(140,160,255,0.7)':'rgba(100,120,200,0.25)',
-              transition:'all 0.4s',
-            }} />
-          ))}
+      {!isOverview && (
+        <div style={{ position:'fixed', bottom:'12%', left:'50%', transform:'translateX(-50%)', zIndex:40, pointerEvents:'none', textAlign:'center' }}>
+          <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
+            {GATEWAYS.map((_, i) => (
+              <div key={i} style={{
+                width: i===focusedIdx?18:5, height:3, borderRadius:2,
+                background: i===focusedIdx?'rgba(140,160,255,0.7)':'rgba(100,120,200,0.25)',
+                transition:'all 0.4s',
+              }} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Overview button — bottom-right, only visible in close-up */}
+      {!isOverview && (
+        <button
+          onClick={goToOverview}
+          style={{
+            position:'fixed', bottom:'22px', right:'22px', zIndex:9200,
+            background:'rgba(6,10,28,0.72)', border:'1px solid rgba(55,90,200,0.28)',
+            borderRadius:'8px', padding:'8px 16px', cursor:'pointer',
+            fontFamily:'var(--font-vyan)', fontSize:'9px', letterSpacing:'0.22em',
+            color:'rgba(90,150,255,0.55)', textTransform:'uppercase',
+            backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+            transition:'color 0.25s, border-color 0.25s, background 0.25s',
+          }}
+          onMouseEnter={e => {
+            const b = e.currentTarget as HTMLButtonElement
+            b.style.color='rgba(150,200,255,0.95)'; b.style.borderColor='rgba(80,140,255,0.55)'; b.style.background='rgba(10,18,50,0.90)'
+          }}
+          onMouseLeave={e => {
+            const b = e.currentTarget as HTMLButtonElement
+            b.style.color='rgba(90,150,255,0.55)'; b.style.borderColor='rgba(55,90,200,0.28)'; b.style.background='rgba(6,10,28,0.72)'
+          }}
+        >
+          Overview
+        </button>
+      )}
 
       {showPanel && panelGateway && (
-        <GlassPanel gateway={panelGateway} onClose={handleClose} onEnter={handleEnter} side={panelSide} />
+        <GlassPanel gateway={panelGateway} onClose={handleClose} onBack={handlePanelBack} onEnter={handleEnter} side={panelSide} />
       )}
       {showComingSoon && (
         <ComingSoonPanel onClose={() => setShowComingSoon(false)} />
