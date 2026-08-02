@@ -148,9 +148,10 @@ function MajorRect({ def, focused, onClick, onExperience }: {
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
     if (!frameMat.current || !cornerMat.current) return
-    const tgtF = focused ? 0.92 : 0.52
+    const tgtF = focused ? 0.88 : 0.38
     frameMat.current.opacity  += (tgtF - frameMat.current.opacity)  * 0.08
-    const tgtC = focused ? 0.80 + 0.20 * Math.abs(Math.sin(t * 3.5)) : 0.36
+    // Focused: dim corners so they don't compete with CSS gradient border
+    const tgtC = focused ? 0.12 : 0.22
     cornerMat.current.opacity += (tgtC - cornerMat.current.opacity) * 0.08
   })
 
@@ -160,7 +161,7 @@ function MajorRect({ def, focused, onClick, onExperience }: {
         <lineBasicMaterial ref={frameMat} color="#ffffff" transparent opacity={0.48} />
       </lineSegments>
       <lineSegments geometry={cornerGeo}>
-        <lineBasicMaterial ref={cornerMat} color="#1a40ff" transparent opacity={0.32} />
+        <lineBasicMaterial ref={cornerMat} color="#ff2a4a" transparent opacity={0.22} />
       </lineSegments>
 
       {/* Invisible hit surface */}
@@ -173,7 +174,7 @@ function MajorRect({ def, focused, onClick, onExperience }: {
       {!focused && (
         <Html position={[0, def.h / 2 + 0.65, 0]} center style={{ pointerEvents: 'none', userSelect: 'none' }}>
           <div style={{
-            color: 'rgba(255,42,74,0.45)',
+            color: 'rgba(255,42,74,0.16)',
             fontSize: '11px', letterSpacing: '0.44em',
             fontFamily: 'var(--font-vyan)', whiteSpace: 'nowrap',
           }}>
@@ -385,16 +386,14 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         100% { background-position: 0% 50%; }
       }
       .qg-border {
-        background: linear-gradient(135deg, #1a40ff 0%, #4f2aff 35%, #7c3aed 65%, #1a40ff 100%);
-        background-size: 300% 300%;
-        animation: qg-border-travel 4s ease infinite;
-        padding: 1.5px;
-        border-radius: 1px;
+        background: linear-gradient(120deg, #1a40ff 0%, #6b25ff 25%, #9c2fff 50%, #6b25ff 75%, #1a40ff 100%);
+        background-size: 400% 400%;
+        animation: qg-border-travel 3s linear infinite;
+        padding: 3px;
+        border-radius: 2px;
       }
       .qg-glass {
-        background: rgba(6, 12, 52, 0.78);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
+        background: rgba(4, 8, 32, 0.28);
         border-radius: 1px;
       }
       .qg-exp-btn {
