@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.2',
+    date: '2026-08-02',
+    title: 'Quantum Grid — Touch Nav & Deep Blue',
+    summary: 'Swipe-to-navigate on touchscreens and deep blue (#1a40ff) brand color across QuantumGrid.',
+    changes: [
+      'Touch swipe left/right navigates between frames (40px threshold, 700ms cooldown)',
+      'Replaced brand red with deep blue (#1a40ff) on all QuantumGrid UI elements',
+    ],
+    gitHash: 'ac12ac5',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.1',
     date: '2026-08-02',
     title: 'Quantum Grid — Brand Typography',
@@ -385,4 +397,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.1'
+export const CURRENT_VERSION = '3.2'
