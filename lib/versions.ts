@@ -15,6 +15,17 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.7',
+    date: '2026-08-02',
+    title: 'Ṛtam Live Integration',
+    summary: 'VYAN ṚTAM live app wired into the Vistara experience panel.',
+    changes: [
+      'VYAN ṚTAM: appUrl set to https://rtam.vyanlabs.com — loads live in the experience overlay iframe',
+    ],
+    gitHash: '5d7a5b8',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.6.2',
     date: '2026-08-02',
     title: 'Quantum Grid — 3D panel hides behind experience overlay',
@@ -489,4 +500,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.6.2'
+export const CURRENT_VERSION = '3.7'
