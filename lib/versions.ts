@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.3',
+    date: '2026-08-02',
+    title: 'Quantum Grid — Glass Panels & Experience Overlay',
+    summary: 'Active frames now show transparent deep blue glass with animated blue→violet gradient border. Each panel shows the VYAN logo, product name, description, and an EXPERIENCE button that opens a full-screen glass overlay.',
+    changes: [
+      'Focused frames: glassmorphism panel (rgba(6,12,52,0.78) + backdrop-filter blur) with 1.5px animated gradient border (blue→violet travelling animation)',
+      'Panel content: VYAN logo-symbol, product name in #ff2a4a red with glow, tantra label, description text, EXPERIENCE button',
+      'EXPERIENCE button opens full-screen glass overlay with iframe (appUrl) or coming-soon placeholder',
+      'Overlay: gradient-bordered glass panel, header with logo + product name + close button, click-outside to dismiss',
+      'Bottom strip dot indicators and tantra label switched to #ff2a4a brand red',
+    ],
+    gitHash: 'c607c2e',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.2',
     date: '2026-08-02',
     title: 'Quantum Grid — Touch Nav & Deep Blue',
@@ -397,4 +412,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.2'
+export const CURRENT_VERSION = '3.3'
