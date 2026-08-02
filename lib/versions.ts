@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.6.2',
+    date: '2026-08-02',
+    title: 'Quantum Grid — 3D panel hides behind experience overlay',
+    summary: 'Focused product card now hides when the experience overlay opens, so the 3D scene shows through the glass panel cleanly.',
+    changes: [
+      'Html transform elements ignore DOM z-index — suppressed focused panel render when expOpen is true',
+      '3D scene now visible translucently through the experience overlay as intended',
+    ],
+    gitHash: '57a5eeb',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.6.1',
     date: '2026-08-02',
     title: 'Quantum Grid — Fix invisible experience overlay',
@@ -477,4 +489,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.6.1'
+export const CURRENT_VERSION = '3.6.2'
