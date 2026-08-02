@@ -1,48 +1,90 @@
 'use client'
 
-import { Suspense, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 
 // ─── Scene parameters ─────────────────────────────────────────────────────────
 
-const CAM_R        = 32
-const DRIFT_SPD    = 0.016      // rad/s base
-const CHANGE_MIN   = 9          // seconds between drift direction shifts
-const CHANGE_MAX   = 22
-const FLY_DUR      = 2.5        // seconds for camera fly-to
+const CAM_R       = 32
+const DRIFT_SPD   = 0.016
+const CHANGE_MIN  = 9
+const CHANGE_MAX  = 22
+const FLY_DUR     = 2.5
 const PARTICLE_CNT = 2200
 const BG_RECT_CNT  = 80
-
-// ─── Easing ───────────────────────────────────────────────────────────────────
 
 function eioC(t: number) {
   return t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
-// ─── Major rect definitions ───────────────────────────────────────────────────
+// ─── Product definitions — mirrors lib/vistara/gateways.ts ───────────────────
 
 interface MajorDef {
   id: number
   pos: [number, number, number]
-  w: number
-  h: number
-  label: string
-  app: string
-  rotX: number
-  rotY: number
+  w: number; h: number
+  name: string        // Sanskrit name
+  tantra: string      // Full VYAN product name
+  tagline: string
+  description: string
+  color: string
+  rotX: number; rotY: number
 }
 
 const MAJOR_DEFS: MajorDef[] = [
-  { id: 0, pos: [  0,   0,   0], w: 14, h:  9.5, label: 'NEXUS',  app: 'Dashboard', rotX:  0.00, rotY:  0.00 },
-  { id: 1, pos: [ 22,   5, -14], w: 11, h:  7.5, label: 'AXIS',   app: 'Analytics', rotX:  0.06, rotY: -0.28 },
-  { id: 2, pos: [-20,  -4, -10], w: 12, h:  8.0, label: 'VERTEX', app: 'Commerce',  rotX: -0.05, rotY:  0.22 },
-  { id: 3, pos: [  9, -11, -22], w:  9, h:  6.5, label: 'PRISM',  app: 'Creator',   rotX:  0.08, rotY: -0.18 },
-  { id: 4, pos: [-14,   9, -28], w: 10, h:  7.0, label: 'ORBIT',  app: 'Network',   rotX: -0.04, rotY:  0.30 },
-  { id: 5, pos: [ 28,  -7, -32], w: 12, h:  8.0, label: 'ZENITH', app: 'Studio',    rotX:  0.06, rotY: -0.25 },
-  { id: 6, pos: [-10,  14, -42], w: 11, h:  8.0, label: 'APEX',   app: 'Research',  rotX: -0.08, rotY:  0.15 },
+  {
+    id: 0, pos: [  0,   0,   0], w: 14, h:  9.5, rotX:  0.00, rotY:  0.00,
+    name: 'Ṛtam',        tantra: 'VYAN ṚTAM',         color: '#d4a853',
+    tagline: 'Conscious Living Through Pravāha',
+    description: 'Harmony, flow, progression. The cosmic order underlying all conscious systems.',
+  },
+  {
+    id: 1, pos: [ 22,   5, -14], w: 11, h:  7.5, rotX:  0.06, rotY: -0.28,
+    name: 'Ojas',        tantra: 'VYAN OJAS',          color: '#e8c87a',
+    tagline: 'Tracking Your Pranic Rhythm',
+    description: 'Rhythm, vitality, circulation. Concentric energy rings measuring the pulse of existence.',
+  },
+  {
+    id: 2, pos: [-20,  -4, -10], w: 12, h:  8.0, rotX: -0.05, rotY:  0.22,
+    name: 'Mudrā',       tantra: 'VYAN MUDRĀ',         color: '#c4924a',
+    tagline: 'The Kośa of Global Entities',
+    description: 'Knowledge, preservation, permanence. The obsidian archive of all that exists.',
+  },
+  {
+    id: 3, pos: [  9, -11, -22], w: 10, h:  7.0, rotX:  0.08, rotY: -0.18,
+    name: 'Netra',       tantra: 'VYAN NETRA',         color: '#f0d080',
+    tagline: 'The Conscious Eye Across Tantras',
+    description: 'Observation, awareness, perception. The astronomical eye that sees all.',
+  },
+  {
+    id: 4, pos: [-14,   9, -28], w: 11, h:  7.5, rotX: -0.04, rotY:  0.30,
+    name: 'Ākṛti',       tantra: 'VYAN ĀKṚTI',         color: '#e8f0ff',
+    tagline: 'Creating Digital Anubhava Through Your Drishti',
+    description: 'Design, creation, transformation. Prismatic crystal formations refracting possibility.',
+  },
+  {
+    id: 5, pos: [ 28,  -7, -32], w: 12, h:  8.0, rotX:  0.06, rotY: -0.25,
+    name: 'Sūtra',       tantra: 'VYAN SŪTRA',         color: '#d4c070',
+    tagline: 'Weaving Sangama Through Vivek',
+    description: 'Connection, relationships, intentional networks. Luminous threads weaving consciousness.',
+  },
+  {
+    id: 6, pos: [-10,  14, -42], w: 11, h:  8.0, rotX: -0.08, rotY:  0.15,
+    name: 'Chitra-Prāṇa', tantra: 'VYAN CHITRA-PRĀṆA', color: '#a0c8e8',
+    tagline: 'Breathing Life Into Imagery',
+    description: 'Creation, motion, imagination. The cosmic aperture where imagery comes alive.',
+  },
+  {
+    id: 7, pos: [ 18,  -8, -52], w: 13, h:  9.0, rotX:  0.05, rotY: -0.20,
+    name: 'Māyā',        tantra: 'VYAN MĀYĀ',          color: '#ffd080',
+    tagline: 'Manifesting Digital Realities',
+    description: 'Manifestation, possibility, digital worlds. The most dynamic gateway — where realities are made.',
+  },
 ]
+
+const N = MAJOR_DEFS.length  // 8
 
 // ─── Geometry builders ────────────────────────────────────────────────────────
 
@@ -58,26 +100,23 @@ function makeRectGeo(w: number, h: number): THREE.BufferGeometry {
   return g
 }
 
-// 4 corner L-brackets as paired line segments
 function makeCornerGeo(w: number, h: number, f: number): THREE.BufferGeometry {
   const hw = w / 2, hh = h / 2, L = Math.min(w, h) * f
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-    -hw + L, -hh, 0, -hw, -hh, 0,   -hw, -hh, 0, -hw, -hh + L, 0,  // BL
-     hw - L, -hh, 0,  hw, -hh, 0,    hw, -hh, 0,  hw, -hh + L, 0,  // BR
-     hw - L,  hh, 0,  hw,  hh, 0,    hw,  hh, 0,  hw,  hh - L, 0,  // TR
-    -hw + L,  hh, 0, -hw,  hh, 0,   -hw,  hh, 0, -hw,  hh - L, 0,  // TL
+    -hw + L, -hh, 0, -hw, -hh, 0,   -hw, -hh, 0, -hw, -hh + L, 0,
+     hw - L, -hh, 0,  hw, -hh, 0,    hw, -hh, 0,  hw, -hh + L, 0,
+     hw - L,  hh, 0,  hw,  hh, 0,    hw,  hh, 0,  hw,  hh - L, 0,
+    -hw + L,  hh, 0, -hw,  hh, 0,   -hw,  hh, 0, -hw,  hh - L, 0,
   ]), 3))
   return g
 }
 
-// ─── Background wireframe rectangles ─────────────────────────────────────────
+// ─── Background rects ─────────────────────────────────────────────────────────
 
 interface BgItem {
-  key: number
-  pos: [number, number, number]
-  rx: number; ry: number; rz: number
-  op: number
+  key: number; pos: [number, number, number]
+  rx: number; ry: number; rz: number; op: number
   geo: THREE.BufferGeometry
 }
 
@@ -90,12 +129,10 @@ function BackgroundRects() {
         key: i,
         pos: [rng(-62, 62), rng(-40, 40), -4 - rng(0, 88)] as [number, number, number],
         rx: rng(-0.85, 0.85), ry: rng(-1.1, 1.1), rz: rng(-0.4, 0.4),
-        op: rng(0.04, 0.28),
+        op: rng(0.04, 0.26),
         geo: makeRectGeo(w, h),
       }
     })
-
-    // Add 10 nested rect pairs at similar positions for depth layering
     const nested: BgItem[] = []
     for (let i = 0; i < 10; i++) {
       const cx = rng(-48, 48), cy = rng(-30, 30), cz = -6 - rng(0, 65)
@@ -103,11 +140,10 @@ function BackgroundRects() {
       const w = rng(3, 10), h = rng(2.5, 7.5)
       const ws = rng(0.42, 0.70), hs = rng(0.42, 0.70)
       nested.push(
-        { key: BG_RECT_CNT + i * 2,     pos: [cx, cy, cz],                          rx, ry, rz, op: rng(0.14, 0.32), geo: makeRectGeo(w, h) },
-        { key: BG_RECT_CNT + i * 2 + 1, pos: [cx + rng(-0.3, 0.3), cy + rng(-0.3, 0.3), cz + rng(-0.6, 0.6)], rx, ry, rz, op: rng(0.10, 0.24), geo: makeRectGeo(w * ws, h * hs) },
+        { key: BG_RECT_CNT + i * 2,     pos: [cx, cy, cz],                                                         rx, ry, rz, op: rng(0.14, 0.32), geo: makeRectGeo(w, h) },
+        { key: BG_RECT_CNT + i * 2 + 1, pos: [cx + rng(-0.3, 0.3), cy + rng(-0.3, 0.3), cz + rng(-0.6, 0.6)],     rx, ry, rz, op: rng(0.10, 0.24), geo: makeRectGeo(w * ws, h * hs) },
       )
     }
-
     return [...base, ...nested]
   }, [])
 
@@ -123,7 +159,7 @@ function BackgroundRects() {
   )
 }
 
-// ─── Particle cloud ───────────────────────────────────────────────────────────
+// ─── Particles ────────────────────────────────────────────────────────────────
 
 function Particles() {
   const geo = useMemo(() => {
@@ -137,16 +173,14 @@ function Particles() {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     return g
   }, [])
-
   return (
     <points geometry={geo}>
-      <pointsMaterial color="#c8d8ff" size={0.07} sizeAttenuation
-        transparent opacity={0.45} depthWrite={false} />
+      <pointsMaterial color="#c8d8ff" size={0.07} sizeAttenuation transparent opacity={0.45} depthWrite={false} />
     </points>
   )
 }
 
-// ─── Depth grid (perspective floor) ──────────────────────────────────────────
+// ─── Depth grid ───────────────────────────────────────────────────────────────
 
 function DepthGrid() {
   const geo = useMemo(() => {
@@ -168,9 +202,7 @@ function DepthGrid() {
 // ─── Major rect ───────────────────────────────────────────────────────────────
 
 function MajorRect({ def, focused, onClick }: {
-  def: MajorDef
-  focused: boolean
-  onClick: () => void
+  def: MajorDef; focused: boolean; onClick: () => void
 }) {
   const frameGeo  = useMemo(() => makeRectGeo(def.w, def.h),         [def.w, def.h])
   const cornerGeo = useMemo(() => makeCornerGeo(def.w, def.h, 0.13), [def.w, def.h])
@@ -180,86 +212,66 @@ function MajorRect({ def, focused, onClick }: {
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
     if (!frameMat.current || !cornerMat.current) return
-    const tgtF = focused ? 0.92 : 0.55
+    const tgtF = focused ? 0.92 : 0.52
     frameMat.current.opacity  += (tgtF - frameMat.current.opacity)  * 0.08
-    const tgtC = focused ? 0.80 + 0.20 * Math.abs(Math.sin(t * 3.5)) : 0.38
+    const tgtC = focused ? 0.80 + 0.20 * Math.abs(Math.sin(t * 3.5)) : 0.36
     cornerMat.current.opacity += (tgtC - cornerMat.current.opacity) * 0.08
   })
 
-  const panelWidth = Math.round(def.w * 44)
-
   return (
     <group position={def.pos} rotation={[def.rotX, def.rotY, 0]}>
-      {/* Frame */}
       <lineSegments geometry={frameGeo}>
-        <lineBasicMaterial ref={frameMat} color="#c4d4f8" transparent opacity={0.55} />
+        <lineBasicMaterial ref={frameMat} color="#c4d4f8" transparent opacity={0.52} />
       </lineSegments>
-
-      {/* Corner brackets */}
       <lineSegments geometry={cornerGeo}>
-        <lineBasicMaterial ref={cornerMat} color="#dde8ff" transparent opacity={0.38} />
+        <lineBasicMaterial ref={cornerMat} color="#dde8ff" transparent opacity={0.36} />
       </lineSegments>
 
-      {/* Invisible clickable surface */}
+      {/* Invisible hit surface */}
       <mesh onClick={(e) => { e.stopPropagation(); onClick() }}>
         <planeGeometry args={[def.w, def.h]} />
         <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
-      {/* Label — always faces camera (no transform) */}
-      <Html
-        position={[0, def.h / 2 + 0.65, 0]}
-        center
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
+      {/* Label — always faces camera */}
+      <Html position={[0, def.h / 2 + 0.65, 0]} center style={{ pointerEvents: 'none', userSelect: 'none' }}>
         <div style={{
-          color: '#96aee0',
-          fontSize: '10px',
-          letterSpacing: '0.44em',
-          fontFamily: 'ui-monospace, "Cascadia Code", monospace',
-          whiteSpace: 'nowrap',
-          opacity: focused ? 1 : 0.45,
-          transition: 'opacity 0.5s',
-          textShadow: focused ? '0 0 16px rgba(148,176,255,0.9)' : 'none',
+          color: focused ? def.color : '#96aee0',
+          fontSize: '10px', letterSpacing: '0.44em',
+          fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap',
+          opacity: focused ? 1 : 0.45, transition: 'opacity 0.5s, color 0.5s',
+          textShadow: focused ? `0 0 18px ${def.color}` : 'none',
         }}>
-          {def.label}
+          {def.name.toUpperCase()}
         </div>
       </Html>
 
-      {/* App panel — placed in 3D space inside the rect */}
+      {/* App panel */}
       {focused && (
-        <Html
-          position={[0, 0, 0.1]}
-          center
-          transform
-          style={{ width: `${panelWidth}px`, pointerEvents: 'auto' }}
-        >
+        <Html position={[0, 0, 0.1]} center transform
+          style={{ width: `${Math.round(def.w * 44)}px`, pointerEvents: 'auto' }}>
           <div style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            border: '1px solid rgba(148,176,255,0.20)',
-            background: 'rgba(2,5,18,0.90)',
+            width: '100%', boxSizing: 'border-box',
+            border: `1px solid ${def.color}28`,
+            borderLeft: `2px solid ${def.color}80`,
+            background: 'rgba(2,5,18,0.92)',
             padding: '22px 24px',
-            fontFamily: 'ui-monospace, "Cascadia Code", monospace',
-            color: '#96aee0',
+            fontFamily: 'ui-monospace, monospace', color: '#96aee0',
           }}>
-            <div style={{
-              fontSize: '8px', letterSpacing: '0.48em',
-              opacity: 0.35, marginBottom: 8,
-            }}>
-              MODULE · {def.label}
+            <div style={{ fontSize: '8px', letterSpacing: '0.5em', opacity: 0.35, marginBottom: 6 }}>
+              VYAN GATEWAY
             </div>
-            <div style={{
-              fontSize: '22px', letterSpacing: '0.16em',
-              marginBottom: 16, color: '#c4d4f8',
-            }}>
-              {def.app.toUpperCase()}
+            <div style={{ fontSize: '26px', letterSpacing: '0.06em', marginBottom: 4, color: def.color }}>
+              {def.name}
             </div>
-            <div style={{
-              fontSize: '10px', lineHeight: 1.8, opacity: 0.32,
-            }}>
-              Interface layer active.<br />
-              Application integration pending.
+            <div style={{ fontSize: '9px', letterSpacing: '0.32em', opacity: 0.5, marginBottom: 14 }}>
+              {def.tantra}
+            </div>
+            <div style={{ fontSize: '12px', lineHeight: 1.55, marginBottom: 12, color: '#b8ccee' }}>
+              {def.tagline}
+            </div>
+            <div style={{ fontSize: '10px', lineHeight: 1.75, opacity: 0.38 }}>
+              {def.description}
             </div>
           </div>
         </Html>
@@ -271,18 +283,13 @@ function MajorRect({ def, focused, onClick }: {
 // ─── Camera controller ────────────────────────────────────────────────────────
 
 interface FlyState {
-  fromPos:  THREE.Vector3
-  toPos:    THREE.Vector3
-  fromLook: THREE.Vector3
-  toLook:   THREE.Vector3
-  elapsed:  number
-  dur:      number
+  fromPos: THREE.Vector3; toPos: THREE.Vector3
+  fromLook: THREE.Vector3; toLook: THREE.Vector3
+  elapsed: number; dur: number
 }
 
 function CameraController({ focusDef }: { focusDef: MajorDef | null }) {
   const { camera } = useThree()
-
-  // Start at theta=π/2, phi=π/2 → [0, 0, CAM_R] — matches Canvas initial camera
   const sphereRef  = useRef({ theta: Math.PI / 2, phi: Math.PI / 2 })
   const velRef     = useRef({ dTheta: DRIFT_SPD, dPhi: DRIFT_SPD * 0.28 })
   const nextChgRef = useRef(CHANGE_MIN + Math.random() * (CHANGE_MAX - CHANGE_MIN))
@@ -293,25 +300,21 @@ function CameraController({ focusDef }: { focusDef: MajorDef | null }) {
   useFrame((_, delta) => {
     elapsedRef.current += delta
 
-    // Focus changed → begin fly animation
     if (focusDef !== prevFocRef.current) {
       prevFocRef.current = focusDef
-
       if (focusDef) {
         const lookTarget = new THREE.Vector3(...focusDef.pos)
         const normal = new THREE.Vector3(0, 0, 1)
           .applyEuler(new THREE.Euler(focusDef.rotX, focusDef.rotY, 0))
         const dist = Math.max(focusDef.w, focusDef.h) * 1.2 + 5
         flyRef.current = {
-          fromPos:  camera.position.clone(),
-          toPos:    lookTarget.clone().addScaledVector(normal, dist),
+          fromPos: camera.position.clone(),
+          toPos: lookTarget.clone().addScaledVector(normal, dist),
           fromLook: new THREE.Vector3(0, 0, 0),
-          toLook:   lookTarget.clone(),
-          elapsed:  0,
-          dur:      FLY_DUR,
+          toLook: lookTarget.clone(),
+          elapsed: 0, dur: FLY_DUR,
         }
       } else {
-        // Unfocus — re-sync drift sphere to current camera position so orbit resumes smoothly
         const { x, y, z } = camera.position
         const r = camera.position.length()
         sphereRef.current = {
@@ -322,11 +325,10 @@ function CameraController({ focusDef }: { focusDef: MajorDef | null }) {
       }
     }
 
-    // Fly in progress
     if (flyRef.current) {
       const fly = flyRef.current
       fly.elapsed += delta
-      const p  = Math.min(fly.elapsed / fly.dur, 1)
+      const p = Math.min(fly.elapsed / fly.dur, 1)
       const ep = eioC(p)
       camera.position.lerpVectors(fly.fromPos, fly.toPos, ep)
       camera.lookAt(new THREE.Vector3().lerpVectors(fly.fromLook, fly.toLook, ep))
@@ -334,15 +336,12 @@ function CameraController({ focusDef }: { focusDef: MajorDef | null }) {
       return
     }
 
-    // Focused & fly done — hold position, face the rect
     if (focusDef) {
       camera.lookAt(...focusDef.pos)
       return
     }
 
-    // ── Free drift ────────────────────────────────────────────────────────────
-
-    // Change direction periodically
+    // Free drift
     if (elapsedRef.current >= nextChgRef.current) {
       const spd = DRIFT_SPD * (0.45 + Math.random() * 1.1)
       velRef.current = {
@@ -351,13 +350,11 @@ function CameraController({ focusDef }: { focusDef: MajorDef | null }) {
       }
       nextChgRef.current = elapsedRef.current + CHANGE_MIN + Math.random() * (CHANGE_MAX - CHANGE_MIN)
     }
-
     const { theta, phi } = sphereRef.current
     const { dTheta, dPhi } = velRef.current
     const newTheta = theta + dTheta * delta
     const newPhi   = Math.max(0.25, Math.min(Math.PI - 0.25, phi + dPhi * delta))
     sphereRef.current = { theta: newTheta, phi: newPhi }
-
     camera.position.set(
       CAM_R * Math.sin(newPhi) * Math.cos(newTheta),
       CAM_R * Math.cos(newPhi),
@@ -369,14 +366,13 @@ function CameraController({ focusDef }: { focusDef: MajorDef | null }) {
   return null
 }
 
-// ─── Scene root ───────────────────────────────────────────────────────────────
+// ─── Scene ────────────────────────────────────────────────────────────────────
 
-function QuantumScene() {
-  const [focusId, setFocusId] = useState<number | null>(null)
-  const focusDef = focusId !== null
-    ? (MAJOR_DEFS.find(d => d.id === focusId) ?? null)
-    : null
-
+function QuantumScene({ focusId, focusDef, setFocusId }: {
+  focusId: number | null
+  focusDef: MajorDef | null
+  setFocusId: (id: number | null) => void
+}) {
   return (
     <>
       <color attach="background" args={['#020509']} />
@@ -386,22 +382,84 @@ function QuantumScene() {
       <Particles />
       <DepthGrid />
       {MAJOR_DEFS.map(def => (
-        <MajorRect
-          key={def.id}
-          def={def}
+        <MajorRect key={def.id} def={def}
           focused={focusId === def.id}
-          onClick={() => setFocusId(p => p === def.id ? null : def.id)}
-        />
+          onClick={() => setFocusId(focusId === def.id ? null : def.id)} />
       ))}
     </>
   )
 }
 
-// ─── Public component ─────────────────────────────────────────────────────────
+// ─── Nav button ───────────────────────────────────────────────────────────────
+
+function NavBtn({ onClick, children, style }: {
+  onClick: () => void; children: React.ReactNode
+  style?: React.CSSProperties
+}) {
+  return (
+    <button onClick={onClick} style={{
+      background: 'transparent',
+      border: '1px solid rgba(148,176,255,0.22)',
+      color: '#7890c8', width: 44, height: 44,
+      fontFamily: 'ui-monospace, monospace',
+      fontSize: '16px', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      transition: 'border-color 0.2s, color 0.2s',
+      outline: 'none',
+      ...style,
+    }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(148,176,255,0.55)'; (e.currentTarget as HTMLElement).style.color = '#b0c8f0' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(148,176,255,0.22)'; (e.currentTarget as HTMLElement).style.color = '#7890c8' }}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ─── QuantumGrid ─────────────────────────────────────────────────────────────
 
 export function QuantumGrid({ onBack }: { onBack?: () => void }) {
+  const [focusId, setFocusId] = useState<number | null>(null)
+  const focusDef = focusId !== null ? (MAJOR_DEFS[focusId] ?? null) : null
+
+  const goNext = useCallback(() =>
+    setFocusId(p => p === null ? 0 : (p + 1) % N), [])
+  const goPrev = useCallback(() =>
+    setFocusId(p => p === null ? N - 1 : (p - 1 + N) % N), [])
+
+  // Keyboard navigation
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') { e.preventDefault(); goNext() }
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); goPrev() }
+      if (e.key === 'Escape')     setFocusId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goNext, goPrev])
+
+  // Scroll navigation with cooldown to avoid multi-jump
+  const scrollCooldown = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      if (scrollCooldown.current) return
+      if (Math.abs(e.deltaY) < 20) return
+      scrollCooldown.current = true
+      setTimeout(() => { scrollCooldown.current = false }, 700)
+      if (e.deltaY > 0) goNext(); else goPrev()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [goNext, goPrev])
+
+  const currentDef = focusDef
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#020509' }}>
+    <div ref={containerRef} style={{ position: 'fixed', inset: 0, background: '#020509' }}>
       <Canvas
         camera={{ position: [0, 0, CAM_R], fov: 62, near: 0.5, far: 200 }}
         style={{ width: '100%', height: '100%' }}
@@ -409,34 +467,72 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         gl={{ antialias: true, alpha: false }}
       >
         <Suspense fallback={null}>
-          <QuantumScene />
+          <QuantumScene focusId={focusId} focusDef={focusDef} setFocusId={setFocusId} />
         </Suspense>
       </Canvas>
 
+      {/* Back button */}
       {onBack && (
-        <button
-          onClick={onBack}
-          style={{
-            position: 'fixed', top: 24, left: 24, zIndex: 10,
-            background: 'transparent',
-            border: '1px solid rgba(148,176,255,0.28)',
-            color: '#7890c8', padding: '8px 18px',
-            fontFamily: 'ui-monospace, monospace',
-            fontSize: '10px', letterSpacing: '0.38em',
-            cursor: 'pointer', outline: 'none',
-          }}
-        >
+        <button onClick={onBack} style={{
+          position: 'fixed', top: 24, left: 24, zIndex: 10,
+          background: 'transparent', border: '1px solid rgba(148,176,255,0.28)',
+          color: '#7890c8', padding: '8px 18px',
+          fontFamily: 'ui-monospace, monospace',
+          fontSize: '10px', letterSpacing: '0.38em', cursor: 'pointer', outline: 'none',
+        }}>
           ← BACK
         </button>
       )}
 
+      {/* Left / Right nav arrows */}
       <div style={{
-        position: 'fixed', bottom: 26, left: '50%', transform: 'translateX(-50%)',
-        color: 'rgba(148,176,255,0.25)', fontSize: '9px',
-        letterSpacing: '0.42em', fontFamily: 'ui-monospace, monospace',
-        pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap',
+        position: 'fixed', left: 24, top: '50%', transform: 'translateY(-50%)',
+        zIndex: 10, display: 'flex', flexDirection: 'column', gap: 8,
       }}>
-        CLICK A FRAME TO FOCUS · CLICK AGAIN TO RELEASE
+        <NavBtn onClick={goPrev}>‹</NavBtn>
+      </div>
+      <div style={{
+        position: 'fixed', right: 24, top: '50%', transform: 'translateY(-50%)',
+        zIndex: 10,
+      }}>
+        <NavBtn onClick={goNext}>›</NavBtn>
+      </div>
+
+      {/* Counter + name strip */}
+      <div style={{
+        position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+        pointerEvents: 'none', userSelect: 'none',
+      }}>
+        {currentDef && (
+          <div style={{
+            color: currentDef.color, fontSize: '10px', letterSpacing: '0.4em',
+            fontFamily: 'ui-monospace, monospace', opacity: 0.75,
+          }}>
+            {currentDef.tantra}
+          </div>
+        )}
+        {/* Dot indicator */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {MAJOR_DEFS.map(d => (
+            <div key={d.id} style={{
+              width: focusId === d.id ? 18 : 6,
+              height: 2,
+              background: focusId === d.id ? (currentDef?.color ?? '#c4d4f8') : 'rgba(148,176,255,0.28)',
+              transition: 'width 0.3s, background 0.3s',
+              borderRadius: 1,
+            }} />
+          ))}
+        </div>
+        <div style={{
+          color: 'rgba(148,176,255,0.25)', fontSize: '9px',
+          letterSpacing: '0.4em', fontFamily: 'ui-monospace, monospace',
+          marginTop: 2,
+        }}>
+          {focusId !== null
+            ? `${focusId + 1} / ${N} · ESC TO RELEASE`
+            : 'SCROLL OR ‹ › TO NAVIGATE · CLICK TO FOCUS'}
+        </div>
       </div>
     </div>
   )
