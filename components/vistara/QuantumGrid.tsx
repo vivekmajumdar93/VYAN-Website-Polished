@@ -160,7 +160,7 @@ function MajorRect({ def, focused, onClick }: {
         <lineBasicMaterial ref={frameMat} color="#ffffff" transparent opacity={0.48} />
       </lineSegments>
       <lineSegments geometry={cornerGeo}>
-        <lineBasicMaterial ref={cornerMat} color="#ff2a4a" transparent opacity={0.32} />
+        <lineBasicMaterial ref={cornerMat} color="#1a40ff" transparent opacity={0.32} />
       </lineSegments>
 
       {/* Invisible hit surface */}
@@ -172,11 +172,11 @@ function MajorRect({ def, focused, onClick }: {
       {/* Label — always faces camera */}
       <Html position={[0, def.h / 2 + 0.65, 0]} center style={{ pointerEvents: 'none', userSelect: 'none' }}>
         <div style={{
-          color: focused ? '#ff2a4a' : 'rgba(255,42,74,0.38)',
+          color: focused ? '#1a40ff' : 'rgba(26,64,255,0.38)',
           fontSize: '11px', letterSpacing: '0.44em',
           fontFamily: 'var(--font-vyan)', whiteSpace: 'nowrap',
           opacity: focused ? 1 : 0.7, transition: 'opacity 0.5s, color 0.5s',
-          textShadow: focused ? '0 0 22px rgba(255,42,74,0.7)' : 'none',
+          textShadow: focused ? '0 0 22px rgba(26,64,255,0.7)' : 'none',
         }}>
           {def.name.toUpperCase()}
         </div>
@@ -188,19 +188,19 @@ function MajorRect({ def, focused, onClick }: {
           style={{ width: `${Math.round(def.w * 44)}px`, pointerEvents: 'auto' }}>
           <div style={{
             width: '100%', boxSizing: 'border-box',
-            border: '1px solid rgba(255,42,74,0.18)',
-            borderLeft: '2px solid rgba(255,42,74,0.55)',
+            border: '1px solid rgba(26,64,255,0.18)',
+            borderLeft: '2px solid rgba(26,64,255,0.55)',
             background: 'rgba(2,3,10,0.94)',
             padding: '22px 24px',
             fontFamily: 'var(--font-vyan)',
           }}>
-            <div style={{ fontSize: '8px', letterSpacing: '0.55em', color: 'rgba(255,42,74,0.35)', marginBottom: 6 }}>
+            <div style={{ fontSize: '8px', letterSpacing: '0.55em', color: 'rgba(26,64,255,0.35)', marginBottom: 6 }}>
               VYAN GATEWAY
             </div>
-            <div style={{ fontSize: '28px', letterSpacing: '0.06em', marginBottom: 4, color: '#ff2a4a' }}>
+            <div style={{ fontSize: '28px', letterSpacing: '0.06em', marginBottom: 4, color: '#1a40ff' }}>
               {def.name}
             </div>
-            <div style={{ fontSize: '9px', letterSpacing: '0.36em', color: 'rgba(255,42,74,0.55)', marginBottom: 14 }}>
+            <div style={{ fontSize: '9px', letterSpacing: '0.36em', color: 'rgba(26,64,255,0.55)', marginBottom: 14 }}>
               {def.tantra}
             </div>
             <div style={{ fontSize: '12px', lineHeight: 1.6, marginBottom: 12, color: 'rgba(255,255,255,0.75)' }}>
@@ -335,8 +335,8 @@ function NavBtn({ onClick, children, style }: {
   return (
     <button onClick={onClick} style={{
       background: 'transparent',
-      border: '1px solid rgba(255,42,74,0.22)',
-      color: 'rgba(255,42,74,0.55)', width: 44, height: 44,
+      border: '1px solid rgba(26,64,255,0.22)',
+      color: 'rgba(26,64,255,0.55)', width: 44, height: 44,
       fontFamily: 'var(--font-vyan)',
       fontSize: '20px', cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -344,8 +344,8 @@ function NavBtn({ onClick, children, style }: {
       outline: 'none',
       ...style,
     }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,42,74,0.6)'; (e.currentTarget as HTMLElement).style.color = '#ff2a4a' }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,42,74,0.22)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,42,74,0.55)' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(26,64,255,0.6)'; (e.currentTarget as HTMLElement).style.color = '#1a40ff' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(26,64,255,0.22)'; (e.currentTarget as HTMLElement).style.color = 'rgba(26,64,255,0.55)' }}
     >
       {children}
     </button>
@@ -374,22 +374,47 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [goNext, goPrev])
 
-  // Scroll navigation with cooldown to avoid multi-jump
-  const scrollCooldown = useRef(false)
+  // Scroll + touch navigation with shared cooldown
+  const navCooldown = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const touchStartX = useRef<number | null>(null)
+
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      if (scrollCooldown.current) return
+      if (navCooldown.current) return
       if (Math.abs(e.deltaY) < 20) return
-      scrollCooldown.current = true
-      setTimeout(() => { scrollCooldown.current = false }, 700)
+      navCooldown.current = true
+      setTimeout(() => { navCooldown.current = false }, 700)
       if (e.deltaY > 0) goNext(); else goPrev()
     }
+
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartX.current = e.touches[0].clientX
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (touchStartX.current === null) return
+      const dx = touchStartX.current - e.changedTouches[0].clientX
+      touchStartX.current = null
+      if (Math.abs(dx) < 40) return   // too short, ignore
+      if (navCooldown.current) return
+      navCooldown.current = true
+      setTimeout(() => { navCooldown.current = false }, 700)
+      if (dx > 0) goNext(); else goPrev()
+    }
+
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
   }, [goNext, goPrev])
 
   const currentDef = focusDef
@@ -411,8 +436,8 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       {onBack && (
         <button onClick={onBack} style={{
           position: 'fixed', top: 24, left: 24, zIndex: 10,
-          background: 'transparent', border: '1px solid rgba(255,42,74,0.25)',
-          color: 'rgba(255,42,74,0.55)', padding: '8px 18px',
+          background: 'transparent', border: '1px solid rgba(26,64,255,0.25)',
+          color: 'rgba(26,64,255,0.55)', padding: '8px 18px',
           fontFamily: 'var(--font-vyan)',
           fontSize: '11px', letterSpacing: '0.38em', cursor: 'pointer', outline: 'none',
         }}>
@@ -442,7 +467,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       }}>
         {currentDef && (
           <div style={{
-            color: '#ff2a4a', fontSize: '10px', letterSpacing: '0.44em',
+            color: '#1a40ff', fontSize: '10px', letterSpacing: '0.44em',
             fontFamily: 'var(--font-vyan)', opacity: 0.8,
           }}>
             {currentDef.tantra}
@@ -454,14 +479,14 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
             <div key={d.id} style={{
               width: focusId === idx ? 18 : 5,
               height: 2,
-              background: focusId === idx ? '#ff2a4a' : 'rgba(255,42,74,0.20)',
+              background: focusId === idx ? '#1a40ff' : 'rgba(26,64,255,0.20)',
               transition: 'width 0.3s, background 0.3s',
               borderRadius: 1,
             }} />
           ))}
         </div>
         <div style={{
-          color: 'rgba(255,42,74,0.22)', fontSize: '9px',
+          color: 'rgba(26,64,255,0.22)', fontSize: '9px',
           letterSpacing: '0.42em', fontFamily: 'var(--font-vyan)',
           marginTop: 2,
         }}>
