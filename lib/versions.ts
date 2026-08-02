@@ -15,12 +15,27 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.4',
+    date: '2026-08-02',
+    title: 'Quantum Grid — True Glass & Vivid Gradient Border',
+    summary: 'Fixed glass panel transparency so the 3D scene shows through; gradient border now visibly travels blue→violet; background labels dimmed.',
+    changes: [
+      'Panel background: rgba(4,8,32,0.28) — genuinely see-through, 3D wireframes visible behind it',
+      'Removed non-functional backdrop-filter (does not composite against WebGL canvas)',
+      'Border padding 1.5px → 3px with more vivid blue→violet→blue gradient at 3s speed',
+      'Non-focused gateway labels: opacity 0.45 → 0.16 — far less intrusive',
+      'Corner brackets: fade to 0.12 opacity when focused and coloured red, not blue',
+    ],
+    gitHash: 'cbeac35',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.3',
     date: '2026-08-02',
     title: 'Quantum Grid — Glass Panels & Experience Overlay',
     summary: 'Active frames now show transparent deep blue glass with animated blue→violet gradient border. Each panel shows the VYAN logo, product name, description, and an EXPERIENCE button that opens a full-screen glass overlay.',
     changes: [
-      'Focused frames: glassmorphism panel (rgba(6,12,52,0.78) + backdrop-filter blur) with 1.5px animated gradient border (blue→violet travelling animation)',
+      'Focused frames: glassmorphism panel with animated gradient border (blue→violet travelling animation)',
       'Panel content: VYAN logo-symbol, product name in #ff2a4a red with glow, tantra label, description text, EXPERIENCE button',
       'EXPERIENCE button opens full-screen glass overlay with iframe (appUrl) or coming-soon placeholder',
       'Overlay: gradient-bordered glass panel, header with logo + product name + close button, click-outside to dismiss',
@@ -412,4 +427,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.3'
+export const CURRENT_VERSION = '3.4'
