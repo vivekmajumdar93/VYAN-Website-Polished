@@ -15,6 +15,23 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.8',
+    date: '2026-08-02',
+    title: 'Cinematic Side Panel',
+    summary: 'Experience overlay redesigned as a dramatic cinematic side panel that slides in from the left or right depending on each gateway\'s position in the 3D scene.',
+    changes: [
+      'Experience panel slides in from left or right (based on gateway 3D pos[0] sign) with spring-curve animation',
+      'Other side shows dimmed 3D scene through semi-transparent backdrop — click to close',
+      'Animated gradient light travels along the inner edge of the panel',
+      'Exit animation: panel slides back out, backdrop fades simultaneously',
+      'Escape key closes the side panel with full closing animation',
+      'Arrow keys and scroll blocked while panel is open',
+      'Mobile: panel widens to 92vw on narrow screens',
+    ],
+    gitHash: '21dcafa',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.7',
     date: '2026-08-02',
     title: 'Ṛtam Live Integration',
@@ -500,4 +517,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.7'
+export const CURRENT_VERSION = '3.8'
