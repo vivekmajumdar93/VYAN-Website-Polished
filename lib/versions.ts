@@ -15,6 +15,19 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.1',
+    date: '2026-08-02',
+    title: 'Quantum Grid — Brand Typography',
+    summary: 'Applied VYAN Shunyalekh typeface and #ff2a4a brand red across all QuantumGrid UI.',
+    changes: [
+      'All QuantumGrid text now uses var(--font-vyan) — VYAN Shunyalekh',
+      'Gateway labels, product names, tantra names, nav arrows, back button, dot indicator all in #ff2a4a',
+      'Corner L-brackets on major frames tinted brand red at low opacity',
+    ],
+    gitHash: 'fa7c6f4',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.0',
     date: '2026-08-02',
     title: 'Vistara — Quantum Grid',
@@ -372,4 +385,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.0'
+export const CURRENT_VERSION = '3.1'
