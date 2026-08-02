@@ -15,6 +15,17 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.4.1',
+    date: '2026-08-02',
+    title: 'Quantum Grid — Fix experience overlay purple bleed',
+    summary: 'Removed backdrop-filter from the experience overlay which was compositing against the WebGL canvas and turning the entire screen bright purple.',
+    changes: [
+      'Experience overlay: removed backdrop-filter, replaced with solid rgba(0,2,12,0.90) dark background',
+    ],
+    gitHash: '5aab08d',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.4',
     date: '2026-08-02',
     title: 'Quantum Grid — True Glass & Vivid Gradient Border',
@@ -427,4 +438,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.4'
+export const CURRENT_VERSION = '3.4.1'
