@@ -384,7 +384,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         50%  { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
       }
-      /* Gradient ONLY on border — pseudo-element mask cuts out the interior */
+      /* Gradient border via pseudo-element mask — interior punched out */
       .qg-panel {
         position: relative;
         background: rgba(4, 8, 48, 0.18);
@@ -404,6 +404,14 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         -webkit-mask-composite: destination-out;
         mask-composite: exclude;
         z-index: -1;
+      }
+      /* Solid glass for DOM overlays — backdrop-filter works here */
+      .qg-exp-glass {
+        background: linear-gradient(180deg, rgba(4, 8, 48, 0.88) 0%, rgba(2, 4, 28, 0.80) 100%);
+        backdrop-filter: blur(8px) saturate(120%);
+        -webkit-backdrop-filter: blur(8px) saturate(120%);
+        border-radius: 1px;
+        box-shadow: 0 0 60px rgba(40,80,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.02);
       }
       .qg-exp-btn {
         margin-top: 6px;
@@ -590,8 +598,8 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
             onClick={e => e.stopPropagation()}
             style={{ position: 'relative', width: '82vw', height: '80vh', maxWidth: 1280 }}
           >
-            <div className="qg-border" style={{ width: '100%', height: '100%' }}>
-              <div className="qg-glass" style={{
+            <div className="qg-panel" style={{ width: '100%', height: '100%' }}>
+              <div className="qg-exp-glass" style={{
                 width: '100%', height: '100%', boxSizing: 'border-box',
                 display: 'flex', flexDirection: 'column',
               }}>
