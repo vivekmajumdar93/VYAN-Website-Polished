@@ -287,7 +287,10 @@ function SkyLightning() {
 }
 
 // ─── MedhaLair ────────────────────────────────────────────────────────────────
-export function MedhaLair() {
+// Export SkyLightning so it can be used independently as atmosphere
+export { SkyLightning }
+
+export function MedhaLair({ disableVideo }: { disableVideo?: boolean } = {}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const dirRef   = useRef<1 | -1>(1)
   const rafRef   = useRef<number>(0)
@@ -337,23 +340,25 @@ export function MedhaLair() {
 
   return (
     <>
-      <video
-        ref={videoRef}
-        src="/assets/medha-entity.mp4"
-        muted
-        playsInline
-        preload="auto"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          objectPosition: 'center center',
-          zIndex: 3,
-          pointerEvents: 'none',
-        }}
-      />
+      {!disableVideo && (
+        <video
+          ref={videoRef}
+          src="/assets/medha-entity.mp4"
+          muted
+          playsInline
+          preload="auto"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center center',
+            zIndex: 3,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       <SkyLightning />
     </>
   )

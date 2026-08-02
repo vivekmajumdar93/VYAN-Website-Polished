@@ -25,6 +25,7 @@ import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './Medha
 import { CosmicStream } from '@/components/CosmicStream';
 import { useCosmicStream } from '@/hooks/useCosmicStream';
 import { MedhaLair } from '@/components/MedhaLair';
+import { MedhaModel3D } from '@/components/MedhaModel3D';
 import { StardustRain } from '@/components/StardustRain';
 import { HangingOrbs } from '@/components/HangingOrbs';
 import { FloatingText } from '@/components/FloatingText';
@@ -427,7 +428,8 @@ export default function MedhaHUD(){
     <div className="mlv" data-mode={mode} style={{position:'fixed',inset:0,width:'100vw',height:'100vh',background:'#000',overflow:'hidden'}}>
       {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
       {mounted&&<VoidCanvas/>}
-      {mounted&&<MedhaLair/>}
+      {mounted&&<MedhaLair disableVideo/>}
+      {mounted&&<MedhaModel3D entityState={es} facultyColor={fc}/>}
 
       {mounted&&<PB color={burstColor} active={burst} ex={ENTITY_POS.x/100} ey={ENTITY_POS.y/100}/>}
       {mounted&&<VerticalChatRail messages={messages} facultyColor={fc} onOpenTranscript={()=>setShowTranscript(v=>!v)} onEditMessage={editMessage} onRegenerate={regenerateFrom}/>}

@@ -137,8 +137,8 @@ function DepthGrid() {
 
 // ─── Major rect ───────────────────────────────────────────────────────────────
 
-function MajorRect({ def, focused, onClick }: {
-  def: Gateway; focused: boolean; onClick: () => void
+function MajorRect({ def, focused, onClick, onExperience }: {
+  def: Gateway; focused: boolean; onClick: () => void; onExperience: () => void
 }) {
   const frameGeo  = useMemo(() => makeRectGeo(def.w, def.h),         [def.w, def.h])
   const cornerGeo = useMemo(() => makeCornerGeo(def.w, def.h, 0.13), [def.w, def.h])
@@ -148,9 +148,10 @@ function MajorRect({ def, focused, onClick }: {
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
     if (!frameMat.current || !cornerMat.current) return
-    const tgtF = focused ? 0.92 : 0.52
+    const tgtF = focused ? 0.88 : 0.38
     frameMat.current.opacity  += (tgtF - frameMat.current.opacity)  * 0.08
-    const tgtC = focused ? 0.80 + 0.20 * Math.abs(Math.sin(t * 3.5)) : 0.36
+    // Focused: dim corners so they don't compete with CSS gradient border
+    const tgtC = focused ? 0.12 : 0.22
     cornerMat.current.opacity += (tgtC - cornerMat.current.opacity) * 0.08
   })
 
@@ -160,7 +161,7 @@ function MajorRect({ def, focused, onClick }: {
         <lineBasicMaterial ref={frameMat} color="#ffffff" transparent opacity={0.48} />
       </lineSegments>
       <lineSegments geometry={cornerGeo}>
-        <lineBasicMaterial ref={cornerMat} color="#1a40ff" transparent opacity={0.32} />
+        <lineBasicMaterial ref={cornerMat} color="#ff2a4a" transparent opacity={0.22} />
       </lineSegments>
 
       {/* Invisible hit surface */}
@@ -169,45 +170,57 @@ function MajorRect({ def, focused, onClick }: {
         <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
-      {/* Label — always faces camera */}
-      <Html position={[0, def.h / 2 + 0.65, 0]} center style={{ pointerEvents: 'none', userSelect: 'none' }}>
-        <div style={{
-          color: focused ? '#1a40ff' : 'rgba(26,64,255,0.38)',
-          fontSize: '11px', letterSpacing: '0.44em',
-          fontFamily: 'var(--font-vyan)', whiteSpace: 'nowrap',
-          opacity: focused ? 1 : 0.7, transition: 'opacity 0.5s, color 0.5s',
-          textShadow: focused ? '0 0 22px rgba(26,64,255,0.7)' : 'none',
-        }}>
-          {def.name.toUpperCase()}
-        </div>
-      </Html>
+      {/* Label — hidden when focused (panel takes over) */}
+      {!focused && (
+        <Html position={[0, def.h / 2 + 0.65, 0]} center style={{ pointerEvents: 'none', userSelect: 'none' }}>
+          <div style={{
+            color: 'rgba(255,42,74,0.16)',
+            fontSize: '11px', letterSpacing: '0.44em',
+            fontFamily: 'var(--font-vyan)', whiteSpace: 'nowrap',
+          }}>
+            {def.name.toUpperCase()}
+          </div>
+        </Html>
+      )}
 
-      {/* App panel */}
+      {/* Focused glass panel */}
       {focused && (
         <Html position={[0, 0, 0.1]} center transform
           style={{ width: `${Math.round(def.w * 44)}px`, pointerEvents: 'auto' }}>
-          <div style={{
-            width: '100%', boxSizing: 'border-box',
-            border: '1px solid rgba(26,64,255,0.18)',
-            borderLeft: '2px solid rgba(26,64,255,0.55)',
-            background: 'rgba(2,3,10,0.94)',
-            padding: '22px 24px',
-            fontFamily: 'var(--font-vyan)',
-          }}>
-            <div style={{ fontSize: '8px', letterSpacing: '0.55em', color: 'rgba(26,64,255,0.35)', marginBottom: 6 }}>
-              VYAN GATEWAY
-            </div>
-            <div style={{ fontSize: '28px', letterSpacing: '0.06em', marginBottom: 4, color: '#1a40ff' }}>
-              {def.name}
-            </div>
-            <div style={{ fontSize: '9px', letterSpacing: '0.36em', color: 'rgba(26,64,255,0.55)', marginBottom: 14 }}>
-              {def.tantra}
-            </div>
-            <div style={{ fontSize: '12px', lineHeight: 1.6, marginBottom: 12, color: 'rgba(255,255,255,0.75)' }}>
-              {def.tagline}
-            </div>
-            <div style={{ fontSize: '10px', lineHeight: 1.8, color: 'rgba(255,255,255,0.32)' }}>
-              {def.description}
+          <div className="qg-border">
+            <div className="qg-glass" style={{
+              padding: '24px 20px 20px',
+              fontFamily: 'var(--font-vyan)',
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', gap: 10,
+              boxSizing: 'border-box', width: '100%',
+            }}>
+              <img src="/logo-symbol.png" alt="VYAN"
+                style={{ width: 38, height: 38, objectFit: 'contain', opacity: 0.88 }} />
+              <div style={{
+                color: '#ff2a4a', fontSize: '26px', letterSpacing: '0.08em',
+                textAlign: 'center', textShadow: '0 0 18px rgba(255,42,74,0.45)',
+              }}>
+                {def.name}
+              </div>
+              <div style={{
+                color: 'rgba(255,42,74,0.45)', fontSize: '8px',
+                letterSpacing: '0.5em', marginTop: -6,
+              }}>
+                {def.tantra}
+              </div>
+              <div style={{
+                color: 'rgba(200,212,255,0.65)', fontSize: '11px',
+                lineHeight: 1.72, textAlign: 'center', padding: '2px 6px',
+              }}>
+                {def.description || def.tagline || 'Coming soon.'}
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onExperience() }}
+                className="qg-exp-btn"
+              >
+                EXPERIENCE
+              </button>
             </div>
           </div>
         </Html>
@@ -304,10 +317,11 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
-function QuantumScene({ focusId, focusDef, setFocusId }: {
+function QuantumScene({ focusId, focusDef, setFocusId, onExperience }: {
   focusId: number | null
   focusDef: Gateway | null
   setFocusId: (id: number | null) => void
+  onExperience: (idx: number) => void
 }) {
   return (
     <>
@@ -320,7 +334,8 @@ function QuantumScene({ focusId, focusDef, setFocusId }: {
       {GATEWAYS.map((def, idx) => (
         <MajorRect key={def.id} def={def}
           focused={focusId === idx}
-          onClick={() => setFocusId(focusId === idx ? null : idx)} />
+          onClick={() => setFocusId(focusId === idx ? null : idx)}
+          onExperience={() => onExperience(idx)} />
       ))}
     </>
   )
@@ -356,7 +371,60 @@ function NavBtn({ onClick, children, style }: {
 
 export function QuantumGrid({ onBack }: { onBack?: () => void }) {
   const [focusId, setFocusId] = useState<number | null>(null)
+  const [expId,   setExpId]   = useState<number | null>(null)
   const focusDef = focusId !== null ? (GATEWAYS[focusId] ?? null) : null
+  const expDef   = expId   !== null ? (GATEWAYS[expId]   ?? null) : null
+
+  // Inject animated glass + gradient border CSS once
+  useEffect(() => {
+    const s = document.createElement('style')
+    s.id = 'qg-styles'
+    s.textContent = `
+      @keyframes qg-border-travel {
+        0%   { background-position: 0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      .qg-border {
+        background: linear-gradient(120deg, #1a40ff 0%, #6b25ff 25%, #9c2fff 50%, #6b25ff 75%, #1a40ff 100%);
+        background-size: 400% 400%;
+        animation: qg-border-travel 3s linear infinite;
+        padding: 3px;
+        border-radius: 2px;
+      }
+      .qg-glass {
+        background: rgba(4, 8, 32, 0.28);
+        border-radius: 1px;
+      }
+      .qg-exp-btn {
+        margin-top: 6px;
+        border: 1px solid rgba(255,42,74,0.45);
+        background: rgba(255,42,74,0.08);
+        color: #ff2a4a;
+        padding: 9px 28px;
+        font-family: var(--font-vyan);
+        font-size: 10px;
+        letter-spacing: 0.42em;
+        cursor: pointer;
+        outline: none;
+        transition: background 0.2s, border-color 0.2s;
+      }
+      .qg-exp-btn:hover {
+        background: rgba(255,42,74,0.18);
+        border-color: rgba(255,42,74,0.75);
+      }
+      .qg-overlay-close {
+        position: absolute; top: 16px; right: 18px;
+        background: transparent; border: none;
+        color: rgba(255,42,74,0.55); font-size: 22px;
+        cursor: pointer; font-family: var(--font-vyan);
+        line-height: 1; padding: 4px 8px;
+      }
+      .qg-overlay-close:hover { color: #ff2a4a; }
+    `
+    if (!document.getElementById('qg-styles')) document.head.appendChild(s)
+    return () => { document.getElementById('qg-styles')?.remove() }
+  }, [])
 
   const goNext = useCallback(() =>
     setFocusId(p => p === null ? 0 : (p + 1) % N), [])
@@ -428,7 +496,8 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         gl={{ antialias: true, alpha: false }}
       >
         <Suspense fallback={null}>
-          <QuantumScene focusId={focusId} focusDef={focusDef} setFocusId={setFocusId} />
+          <QuantumScene focusId={focusId} focusDef={focusDef} setFocusId={setFocusId}
+            onExperience={(idx) => setExpId(idx)} />
         </Suspense>
       </Canvas>
 
@@ -467,26 +536,26 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       }}>
         {currentDef && (
           <div style={{
-            color: '#1a40ff', fontSize: '10px', letterSpacing: '0.44em',
-            fontFamily: 'var(--font-vyan)', opacity: 0.8,
+            color: '#ff2a4a', fontSize: '10px', letterSpacing: '0.44em',
+            fontFamily: 'var(--font-vyan)', opacity: 0.7,
           }}>
             {currentDef.tantra}
           </div>
         )}
         {/* Dot indicator */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {GATEWAYS.map((d, idx) => (
-            <div key={d.id} style={{
+          {GATEWAYS.map((_, idx) => (
+            <div key={idx} style={{
               width: focusId === idx ? 18 : 5,
               height: 2,
-              background: focusId === idx ? '#1a40ff' : 'rgba(26,64,255,0.20)',
+              background: focusId === idx ? '#ff2a4a' : 'rgba(255,42,74,0.20)',
               transition: 'width 0.3s, background 0.3s',
               borderRadius: 1,
             }} />
           ))}
         </div>
         <div style={{
-          color: 'rgba(26,64,255,0.22)', fontSize: '9px',
+          color: 'rgba(255,42,74,0.22)', fontSize: '9px',
           letterSpacing: '0.42em', fontFamily: 'var(--font-vyan)',
           marginTop: 2,
         }}>
@@ -495,6 +564,84 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
             : 'SCROLL OR ‹ › TO NAVIGATE · CLICK TO FOCUS'}
         </div>
       </div>
+
+      {/* ── Experience overlay ────────────────────────────────────────────── */}
+      {expDef && (
+        <div
+          onClick={() => setExpId(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            background: 'rgba(0,4,20,0.72)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ position: 'relative', width: '82vw', height: '80vh', maxWidth: 1280 }}
+          >
+            <div className="qg-border" style={{ width: '100%', height: '100%' }}>
+              <div className="qg-glass" style={{
+                width: '100%', height: '100%', boxSizing: 'border-box',
+                display: 'flex', flexDirection: 'column',
+              }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '18px 24px 14px',
+                  borderBottom: '1px solid rgba(26,64,255,0.18)',
+                  flexShrink: 0,
+                }}>
+                  <img src="/logo-symbol.png" alt="VYAN"
+                    style={{ width: 28, height: 28, objectFit: 'contain', opacity: 0.85 }} />
+                  <div>
+                    <div style={{
+                      color: '#ff2a4a', fontFamily: 'var(--font-vyan)',
+                      fontSize: '20px', letterSpacing: '0.08em',
+                      textShadow: '0 0 14px rgba(255,42,74,0.4)',
+                    }}>
+                      {expDef.name}
+                    </div>
+                    <div style={{
+                      color: 'rgba(255,42,74,0.4)', fontFamily: 'var(--font-vyan)',
+                      fontSize: '8px', letterSpacing: '0.5em', marginTop: 2,
+                    }}>
+                      {expDef.tantra}
+                    </div>
+                  </div>
+                  <button className="qg-overlay-close" onClick={() => setExpId(null)}>✕</button>
+                </div>
+                <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                  {expDef.appUrl ? (
+                    <iframe src={expDef.appUrl}
+                      style={{ width: '100%', height: '100%', border: 'none' }}
+                      allow="fullscreen" />
+                  ) : (
+                    <div style={{
+                      width: '100%', height: '100%',
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center', gap: 16,
+                      fontFamily: 'var(--font-vyan)',
+                    }}>
+                      <img src="/logo-symbol.png" alt="VYAN"
+                        style={{ width: 64, opacity: 0.25 }} />
+                      <div style={{ color: '#ff2a4a', fontSize: '22px', letterSpacing: '0.1em', opacity: 0.7 }}>
+                        {expDef.name}
+                      </div>
+                      <div style={{
+                        color: 'rgba(200,212,255,0.35)', fontSize: '11px',
+                        letterSpacing: '0.3em', textAlign: 'center', maxWidth: 320,
+                      }}>
+                        {expDef.tagline || 'Experience coming soon.'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
