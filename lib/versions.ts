@@ -15,6 +15,19 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.9.4',
+    date: '2026-08-03',
+    title: 'Colorized Background Rects',
+    summary: 'Background wireframe rectangles now render in a muted multi-color palette instead of solid white.',
+    changes: [
+      'Each background rect randomly picks from deep blue, violet, purple, crimson, teal, amber, and emerald tones',
+      'White weighted at 3x to maintain contrast and prevent oversaturation',
+      'Existing low opacities (4–26%) keep colors dark and subtle',
+    ],
+    gitHash: '81d20be',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.9.3',
     date: '2026-08-03',
     title: 'Text Legibility Fix',
@@ -574,4 +587,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.9.3'
+export const CURRENT_VERSION = '3.9.4'
