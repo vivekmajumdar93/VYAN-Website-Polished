@@ -15,6 +15,19 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.9.2',
+    date: '2026-08-03',
+    title: 'Gradient Border Fix',
+    summary: 'Fixed the animated gradient border on the floating experience panel — was hidden due to a z-index conflict with the glass fill.',
+    changes: [
+      'Removed isolation:isolate and z-index:-1 from panel ::before pseudo-element',
+      'Added pointer-events:none so the border layer does not block panel interactions',
+      'Gradient border now correctly animates across all four panel edges',
+    ],
+    gitHash: '46a3939',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.9.1',
     date: '2026-08-03',
     title: 'Footer Suppression Fix',
@@ -546,4 +559,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.9.1'
+export const CURRENT_VERSION = '3.9.2'
