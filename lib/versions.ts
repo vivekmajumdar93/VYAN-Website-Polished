@@ -15,6 +15,24 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.0',
+    date: '2026-08-03',
+    title: 'Navika — Living Orb in Medhā',
+    summary: 'Replaces the static top-right corner marker in Medhā with a fully animated 3D orb creature: procedural body, orbiting particles, blinking eyes, cursor awareness, and idle animations.',
+    changes: [
+      'NavikaOrbWidget: 88×88px fixed-position canvas, zIndex 40, pointer-events none',
+      'Procedural NavikaModel: glowing orb body, equatorial ring, three petals, two eyes',
+      'NavikaAnimator: blink/saccade cycles, emissive breathing, petal sway',
+      'NavikaMovement: cursor-scoped tracking (widget bbox), squash/stretch, spawn pop',
+      'NavikaParticles: 60 orbiting particles with escape/respawn FSM, GLSL glow shader',
+      'NavikaIdleController: fires random idle/ripple animations every 8–22 s',
+      'navikaStore (Zustand): shared state for pointer, idle, ripple, inspect nonces',
+      'HangingOrbs settings button shifted below the 88px orb (top: ~112–130px)',
+    ],
+    gitHash: '67ad957',
+    pages: ['Medhā'],
+  },
+  {
     version: '3.4',
     date: '2026-08-02',
     title: 'Quantum Grid — True Glass & Vivid Gradient Border',
@@ -427,4 +445,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.4'
+export const CURRENT_VERSION = '4.0'
