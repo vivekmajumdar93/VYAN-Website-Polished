@@ -377,6 +377,13 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
   const expIdRef = useRef<number | null>(null)
   useEffect(() => { expIdRef.current = expId }, [expId])
 
+  // Suppress NebulaFooter while panel is open
+  useEffect(() => {
+    if (expId !== null) document.body.classList.add('qg-exp-open')
+    else                document.body.classList.remove('qg-exp-open')
+    return () =>        document.body.classList.remove('qg-exp-open')
+  }, [expId])
+
   const closeExp = useCallback(() => {
     setExpClosing(true)
     setTimeout(() => { setExpId(null); setExpClosing(false) }, 520)
@@ -546,6 +553,13 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       .qg-exp-btn:hover {
         background: rgba(255, 42, 74, 0.18);
         border-color: rgba(255, 42, 74, 0.75);
+      }
+
+      /* Hide footer while experience panel is open */
+      body.qg-exp-open .nf-root {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
       }
     `
     if (!document.getElementById('qg-styles')) document.head.appendChild(s)
