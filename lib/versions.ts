@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.9.1',
+    date: '2026-08-03',
+    title: 'Footer Suppression Fix',
+    summary: 'NebulaFooter is now hidden while the experience panel is open, preventing it from overlapping panel content.',
+    changes: [
+      'NebulaFooter fades out (opacity 0, pointer-events none) when experience panel opens',
+      'Footer restores when panel closes or on unmount',
+    ],
+    gitHash: '3a715c5',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.9',
     date: '2026-08-03',
     title: 'Floating Panel — All-Side Border & Hover Lift',
@@ -534,4 +546,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.9'
+export const CURRENT_VERSION = '3.9.1'
