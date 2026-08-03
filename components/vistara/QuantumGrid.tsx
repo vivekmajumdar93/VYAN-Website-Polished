@@ -50,15 +50,29 @@ function makeCornerGeo(w: number, h: number, f: number): THREE.BufferGeometry {
 
 // ─── Background rects ─────────────────────────────────────────────────────────
 
+// Muted palette for background rect wireframes — dark tones, low saturation
+const BG_COLORS = [
+  '#ffffff', '#ffffff', '#ffffff',  // white weighted heavier for contrast
+  '#4466ff',  // deep blue
+  '#7744ff',  // deep violet
+  '#aa44ff',  // deep purple
+  '#ff3355',  // dark crimson (brand family)
+  '#22aacc',  // dark teal
+  '#cc8800',  // dark amber
+  '#44aa88',  // dark emerald
+]
+
 interface BgItem {
   key: number; pos: [number, number, number]
   rx: number; ry: number; rz: number; op: number
+  color: string
   geo: THREE.BufferGeometry
 }
 
 function BackgroundRects() {
   const items = useMemo<BgItem[]>(() => {
-    const rng = (a: number, b: number) => a + Math.random() * (b - a)
+    const rng  = (a: number, b: number) => a + Math.random() * (b - a)
+    const pick = () => BG_COLORS[Math.floor(Math.random() * BG_COLORS.length)]
     const base: BgItem[] = Array.from({ length: BG_RECT_CNT }, (_, i) => {
       const w = rng(0.6, 11), h = rng(0.5, 8.5)
       return {
@@ -66,6 +80,7 @@ function BackgroundRects() {
         pos: [rng(-62, 62), rng(-40, 40), -4 - rng(0, 88)] as [number, number, number],
         rx: rng(-0.85, 0.85), ry: rng(-1.1, 1.1), rz: rng(-0.4, 0.4),
         op: rng(0.04, 0.26),
+        color: pick(),
         geo: makeRectGeo(w, h),
       }
     })
@@ -75,9 +90,10 @@ function BackgroundRects() {
       const rx = rng(-0.3, 0.3), ry = rng(-0.45, 0.45), rz = rng(-0.18, 0.18)
       const w = rng(3, 10), h = rng(2.5, 7.5)
       const ws = rng(0.42, 0.70), hs = rng(0.42, 0.70)
+      const c = pick()
       nested.push(
-        { key: BG_RECT_CNT + i * 2,     pos: [cx, cy, cz],                                                         rx, ry, rz, op: rng(0.14, 0.32), geo: makeRectGeo(w, h) },
-        { key: BG_RECT_CNT + i * 2 + 1, pos: [cx + rng(-0.3, 0.3), cy + rng(-0.3, 0.3), cz + rng(-0.6, 0.6)],     rx, ry, rz, op: rng(0.10, 0.24), geo: makeRectGeo(w * ws, h * hs) },
+        { key: BG_RECT_CNT + i * 2,     pos: [cx, cy, cz],                                                         rx, ry, rz, op: rng(0.14, 0.32), color: c, geo: makeRectGeo(w, h) },
+        { key: BG_RECT_CNT + i * 2 + 1, pos: [cx + rng(-0.3, 0.3), cy + rng(-0.3, 0.3), cz + rng(-0.6, 0.6)],     rx, ry, rz, op: rng(0.10, 0.24), color: c, geo: makeRectGeo(w * ws, h * hs) },
       )
     }
     return [...base, ...nested]
@@ -88,7 +104,7 @@ function BackgroundRects() {
       {items.map(r => (
         <lineSegments key={r.key} geometry={r.geo}
           position={r.pos} rotation={[r.rx, r.ry, r.rz]}>
-          <lineBasicMaterial color="#ffffff" transparent opacity={r.op} depthWrite={false} />
+          <lineBasicMaterial color={r.color} transparent opacity={r.op} depthWrite={false} />
         </lineSegments>
       ))}
     </>
