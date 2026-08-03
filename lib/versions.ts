@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.9.3',
+    date: '2026-08-03',
+    title: 'Text Legibility Fix',
+    summary: 'All dim text across the Vistara experience panel and 3D in-frame cards brought up to readable opacity.',
+    changes: [
+      'Tantra subtitle (e.g. "VYAN ṚTAM"): 0.36 → 0.72 opacity',
+      'Tagline strip in experience panel: 0.30 → 0.82 opacity',
+      'Coming-soon placeholder text: 0.26 → 0.80 opacity',
+      'Description text in 3D focused card: 0.62 → 0.90 opacity',
+      'Nav hint text at bottom: 0.22 → 0.50 opacity',
+    ],
+    gitHash: '4a5524e',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.9.2',
     date: '2026-08-03',
     title: 'Gradient Border Fix',
@@ -559,4 +574,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.9.2'
+export const CURRENT_VERSION = '3.9.3'
