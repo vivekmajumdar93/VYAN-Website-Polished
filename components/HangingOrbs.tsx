@@ -76,7 +76,7 @@ function FacultyCloseButton({ onClose }: { onClose: () => void }) {
       onMouseLeave={() => setHovered(false)}
       onClick={onClose}
       style={{
-        position: 'fixed', top: 12, right: 12, zIndex: 83,
+        position: 'fixed', top: 12, right: 116, zIndex: 83,
         background: 'none', border: 'none', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '6px', borderRadius: '50%',
