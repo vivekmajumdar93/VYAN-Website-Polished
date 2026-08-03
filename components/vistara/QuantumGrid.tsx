@@ -201,13 +201,13 @@ function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
               {def.name}
             </div>
             <div style={{
-              color: 'rgba(255,42,74,0.42)', fontSize: '8px',
+              color: 'rgba(255,42,74,0.72)', fontSize: '8px',
               letterSpacing: '0.5em', marginTop: -6,
             }}>
               {def.tantra}
             </div>
             <div style={{
-              color: 'rgba(200,212,255,0.62)', fontSize: '11px',
+              color: 'rgba(210,222,255,0.90)', fontSize: '11px',
               lineHeight: 1.72, textAlign: 'center', padding: '2px 6px',
             }}>
               {def.description || def.tagline || 'Coming soon.'}
@@ -713,7 +713,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
           ))}
         </div>
         <div style={{
-          color: 'rgba(255,42,74,0.22)', fontSize: '9px',
+          color: 'rgba(255,42,74,0.50)', fontSize: '9px',
           letterSpacing: '0.42em', fontFamily: 'var(--font-vyan)',
           marginTop: 2,
         }}>
@@ -775,7 +775,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
                         {expDef.name}
                       </div>
                       <div style={{
-                        color: 'rgba(255,42,74,0.36)', fontFamily: 'var(--font-vyan)',
+                        color: 'rgba(255,42,74,0.72)', fontFamily: 'var(--font-vyan)',
                         fontSize: '8px', letterSpacing: '0.52em', marginTop: 3,
                       }}>
                         {expDef.tantra}
@@ -807,9 +807,9 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
                 {expDef.tagline ? (
                   <div style={{
                     padding: '10px 28px 9px', flexShrink: 0,
-                    color: 'rgba(175,195,255,0.30)', fontFamily: 'var(--font-vyan)',
+                    color: 'rgba(190,210,255,0.82)', fontFamily: 'var(--font-vyan)',
                     fontSize: '9px', letterSpacing: '0.30em',
-                    borderBottom: '1px solid rgba(26,64,255,0.08)',
+                    borderBottom: '1px solid rgba(26,64,255,0.12)',
                     textTransform: 'uppercase',
                   }}>
                     {expDef.tagline}
@@ -840,7 +840,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
                         {expDef.name}
                       </div>
                       <div style={{
-                        color: 'rgba(190,205,255,0.26)',
+                        color: 'rgba(200,215,255,0.80)',
                         fontSize: '10px', letterSpacing: '0.28em',
                         textAlign: 'center', maxWidth: 260,
                         lineHeight: 2.0, textTransform: 'uppercase',
