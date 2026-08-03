@@ -32,6 +32,7 @@ import { FloatingText } from '@/components/FloatingText';
 import { CloseIcon, SendIcon, AttachIcon, SpeakIcon, RefreshIcon } from '@/components/icons/VyanIcons';
 import { VerticalChatRail } from '@/components/VerticalChatRail';
 import { ChatHistoryModal } from '@/components/ChatHistoryModal';
+import NavikaOrbWidget from '@/components/navika/NavikaOrbWidget';
 import './medha.css';
 
 // ─── Faculty colors ────────────────────────────────────────────────────────────
@@ -665,6 +666,9 @@ export default function MedhaHUD(){
 
       <input ref={fileR} type="file" accept="image/*,.pdf,.txt,.md,.json,.csv" style={{display:'none'}}
         onChange={e=>{const f=e.target.files?.[0];if(!f)return;setComposerText(c=>`${c}\n\n[attached: ${f.name} · ${(f.size/1024).toFixed(1)}KB]`);e.target.value='';}}/>
+
+      {/* Navika ambient orb — top-right, purely decorative, pointer-events:none */}
+      {mounted && <NavikaOrbWidget />}
     </div>
   );
 }
