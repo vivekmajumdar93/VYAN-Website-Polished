@@ -15,6 +15,23 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '3.9',
+    date: '2026-08-03',
+    title: 'Floating Panel — All-Side Border & Hover Lift',
+    summary: 'Experience panel redesigned as a floating card inset from all screen edges, with an animated gradient border on all four sides and a cinematic hover lift effect.',
+    changes: [
+      'Panel floats 20px from top, bottom, and outer edge — no longer edge-to-edge',
+      'Animated gradient border runs around all four sides of the floating panel',
+      'Hover lift: panel rises 7px with deepened shadow on pointer devices (disabled on touch)',
+      'Footer no longer conflicts — panel clears the footer zone naturally via bottom inset',
+      'Mobile: panel centers with 14px insets from all sides, scales to fill available space',
+      'Tablet: panel widens to 62vw for better content density',
+      'Dim backdrop opacity reduced slightly to let 3D scene show through more clearly',
+    ],
+    gitHash: 'bd51113',
+    pages: ['Vistara'],
+  },
+  {
     version: '3.8',
     date: '2026-08-02',
     title: 'Cinematic Side Panel',
@@ -517,4 +534,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '3.8'
+export const CURRENT_VERSION = '3.9'
