@@ -393,20 +393,20 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         100% { background-position: 0% 50%; }
       }
       @keyframes qg-slide-in-right {
-        from { transform: translateX(110%); opacity: 0.4; }
+        from { transform: translateX(115%); opacity: 0.5; }
         to   { transform: translateX(0);    opacity: 1; }
       }
       @keyframes qg-slide-out-right {
         from { transform: translateX(0);    opacity: 1; }
-        to   { transform: translateX(110%); opacity: 0.4; }
+        to   { transform: translateX(115%); opacity: 0.5; }
       }
       @keyframes qg-slide-in-left {
-        from { transform: translateX(-110%); opacity: 0.4; }
+        from { transform: translateX(-115%); opacity: 0.5; }
         to   { transform: translateX(0);     opacity: 1; }
       }
       @keyframes qg-slide-out-left {
         from { transform: translateX(0);     opacity: 1; }
-        to   { transform: translateX(-110%); opacity: 0.4; }
+        to   { transform: translateX(-115%); opacity: 0.5; }
       }
       @keyframes qg-dim-in {
         from { opacity: 0; }
@@ -416,11 +416,8 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         from { opacity: 1; }
         to   { opacity: 0; }
       }
-      @keyframes qg-edge-travel {
-        0%   { background-position: 0% 0%; }
-        100% { background-position: 0% 100%; }
-      }
-      /* Gradient border via pseudo-element mask — interior punched out */
+
+      /* ── In-frame 3D glass panel ────────────────────────────────── */
       .qg-panel {
         position: relative;
         background: rgba(4, 8, 48, 0.18);
@@ -441,48 +438,102 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         mask-composite: exclude;
         z-index: -1;
       }
-      /* Solid glass for DOM overlays — backdrop-filter works here */
-      .qg-exp-glass {
-        background: linear-gradient(160deg, rgba(4,8,52,0.94) 0%, rgba(2,4,32,0.90) 100%);
-        backdrop-filter: blur(14px) saturate(130%);
-        -webkit-backdrop-filter: blur(14px) saturate(130%);
-      }
-      /* Side panel container */
-      .qg-side-panel {
-        width: clamp(300px, 52vw, 900px);
-        height: 100%;
-        position: relative;
-        flex-shrink: 0;
-        overflow: hidden;
-      }
-      @media (max-width: 640px) {
-        .qg-side-panel { width: 92vw; }
-      }
-      /* Animated gradient line on the inner edge */
-      .qg-side-edge {
+
+      /* ── Floating experience panel ─────────────────────────────── */
+
+      /* Slide/position wrapper — never receives pointer events itself */
+      .qg-panel-wrapper {
         position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 3px;
-        background: linear-gradient(
-          to bottom,
-          transparent 0%,
-          #1a40ff 15%,
-          #6b25ff 35%,
-          #9c2fff 50%,
-          #6b25ff 65%,
-          #1a40ff 85%,
-          transparent 100%
-        );
-        background-size: 100% 300%;
-        animation: qg-edge-travel 2.8s ease-in-out infinite alternate;
-        z-index: 10;
+        top: 20px;
+        bottom: 20px;
+        width: clamp(300px, 50vw, 840px);
         pointer-events: none;
       }
+      .qg-panel-right { right: 20px; }
+      .qg-panel-left  { left: 20px;  }
+
+      /* Tablet */
+      @media (min-width: 641px) and (max-width: 1024px) {
+        .qg-panel-wrapper { width: clamp(280px, 62vw, 680px); }
+      }
+
+      /* Mobile — centered with symmetric insets */
+      @media (max-width: 640px) {
+        .qg-panel-wrapper,
+        .qg-panel-right,
+        .qg-panel-left {
+          left: 14px !important;
+          right: 14px !important;
+          width: auto !important;
+          top: 14px !important;
+          bottom: 14px !important;
+        }
+      }
+
+      /* The actual panel card — gradient border on all 4 sides */
+      .qg-float-panel {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 3px;
+        isolation: isolate;
+        pointer-events: auto;
+        box-shadow:
+          0 24px 64px rgba(12, 32, 160, 0.34),
+          0 6px 20px rgba(0, 0, 0, 0.55),
+          0 0 0 1px rgba(50, 90, 255, 0.08);
+        transition: transform 0.44s cubic-bezier(0.34, 1.56, 0.64, 1),
+                    box-shadow 0.44s ease;
+      }
+      /* Hover lift — pointer devices only */
+      @media (hover: hover) {
+        .qg-float-panel:hover {
+          transform: translateY(-7px);
+          box-shadow:
+            0 38px 90px rgba(16, 44, 200, 0.44),
+            0 12px 32px rgba(0, 0, 0, 0.65),
+            0 0 70px rgba(60, 30, 220, 0.20),
+            0 0 0 1px rgba(80, 120, 255, 0.18);
+        }
+      }
+      /* Animated gradient border — all 4 sides */
+      .qg-float-panel::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 3px;
+        padding: 2px;
+        background: linear-gradient(
+          120deg,
+          #1028ff 0%,
+          #6020ff 20%,
+          #a030ff 40%,
+          #6020ff 60%,
+          #1028ff 80%,
+          #6020ff 100%
+        );
+        background-size: 400% 400%;
+        animation: qg-border-travel 2.8s linear infinite;
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: destination-out;
+        mask-composite: exclude;
+        z-index: -1;
+      }
+
+      /* Glass fill for the floating panel */
+      .qg-exp-glass {
+        background: linear-gradient(160deg, rgba(4, 8, 54, 0.96) 0%, rgba(2, 4, 34, 0.93) 100%);
+        backdrop-filter: blur(16px) saturate(130%);
+        -webkit-backdrop-filter: blur(16px) saturate(130%);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      /* EXPERIENCE button in 3D card */
       .qg-exp-btn {
         margin-top: 6px;
-        border: 1px solid rgba(255,42,74,0.45);
-        background: rgba(255,42,74,0.08);
+        border: 1px solid rgba(255, 42, 74, 0.45);
+        background: rgba(255, 42, 74, 0.08);
         color: #ff2a4a;
         padding: 9px 28px;
         font-family: var(--font-vyan);
@@ -493,8 +544,8 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         transition: background 0.2s, border-color 0.2s;
       }
       .qg-exp-btn:hover {
-        background: rgba(255,42,74,0.18);
-        border-color: rgba(255,42,74,0.75);
+        background: rgba(255, 42, 74, 0.18);
+        border-color: rgba(255, 42, 74, 0.75);
       }
     `
     if (!document.getElementById('qg-styles')) document.head.appendChild(s)
@@ -532,7 +583,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      if (expIdRef.current !== null) return  // overlay open — block nav
+      if (expIdRef.current !== null) return
       if (navCooldown.current) return
       if (Math.abs(e.deltaY) < 20) return
       navCooldown.current = true
@@ -548,7 +599,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       if (touchStartX.current === null) return
       const dx = touchStartX.current - e.changedTouches[0].clientX
       touchStartX.current = null
-      if (expIdRef.current !== null) return  // overlay open — block nav
+      if (expIdRef.current !== null) return
       if (Math.abs(dx) < 40) return
       if (navCooldown.current) return
       navCooldown.current = true
@@ -568,7 +619,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
 
   const currentDef = focusDef
 
-  // Derive side panel animation values
+  // Derive panel animation values
   const isRight   = expDef ? expDef.pos[0] >= 0 : true
   const panelAnim = expDef
     ? expClosing
@@ -634,7 +685,6 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
             {currentDef.tantra}
           </div>
         )}
-        {/* Dot indicator */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {GATEWAYS.map((_, idx) => (
             <div key={idx} style={{
@@ -657,136 +707,135 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         </div>
       </div>
 
-      {/* ── Experience side panel ──────────────────────────────────────────── */}
+      {/* ── Floating experience panel ──────────────────────────────────────── */}
       {expDef && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 50,
-          display: 'flex',
-          flexDirection: isRight ? 'row' : 'row-reverse',
-        }}>
-          {/* Dim backdrop — shows 3D scene through it, click to close */}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
+
+          {/* Full-screen dim — shows 3D scene through it, click to close */}
           <div
             onClick={closeExp}
             style={{
-              flex: 1,
-              background: 'rgba(0,2,14,0.68)',
+              position: 'absolute', inset: 0,
+              background: 'rgba(0, 2, 14, 0.62)',
               animation: dimAnim,
               cursor: 'pointer',
             }}
           />
 
-          {/* Side panel */}
-          <div className="qg-side-panel" style={{ animation: panelAnim }}>
-            {/* Animated gradient line on the inner edge */}
-            <div className="qg-side-edge" style={{
-              [isRight ? 'left' : 'right']: 0,
-            }} />
+          {/* Slide wrapper — positions panel on the appropriate side */}
+          <div
+            className={`qg-panel-wrapper ${isRight ? 'qg-panel-right' : 'qg-panel-left'}`}
+            style={{ animation: panelAnim }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Floating card — gradient border on all 4 sides + hover lift */}
+            <div className="qg-float-panel">
 
-            {/* Glass fill */}
-            <div className="qg-exp-glass" style={{
-              width: '100%', height: '100%',
-              boxSizing: 'border-box',
-              display: 'flex', flexDirection: 'column',
-            }}>
-
-              {/* Header */}
-              <div style={{
-                padding: '22px 28px 18px',
-                borderBottom: '1px solid rgba(26,64,255,0.16)',
-                flexShrink: 0,
-                display: 'flex', alignItems: 'center',
-                justifyContent: 'space-between', gap: 14,
+              {/* Glass fill */}
+              <div className="qg-exp-glass" style={{
+                width: '100%', height: '100%',
+                boxSizing: 'border-box',
+                display: 'flex', flexDirection: 'column',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-                  <img src="/logo-symbol.png" alt="VYAN"
-                    style={{ width: 30, height: 30, objectFit: 'contain', opacity: 0.85, flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{
-                      color: '#ff2a4a', fontFamily: 'var(--font-vyan)',
-                      fontSize: '22px', letterSpacing: '0.08em',
-                      textShadow: '0 0 20px rgba(255,42,74,0.40)',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
-                      {expDef.name}
-                    </div>
-                    <div style={{
-                      color: 'rgba(255,42,74,0.38)', fontFamily: 'var(--font-vyan)',
-                      fontSize: '8px', letterSpacing: '0.52em', marginTop: 3,
-                    }}>
-                      {expDef.tantra}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={closeExp}
-                  style={{
-                    background: 'none', border: '1px solid rgba(255,42,74,0.28)',
-                    color: 'rgba(255,42,74,0.55)', fontSize: '15px',
-                    cursor: 'pointer', fontFamily: 'var(--font-vyan)',
-                    padding: '5px 9px', lineHeight: 1, flexShrink: 0,
-                    transition: 'color 0.2s, border-color 0.2s',
-                  }}
-                  onMouseEnter={e => {
-                    const b = e.currentTarget as HTMLButtonElement
-                    b.style.color = '#ff2a4a'; b.style.borderColor = 'rgba(255,42,74,0.65)'
-                  }}
-                  onMouseLeave={e => {
-                    const b = e.currentTarget as HTMLButtonElement
-                    b.style.color = 'rgba(255,42,74,0.55)'; b.style.borderColor = 'rgba(255,42,74,0.28)'
-                  }}
-                >✕</button>
-              </div>
 
-              {/* Tagline strip */}
-              {expDef.tagline ? (
+                {/* Header */}
                 <div style={{
-                  padding: '10px 28px 9px',
+                  padding: '22px 28px 18px',
+                  borderBottom: '1px solid rgba(26,64,255,0.14)',
                   flexShrink: 0,
-                  color: 'rgba(180,200,255,0.32)',
-                  fontFamily: 'var(--font-vyan)',
-                  fontSize: '9px', letterSpacing: '0.30em',
-                  borderBottom: '1px solid rgba(26,64,255,0.08)',
-                  textTransform: 'uppercase',
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', gap: 14,
                 }}>
-                  {expDef.tagline}
-                </div>
-              ) : null}
-
-              {/* Content */}
-              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-                {expDef.appUrl ? (
-                  <iframe
-                    src={expDef.appUrl}
-                    style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                    allow="fullscreen"
-                  />
-                ) : (
-                  <div style={{
-                    width: '100%', height: '100%',
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center', gap: 20,
-                    fontFamily: 'var(--font-vyan)',
-                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
                     <img src="/logo-symbol.png" alt="VYAN"
-                      style={{ width: 54, opacity: 0.20 }} />
-                    <div style={{
-                      color: '#ff2a4a', fontSize: '20px',
-                      letterSpacing: '0.10em', opacity: 0.55,
-                    }}>
-                      {expDef.name}
-                    </div>
-                    <div style={{
-                      color: 'rgba(190,205,255,0.28)',
-                      fontSize: '10px', letterSpacing: '0.28em',
-                      textAlign: 'center', maxWidth: 260, lineHeight: 2.0,
-                      textTransform: 'uppercase',
-                    }}>
-                      {expDef.description || expDef.tagline || 'Experience coming soon.'}
+                      style={{ width: 30, height: 30, objectFit: 'contain', opacity: 0.85, flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        color: '#ff2a4a', fontFamily: 'var(--font-vyan)',
+                        fontSize: '22px', letterSpacing: '0.08em',
+                        textShadow: '0 0 20px rgba(255,42,74,0.38)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {expDef.name}
+                      </div>
+                      <div style={{
+                        color: 'rgba(255,42,74,0.36)', fontFamily: 'var(--font-vyan)',
+                        fontSize: '8px', letterSpacing: '0.52em', marginTop: 3,
+                      }}>
+                        {expDef.tantra}
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
 
+                  <button
+                    onClick={closeExp}
+                    style={{
+                      background: 'none', border: '1px solid rgba(255,42,74,0.28)',
+                      color: 'rgba(255,42,74,0.55)', fontSize: '15px',
+                      cursor: 'pointer', fontFamily: 'var(--font-vyan)',
+                      padding: '5px 9px', lineHeight: 1, flexShrink: 0,
+                      transition: 'color 0.2s, border-color 0.2s',
+                    }}
+                    onMouseEnter={e => {
+                      const b = e.currentTarget as HTMLButtonElement
+                      b.style.color = '#ff2a4a'; b.style.borderColor = 'rgba(255,42,74,0.65)'
+                    }}
+                    onMouseLeave={e => {
+                      const b = e.currentTarget as HTMLButtonElement
+                      b.style.color = 'rgba(255,42,74,0.55)'; b.style.borderColor = 'rgba(255,42,74,0.28)'
+                    }}
+                  >✕</button>
+                </div>
+
+                {/* Tagline strip */}
+                {expDef.tagline ? (
+                  <div style={{
+                    padding: '10px 28px 9px', flexShrink: 0,
+                    color: 'rgba(175,195,255,0.30)', fontFamily: 'var(--font-vyan)',
+                    fontSize: '9px', letterSpacing: '0.30em',
+                    borderBottom: '1px solid rgba(26,64,255,0.08)',
+                    textTransform: 'uppercase',
+                  }}>
+                    {expDef.tagline}
+                  </div>
+                ) : null}
+
+                {/* Content */}
+                <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                  {expDef.appUrl ? (
+                    <iframe
+                      src={expDef.appUrl}
+                      style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                      allow="fullscreen"
+                    />
+                  ) : (
+                    <div style={{
+                      width: '100%', height: '100%',
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center', gap: 20,
+                      fontFamily: 'var(--font-vyan)',
+                    }}>
+                      <img src="/logo-symbol.png" alt="VYAN"
+                        style={{ width: 54, opacity: 0.20 }} />
+                      <div style={{
+                        color: '#ff2a4a', fontSize: '20px',
+                        letterSpacing: '0.10em', opacity: 0.55,
+                      }}>
+                        {expDef.name}
+                      </div>
+                      <div style={{
+                        color: 'rgba(190,205,255,0.26)',
+                        fontSize: '10px', letterSpacing: '0.28em',
+                        textAlign: 'center', maxWidth: 260,
+                        lineHeight: 2.0, textTransform: 'uppercase',
+                      }}>
+                        {expDef.description || expDef.tagline || 'Experience coming soon.'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
             </div>
           </div>
         </div>
