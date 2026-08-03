@@ -483,7 +483,6 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         width: 100%;
         height: 100%;
         border-radius: 3px;
-        isolation: isolate;
         pointer-events: auto;
         box-shadow:
           0 24px 64px rgba(12, 32, 160, 0.34),
@@ -503,7 +502,10 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
             0 0 0 1px rgba(80, 120, 255, 0.18);
         }
       }
-      /* Animated gradient border — all 4 sides */
+      /* Animated gradient border — all 4 sides.
+         No z-index:-1 here: ::before (position:absolute) naturally paints
+         above non-positioned children in CSS order; mask-composite punches
+         out the interior so the glass fill beneath shows through. */
       .qg-float-panel::before {
         content: '';
         position: absolute;
@@ -524,7 +526,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
         -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
         -webkit-mask-composite: destination-out;
         mask-composite: exclude;
-        z-index: -1;
+        pointer-events: none;
       }
 
       /* Glass fill for the floating panel */
