@@ -15,6 +15,23 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.1',
+    date: '2026-08-04',
+    title: 'Navika — Global Living Orb',
+    summary: 'Promotes NavikaOrbWidget from Medhā-only to the global cosmic layout, replacing the ConciergeOrb on every page. Fixes the global canvas CSS conflict that was preventing the R3F canvas from rendering correctly.',
+    changes: [
+      'NavikaOrbWidget now mounted in CosmicLayout — visible on all pages site-wide',
+      'ConciergeOrb removed from layout.tsx; replaced by NavikaOrbWidget',
+      'Scoped canvas CSS rule to #vyan-root so R3F canvases elsewhere are not overridden',
+      'Removed duplicate NavikaOrbWidget from MedhaHUD (now inherited from layout)',
+      'HangingOrbs settings button top raised to clamp(112px,14.5vh,130px) to clear 88px orb',
+      'Chat history button right-shifted to clamp(116px,15vw,136px) to clear the orb',
+      'FacultyCloseButton right-shifted to 116px to clear the orb',
+    ],
+    gitHash: '7d4c349',
+    pages: ['All pages', 'Medhā'],
+  },
+  {
     version: '4.0',
     date: '2026-08-03',
     title: 'Navika — Living Orb in Medhā',
@@ -445,4 +462,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.0'
+export const CURRENT_VERSION = '4.1'
