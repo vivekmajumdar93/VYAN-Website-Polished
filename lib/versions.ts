@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.2',
+    date: '2026-08-04',
+    title: 'Navika — True Character GLB',
+    summary: 'Replaces the wrong procedural purple sphere with the real Navika character: dark teardrop body, flame tail, glowing ring eyes, crown lotus, orbital constellation ring. Fixes the white canvas box and the purple panel regression.',
+    changes: [
+      'navika.glb generated: dark matte teardrop body, neon flame spine, face visor, torus ring eyes in socket groups, stubby arms, crown lotus petals, meridian chain, tilted orbital ring with 24 constellation dots',
+      'NavikaModel.tsx: useGLTF() instead of procedural geometry; refs wired to named GLB nodes',
+      'Eye socket groups keep eyes at local (0,0,0) so saccade position.set() works correctly',
+      'Navika.tsx Canvas: position:absolute overrides global canvas{position:fixed}; transparent background removes white box',
+      'styles.css canvas rule reverted to global — VYAN Three.js scene requires it for full-screen coverage',
+    ],
+    gitHash: '96adfca',
+    pages: ['All pages'],
+  },
+  {
     version: '4.1',
     date: '2026-08-04',
     title: 'Navika — Global Living Orb',
@@ -462,4 +477,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.1'
+export const CURRENT_VERSION = '4.2'
