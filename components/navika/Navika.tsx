@@ -33,7 +33,7 @@ export default function Navika({ containerRef, homePosition }: Props) {
   return (
     <Canvas
       camera={{ position: [0, 0, 4], fov: 50 }}
-      style={{ width: '100%', height: '100%' }}
+      style={{ position: 'absolute', inset: 0, background: 'transparent' }}
       gl={{ alpha: true, antialias: true }}
     >
       <ambientLight intensity={0.35} />
