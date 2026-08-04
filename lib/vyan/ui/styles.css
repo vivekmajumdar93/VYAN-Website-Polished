@@ -8,7 +8,7 @@ background: #000;
 color: rgba(244, 235, 255, 0.94);
 font-family: var(--font-vyan);
 }
-canvas {
+#vyan-root canvas {
 position: fixed;
 inset: 0;
 display: block;
