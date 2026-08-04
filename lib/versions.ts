@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.3',
+    date: '2026-08-04',
+    title: 'Navika — Video Orb',
+    summary: 'Replaces the R3F canvas Navika with a real video render: forward + reversed clips alternate seamlessly, mix-blend-mode:screen drops the black background on the void canvas.',
+    changes: [
+      'NavikaOrbVideo.tsx: two HTMLVideoElement ping-pong — forward clip ends → reversed clip plays, reversed ends → forward plays; no native-reverse stutter',
+      'mix-blend-mode:screen against site pure-black background; brightness/saturation/contrast filter + purple drop-shadow',
+      'Mounted globally in CosmicLayout at top:16 right:16 size=88, zIndex:40, pointer-events:none',
+      'navika-orb-forward.mp4 placed in public/videos/',
+      'navika-orb-reversed.mp4 pending (MOV→MP4 remux in follow-up commit)',
+      'Removed entire R3F Navika subsystem: canvas, animator, movement, particles, idle controller, store, GLB',
+    ],
+    gitHash: '7684011',
+    pages: ['All pages'],
+  },
+  {
     version: '4.2',
     date: '2026-08-04',
     title: 'Navika — True Character GLB',
@@ -477,4 +493,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.2'
+export const CURRENT_VERSION = '4.3'
