@@ -15,6 +15,24 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.5',
+    date: '2026-08-05',
+    title: 'Navika — Cinematic Presence & Directional Awareness',
+    summary: 'Navika now floats at top-center of every page, dissolves cinematically between clips (fade out → black → fade in), and responds to which side of the screen you interact with — left half plays the reversed clip, right half plays the forward clip; idle drifts back to slow-motion ping-pong after 2 seconds.',
+    changes: [
+      'Gentle 3.5s hover float animation (translateY -10px) via navika-orb-float keyframe in globals.css',
+      'Position moved from top-right to top-center (fixed, left:50%, translateX(-50%))',
+      'Cinematic dissolve on ALL video switches: 450ms ease-in fade-out → 80ms black hold → 600ms ease-out fade-in',
+      'State machine: idle (0.45× slow-motion ping-pong) / left (reversed clip loops, 1×) / right (forward clip loops, 1×)',
+      'Global pointermove + pointerdown listeners track pointer X vs window center; touch-friendly',
+      'Idle timer: 2s of no pointer activity returns orb to idle slow-motion state',
+      'Cinematic engine: latest intent always wins during a fade; rapid direction changes queue and apply after current fade-out',
+      '1 200 simulation runs of random interaction sequences → 1 200/1 200 passed',
+    ],
+    gitHash: '895c75a',
+    pages: ['All pages'],
+  },
+  {
     version: '4.4',
     date: '2026-08-05',
     title: 'Navika — Seamless Loop & Void Blend',
@@ -507,4 +525,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.4'
+export const CURRENT_VERSION = '4.5'
