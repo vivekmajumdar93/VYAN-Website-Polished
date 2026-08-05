@@ -9,7 +9,7 @@ export default function CosmicLayout({ children }: { children: React.ReactNode }
     <>
       <CosmicCanvas />
       {/* Nāvika — ambient presence, top-right, decorative only */}
-      <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 40, pointerEvents: 'none' }}>
+      <div style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 40, pointerEvents: 'none' }}>
         <NavikaOrbVideo
           size={88}
           forwardSrc="/videos/navika-orb-forward.mp4"

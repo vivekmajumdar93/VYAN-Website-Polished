@@ -120,3 +120,15 @@ input, textarea, select, button {
 }
 
 /* ===== Imported from /lib/vyan/ui/styles.css equivalents are loaded inline via Overlay ===== */
+
+/* ===== Nāvika orb: float hover animation ===== */
+@keyframes navika-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+.navika-orb-float {
+  animation: navika-float 3.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .navika-orb-float { animation: none; }
+}
