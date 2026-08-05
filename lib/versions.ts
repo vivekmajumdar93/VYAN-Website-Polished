@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.5.1',
+    date: '2026-08-05',
+    title: 'Navika — Direction Fix & Blink Fix',
+    summary: 'Corrects inverted left/right interaction and removes the blinking caused by cinematic dissolve being applied to idle ping-pong.',
+    changes: [
+      'Direction fix: cursor left → forward clip (left-looking, A); cursor right → reversed clip (right-looking, B)',
+      'Blink fix: idle ping-pong now uses a seamless 180ms crossfade between video opacities — wrapper stays fully visible, no disappear/reappear in idle',
+      'Cinematic dissolve (fade out → black → fade in) reserved exclusively for state changes: idle↔left, idle↔right, left↔right',
+      'Added isFinite + duration > 0.5 guard to ping-pong timeupdate to prevent spurious trigger before video metadata loads',
+    ],
+    gitHash: '6dd61e7',
+    pages: ['All pages'],
+  },
+  {
     version: '4.5',
     date: '2026-08-05',
     title: 'Navika — Cinematic Presence & Directional Awareness',
@@ -525,4 +539,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.5'
+export const CURRENT_VERSION = '4.5.1'
