@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.4',
+    date: '2026-08-05',
+    title: 'Navika — Seamless Loop & Void Blend',
+    summary: 'Removes the purple halo so Navika is one with the void, and eliminates the buffering gap between forward and reversed clips with a pre-emptive crossfade.',
+    changes: [
+      'drop-shadow removed from filter — no purple ring; orb blends cleanly into black void via mix-blend-mode:screen',
+      'Replaced ended-event swap with timeupdate 120ms lookahead: incoming clip plays before outgoing finishes, no decode-stall gap',
+      '120ms CSS opacity crossfade on both video elements for invisible seam',
+      'Added optional playbackRate prop for per-placement speed tuning',
+    ],
+    gitHash: '347efdd',
+    pages: ['All pages'],
+  },
+  {
     version: '4.3',
     date: '2026-08-04',
     title: 'Navika — Video Orb',
@@ -493,4 +507,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.3'
+export const CURRENT_VERSION = '4.4'
