@@ -28,6 +28,7 @@ export const GATEWAYS: Gateway[] = [
     description: 'Harmony, flow, progression. The cosmic order underlying all conscious systems.',
     color: '#d4a853',
     pos: [  0,   0,   0], w: 14, h:  9.5, rotX:  0.00, rotY:  0.00,
+    appUrl: 'https://rtam.vyanlabs.com',
   },
   {
     id: 'ojas',
