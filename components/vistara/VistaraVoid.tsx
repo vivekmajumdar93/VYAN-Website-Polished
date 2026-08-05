@@ -1842,6 +1842,17 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
 
   useEffect(() => () => cancelAnimationFrame(vortexAnimRef.current), [])
 
+  // Broadcast panel open/close so Nāvika can reposition away from covered areas
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('vyan:panel-state', {
+      detail: { open: showPanel || showComingSoon },
+    }));
+  }, [showPanel, showComingSoon])
+  // Reset on unmount (page navigation)
+  useEffect(() => () => {
+    window.dispatchEvent(new CustomEvent('vyan:panel-state', { detail: { open: false } }));
+  }, [])
+
   const handleClose = useCallback(() => { setShowPanel(false); setPanelGateway(null) }, [])
   const handleEnter = useCallback(() => {
     const gw = panelGateway; handleClose(); if (gw) onGatewayEnter?.(gw)

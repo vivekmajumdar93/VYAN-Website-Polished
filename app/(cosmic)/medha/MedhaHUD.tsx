@@ -454,7 +454,7 @@ export default function MedhaHUD(){
           </div>
         </div>
         {/* Chat history — anchored top-right, still accessible */}
-        <button onClick={()=>setShowChatHistory(true)} className="vyan-icon-btn" style={{position:'fixed',top:'14px',right:'clamp(68px,16vw,90px)',zIndex:50}}>
+        <button onClick={()=>setShowChatHistory(true)} className="vyan-icon-btn" style={{position:'fixed',top:'14px',right:'clamp(116px,15vw,136px)',zIndex:50}}>
           <RefreshIcon size={22} />
         </button>
       </div>
@@ -665,6 +665,7 @@ export default function MedhaHUD(){
 
       <input ref={fileR} type="file" accept="image/*,.pdf,.txt,.md,.json,.csv" style={{display:'none'}}
         onChange={e=>{const f=e.target.files?.[0];if(!f)return;setComposerText(c=>`${c}\n\n[attached: ${f.name} · ${(f.size/1024).toFixed(1)}KB]`);e.target.value='';}}/>
+
     </div>
   );
 }

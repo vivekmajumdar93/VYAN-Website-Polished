@@ -76,7 +76,7 @@ function FacultyCloseButton({ onClose }: { onClose: () => void }) {
       onMouseLeave={() => setHovered(false)}
       onClick={onClose}
       style={{
-        position: 'fixed', top: 12, right: 12, zIndex: 83,
+        position: 'fixed', top: 12, right: 116, zIndex: 83,
         background: 'none', border: 'none', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '6px', borderRadius: '50%',
@@ -204,7 +204,7 @@ export function HangingOrbs({
         <motion.div
           animate={{ x: NAV_DRIFT[2].x, y: NAV_DRIFT[2].y }}
           transition={{ x: driftTx(NAV_DRIFT[2].xDur, NAV_DRIFT[2].xPause), y: driftTx(NAV_DRIFT[2].yDur, NAV_DRIFT[2].yPause) }}
-          style={{ position: 'fixed', right: 'clamp(14px, 3.5vw, 28px)', top: 'clamp(18px, 4.5vh, 34px)', zIndex: 70 }}
+          style={{ position: 'fixed', right: 'clamp(14px, 3.5vw, 28px)', top: 'clamp(112px, 14.5vh, 130px)', zIndex: 70 }}
         >
           <button
             onClick={onSettingsOpen}
