@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.5.2',
+    date: '2026-08-05',
+    title: 'Navika — Always Visible, No Black Square',
+    summary: 'Fixes the visible black rectangle behind Navika on panel backgrounds and ensures she stays above all panels, sliding to a clear corner when one opens.',
+    changes: [
+      'Root-cause fix: filter (brightness/saturate/contrast) moved from wrapper div onto each video element. Wrapper filter created an isolated compositing group where mix-blend-mode:screen blended against black instead of the real page — causing the black square on any non-black surface.',
+      'z-index raised from 40 to 250 — Navika now renders above GlassPanel and ComingSoonPanel (both z:200)',
+      'VistaraVoid dispatches vyan:panel-state {open:bool} when showPanel or showComingSoon changes; fires open:false on unmount to reset position on other pages',
+      'NavikaOrbVideo listens to vyan:panel-state and slides to right corner (0.5s cubic-bezier ease) when any panel opens, returns to top-center when it closes',
+      'NavikaOrbVideo is now self-contained: manages its own position:fixed + zIndex; layout.tsx wrapper div removed',
+    ],
+    gitHash: '485f0f9',
+    pages: ['All pages', 'Vistara'],
+  },
+  {
     version: '4.5.1',
     date: '2026-08-05',
     title: 'Navika — Direction Fix & Blink Fix',
@@ -539,4 +554,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.5.1'
+export const CURRENT_VERSION = '4.5.2'
