@@ -28,13 +28,13 @@ const FADE_OUT_MS  = 450;
 const FADE_HOLD_MS = 80;
 const FADE_IN_MS   = 600;
 
-// ── Filter is on the VIDEO ELEMENTS (not the wrapper) ─────────────────────────
-// Putting filter on a wrapper creates an isolated compositing group: mix-blend-mode:screen
-// then blends against that group's black surface, not the real page — producing the
-// visible black square on non-black backgrounds (panels, etc.).
-// With filter on each video, screen-blend composites directly against whatever the
-// page shows below Navika, so black pixels are always transparent regardless of what
-// surface is underneath.
+// ── mix-blend-mode:screen lives on the ANCHOR, not the videos ─────────────────
+// The anchor is the compositing-group root. Its entire rendered content (black
+// video background + glowing orb pixels) gets screen-blended against the real
+// page. Black → shows page through. Works on any surface: panels, void, glass.
+// Putting screen on the videos instead fails because the first video composites
+// against a transparent group backdrop (source-over), not the real page, so
+// black remains opaque inside the group before the group is drawn normally.
 const VIDEO_FILTER = 'brightness(1.4) saturate(1.5) contrast(1.08)';
 
 export default function NavikaOrbVideo({
@@ -48,8 +48,8 @@ export default function NavikaOrbVideo({
   const aRef       = useRef<HTMLVideoElement>(null);
   const bRef       = useRef<HTMLVideoElement>(null);
 
-  // Panel-open state — drives anchor position
-  const [panelOpen, setPanelOpen] = useState(false);
+  // null = center; 'left' = top-left corner; 'right' = top-right corner
+  const [panelCorner, setPanelCorner] = useState<'left' | 'right' | null>(null);
 
   // Video state machine
   const orbState  = useRef<OrbState>('idle');
@@ -59,10 +59,18 @@ export default function NavikaOrbVideo({
   const pingBusy  = useRef(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Panel-state listener: slide to right corner when any panel opens ─────────
+  // ── Panel-state listener ──────────────────────────────────────────────────────
+  // Panels dispatch { open: bool, corner?: 'left'|'right' }.
+  // corner = which corner Navika should occupy (opposite of where the panel is).
+  // Default corner when not specified: 'right'.
   useEffect(() => {
     function onPanelState(e: Event) {
-      setPanelOpen((e as CustomEvent).detail?.open ?? false);
+      const detail = (e as CustomEvent).detail;
+      if (detail?.open) {
+        setPanelCorner(detail.corner ?? 'right');
+      } else {
+        setPanelCorner(null);
+      }
     }
     window.addEventListener('vyan:panel-state', onPanelState);
     return () => window.removeEventListener('vyan:panel-state', onPanelState);
@@ -197,11 +205,15 @@ export default function NavikaOrbVideo({
     };
   }, []);
 
-  // Anchor position: center by default, right corner when panel is open.
-  // Uses translateX so CSS can smoothly interpolate. left:0 is the base.
-  const anchorTranslate = panelOpen
-    ? `translateX(calc(100vw - ${size + 16}px))`
-    : `translateX(calc(50vw - ${size / 2}px))`;
+  // Anchor position: center (null), top-left ('left'), or top-right ('right')
+  let anchorTranslate: string;
+  if (panelCorner === 'left') {
+    anchorTranslate = 'translateX(16px)';
+  } else if (panelCorner === 'right') {
+    anchorTranslate = `translateX(calc(100vw - ${size + 16}px))`;
+  } else {
+    anchorTranslate = `translateX(calc(50vw - ${size / 2}px))`;
+  }
 
   const videoStyle: React.CSSProperties = {
     position: 'absolute',
@@ -209,22 +221,25 @@ export default function NavikaOrbVideo({
     width: '100%',
     height: '100%',
     objectFit: 'contain',
-    mixBlendMode: 'screen',
-    // Filter here (not on wrapper) keeps mix-blend-mode compositing against the
-    // real page background, so black pixels stay transparent on any surface.
+    // No mix-blend-mode here — it goes on the anchor so the entire
+    // rendered group (including opaque black video pixels) is screen-blended
+    // against the real page, making black transparent on any surface.
     filter: VIDEO_FILTER,
   };
 
   return (
-    // Anchor: handles fixed position + left↔right slide when panels open
+    // Anchor: fixed position + slide between corners
+    // mix-blend-mode:screen here composites the whole anchor group against the page:
+    // black pixels in the rendered video → show whatever is behind Navika.
     <div
       ref={anchorRef}
       style={{
         position: 'fixed',
         top: 16,
         left: 0,
-        zIndex: 250,          // above GlassPanel (200) and ComingSoonPanel (200)
+        zIndex: 250,
         pointerEvents: 'none',
+        mixBlendMode: 'screen',
         transform: anchorTranslate,
         transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
@@ -238,7 +253,6 @@ export default function NavikaOrbVideo({
           width: size,
           height: size,
           flexShrink: 0,
-          // No filter here — filter isolation would break mix-blend-mode:screen
         }}
       >
         <video ref={aRef} src={forwardSrc}  muted playsInline preload="auto" style={videoStyle} />

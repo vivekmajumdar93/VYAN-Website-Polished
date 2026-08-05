@@ -485,6 +485,7 @@ if (info.html) {
   this.panelBody.textContent = info.description;
 }
 this.panel.classList.add('open');
+window.dispatchEvent(new CustomEvent('vyan:panel-state', { detail: { open: true } }));
 }
 
 // Wires any [data-vyan-form] forms inside the slab body to the matching API.
@@ -566,6 +567,7 @@ private wireSlabForms() {
 }
 closePanel() {
 this.panel.classList.remove('open');
+window.dispatchEvent(new CustomEvent('vyan:panel-state', { detail: { open: false } }));
 }
 
 setShunyaCaption(name: string, tagline: string, focus: number) {

@@ -131,9 +131,12 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
     // PHASE 10 — pause cosmic ScrollJourney while a product slab is open
     // so wheel-scroll doesn't fly the camera past other Shunya orbs.
     document.body.classList.add('vyan-paused');
+    // Move Nāvika out of the way while this panel is open
+    window.dispatchEvent(new CustomEvent('vyan:panel-state', { detail: { open: true } }));
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.classList.remove('vyan-paused');
+      window.dispatchEvent(new CustomEvent('vyan:panel-state', { detail: { open: false } }));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
