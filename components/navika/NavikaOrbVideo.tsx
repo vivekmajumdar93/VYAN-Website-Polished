@@ -8,28 +8,29 @@ interface NavikaOrbVideoProps {
   size: number;
   className?: string;
   style?: React.CSSProperties;
-  /** A = forward clip (right-looking) */
+  /** A = forward clip (left-looking) */
   forwardSrc?: string;
-  /** B = reversed clip (left-looking) */
+  /** B = reversed clip (right-looking) */
   reversedSrc?: string;
 }
 
 const DEFAULT_FORWARD  = '/videos/navika-orb-forward.mp4';
 const DEFAULT_REVERSED = '/videos/navika-orb-reversed.mp4';
 
-// Idle ping-pong: how many video-seconds before clip end to begin the fade
-const IDLE_FADE_LEAD = 0.55;
+// Idle ping-pong: seamless crossfade between A and B (no wrapper fade)
+const PING_CF_LEAD = 0.3;   // video-seconds before clip end to start crossfade
+const PING_CF_MS   = 180;   // crossfade duration
 
-// Slow-motion rate for idle breathe; normal speed for directional
+// Slow rate for idle breathe; normal for directional
 const IDLE_RATE    = 0.45;
 const ACTIVE_RATE  = 1.0;
 
 // After N ms of no pointer activity → drift back to idle
 const IDLE_TIMEOUT = 2000;
 
-// Cinematic fade timings (ms)
+// Cinematic dissolve timings — only fired on STATE changes, not ping-pong
 const FADE_OUT_MS  = 450;
-const FADE_HOLD_MS = 80;   // black hold between out and in
+const FADE_HOLD_MS = 80;
 const FADE_IN_MS   = 600;
 
 export default function NavikaOrbVideo({
@@ -44,9 +45,11 @@ export default function NavikaOrbVideo({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const orbState   = useRef<OrbState>('idle');
   const active     = useRef<'a' | 'b'>('a');
-  // Cinematic engine
+  // Cinematic engine (state transitions only)
   const cBusy      = useRef(false);
   const cPending   = useRef<(() => void) | null>(null);
+  // Idle ping-pong debounce
+  const pingBusy   = useRef(false);
   const idleTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -54,12 +57,30 @@ export default function NavikaOrbVideo({
     const b = bRef.current!;
     const w = wrapperRef.current!;
 
-    // ── Cinematic fade engine ─────────────────────────────────────────
-    // Fades the whole orb to black, runs switchFn while invisible,
-    // then fades back in. Latest queued switchFn always wins.
+    // ── Idle ping-pong: seamless crossfade (wrapper stays visible) ────
+    // Used ONLY within idle state to alternate A↔B smoothly.
+    function pingFade(incoming: HTMLVideoElement, outgoing: HTMLVideoElement, next: 'a' | 'b') {
+      if (pingBusy.current) return;
+      pingBusy.current = true;
+      incoming.currentTime = 0;
+      incoming.play().catch(() => {});
+      incoming.style.transition = `opacity ${PING_CF_MS}ms ease`;
+      outgoing.style.transition  = `opacity ${PING_CF_MS}ms ease`;
+      incoming.style.opacity = '1';
+      outgoing.style.opacity  = '0';
+      active.current = next;
+      setTimeout(() => {
+        outgoing.pause();
+        pingBusy.current = false;
+      }, PING_CF_MS + 50);
+    }
+
+    // ── Cinematic dissolve engine (state transitions) ──────────────────
+    // Fades the entire orb to void-black, runs switchFn, then fades back in.
+    // Latest queued switchFn always wins over an earlier queued one.
     function cinematicSwitch(switchFn: () => void) {
       if (cBusy.current) {
-        cPending.current = switchFn; // overwrite with latest intent
+        cPending.current = switchFn;
         return;
       }
       _doFade(switchFn);
@@ -71,7 +92,6 @@ export default function NavikaOrbVideo({
       w.style.opacity = '0';
 
       setTimeout(() => {
-        // Apply the latest intent (may have changed during fade-out)
         const fn = cPending.current ?? switchFn;
         cPending.current = null;
         fn();
@@ -92,42 +112,33 @@ export default function NavikaOrbVideo({
 
     // ── Raw video switches (run while orb is invisible) ───────────────
     function rawShowA(loop: boolean, rate: number) {
-      b.pause();
-      b.style.opacity = '0';
-      b.loop = false;
-      a.loop = loop;
-      a.playbackRate = rate;
-      b.playbackRate = rate;
-      a.currentTime = 0;
-      a.style.opacity = '1';
+      b.pause(); b.style.opacity = '0'; b.loop = false;
+      a.loop = loop; a.playbackRate = rate; b.playbackRate = rate;
+      a.currentTime = 0; a.style.opacity = '1';
       a.play().catch(() => {});
       active.current = 'a';
     }
 
     function rawShowB(loop: boolean, rate: number) {
-      a.pause();
-      a.style.opacity = '0';
-      a.loop = false;
-      b.loop = loop;
-      b.playbackRate = rate;
-      a.playbackRate = rate;
-      b.currentTime = 0;
-      b.style.opacity = '1';
+      a.pause(); a.style.opacity = '0'; a.loop = false;
+      b.loop = loop; b.playbackRate = rate; a.playbackRate = rate;
+      b.currentTime = 0; b.style.opacity = '1';
       b.play().catch(() => {});
       active.current = 'b';
     }
 
     // ── State transitions ─────────────────────────────────────────────
+    // forward (A) = left-looking; reversed (B) = right-looking
     function goLeft() {
       if (orbState.current === 'left' && !cBusy.current) return;
       orbState.current = 'left';
-      cinematicSwitch(() => rawShowB(true, ACTIVE_RATE));
+      cinematicSwitch(() => rawShowA(true, ACTIVE_RATE));
     }
 
     function goRight() {
       if (orbState.current === 'right' && !cBusy.current) return;
       orbState.current = 'right';
-      cinematicSwitch(() => rawShowA(true, ACTIVE_RATE));
+      cinematicSwitch(() => rawShowB(true, ACTIVE_RATE));
     }
 
     function goIdle() {
@@ -156,27 +167,21 @@ export default function NavikaOrbVideo({
     window.addEventListener('pointerdown', onPointer);
 
     // ── Idle ping-pong (timeupdate) ───────────────────────────────────
-    // Near the end of each idle clip, cinematically dissolve to the other.
+    // Seamlessly crossfades A→B→A when idle.  Guard: valid duration + idle + not busy.
     function onATime() {
-      if (active.current !== 'a' || orbState.current !== 'idle' || cBusy.current) return;
+      if (active.current !== 'a' || orbState.current !== 'idle') return;
+      if (pingBusy.current || cBusy.current) return;
+      if (!isFinite(a.duration) || a.duration < 0.5) return;
       const r = a.duration - a.currentTime;
-      if (r > 0 && r < IDLE_FADE_LEAD) {
-        a.pause(); // freeze so clip doesn't end before we switch
-        cinematicSwitch(() => {
-          if (orbState.current === 'idle') rawShowB(false, IDLE_RATE);
-        });
-      }
+      if (r > 0 && r < PING_CF_LEAD) pingFade(b, a, 'b');
     }
 
     function onBTime() {
-      if (active.current !== 'b' || orbState.current !== 'idle' || cBusy.current) return;
+      if (active.current !== 'b' || orbState.current !== 'idle') return;
+      if (pingBusy.current || cBusy.current) return;
+      if (!isFinite(b.duration) || b.duration < 0.5) return;
       const r = b.duration - b.currentTime;
-      if (r > 0 && r < IDLE_FADE_LEAD) {
-        b.pause();
-        cinematicSwitch(() => {
-          if (orbState.current === 'idle') rawShowA(false, IDLE_RATE);
-        });
-      }
+      if (r > 0 && r < PING_CF_LEAD) pingFade(a, b, 'a');
     }
 
     a.addEventListener('timeupdate', onATime);
