@@ -400,6 +400,21 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
     return () =>        document.body.classList.remove('qg-exp-open')
   }, [expId])
 
+  // Broadcast panel open/close so Nāvika repositions to the opposite corner
+  useEffect(() => {
+    if (expId === null) {
+      window.dispatchEvent(new CustomEvent('vyan:panel-state', { detail: { open: false } }));
+      return;
+    }
+    const panelOnRight = (GATEWAYS[expId]?.pos[0] ?? 0) >= 0;
+    window.dispatchEvent(new CustomEvent('vyan:panel-state', {
+      detail: { open: true, corner: panelOnRight ? 'left' : 'right' },
+    }));
+  }, [expId])
+  useEffect(() => () => {
+    window.dispatchEvent(new CustomEvent('vyan:panel-state', { detail: { open: false } }));
+  }, [])
+
   const closeExp = useCallback(() => {
     setExpClosing(true)
     setTimeout(() => { setExpId(null); setExpClosing(false) }, 520)

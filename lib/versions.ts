@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.6',
+    date: '2026-08-05',
+    title: 'Navika — True Transparency & Corner Awareness',
+    summary: 'Fixes the black square on all panels and makes Navika slide to the correct corner for every panel type — including QuantumGrid, Shunya slabs, and product demos.',
+    changes: [
+      'Root-cause fix for black square: mix-blend-mode:screen moved from video elements to the anchor div. The anchor is the compositing-group root; its entire rendered content (opaque black video background + orb glow) is now screen-blended against the real page. Black → transparent on any surface.',
+      'QuantumGrid experience panel now dispatches vyan:panel-state with corner direction: panel on right → Navika goes to top-left, panel on left → Navika goes to top-right.',
+      'Overlay (Shunya slabs: Udbhava, Sandhi, Saṅkalpa) now dispatches vyan:panel-state {open:true} on openPanel and {open:false} on closePanel.',
+      'VistaraProductDemo now dispatches vyan:panel-state on mount/unmount so Navika moves out of the way when a product slab is open.',
+      'NavikaOrbVideo updated to handle corner: "left" (top-left) or "right" (top-right) from event detail; defaults to right when corner not specified.',
+    ],
+    gitHash: 'eb26093',
+    pages: ['All pages', 'Vistara', 'Shunya'],
+  },
+  {
     version: '4.5.2',
     date: '2026-08-05',
     title: 'Navika — Always Visible, No Black Square',
@@ -714,4 +729,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.5.2'
+export const CURRENT_VERSION = '4.6'
