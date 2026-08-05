@@ -26,7 +26,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'VistaraProductDemo now dispatches vyan:panel-state on mount/unmount so Navika moves out of the way when a product slab is open.',
       'NavikaOrbVideo updated to handle corner: "left" (top-left) or "right" (top-right) from event detail; defaults to right when corner not specified.',
     ],
-    gitHash: 'pending',
+    gitHash: 'eb26093',
     pages: ['All pages', 'Vistara', 'Shunya'],
   },
   {
@@ -729,4 +729,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.5.2'
+export const CURRENT_VERSION = '4.6'
