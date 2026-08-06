@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.7',
+    date: '2026-08-06',
+    title: 'Navika — Subtle Lean, Returns Home When Idle',
+    summary: 'Replaces full cursor-follow with a gentle lean toward the interaction point; Navika returns to top-center when idle.',
+    changes: [
+      'Navika no longer drags to the cursor position — instead leans 12% of the cursor-to-home vector (capped at ±110px horizontal, ±65px vertical)',
+      'posIdle ref: cleared on any pointer activity, restored after 2s of no interaction via goIdle()',
+      'When idle, Navika drifts back to home (top-center, y=16px) via the existing rAF lerp loop',
+      'Corner-parking on panel open remains unchanged — lean/home logic only applies when no panel is open',
+    ],
+    gitHash: '16baf5c',
+    pages: ['All pages'],
+  },
+  {
     version: '4.6.1',
     date: '2026-08-06',
     title: 'Navika — Slow-Motion Cinematic Timing',
@@ -742,4 +756,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.6.1'
+export const CURRENT_VERSION = '4.7'
