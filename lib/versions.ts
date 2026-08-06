@@ -25,7 +25,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Anchor origin moved to top:0 left:0; transform carries all X+Y positioning',
       'Vistara BACK button: color lifted from rgba(26,64,255,0.55) to rgba(180,200,255,0.90), glass background added, zIndex raised to 260, hover highlight added',
     ],
-    gitHash: 'pending',
+    gitHash: '3647cf7',
     pages: ['All pages', 'Vistara'],
   },
   {
@@ -756,4 +756,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.6.1'
+export const CURRENT_VERSION = '4.7'
