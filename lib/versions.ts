@@ -24,7 +24,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Idle ping-pong crossfade: 180ms → 500ms; lead window extended from 0.3s to 0.5s',
       'Panel slide (center ↔ corner): 0.5s linear → 1.4s spring (cubic-bezier 0.16,1,0.3,1)',
     ],
-    gitHash: 'pending',
+    gitHash: 'e96caca',
     pages: ['All pages'],
   },
   {
@@ -742,4 +742,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.6'
+export const CURRENT_VERSION = '4.6.1'
