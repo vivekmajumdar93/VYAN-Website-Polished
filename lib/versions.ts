@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.7',
+    date: '2026-08-06',
+    title: 'Navika — Cursor Follow & Smart Parking',
+    summary: 'Navika now slowly drifts toward the user\'s cursor at all times, and parks below existing UI buttons when panels open. Back button in Vistara made visible.',
+    changes: [
+      'rAF lerp cursor-follow: Navika floats toward the pointer at LERP=0.038 (~1.3s to close 95% of gap) — no CSS transitions, imperatively driven at 60fps',
+      'When panel opens, Navika drifts to the opposite corner: left corner parks at (16px, 80px) — below SoundConsole pill and BACK button; right corner at (windowWidth-104px, 16px)',
+      'Anchor origin moved to top:0 left:0; transform carries all X+Y positioning',
+      'Vistara BACK button: color lifted from rgba(26,64,255,0.55) to rgba(180,200,255,0.90), glass background added, zIndex raised to 260, hover highlight added',
+    ],
+    gitHash: 'pending',
+    pages: ['All pages', 'Vistara'],
+  },
+  {
     version: '4.6.1',
     date: '2026-08-06',
     title: 'Navika — Slow-Motion Cinematic Timing',

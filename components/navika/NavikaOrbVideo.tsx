@@ -28,28 +28,37 @@ const FADE_OUT_MS  = 900;
 const FADE_HOLD_MS = 250;
 const FADE_IN_MS   = 1400;
 
-// ── mix-blend-mode:screen lives on the ANCHOR, not the videos ─────────────────
-// The anchor is the compositing-group root. Its entire rendered content (black
-// video background + glowing orb pixels) gets screen-blended against the real
-// page. Black → shows page through. Works on any surface: panels, void, glass.
-// Putting screen on the videos instead fails because the first video composites
-// against a transparent group backdrop (source-over), not the real page, so
-// black remains opaque inside the group before the group is drawn normally.
+// ── mix-blend-mode:screen on the ANCHOR composites the whole group against
+// the real page, making black pixels transparent on any surface.
 const VIDEO_FILTER = 'brightness(1.4) saturate(1.5) contrast(1.08)';
+
+// ── Cursor-follow: Navika slowly drifts toward the pointer ────────────────────
+// LERP = fraction of remaining distance closed per frame (~60fps).
+// 0.038 → feels like floating in water; ~1.3s to close 95% of the gap.
+const FOLLOW_LERP = 0.038;
+
+// Panel-corner parking positions (clear of ACOUSTIC + BACK buttons on the left)
+const CORNER_LEFT_X  = 16;
+const CORNER_LEFT_Y  = 80;   // below SoundConsole (top:22+24px) and BACK btn (~60px)
+const CORNER_RIGHT_Y = 16;
 
 export default function NavikaOrbVideo({
   size = 88,
   forwardSrc  = DEFAULT_FORWARD,
   reversedSrc = DEFAULT_REVERSED,
 }: NavikaOrbVideoProps) {
-  // ── Position: anchor (fixed) manages left/right; wrapper manages float anim ──
   const anchorRef  = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const aRef       = useRef<HTMLVideoElement>(null);
   const bRef       = useRef<HTMLVideoElement>(null);
 
-  // null = center; 'left' = top-left corner; 'right' = top-right corner
+  // Panel corner state + ref (ref so rAF closure always has the latest value)
   const [panelCorner, setPanelCorner] = useState<'left' | 'right' | null>(null);
+  const panelCornerRef = useRef<'left' | 'right' | null>(null);
+
+  // Cursor position, updated on every pointermove (null = not yet known)
+  const pointerX = useRef<number | null>(null);
+  const pointerY = useRef<number | null>(null);
 
   // Video state machine
   const orbState  = useRef<OrbState>('idle');
@@ -59,24 +68,59 @@ export default function NavikaOrbVideo({
   const pingBusy  = useRef(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Panel-state listener ──────────────────────────────────────────────────────
-  // Panels dispatch { open: bool, corner?: 'left'|'right' }.
-  // corner = which corner Navika should occupy (opposite of where the panel is).
-  // Default corner when not specified: 'right'.
+  // ── Panel-state listener ───────────────────────────────────────────────────
   useEffect(() => {
     function onPanelState(e: Event) {
       const detail = (e as CustomEvent).detail;
-      if (detail?.open) {
-        setPanelCorner(detail.corner ?? 'right');
-      } else {
-        setPanelCorner(null);
-      }
+      const corner: 'left' | 'right' | null = detail?.open
+        ? (detail.corner ?? 'right')
+        : null;
+      setPanelCorner(corner);
+      panelCornerRef.current = corner;
     }
     window.addEventListener('vyan:panel-state', onPanelState);
     return () => window.removeEventListener('vyan:panel-state', onPanelState);
   }, []);
 
-  // ── Video logic ──────────────────────────────────────────────────────────────
+  // ── rAF cursor-follow loop ─────────────────────────────────────────────────
+  // Drives anchor.style.transform directly — no React re-renders, 60fps smooth.
+  useEffect(() => {
+    const anchor = anchorRef.current!;
+    // Start at top-center
+    let cx = (typeof window !== 'undefined' ? window.innerWidth : 800) / 2 - size / 2;
+    let cy = 16;
+    let rafId: number;
+
+    function getTarget() {
+      const corner = panelCornerRef.current;
+      if (corner === 'left') {
+        return { x: CORNER_LEFT_X, y: CORNER_LEFT_Y };
+      }
+      if (corner === 'right') {
+        return { x: window.innerWidth - size - 16, y: CORNER_RIGHT_Y };
+      }
+      // No panel: follow cursor, clamped inside viewport
+      const px = pointerX.current ?? window.innerWidth / 2;
+      const py = pointerY.current ?? cy;
+      return {
+        x: Math.max(8, Math.min(window.innerWidth  - size - 8, px - size / 2)),
+        y: Math.max(8, Math.min(window.innerHeight - size - 8, py - size / 2)),
+      };
+    }
+
+    function tick() {
+      const { x: tx, y: ty } = getTarget();
+      cx += (tx - cx) * FOLLOW_LERP;
+      cy += (ty - cy) * FOLLOW_LERP;
+      anchor.style.transform = `translate(${cx}px, ${cy}px)`;
+      rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size]);
+
+  // ── Video logic + pointer tracking ────────────────────────────────────────
   useEffect(() => {
     const a = aRef.current!;
     const b = bRef.current!;
@@ -122,7 +166,6 @@ export default function NavikaOrbVideo({
       }, FADE_OUT_MS + FADE_HOLD_MS);
     }
 
-    // Raw switches (run while orb is invisible)
     function rawShowA(loop: boolean, rate: number) {
       b.pause(); b.style.opacity = '0'; b.loop = false;
       a.loop = loop; a.playbackRate = rate; b.playbackRate = rate;
@@ -136,8 +179,6 @@ export default function NavikaOrbVideo({
       b.play().catch(() => {}); active.current = 'b';
     }
 
-    // State transitions
-    // A = forward = left-looking; B = reversed = right-looking
     function goLeft() {
       if (orbState.current === 'left' && !cBusy.current) return;
       orbState.current = 'left';
@@ -164,6 +205,10 @@ export default function NavikaOrbVideo({
     }
 
     function onPointer(e: PointerEvent) {
+      // Update cursor position for the rAF follow loop
+      pointerX.current = e.clientX;
+      pointerY.current = e.clientY;
+      // Update directional video state
       resetIdleTimer();
       if (e.clientX < window.innerWidth / 2) goLeft();
       else goRight();
@@ -171,7 +216,6 @@ export default function NavikaOrbVideo({
     window.addEventListener('pointermove', onPointer);
     window.addEventListener('pointerdown', onPointer);
 
-    // Idle ping-pong timeupdate
     function onATime() {
       if (active.current !== 'a' || orbState.current !== 'idle') return;
       if (pingBusy.current || cBusy.current) return;
@@ -189,7 +233,6 @@ export default function NavikaOrbVideo({
     a.addEventListener('timeupdate', onATime);
     b.addEventListener('timeupdate', onBTime);
 
-    // Init: idle, A playing slowly
     a.style.opacity = '1'; b.style.opacity = '0';
     a.playbackRate = IDLE_RATE; b.playbackRate = IDLE_RATE;
     a.loop = false; b.loop = false;
@@ -205,55 +248,35 @@ export default function NavikaOrbVideo({
     };
   }, []);
 
-  // Anchor position: center (null), top-left ('left'), or top-right ('right')
-  let anchorTranslate: string;
-  if (panelCorner === 'left') {
-    anchorTranslate = 'translateX(16px)';
-  } else if (panelCorner === 'right') {
-    anchorTranslate = `translateX(calc(100vw - ${size + 16}px))`;
-  } else {
-    anchorTranslate = `translateX(calc(50vw - ${size / 2}px))`;
-  }
-
   const videoStyle: React.CSSProperties = {
     position: 'absolute',
     inset: 0,
     width: '100%',
     height: '100%',
     objectFit: 'contain',
-    // No mix-blend-mode here — it goes on the anchor so the entire
-    // rendered group (including opaque black video pixels) is screen-blended
-    // against the real page, making black transparent on any surface.
     filter: VIDEO_FILTER,
   };
 
   return (
-    // Anchor: fixed position + slide between corners
-    // mix-blend-mode:screen here composites the whole anchor group against the page:
-    // black pixels in the rendered video → show whatever is behind Navika.
+    // Anchor: top:0 left:0 — rAF drives translate(x,y) for all movement.
+    // mix-blend-mode:screen on the anchor: entire rendered group screen-blended
+    // against the real page so black video pixels are always transparent.
     <div
       ref={anchorRef}
       style={{
         position: 'fixed',
-        top: 16,
+        top: 0,
         left: 0,
         zIndex: 250,
         pointerEvents: 'none',
         mixBlendMode: 'screen',
-        transform: anchorTranslate,
-        transition: 'transform 1.4s cubic-bezier(0.16, 1, 0.3, 1)',
+        // transform set imperatively by rAF — no CSS transition needed
       }}
     >
-      {/* Wrapper: handles float bob animation + cinematic opacity fade */}
       <div
         ref={wrapperRef}
         className="navika-orb-float"
-        style={{
-          position: 'relative',
-          width: size,
-          height: size,
-          flexShrink: 0,
-        }}
+        style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}
       >
         <video ref={aRef} src={forwardSrc}  muted playsInline preload="auto" style={videoStyle} />
         <video ref={bRef} src={reversedSrc} muted playsInline preload="auto" style={videoStyle} />

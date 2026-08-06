@@ -694,12 +694,23 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
       {/* Back button */}
       {onBack && (
         <button onClick={onBack} style={{
-          position: 'fixed', top: 24, left: 24, zIndex: 10,
-          background: 'transparent', border: '1px solid rgba(26,64,255,0.25)',
-          color: 'rgba(26,64,255,0.55)', padding: '8px 18px',
-          fontFamily: 'var(--font-vyan)',
+          position: 'fixed', top: 24, left: 24, zIndex: 260,
+          background: 'rgba(4, 6, 20, 0.55)',
+          border: '1px solid rgba(140, 160, 255, 0.40)',
+          color: 'rgba(180, 200, 255, 0.90)', padding: '8px 18px',
+          fontFamily: 'var(--font-vyan)', backdropFilter: 'blur(8px)',
           fontSize: '11px', letterSpacing: '0.38em', cursor: 'pointer', outline: 'none',
-        }}>
+          transition: 'color 0.2s, border-color 0.2s',
+        }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.color = '#fff';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(180,200,255,0.75)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.color = 'rgba(180,200,255,0.90)';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(140,160,255,0.40)';
+          }}
+        >
           ← BACK
         </button>
       )}
