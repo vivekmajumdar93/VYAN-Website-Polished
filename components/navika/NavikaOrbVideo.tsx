@@ -16,17 +16,17 @@ const DEFAULT_FORWARD  = '/videos/navika-orb-forward.mp4';
 const DEFAULT_REVERSED = '/videos/navika-orb-reversed.mp4';
 
 // Idle ping-pong: seamless crossfade between A and B (wrapper stays fully visible)
-const PING_CF_LEAD = 0.3;   // video-seconds before end to start crossfade
-const PING_CF_MS   = 180;   // crossfade duration (ms)
+const PING_CF_LEAD = 0.5;   // video-seconds before end to start crossfade
+const PING_CF_MS   = 500;   // crossfade duration (ms)
 
 const IDLE_RATE    = 0.45;
 const ACTIVE_RATE  = 1.0;
 const IDLE_TIMEOUT = 2000;  // ms without pointer → back to idle
 
 // Cinematic dissolve — fires ONLY on state transitions (idle↔left/right)
-const FADE_OUT_MS  = 450;
-const FADE_HOLD_MS = 80;
-const FADE_IN_MS   = 600;
+const FADE_OUT_MS  = 900;
+const FADE_HOLD_MS = 250;
+const FADE_IN_MS   = 1400;
 
 // ── mix-blend-mode:screen lives on the ANCHOR, not the videos ─────────────────
 // The anchor is the compositing-group root. Its entire rendered content (black
@@ -241,7 +241,7 @@ export default function NavikaOrbVideo({
         pointerEvents: 'none',
         mixBlendMode: 'screen',
         transform: anchorTranslate,
-        transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'transform 1.4s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* Wrapper: handles float bob animation + cinematic opacity fade */}

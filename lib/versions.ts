@@ -15,6 +15,19 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.6.1',
+    date: '2026-08-06',
+    title: 'Navika — Slow-Motion Cinematic Timing',
+    summary: 'All Navika transitions slowed to a deliberate, cinematic pace.',
+    changes: [
+      'Cinematic dissolve: fade-out 450ms → 900ms, hold 80ms → 250ms, fade-in 600ms → 1400ms',
+      'Idle ping-pong crossfade: 180ms → 500ms; lead window extended from 0.3s to 0.5s',
+      'Panel slide (center ↔ corner): 0.5s linear → 1.4s spring (cubic-bezier 0.16,1,0.3,1)',
+    ],
+    gitHash: 'pending',
+    pages: ['All pages'],
+  },
+  {
     version: '4.6',
     date: '2026-08-05',
     title: 'Navika — True Transparency & Corner Awareness',
