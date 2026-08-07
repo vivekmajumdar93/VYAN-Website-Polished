@@ -15,6 +15,18 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.7.1',
+    date: '2026-08-07',
+    title: 'Footer — Slimmer Profile',
+    summary: 'Global footer height reduced by 30% on all screen sizes.',
+    changes: [
+      'NebulaFooter desktop: 10vh/88px → 7vh/62px',
+      'NebulaFooter mobile: 12vh/76px → 8.4vh/53px',
+    ],
+    gitHash: '7d70b67',
+    pages: ['All pages'],
+  },
+  {
     version: '4.7',
     date: '2026-08-06',
     title: 'Navika — Subtle Lean, Returns Home When Idle',
@@ -756,4 +768,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.7'
+export const CURRENT_VERSION = '4.7.1'
