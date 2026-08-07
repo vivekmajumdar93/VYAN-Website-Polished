@@ -4,8 +4,8 @@
 .nf-root {
   position: fixed;
   left: 0; right: 0; bottom: 0;
-  height: 10vh;
-  min-height: 88px;
+  height: 7vh;
+  min-height: 62px;
   z-index: 9100;
   pointer-events: auto;
   display: flex;
@@ -247,7 +247,7 @@
 }
 
 @media (max-width: 767px) {
-  .nf-root { min-height: 76px; height: 12vh; }
+  .nf-root { min-height: 53px; height: 8.4vh; }
   .nf-slab { padding: 7px 12px; font-size: 9px; letter-spacing: 0.2em; }
   .nf-pill { min-width: 100px; padding: 6px 14px; }
   .nf-pill__text { font-size: 10px; letter-spacing: 0.24em; }
