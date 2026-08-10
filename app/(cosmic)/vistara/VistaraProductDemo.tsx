@@ -161,8 +161,6 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
   // ── Anchor slab to the clicked node's screen position ────────────────────
   useEffect(() => {
     let raf = 0;
-    const SLAB_WIDTH  = 480;
-    const SLAB_HEIGHT = 580;
     let tmpV: any = null;
     try {
       const THREE = require('three');
@@ -177,6 +175,8 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
     const tick = () => {
       const el = slabRef.current;
       if (!el) { raf = requestAnimationFrame(tick); return; }
+      const SLAB_WIDTH  = el.offsetWidth  || 1100;
+      const SLAB_HEIGHT = el.offsetHeight || 700;
 
       let anchorScreen: { x: number; y: number } | null = null;
       try {
@@ -296,8 +296,8 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
     >
       <div
         ref={slabRef}
-        className={`vpd-slab ${closing ? 'is-closing' : ''}`}
-        style={{ ['--accent' as any]: spec.accent, width: 480, height: 580 }}
+        className={`vpd-slab ${closing ? 'is-closing' : ''} ${spec.embedUrl ? 'has-embed' : ''}`}
+        style={{ ['--accent' as any]: spec.accent }}
       >
         {/* Filament */}
         <svg className="vpd-anchor-filament" aria-hidden="true">
