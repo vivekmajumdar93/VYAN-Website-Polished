@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.8',
+    date: '2026-08-08',
+    title: 'Panel Full-App View + VyanInterface Gateway',
+    summary: 'Product panel now shows the entire embedded app without panel-level scroll. VyanInterface prototype integrated as /vistara/interface.',
+    changes: [
+      'Product slab resized from 480×580 to min(90vw,1100px)×min(88vh,700px) — room for full responsive app',
+      'has-embed mode: controls column hidden when embedUrl is set; iframe fills the full panel body',
+      'rAF anchor loop reads actual slab dimensions (offsetWidth/Height) for correct positioning clamps',
+      'VyanInterface.tsx integrated: 3 gateway orbs (Ṛtam, Ojas, Mudrā), colors aligned to gateway palette',
+      'Broken video reference removed; orb clicks navigate to /vistara/ritam|ojas|mudra',
+      'New route /vistara/interface renders VyanInterface via dynamic()+ssr:false',
+    ],
+    gitHash: '5fa4897',
+    pages: ['Vistara'],
+  },
+  {
     version: '4.7.1',
     date: '2026-08-07',
     title: 'Footer — Slimmer Profile',
@@ -768,4 +784,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.7.1'
+export const CURRENT_VERSION = '4.8'
