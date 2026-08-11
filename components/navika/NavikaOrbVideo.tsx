@@ -97,8 +97,9 @@ export default function NavikaOrbVideo({
 
       const homeX = window.innerWidth / 2 - size / 2;
 
-      // Idle or no pointer yet → drift back to home
-      if (posIdle.current || pointerX.current === null) {
+      // Idle, no pointer yet, or inside Vistara (camera provides parallax) → stay home
+      if (posIdle.current || pointerX.current === null ||
+          window.location.pathname.startsWith('/vistara')) {
         return { x: homeX, y: HOME_Y };
       }
 
