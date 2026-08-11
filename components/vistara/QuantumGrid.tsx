@@ -406,7 +406,7 @@ function QuantumScene({ focusId, focusDef, setFocusId, onExperience, expOpen }: 
 }) {
   return (
     <>
-      <color attach="background" args={['#020509']} />
+      {/* No solid background — canvas is transparent, video shows through */}
       <fog   attach="fog"        args={['#020509', 52, 145]} />
       <CameraController focusDef={focusDef} />
       <BackgroundRects />
@@ -460,6 +460,13 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
   // Ref so event-handler closures always see current expId without re-registering
   const expIdRef = useRef<number | null>(null)
   useEffect(() => { expIdRef.current = expId }, [expId])
+
+  // Slow-play the background video
+  const videoBgRef = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const v = videoBgRef.current
+    if (v) v.playbackRate = 0.35
+  }, [])
 
   // Suppress NebulaFooter while panel is open
   useEffect(() => {
@@ -747,11 +754,34 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
 
   return (
     <div ref={containerRef} style={{ position: 'fixed', inset: 0, background: '#020509' }}>
+
+      {/* Background video — slow loop behind the 3D scene */}
+      <video
+        ref={videoBgRef}
+        autoPlay loop muted playsInline
+        style={{
+          position: 'absolute', inset: 0,
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+          opacity: 0.52,
+          pointerEvents: 'none',
+        }}
+      >
+        <source src="/videos/vistara-bg.mp4" type="video/mp4" />
+      </video>
+
+      {/* Depth vignette — darkens edges so 3D scene reads clearly */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse at 50% 48%, rgba(2,5,9,0.18) 0%, rgba(2,5,9,0.72) 100%)',
+        pointerEvents: 'none',
+      }} />
+
       <Canvas
         camera={{ position: [0, 0, CAM_R], fov: 62, near: 0.5, far: 200 }}
         style={{ width: '100%', height: '100%' }}
         dpr={[1, 2]}
-        gl={{ antialias: true, alpha: false }}
+        gl={{ antialias: true, alpha: true }}
       >
         <Suspense fallback={null}>
           <QuantumScene focusId={focusId} focusDef={focusDef} setFocusId={setFocusId}
