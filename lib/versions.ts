@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.8.1',
+    date: '2026-08-09',
+    title: 'Vistara — Full-App Panel View + Square Hover',
+    summary: 'Embedded apps now fit entirely in the panel without scrolling. Gateway squares light up on hover.',
+    changes: [
+      'ScaledIframe: CSS transform:scale() fits the entire embedded app (design height 900px) into the panel body — zero panel scroll, internal app interactions unchanged',
+      'iframe viewport width scales with container so app fills edge-to-edge horizontally',
+      'MajorRect hover: wireframe frame brightens (0.38→0.65 opacity), corners shift to gateway accent color',
+      'Label above each square brightens to accent color with glow on hover (CSS 0.25s transition)',
+      'Cursor changes to pointer on hover; cleaned up correctly on unmount',
+    ],
+    gitHash: '0adaba9',
+    pages: ['Vistara'],
+  },
+  {
     version: '4.8',
     date: '2026-08-08',
     title: 'Panel Full-App View + VyanInterface Gateway',
@@ -784,4 +799,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.8'
+export const CURRENT_VERSION = '4.8.1'
