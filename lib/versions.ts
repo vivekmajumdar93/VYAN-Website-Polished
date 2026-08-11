@@ -15,6 +15,22 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '5.0',
+    date: '2026-08-11',
+    title: 'Vistara — Hover Glow + Cursor Parallax',
+    summary: 'Product squares now glow in their accent colour on hover, and the camera leans subtly toward the cursor so the scene follows the user\'s gaze.',
+    changes: [
+      'Frame wireframe adopts square accent colour on hover (was always white)',
+      'Corner accents also shift to accent colour; opacity jumps to 0.92 (was 0.58)',
+      'Frame opacity on hover raised to 0.88 (was 0.65) for clear visual feedback',
+      'Camera cursor lean: scene drifts ~2.4 units toward pointer in free mode, 0.7 when focused',
+      'Lean uses LERP (factor 0.04) so motion is smooth and cinematic, not instant',
+      'Lean decays during fly animation so focus transitions stay clean',
+    ],
+    gitHash: '274bed3',
+    pages: ['Vistara'],
+  },
+  {
     version: '4.9',
     date: '2026-08-10',
     title: 'Vistara — Background Video',
@@ -814,4 +830,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.9'
+export const CURRENT_VERSION = '5.0'
