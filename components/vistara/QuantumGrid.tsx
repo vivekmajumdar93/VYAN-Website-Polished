@@ -213,10 +213,10 @@ function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
   useFrame(() => {
     if (!frameMat.current || !cornerMat.current) return
     const h = hoveredRef.current
-    const tgtF = focused ? 0.88 : h ? 0.65 : 0.38
-    frameMat.current.opacity  += (tgtF - frameMat.current.opacity)  * 0.08
-    const tgtC = focused ? 0.10 : h ? 0.58 : 0.22
-    cornerMat.current.opacity += (tgtC - cornerMat.current.opacity) * 0.08
+    const tgtF = focused ? 0.92 : h ? 0.88 : 0.35
+    frameMat.current.opacity  += (tgtF - frameMat.current.opacity)  * 0.09
+    const tgtC = focused ? 0.12 : h ? 0.92 : 0.22
+    cornerMat.current.opacity += (tgtC - cornerMat.current.opacity) * 0.09
   })
 
   return (
@@ -236,6 +236,7 @@ function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
           hoveredRef.current = true
           setIsHov(true)
           document.body.style.cursor = 'pointer'
+          if (frameMat.current)  frameMat.current.color.set(def.color)
           if (cornerMat.current) cornerMat.current.color.set(def.color)
         }}
         onPointerOut={(e) => {
@@ -243,6 +244,7 @@ function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
           hoveredRef.current = false
           setIsHov(false)
           document.body.style.cursor = ''
+          if (frameMat.current)  frameMat.current.color.set('#ffffff')
           if (cornerMat.current) cornerMat.current.color.set('#ff2a4a')
         }}
       >
@@ -325,8 +327,10 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
   const elapsedRef = useRef(0)
   const flyRef     = useRef<FlyState | null>(null)
   const prevFocRef = useRef<Gateway | null>(null)
+  const leanX      = useRef(0)
+  const leanY      = useRef(0)
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     elapsedRef.current += delta
 
     if (focusDef !== prevFocRef.current) {
@@ -361,11 +365,21 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
       const ep = eioC(p)
       camera.position.lerpVectors(fly.fromPos, fly.toPos, ep)
       camera.lookAt(new THREE.Vector3().lerpVectors(fly.fromLook, fly.toLook, ep))
+      // Decay lean during fly so it doesn't accumulate
+      leanX.current *= 0.88
+      leanY.current *= 0.88
       if (p >= 1) flyRef.current = null
       return
     }
 
+    // Smooth cursor lean — squares drift subtly toward pointer
+    const lf = focusDef ? 0.7 : 2.4
+    leanX.current += (state.pointer.x * lf       - leanX.current) * 0.04
+    leanY.current += (state.pointer.y * lf * 0.55 - leanY.current) * 0.04
+
     if (focusDef) {
+      camera.position.x += leanX.current
+      camera.position.y += leanY.current
       camera.lookAt(...focusDef.pos)
       return
     }
@@ -389,6 +403,8 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
       CAM_R * Math.cos(newPhi),
       CAM_R * Math.sin(newPhi) * Math.sin(newTheta),
     )
+    camera.position.x += leanX.current
+    camera.position.y += leanY.current
     camera.lookAt(0, 0, 0)
   })
 
