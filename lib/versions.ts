@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '4.9',
+    date: '2026-08-10',
+    title: 'Vistara — Background Video',
+    summary: 'Gemini-generated video plays slowly in a loop behind the Vistara 3D scene. Depth of the wireframe squares is preserved.',
+    changes: [
+      'Added public/videos/vistara-bg.mp4 (2.5 MB) as Vistara background',
+      'Canvas WebGL context made transparent (alpha:true) — video shows through',
+      'Video playback rate: 0.35× (slow, cinematic loop)',
+      'Radial vignette overlay keeps 3D depth and readability intact',
+      'Three.js fog still fades distant squares to dark — depth cues unchanged',
+    ],
+    gitHash: 'c445dd4',
+    pages: ['Vistara'],
+  },
+  {
     version: '4.8.1',
     date: '2026-08-09',
     title: 'Vistara — Full-App Panel View + Square Hover',
@@ -799,4 +814,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '4.8.1'
+export const CURRENT_VERSION = '4.9'
