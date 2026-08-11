@@ -48,6 +48,51 @@ function makeCornerGeo(w: number, h: number, f: number): THREE.BufferGeometry {
   return g
 }
 
+// ─── Scaled iframe ────────────────────────────────────────────────────────────
+// Renders the embedded app at a tall "design height" and CSS-scales it down so
+// the entire page fits the panel with zero panel-level scroll.
+// The iframe viewport width = containerWidth / scale so content fills edge-to-edge.
+
+const IFRAME_DESIGN_H = 900
+
+function ScaledIframe({ src }: { src: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [frame, setFrame] = useState({ scale: 1, iframeW: 480 })
+
+  useEffect(() => {
+    const measure = () => {
+      const el = containerRef.current
+      if (!el) return
+      const { width, height } = el.getBoundingClientRect()
+      const scale = Math.min(height / IFRAME_DESIGN_H, 1)
+      // iframeW: at this scale the iframe renders at iframeW px → appears as width px
+      setFrame({ scale, iframeW: scale < 1 ? width / scale : width })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (containerRef.current) ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
+      <div style={{
+        position: 'absolute', top: 0, left: 0,
+        width: frame.iframeW,
+        height: IFRAME_DESIGN_H,
+        transform: `scale(${frame.scale})`,
+        transformOrigin: 'top left',
+      }}>
+        <iframe
+          src={src}
+          style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+          allow="fullscreen"
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Background rects ─────────────────────────────────────────────────────────
 
 // Muted palette for background rect wireframes — dark tones, low saturation
@@ -160,12 +205,17 @@ function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
   const cornerGeo = useMemo(() => makeCornerGeo(def.w, def.h, 0.13), [def.w, def.h])
   const frameMat  = useRef<THREE.LineBasicMaterial>(null!)
   const cornerMat = useRef<THREE.LineBasicMaterial>(null!)
+  const hoveredRef = useRef(false)
+  const [isHov, setIsHov] = useState(false)
+
+  useEffect(() => () => { document.body.style.cursor = '' }, [])
 
   useFrame(() => {
     if (!frameMat.current || !cornerMat.current) return
-    const tgtF = focused ? 0.88 : 0.38
+    const h = hoveredRef.current
+    const tgtF = focused ? 0.88 : h ? 0.65 : 0.38
     frameMat.current.opacity  += (tgtF - frameMat.current.opacity)  * 0.08
-    const tgtC = focused ? 0.10 : 0.22
+    const tgtC = focused ? 0.10 : h ? 0.58 : 0.22
     cornerMat.current.opacity += (tgtC - cornerMat.current.opacity) * 0.08
   })
 
@@ -179,7 +229,23 @@ function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
       </lineSegments>
 
       {/* Invisible hit surface */}
-      <mesh onClick={(e) => { e.stopPropagation(); onClick() }}>
+      <mesh
+        onClick={(e) => { e.stopPropagation(); onClick() }}
+        onPointerOver={(e) => {
+          e.stopPropagation()
+          hoveredRef.current = true
+          setIsHov(true)
+          document.body.style.cursor = 'pointer'
+          if (cornerMat.current) cornerMat.current.color.set(def.color)
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation()
+          hoveredRef.current = false
+          setIsHov(false)
+          document.body.style.cursor = ''
+          if (cornerMat.current) cornerMat.current.color.set('#ff2a4a')
+        }}
+      >
         <planeGeometry args={[def.w, def.h]} />
         <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
@@ -188,9 +254,11 @@ function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
       {!focused && (
         <Html position={[0, def.h / 2 + 0.65, 0]} center style={{ pointerEvents: 'none', userSelect: 'none' }}>
           <div style={{
-            color: 'rgba(255,42,74,0.16)',
+            color: isHov ? def.color : 'rgba(255,42,74,0.16)',
             fontSize: '11px', letterSpacing: '0.44em',
             fontFamily: 'var(--font-vyan)', whiteSpace: 'nowrap',
+            textShadow: isHov ? `0 0 14px ${def.color}` : 'none',
+            transition: 'color 0.25s, text-shadow 0.25s',
           }}>
             {def.name.toUpperCase()}
           </div>
@@ -847,14 +915,10 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
                   </div>
                 ) : null}
 
-                {/* Content */}
+                {/* Content — ScaledIframe fits the entire app in the panel without scroll */}
                 <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
                   {expDef.appUrl ? (
-                    <iframe
-                      src={expDef.appUrl}
-                      style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                      allow="fullscreen"
-                    />
+                    <ScaledIframe src={expDef.appUrl} />
                   ) : (
                     <div style={{
                       width: '100%', height: '100%',
