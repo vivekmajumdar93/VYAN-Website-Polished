@@ -372,10 +372,10 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
       return
     }
 
-    // Smooth cursor lean — squares drift subtly toward pointer
-    const lf = focusDef ? 0.7 : 2.4
-    leanX.current += (state.pointer.x * lf       - leanX.current) * 0.04
-    leanY.current += (state.pointer.y * lf * 0.55 - leanY.current) * 0.04
+    // Subtle handheld-camera lean — almost imperceptible, like gyro parallax
+    const lf = focusDef ? 0.22 : 0.55
+    leanX.current += (state.pointer.x * lf        - leanX.current) * 0.022
+    leanY.current += (state.pointer.y * lf * 0.50 - leanY.current) * 0.022
 
     if (focusDef) {
       camera.position.x += leanX.current
@@ -403,6 +403,7 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
       CAM_R * Math.cos(newPhi),
       CAM_R * Math.sin(newPhi) * Math.sin(newTheta),
     )
+    // Apply lean after spherical position so squares shift, not disappear
     camera.position.x += leanX.current
     camera.position.y += leanY.current
     camera.lookAt(0, 0, 0)
