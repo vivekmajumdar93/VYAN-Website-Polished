@@ -15,6 +15,19 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '5.0.1',
+    date: '2026-08-11',
+    title: 'Navika Lean Contained + Lean Factor Fix',
+    summary: 'Navika stays frozen at home position inside Vistara so she does not compound the camera parallax. Camera lean factor reduced to subtle handheld-camera range.',
+    changes: [
+      'Navika lean disabled inside /vistara* — getTarget() returns home when pathname starts with /vistara',
+      'Camera lean factor reduced: 2.4 → 0.55 (free), 0.7 → 0.22 (focused)',
+      'Lean lerp slowed to 0.022 for dreamier, more cinematic motion',
+    ],
+    gitHash: 'afffda4',
+    pages: ['Vistara', 'Nāvika'],
+  },
+  {
     version: '5.0',
     date: '2026-08-11',
     title: 'Vistara — Hover Glow + Cursor Parallax',
@@ -830,4 +843,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '5.0'
+export const CURRENT_VERSION = '5.0.1'
