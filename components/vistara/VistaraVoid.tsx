@@ -1393,6 +1393,7 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
       position:'fixed', inset:0, zIndex:200, display:'flex',
       alignItems:     isMobile ? 'flex-end' : 'stretch',
       justifyContent: isMobile ? 'center' : isLeft ? 'flex-start' : 'flex-end',
+      padding: isMobile ? '0 12px 16px' : '0',
     }}>
       {/* Backdrop — click outside to dismiss panel, stay on current orb */}
       <div onClick={handleClose} style={{
@@ -1411,9 +1412,9 @@ function GlassPanel({ gateway, onClose, onBack, onEnter, side }: {
         style={{
         position:'relative', zIndex:2,
         width:  isMobile ? '100%' : 'min(500px, 46vw)',
-        height: isMobile ? '88vh' : '100vh',
+        height: isMobile ? '76vh' : '100vh',
         display:'flex', flexDirection:'column',
-        borderRadius: isMobile ? '18px 18px 0 0' : '0',
+        borderRadius: isMobile ? '18px' : '0',
         overflow:'hidden',
         background: isMobile ? 'rgba(4,7,26,0.78)' : 'rgba(4,7,26,0.62)',
         backdropFilter:'blur(26px) saturate(1.4)',

@@ -15,6 +15,20 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '5.2',
+    date: '2026-08-14',
+    title: 'Mobile Panel UX + Navika Square Fix',
+    summary: 'Vistara product panel is smaller and inset on mobile. Navika stays top-center on mobile and no longer shows a square halo.',
+    changes: [
+      'Panel height reduced 88vh → 76vh on mobile; 12px side margins + 16px bottom gap give it breathing room',
+      'Panel corners fully rounded on mobile (all 4 corners, was top-only)',
+      'Navika never corner-parks on mobile (<768px) — stays at top-center while panel is open',
+      'Square halo fixed: mix-blend-mode:screen moved from wrapper div to individual <video> elements, eliminating the rectangular stacking-context outline',
+    ],
+    gitHash: 'PENDING',
+    pages: ['Vistara', 'Nāvika'],
+  },
+  {
     version: '5.1',
     date: '2026-08-14',
     title: 'Brand Refresh + Vistara Parallax',
@@ -29,6 +43,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
     ],
     gitHash: '3c163b6',
     pages: ['All pages', 'Vistara', 'Nāvika'],
+  },
   {
     version: '5.0.1',
     date: '2026-08-11',
@@ -858,4 +873,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '5.1'
+export const CURRENT_VERSION = '5.2'

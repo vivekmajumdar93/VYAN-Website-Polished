@@ -92,8 +92,12 @@ export default function NavikaOrbVideo({
 
     function getTarget() {
       const corner = panelCornerRef.current;
-      if (corner === 'left')  return { x: CORNER_LEFT_X,                   y: CORNER_LEFT_Y };
-      if (corner === 'right') return { x: window.innerWidth - size - 16,   y: CORNER_RIGHT_Y };
+      // On mobile (< 768px), never corner-park — stay at top-center only
+      const isMob = window.innerWidth < 768;
+      if (!isMob) {
+        if (corner === 'left')  return { x: CORNER_LEFT_X,                   y: CORNER_LEFT_Y };
+        if (corner === 'right') return { x: window.innerWidth - size - 16,   y: CORNER_RIGHT_Y };
+      }
 
       const homeX = window.innerWidth / 2 - size / 2;
 
@@ -256,6 +260,7 @@ export default function NavikaOrbVideo({
     height: '100%',
     objectFit: 'contain',
     filter: VIDEO_FILTER,
+    mixBlendMode: 'screen',
   };
 
   return (
@@ -267,7 +272,6 @@ export default function NavikaOrbVideo({
         left: 0,
         zIndex: 250,
         pointerEvents: 'none',
-        mixBlendMode: 'screen',
       }}
     >
       <div
