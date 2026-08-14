@@ -25,7 +25,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Navika never corner-parks on mobile (<768px) — stays at top-center while panel is open',
       'Square halo fixed: mix-blend-mode:screen moved from wrapper div to individual <video> elements, eliminating the rectangular stacking-context outline',
     ],
-    gitHash: 'PENDING',
+    gitHash: '107577d',
     pages: ['Vistara', 'Nāvika'],
   },
   {
