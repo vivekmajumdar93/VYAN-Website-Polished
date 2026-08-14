@@ -222,7 +222,7 @@ function MajorRect({ def, focused, expOpen, onClick, onExperience }: {
   return (
     <group position={def.pos} rotation={[def.rotX, def.rotY, 0]}>
       <lineSegments geometry={frameGeo}>
-        <lineBasicMaterial ref={frameMat} color="#ffffff" transparent opacity={0.48} />
+        <lineBasicMaterial ref={frameMat} color="#ffffff" transparent opacity={0.35} />
       </lineSegments>
       <lineSegments geometry={cornerGeo}>
         <lineBasicMaterial ref={cornerMat} color="#ff2a4a" transparent opacity={0.22} />

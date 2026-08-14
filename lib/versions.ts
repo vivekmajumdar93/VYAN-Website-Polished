@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '5.1',
+    date: '2026-08-14',
+    title: 'Brand Refresh + Vistara Parallax',
+    summary: 'New VYAN logo across the site. Vistara squares glow in accent colour on hover and the camera leans subtly toward the cursor like a handheld recording. Navika stays fixed inside Vistara.',
+    changes: [
+      'New logo (lotus + custom VYAN wordmark, pink-mauve gradient) replaces old red-text logo site-wide',
+      'Square frame adopts accent colour on hover; corner opacity jumps to 0.92',
+      'Label text glows in accent colour on hover',
+      'Camera cursor lean: ±0.55 units max in free mode, ±0.22 when focused, lerp 0.022',
+      'Lean decays during fly-to-focus animation so transitions stay clean',
+      'Navika lean disabled inside /vistara — she stays at home position while camera does parallax',
+    ],
+    gitHash: '3c163b6',
+    pages: ['All pages', 'Vistara', 'Nāvika'],
+  {
     version: '5.0.1',
     date: '2026-08-11',
     title: 'Navika Lean Contained + Lean Factor Fix',
@@ -843,4 +858,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '5.0.1'
+export const CURRENT_VERSION = '5.1'
