@@ -26,7 +26,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Parallax capped at ±2.5 units ≈ 1 cm on a standard screen in overview; ±0.8 units when focused',
       'Fly-to-square animation unchanged; unfocus flies back to current orbit position',
     ],
-    gitHash: 'PENDING',
+    gitHash: 'fb32b54',
     pages: ['Vistara'],
   },
   {
