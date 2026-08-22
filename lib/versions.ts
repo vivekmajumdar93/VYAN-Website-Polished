@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '5.3',
+    date: '2026-08-22',
+    title: 'Vistara — Fixed Camera + True Parallax',
+    summary: 'Removed orbital drift that was sending squares off-screen. Camera is now fixed; cursor/touch tilts the grid 1-2 cm in the opposite direction.',
+    changes: [
+      'Removed spherical orbital drift (DRIFT_SPD loop) — squares no longer wander off-frame',
+      'Camera fixed at (0, 1, 32) — all product squares visible in one view',
+      'Gyroscope parallax: cursor/touch right → camera shifts right → grid moves LEFT (±3 units max ≈ 1.2 cm on screen)',
+      'Y-axis parallax at 55 % of X for natural tilt feel',
+      'Focus fly-to-square unchanged; unfocus now flies back to home position smoothly',
+    ],
+    gitHash: 'PENDING',
+    pages: ['Vistara'],
+  },
+  {
     version: '5.2',
     date: '2026-08-14',
     title: 'Mobile Panel UX + Navika Square Fix',
@@ -873,4 +888,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '5.2'
+export const CURRENT_VERSION = '5.3'

@@ -9,10 +9,11 @@ import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 // ─── Scene parameters ─────────────────────────────────────────────────────────
 
 const CAM_R        = 32
-const DRIFT_SPD    = 0.016
-const CHANGE_MIN   = 9
-const CHANGE_MAX   = 22
 const FLY_DUR      = 2.5
+// Parallax: cursor/touch on the right → camera shifts right → grid drifts LEFT.
+// At CAM_R=32 with 75° FOV, 3 units ≈ 1.2 cm on a standard 1920 px screen.
+const LEAN_MAX     = 3.0
+const LEAN_LERP    = 0.025
 const PARTICLE_CNT = 2200
 const BG_RECT_CNT  = 80
 
@@ -320,44 +321,48 @@ interface FlyState {
 }
 
 function CameraController({ focusDef }: { focusDef: Gateway | null }) {
-  const { camera } = useThree()
-  const sphereRef  = useRef({ theta: Math.PI / 2, phi: Math.PI / 2 })
-  const velRef     = useRef({ dTheta: DRIFT_SPD, dPhi: DRIFT_SPD * 0.28 })
-  const nextChgRef = useRef(CHANGE_MIN + Math.random() * (CHANGE_MAX - CHANGE_MIN))
-  const elapsedRef = useRef(0)
-  const flyRef     = useRef<FlyState | null>(null)
-  const prevFocRef = useRef<Gateway | null>(null)
-  const leanX      = useRef(0)
-  const leanY      = useRef(0)
+  const { camera }    = useThree()
+  const flyRef        = useRef<FlyState | null>(null)
+  const prevFocRef    = useRef<Gateway | null>(null)
+  const focusBasePos  = useRef(new THREE.Vector3(0, 1, CAM_R))
+  const leanX         = useRef(0)
+  const leanY         = useRef(0)
 
   useFrame((state, delta) => {
-    elapsedRef.current += delta
-
+    // ── Detect focus change, start fly ──────────────────────────────────────
     if (focusDef !== prevFocRef.current) {
+      const prev = prevFocRef.current
       prevFocRef.current = focusDef
       if (focusDef) {
         const lookTarget = new THREE.Vector3(...focusDef.pos)
         const normal = new THREE.Vector3(0, 0, 1)
           .applyEuler(new THREE.Euler(focusDef.rotX, focusDef.rotY, 0))
         const dist = Math.max(focusDef.w, focusDef.h) * 1.2 + 5
+        const toPos = lookTarget.clone().addScaledVector(normal, dist)
+        focusBasePos.current = toPos.clone()
         flyRef.current = {
           fromPos: camera.position.clone(),
-          toPos: lookTarget.clone().addScaledVector(normal, dist),
+          toPos,
           fromLook: new THREE.Vector3(0, 0, 0),
           toLook: lookTarget.clone(),
           elapsed: 0, dur: FLY_DUR,
         }
       } else {
-        const { x, y, z } = camera.position
-        const r = camera.position.length()
-        sphereRef.current = {
-          phi:   Math.acos(Math.max(-1, Math.min(1, y / r))),
-          theta: Math.atan2(z, x),
+        // Fly back to home
+        const homePt = new THREE.Vector3(0, 1, CAM_R)
+        flyRef.current = {
+          fromPos: camera.position.clone(),
+          toPos: homePt,
+          fromLook: prev ? new THREE.Vector3(...prev.pos) : new THREE.Vector3(0, 0, 0),
+          toLook: new THREE.Vector3(0, 0, 0),
+          elapsed: 0, dur: FLY_DUR * 0.65,
         }
-        flyRef.current = null
+        leanX.current = 0
+        leanY.current = 0
       }
     }
 
+    // ── Active fly ───────────────────────────────────────────────────────────
     if (flyRef.current) {
       const fly = flyRef.current
       fly.elapsed += delta
@@ -365,48 +370,28 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
       const ep = eioC(p)
       camera.position.lerpVectors(fly.fromPos, fly.toPos, ep)
       camera.lookAt(new THREE.Vector3().lerpVectors(fly.fromLook, fly.toLook, ep))
-      // Decay lean during fly so it doesn't accumulate
-      leanX.current *= 0.88
-      leanY.current *= 0.88
+      leanX.current *= 0.92
+      leanY.current *= 0.92
       if (p >= 1) flyRef.current = null
       return
     }
 
-    // Subtle handheld-camera lean — almost imperceptible, like gyro parallax
-    const lf = focusDef ? 0.22 : 0.55
-    leanX.current += (state.pointer.x * lf        - leanX.current) * 0.022
-    leanY.current += (state.pointer.y * lf * 0.50 - leanY.current) * 0.022
+    // ── Gyroscope parallax ──────────────────────────────────────────────────
+    // Cursor/touch RIGHT  → camera shifts +X → grid appears to move LEFT  ✓
+    // Cursor/touch UP     → camera shifts +Y → grid appears to move DOWN  ✓
+    const lf = focusDef ? 0.8 : LEAN_MAX
+    leanX.current += (state.pointer.x * lf        - leanX.current) * LEAN_LERP
+    leanY.current += (state.pointer.y * lf * 0.55 - leanY.current) * LEAN_LERP
 
     if (focusDef) {
-      camera.position.x += leanX.current
-      camera.position.y += leanY.current
+      const base = focusBasePos.current
+      camera.position.set(base.x + leanX.current, base.y + leanY.current, base.z)
       camera.lookAt(...focusDef.pos)
-      return
+    } else {
+      // Fixed home + parallax offset
+      camera.position.set(leanX.current, 1 + leanY.current, CAM_R)
+      camera.lookAt(0, 0, 0)
     }
-
-    // Free drift
-    if (elapsedRef.current >= nextChgRef.current) {
-      const spd = DRIFT_SPD * (0.45 + Math.random() * 1.1)
-      velRef.current = {
-        dTheta: (Math.random() < 0.5 ? 1 : -1) * spd * (0.55 + Math.random() * 0.9),
-        dPhi:   (Math.random() < 0.5 ? 1 : -1) * spd * 0.28,
-      }
-      nextChgRef.current = elapsedRef.current + CHANGE_MIN + Math.random() * (CHANGE_MAX - CHANGE_MIN)
-    }
-    const { theta, phi } = sphereRef.current
-    const { dTheta, dPhi } = velRef.current
-    const newTheta = theta + dTheta * delta
-    const newPhi   = Math.max(0.25, Math.min(Math.PI - 0.25, phi + dPhi * delta))
-    sphereRef.current = { theta: newTheta, phi: newPhi }
-    camera.position.set(
-      CAM_R * Math.sin(newPhi) * Math.cos(newTheta),
-      CAM_R * Math.cos(newPhi),
-      CAM_R * Math.sin(newPhi) * Math.sin(newTheta),
-    )
-    // Apply lean after spherical position so squares shift, not disappear
-    camera.position.x += leanX.current
-    camera.position.y += leanY.current
-    camera.lookAt(0, 0, 0)
   })
 
   return null
