@@ -26,7 +26,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Y-axis parallax at 55 % of X for natural tilt feel',
       'Focus fly-to-square unchanged; unfocus now flies back to home position smoothly',
     ],
-    gitHash: 'PENDING',
+    gitHash: 'b49f4ad',
     pages: ['Vistara'],
   },
   {
