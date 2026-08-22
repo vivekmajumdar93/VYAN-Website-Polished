@@ -10,10 +10,19 @@ import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 
 const CAM_R        = 32
 const FLY_DUR      = 2.5
-// Parallax: cursor/touch on the right → camera shifts right → grid drifts LEFT.
-// At CAM_R=32 with 75° FOV, 3 units ≈ 1.2 cm on a standard 1920 px screen.
-const LEAN_MAX     = 3.0
-const LEAN_LERP    = 0.025
+// Overview orbit — sine-wave oscillation, constrained so every square stays in-frame.
+// ±0.15 rad (≈ ±8.6°) keeps the widest square (Ojas at x=22) at 22° from frame-centre,
+// well inside the 37.5° half-FOV.
+const THETA_BASE   = Math.PI / 2
+const THETA_RANGE  = 0.15          // horizontal swing amplitude (rad)
+const PHI_BASE     = Math.PI / 2
+const PHI_RANGE    = 0.06          // vertical bob amplitude (rad)
+const THETA_SPD    = 0.042         // rad/s  → ~150 s full cycle
+const PHI_SPD      = 0.031         // rad/s  → ~200 s full cycle
+// Cursor/touch parallax — opposite direction, 1-2 cm max on screen.
+// At CAM_R=32 with 75° FOV: 1 unit ≈ 39 px ≈ 0.4 cm, so 2.5 units ≈ 1 cm.
+const LEAN_MAX     = 2.5
+const LEAN_LERP    = 0.028
 const PARTICLE_CNT = 2200
 const BG_RECT_CNT  = 80
 
@@ -321,15 +330,30 @@ interface FlyState {
 }
 
 function CameraController({ focusDef }: { focusDef: Gateway | null }) {
-  const { camera }    = useThree()
-  const flyRef        = useRef<FlyState | null>(null)
-  const prevFocRef    = useRef<Gateway | null>(null)
-  const focusBasePos  = useRef(new THREE.Vector3(0, 1, CAM_R))
-  const leanX         = useRef(0)
-  const leanY         = useRef(0)
+  const { camera }   = useThree()
+  const flyRef       = useRef<FlyState | null>(null)
+  const prevFocRef   = useRef<Gateway | null>(null)
+  const focusBasePos = useRef(new THREE.Vector3(0, 1, CAM_R))
+  const elapsedRef   = useRef(0)
+  const leanX        = useRef(0)
+  const leanY        = useRef(0)
+
+  // Compute the current orbit position (always valid — used for fly-back target too)
+  const orbitPos = (t: number) => {
+    const theta = THETA_BASE + Math.sin(t * THETA_SPD) * THETA_RANGE
+    const phi   = PHI_BASE   + Math.sin(t * PHI_SPD + 1.4) * PHI_RANGE
+    return new THREE.Vector3(
+      CAM_R * Math.sin(phi) * Math.cos(theta),
+      CAM_R * Math.cos(phi),
+      CAM_R * Math.sin(phi) * Math.sin(theta),
+    )
+  }
 
   useFrame((state, delta) => {
-    // ── Detect focus change, start fly ──────────────────────────────────────
+    elapsedRef.current += delta
+    const t = elapsedRef.current
+
+    // ── Focus change → trigger fly ──────────────────────────────────────────
     if (focusDef !== prevFocRef.current) {
       const prev = prevFocRef.current
       prevFocRef.current = focusDef
@@ -348,13 +372,12 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
           elapsed: 0, dur: FLY_DUR,
         }
       } else {
-        // Fly back to home
-        const homePt = new THREE.Vector3(0, 1, CAM_R)
+        // Fly back to where the orbit currently is
         flyRef.current = {
           fromPos: camera.position.clone(),
-          toPos: homePt,
+          toPos:   orbitPos(t),
           fromLook: prev ? new THREE.Vector3(...prev.pos) : new THREE.Vector3(0, 0, 0),
-          toLook: new THREE.Vector3(0, 0, 0),
+          toLook:   new THREE.Vector3(0, 0, 0),
           elapsed: 0, dur: FLY_DUR * 0.65,
         }
         leanX.current = 0
@@ -376,20 +399,21 @@ function CameraController({ focusDef }: { focusDef: Gateway | null }) {
       return
     }
 
-    // ── Gyroscope parallax ──────────────────────────────────────────────────
-    // Cursor/touch RIGHT  → camera shifts +X → grid appears to move LEFT  ✓
-    // Cursor/touch UP     → camera shifts +Y → grid appears to move DOWN  ✓
-    const lf = focusDef ? 0.8 : LEAN_MAX
+    // ── Cursor/touch parallax ────────────────────────────────────────────────
+    // Interaction RIGHT → camera +X → grid appears to drift LEFT (opposite). ✓
+    const lf = focusDef ? LEAN_MAX * 0.32 : LEAN_MAX
     leanX.current += (state.pointer.x * lf        - leanX.current) * LEAN_LERP
     leanY.current += (state.pointer.y * lf * 0.55 - leanY.current) * LEAN_LERP
 
     if (focusDef) {
+      // Focused: stay at the fly destination + live parallax tilt
       const base = focusBasePos.current
       camera.position.set(base.x + leanX.current, base.y + leanY.current, base.z)
       camera.lookAt(...focusDef.pos)
     } else {
-      // Fixed home + parallax offset
-      camera.position.set(leanX.current, 1 + leanY.current, CAM_R)
+      // Overview: constrained sine-wave orbit + cursor parallax on top
+      const base = orbitPos(t)
+      camera.position.set(base.x + leanX.current, base.y + leanY.current, base.z)
       camera.lookAt(0, 0, 0)
     }
   })

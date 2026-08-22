@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '5.4',
+    date: '2026-08-22',
+    title: 'Vistara — Constrained Orbit + Parallax',
+    summary: 'Overview orbit restored but bounded to ±8.6° so squares never leave the frame. Cursor/touch adds 1-2 cm parallax in the opposite direction on top of the orbit, both in overview and while focused on a square.',
+    changes: [
+      'Orbit replaced with sine-wave oscillation (THETA ±0.15 rad, PHI ±0.06 rad, ~150 s / ~200 s cycles)',
+      'At maximum orbit swing, widest square (Ojas x=22) stays at 22° from frame-centre — well inside 37.5° half-FOV',
+      'Cursor/touch right → camera +X → grid drifts LEFT; same for all 360° directions',
+      'Parallax capped at ±2.5 units ≈ 1 cm on a standard screen in overview; ±0.8 units when focused',
+      'Fly-to-square animation unchanged; unfocus flies back to current orbit position',
+    ],
+    gitHash: 'PENDING',
+    pages: ['Vistara'],
+  },
+  {
     version: '5.3',
     date: '2026-08-22',
     title: 'Vistara — Fixed Camera + True Parallax',
@@ -888,4 +903,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '5.3'
+export const CURRENT_VERSION = '5.4'
