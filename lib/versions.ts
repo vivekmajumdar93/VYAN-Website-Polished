@@ -24,7 +24,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Steel-blue accent (#8ab0e0) distinguishes it from the amber/gold cluster',
       'Tagline: "A Medhā-Driven System for Market Intelligence"',
     ],
-    gitHash: 'PENDING',
+    gitHash: '90355f5',
     pages: ['Vistara'],
   },
   {
