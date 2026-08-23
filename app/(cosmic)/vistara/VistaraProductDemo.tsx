@@ -11,7 +11,7 @@ import './vistara-demo.css';
 // before the panel appears.
 // ============================================================
 
-type ProductKey = 'ritam' | 'ojas' | 'mudra' | 'netra' | 'akriti' | 'sutra' | 'placeholder';
+type ProductKey = 'ritam' | 'ojas' | 'vanijya' | 'mudra' | 'netra' | 'akriti' | 'sutra' | 'chitra-prana' | 'maya' | 'sangraha' | 'placeholder';
 
 type DemoSpec = {
   key: ProductKey;
@@ -100,10 +100,58 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     ],
     outputHint: 'The saṅgama will weave itself here.',
   },
+  vanijya: {
+    key: 'vanijya', name: 'VYAN Vaṇijya', tagline: 'A Medhā-Driven System for Market Intelligence',
+    domain: 'MEDHĀ · INTELLIGENCE', accent: '#8ab0e0', ctaLabel: 'Read the market',
+    promptPlaceholder: 'Name a market, sector, or asset — Vaṇijya will trace its invisible flows.',
+    models: ['Vaṇijya · Signal', 'Vaṇijya · Macro', 'Vaṇijya · Micro'],
+    sliders: [
+      { key: 'horizon', label: 'Temporal horizon (days)', min: 1, max: 365, def: 30 },
+      { key: 'sensitivity', label: 'Signal sensitivity', min: 0, max: 100, def: 65, unit: '%' },
+      { key: 'depth', label: 'Analysis depth', min: 1, max: 5, def: 3 },
+    ],
+    outputHint: 'The invisible flows of the market will surface here.',
+  },
+  'chitra-prana': {
+    key: 'chitra-prana', name: 'VYAN Chitra-Prāṇa', tagline: 'Breathing Life Into Imagery',
+    domain: 'PRĀṆA · IMAGERY', accent: '#a0c8e8', ctaLabel: 'Breathe life',
+    promptPlaceholder: 'Describe an image or scene — Chitra-Prāṇa will breathe prāṇa into it.',
+    models: ['Chitra-Prāṇa · Still', 'Chitra-Prāṇa · Motion', 'Chitra-Prāṇa · Living'],
+    sliders: [
+      { key: 'vitality', label: 'Prāṇic vitality', min: 0, max: 100, def: 70, unit: '%' },
+      { key: 'motion', label: 'Motion amplitude', min: 0, max: 100, def: 45, unit: '%' },
+      { key: 'frames', label: 'Animation frames', min: 12, max: 120, def: 48 },
+    ],
+    outputHint: 'The living image will breathe here.',
+  },
+  maya: {
+    key: 'maya', name: 'VYAN Māyā', tagline: 'Manifesting Digital Realities',
+    domain: 'MĀYĀ · MANIFESTATION', accent: '#ffd080', ctaLabel: 'Manifest',
+    promptPlaceholder: 'Describe the reality you wish to manifest — Māyā will construct it.',
+    models: ['Māyā · Illusion', 'Māyā · Simulation', 'Māyā · Emergence'],
+    sliders: [
+      { key: 'complexity', label: 'Reality complexity', min: 1, max: 10, def: 5 },
+      { key: 'fidelity', label: 'Perceptual fidelity', min: 0, max: 100, def: 80, unit: '%' },
+      { key: 'entropy', label: 'Entropic drift', min: 0, max: 100, def: 20, unit: '%' },
+    ],
+    outputHint: 'Your digital reality will manifest here.',
+  },
+  sangraha: {
+    key: 'sangraha', name: 'VYAN Saṅgraha', tagline: 'The Living Archive of All Knowing',
+    domain: 'GRĀHA · ARCHIVE', accent: '#c8a0e8', ctaLabel: 'Gather',
+    promptPlaceholder: 'Name a domain or topic — Saṅgraha will assemble its knowing.',
+    models: ['Saṅgraha · Sparse', 'Saṅgraha · Dense', 'Saṅgraha · Vast'],
+    sliders: [
+      { key: 'breadth', label: 'Collection breadth', min: 1, max: 10, def: 5 },
+      { key: 'depth', label: 'Archive depth', min: 1, max: 5, def: 3 },
+      { key: 'recency', label: 'Recency weight', min: 0, max: 100, def: 50, unit: '%' },
+    ],
+    outputHint: 'The gathered knowing will be assembled here.',
+  },
   placeholder: {
     key: 'placeholder', name: 'VYAN ···', tagline: 'Awaiting Initiation',
     domain: 'BIJA · SEED', accent: '#888899', ctaLabel: 'Awaiting',
-    promptPlaceholder: 'A seventh Vistāra awaits the next emergence.',
+    promptPlaceholder: 'A gateway awaits the next emergence.',
     models: ['(unmanifest)'], sliders: [],
     outputHint: 'The form is still unseen.',
   },

@@ -3,7 +3,7 @@
 import { notFound } from 'next/navigation';
 import VistaraProductDemo from '../VistaraProductDemo';
 
-const VALID_PRODUCTS = ['ritam', 'ojas', 'mudra', 'netra', 'akriti', 'sutra', 'placeholder'] as const;
+const VALID_PRODUCTS = ['ritam', 'ojas', 'vanijya', 'mudra', 'netra', 'akriti', 'sutra', 'chitra-prana', 'maya', 'sangraha', 'placeholder'] as const;
 type ValidProduct = typeof VALID_PRODUCTS[number];
 const VALID_SET = new Set<string>(VALID_PRODUCTS);
 
