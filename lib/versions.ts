@@ -13,7 +13,24 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
+export const CURRENT_VERSION = '5.7'
+
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '5.7',
+    date: '2026-08-23',
+    title: 'All Gateway Product Demo Panels',
+    summary: 'Added interactive product demo panels for all remaining VYAN gateways: Vaṇijya, Chitra-Prāṇa, Māyā, and Saṅgraha. Each panel has its own domain label, accent colour, model variants, and unique slider controls.',
+    changes: [
+      'Vaṇijya panel: MEDHĀ · INTELLIGENCE — Signal/Macro/Micro models, temporal horizon, signal sensitivity, analysis depth sliders',
+      'Chitra-Prāṇa panel: PRĀṆA · IMAGERY — Still/Motion/Living models, prāṇic vitality, motion amplitude, animation frames sliders',
+      'Māyā panel: MĀYĀ · MANIFESTATION — Illusion/Simulation/Emergence models, reality complexity, perceptual fidelity, entropic drift sliders',
+      'Saṅgraha panel: GRĀHA · ARCHIVE — Sparse/Dense/Vast models, collection breadth, archive depth, recency weight sliders',
+      'VALID_PRODUCTS updated to include all 10 gateway product keys',
+    ],
+    gitHash: '8210b2f',
+    pages: ['Vistara', 'Vistara/[product]'],
+  },
   {
     version: '5.6',
     date: '2026-08-22',
@@ -931,4 +948,3 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '5.6'
