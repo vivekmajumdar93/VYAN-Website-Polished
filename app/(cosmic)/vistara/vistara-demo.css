@@ -127,7 +127,8 @@
   scrollbar-color: color-mix(in srgb, var(--accent, #d4a8ff) 30%, transparent) transparent;
 }
 .vpd-canvas {
-  padding: 22px 28px; overflow-y: auto;
+  position: relative;
+  padding: 22px 28px; overflow: hidden;
   display: flex; flex-direction: column;
   background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent, #d4a8ff) 7%, transparent) 0%, transparent 60%);
 }
