@@ -13,9 +13,22 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '5.8'
+export const CURRENT_VERSION = '5.9'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '5.9',
+    date: '2026-08-23',
+    title: 'Visualizations in Inline Gateway Panel',
+    summary: 'Per-product canvas visualizations now appear in the QuantumGrid inline experience panel (the panel that opens when you click EXPERIENCE on a square at /vistara). Shared visualization code extracted to ProductViz.tsx.',
+    changes: [
+      'QuantumGrid inline panel shows product-specific canvas visualization instead of generic text',
+      'ProductViz component extracted to components/vistara/ProductViz.tsx — shared between inline panel and /vistara/[product] pages',
+      'All 10 gateway visualizations wired via gateway id (rtam, ojas, vanijya, mudra, netra, akriti, sutra, chitra-prana, maya, sangraha)',
+    ],
+    gitHash: '877a171',
+    pages: ['Vistara', 'Vistara/[product]'],
+  },
   {
     version: '5.8',
     date: '2026-08-23',
