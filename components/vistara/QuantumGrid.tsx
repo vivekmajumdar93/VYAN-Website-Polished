@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
+import { ProductViz, DRAW_FNS } from './ProductViz'
 
 // ─── Scene parameters ─────────────────────────────────────────────────────────
 
@@ -975,6 +976,8 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
                 <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
                   {expDef.appUrl ? (
                     <ScaledIframe src={expDef.appUrl} />
+                  ) : DRAW_FNS[expDef.id] ? (
+                    <ProductViz id={expDef.id} accent={expDef.color} />
                   ) : (
                     <div style={{
                       width: '100%', height: '100%',
@@ -989,14 +992,6 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
                         letterSpacing: '0.10em', opacity: 0.55,
                       }}>
                         {expDef.name}
-                      </div>
-                      <div style={{
-                        color: 'rgba(200,215,255,0.80)',
-                        fontSize: '10px', letterSpacing: '0.28em',
-                        textAlign: 'center', maxWidth: 260,
-                        lineHeight: 2.0, textTransform: 'uppercase',
-                      }}>
-                        {expDef.description || expDef.tagline || 'Experience coming soon.'}
                       </div>
                     </div>
                   )}
