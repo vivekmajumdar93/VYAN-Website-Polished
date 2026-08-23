@@ -13,9 +13,30 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '5.7'
+export const CURRENT_VERSION = '5.8'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '5.8',
+    date: '2026-08-23',
+    title: 'Product Canvas Visualizations',
+    summary: 'Each product panel now has a unique animated canvas visualization on the right side instead of a generic orb. The loader no longer shows a redundant VYAN text below the wordmark.',
+    changes: [
+      'Ṛtam: flowing multi-wave sine composition in gold',
+      'Ojas: expanding prāṇic pulse rings with HRV heartbeat line',
+      'Vaṇijya: market price-chart with curve fill and data points',
+      'Mudrā: glowing sphere with three elliptical orbiting particles',
+      'Netra: iris rings with rotating tick marks and scanning arc',
+      'Ākṛti: nested rotating crystal polygons with light-ray spokes',
+      'Sūtra: force-graph particle network with dynamic edge opacity',
+      'Chitra-Prāṇa: animated aperture blades with center light burst',
+      'Māyā: morphing particle field cycling between sphere and chaos',
+      'Saṅgraha: stacked archive discs with accumulating scan line',
+      'Loader: removed redundant VYAN brand text below logo-symbol.png',
+    ],
+    gitHash: '85937d8',
+    pages: ['Vistara/[product]', 'Home loader'],
+  },
   {
     version: '5.7',
     date: '2026-08-23',
