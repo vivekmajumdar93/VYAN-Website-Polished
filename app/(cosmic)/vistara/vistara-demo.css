@@ -166,6 +166,21 @@
   border-color: color-mix(in srgb, var(--accent, #d4a8ff) 70%, transparent); color: #fff;
   box-shadow: 0 0 18px color-mix(in srgb, var(--accent, #d4a8ff) 30%, transparent);
 }
+.vpd-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: -6px 0 18px; }
+.vpd-chip {
+  background: color-mix(in srgb, var(--accent, #d4a8ff) 8%, rgba(10,6,22,0.4));
+  border: 1px solid color-mix(in srgb, var(--accent, #d4a8ff) 22%, transparent);
+  border-radius: 999px; padding: 5px 12px;
+  color: color-mix(in srgb, var(--accent, #d4a8ff) 85%, white 15%);
+  font: 400 10px/1.4 var(--font-vyan); letter-spacing: 0.04em;
+  cursor: pointer; transition: all 0.18s ease; text-align: left;
+}
+.vpd-chip:hover {
+  background: color-mix(in srgb, var(--accent, #d4a8ff) 18%, rgba(10,6,22,0.6));
+  border-color: color-mix(in srgb, var(--accent, #d4a8ff) 55%, transparent);
+  color: #fff;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent, #d4a8ff) 20%, transparent);
+}
 .vpd-field--slider input[type="range"] {
   -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent, #d4a8ff) 50%, transparent), color-mix(in srgb, var(--accent, #d4a8ff) 14%, transparent));

@@ -22,6 +22,7 @@ type DemoSpec = {
   accent: string;
   ctaLabel: string;
   promptPlaceholder: string;
+  chips: string[];
   models: string[];
   sliders: { key: string; label: string; min: number; max: number; def: number; unit?: string }[];
   outputHint: string;
@@ -33,6 +34,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'ritam', name: 'VYAN Ṛtam', tagline: 'Conscious Living Through Pravāha',
     domain: 'PRAVĀHA · FLOW', accent: '#9a55ff', ctaLabel: 'Surface the flow',
     promptPlaceholder: 'Describe a moment from your day. Ṛtam will surface its pravāha.',
+    chips: [
+      'Map today\'s moments of flow and friction',
+      'I woke at 6am, meditated, felt scattered by noon',
+      'Show how my creative peak shifts through the week',
+    ],
     models: ['Ṛtam · Native', 'Ṛtam · Reflective', 'Ṛtam · Vast'],
     sliders: [
       { key: 'depth', label: 'Reflection depth', min: 1, max: 5, def: 3 },
@@ -45,6 +51,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'ojas', name: 'VYAN Ojas', tagline: 'Tracking Your Prāṇic Rhythm',
     domain: 'PRĀṆA · RHYTHM', accent: '#ffb84d', ctaLabel: 'Read the pulse',
     promptPlaceholder: 'Describe how you slept, ate, moved — Ojas will surface the prāṇic rhythm.',
+    chips: [
+      'I slept 6 hrs, skipped breakfast, trained at noon',
+      'My HRV is 42ms — what does Ojas read?',
+      'Chart my energy arc across the last 14 days',
+    ],
     models: ['Ojas · Solar', 'Ojas · Lunar', 'Ojas · Circadian'],
     sliders: [
       { key: 'hr', label: 'HRV sensitivity', min: 0, max: 100, def: 60, unit: '%' },
@@ -57,6 +68,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'mudra', name: 'VYAN Mudrā', tagline: 'The Kośa of Global Entities',
     domain: 'KOŚA · IDENTITY', accent: '#3a90ff', ctaLabel: 'Cast the seal',
     promptPlaceholder: 'Name an entity — Mudrā will surface its kośa.',
+    chips: [
+      'Surface the kośa of Apple Inc',
+      'Map the lineage of the Tata Group',
+      'Who forms the saṅgha behind Anthropic?',
+    ],
     models: ['Mudrā · Aperture', 'Mudrā · Lineage', 'Mudrā · Saṅgha'],
     sliders: [
       { key: 'depth', label: 'Kośa depth', min: 1, max: 5, def: 3 },
@@ -69,6 +85,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'netra', name: 'VYAN Netra', tagline: 'The Conscious Eye Across Tantras',
     domain: 'TANTRA · OBSERVABILITY', accent: '#22e0d4', ctaLabel: 'Open the eye',
     promptPlaceholder: 'Name a domain to observe — Netra opens its eye.',
+    chips: [
+      'Open the eye on the generative AI space',
+      'What signals are moving in quantum computing?',
+      'Observe the climate tech tantra this quarter',
+    ],
     models: ['Netra · Yantra', 'Netra · Tantra', 'Netra · Mantra'],
     sliders: [
       { key: 'breadth', label: 'Breadth of gaze', min: 1, max: 10, def: 5 },
@@ -81,6 +102,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'akriti', name: 'VYAN Ākṛti', tagline: 'Creating Digital Anubhava Through Your Dṛṣṭi',
     domain: 'DṚṢṬI · CREATION', accent: '#ff8aa2', ctaLabel: 'Manifest',
     promptPlaceholder: 'Describe the dṛṣṭi in your mind — Ākṛti will manifest it.',
+    chips: [
+      'A sacred geometry identity for a wellness studio',
+      'Brutalist typography meets Vedic illustration',
+      'A cosmic UI for a silent meditation app',
+    ],
     models: ['Ākṛti · Pearl', 'Ākṛti · Vermilion', 'Ākṛti · Indigo'],
     sliders: [
       { key: 'fidelity', label: 'Fidelity to vision', min: 0, max: 100, def: 85, unit: '%' },
@@ -93,6 +119,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'sutra', name: 'VYAN Sūtra', tagline: 'Weaving Saṅgama Through Viveka',
     domain: 'SAṄGAMA · CONNECTION', accent: '#d4a8ff', ctaLabel: 'Weave',
     promptPlaceholder: 'Name two threads — Sūtra will weave the saṅgama.',
+    chips: [
+      'Weave climate tech and indigenous land stewardship',
+      'Connect yoga philosophy with modern neuroscience',
+      'The thread between Vedic mathematics and machine learning',
+    ],
     models: ['Sūtra · Single', 'Sūtra · Bridge', 'Sūtra · Lattice'],
     sliders: [
       { key: 'viveka', label: 'Viveka strictness', min: 0, max: 100, def: 65, unit: '%' },
@@ -105,6 +136,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'vanijya', name: 'VYAN Vaṇijya', tagline: 'A Medhā-Driven System for Market Intelligence',
     domain: 'MEDHĀ · INTELLIGENCE', accent: '#8ab0e0', ctaLabel: 'Read the market',
     promptPlaceholder: 'Name a market, sector, or asset — Vaṇijya will trace its invisible flows.',
+    chips: [
+      'Trace the invisible flows in AI infrastructure',
+      'What macro signals are shifting in Southeast Asia?',
+      'Surface momentum in global semiconductor supply chains',
+    ],
     models: ['Vaṇijya · Signal', 'Vaṇijya · Macro', 'Vaṇijya · Micro'],
     sliders: [
       { key: 'horizon', label: 'Temporal horizon (days)', min: 1, max: 365, def: 30 },
@@ -117,6 +153,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'chitra-prana', name: 'VYAN Chitra-Prāṇa', tagline: 'Breathing Life Into Imagery',
     domain: 'PRĀṆA · IMAGERY', accent: '#a0c8e8', ctaLabel: 'Breathe life',
     promptPlaceholder: 'Describe an image or scene — Chitra-Prāṇa will breathe prāṇa into it.',
+    chips: [
+      'A still ocean at dawn breathing into motion',
+      'Sacred geometry dissolving into river light',
+      'An ancient forest breathing in slow time',
+    ],
     models: ['Chitra-Prāṇa · Still', 'Chitra-Prāṇa · Motion', 'Chitra-Prāṇa · Living'],
     sliders: [
       { key: 'vitality', label: 'Prāṇic vitality', min: 0, max: 100, def: 70, unit: '%' },
@@ -129,6 +170,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'maya', name: 'VYAN Māyā', tagline: 'Manifesting Digital Realities',
     domain: 'MĀYĀ · MANIFESTATION', accent: '#ffd080', ctaLabel: 'Manifest',
     promptPlaceholder: 'Describe the reality you wish to manifest — Māyā will construct it.',
+    chips: [
+      'A living city built from sacred geometry and light',
+      'Simulate the emergence of consciousness in a digital void',
+      'Manifest a world where language becomes architecture',
+    ],
     models: ['Māyā · Illusion', 'Māyā · Simulation', 'Māyā · Emergence'],
     sliders: [
       { key: 'complexity', label: 'Reality complexity', min: 1, max: 10, def: 5 },
@@ -141,6 +187,11 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'sangraha', name: 'VYAN Saṅgraha', tagline: 'The Living Archive of All Knowing',
     domain: 'GRĀHA · ARCHIVE', accent: '#c8a0e8', ctaLabel: 'Gather',
     promptPlaceholder: 'Name a domain or topic — Saṅgraha will assemble its knowing.',
+    chips: [
+      'Assemble the living canon of Vedic science',
+      'Gather everything known about the gut-brain axis',
+      'Archive the philosophy and practice of deep listening',
+    ],
     models: ['Saṅgraha · Sparse', 'Saṅgraha · Dense', 'Saṅgraha · Vast'],
     sliders: [
       { key: 'breadth', label: 'Collection breadth', min: 1, max: 10, def: 5 },
@@ -153,6 +204,7 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
     key: 'placeholder', name: 'VYAN ···', tagline: 'Awaiting Initiation',
     domain: 'BIJA · SEED', accent: '#888899', ctaLabel: 'Awaiting',
     promptPlaceholder: 'A gateway awaits the next emergence.',
+    chips: [],
     models: ['(unmanifest)'], sliders: [],
     outputHint: 'The form is still unseen.',
   },
@@ -389,6 +441,14 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
               />
               <span className="vpd-count">{prompt.length}/2000</span>
             </label>
+            {spec.chips.length > 0 && (
+              <div className="vpd-chips">
+                {spec.chips.map(chip => (
+                  <button key={chip} type="button" className="vpd-chip"
+                          onClick={() => setPrompt(chip)}>{chip}</button>
+                ))}
+              </div>
+            )}
             <label className="vpd-field">
               <span>Model</span>
               <div className="vpd-pills">
