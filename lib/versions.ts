@@ -13,9 +13,22 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '5.9'
+export const CURRENT_VERSION = '6.0'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.0',
+    date: '2026-08-23',
+    title: 'Prompt Chips — Per-Product Quick Starters',
+    summary: 'Each product panel now displays clickable prompt chips below the textarea. Chips are product-specific and populate the textarea when tapped.',
+    changes: [
+      'Added 3 pre-determined prompt chips for all 10 product panels (Ṛtam, Ojas, Mudrā, Netra, Ākṛti, Sūtra, Vaṇijya, Chitra-Prāṇa, Māyā, Saṅgraha)',
+      'Clicking a chip populates the prompt textarea instantly',
+      'Chips styled with per-product accent color, pill shape, hover glow',
+    ],
+    gitHash: '987c25a',
+    pages: ['Vistara/[product]'],
+  },
   {
     version: '5.9',
     date: '2026-08-23',
