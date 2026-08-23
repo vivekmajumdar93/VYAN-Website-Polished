@@ -15,6 +15,19 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '5.5',
+    date: '2026-08-22',
+    title: 'Vaṇijya Gateway',
+    summary: 'New product square added to the Vistara grid — VYAN Vaṇijya, the Medhā-driven market intelligence system.',
+    changes: [
+      'Added Vaṇijya gateway to GATEWAYS — positioned upper-right near Ojas (18, 8, -20)',
+      'Steel-blue accent (#8ab0e0) distinguishes it from the amber/gold cluster',
+      'Tagline: "A Medhā-Driven System for Market Intelligence"',
+    ],
+    gitHash: 'PENDING',
+    pages: ['Vistara'],
+  },
+  {
     version: '5.4',
     date: '2026-08-22',
     title: 'Vistara — Constrained Orbit + Parallax',
@@ -903,4 +916,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '5.4'
+export const CURRENT_VERSION = '5.5'
