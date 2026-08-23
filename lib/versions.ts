@@ -26,7 +26,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'VistaraVoid ring C updated [2,5] → [3,6] (Mudrā, Sūtra)',
       'ORB_SIZES and ORB_CFG extended to 10 entries to cover all gateways',
     ],
-    gitHash: 'PENDING',
+    gitHash: '31e2743',
     pages: ['Vistara'],
   },
   {
