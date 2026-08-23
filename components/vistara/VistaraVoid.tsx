@@ -9,17 +9,22 @@ import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
 import { BackIcon, SendIcon, CloseIcon } from '@/components/icons/VyanIcons'
 
 // ─── gyroscope constants ──────────────────────────────────────────────────────
-const ORB_SIZES = [28, 24, 22, 30, 32, 26, 26, 34]
+// Index map after Vaṇijya inserted at 2:
+// 0 Ṛtam · 1 Ojas · 2 Vaṇijya · 3 Mudrā · 4 Netra · 5 Ākṛti
+// 6 Sūtra · 7 Chitra-Prāṇa · 8 Māyā · 9 Saṅgraha
+const ORB_SIZES = [28, 24, 26, 22, 30, 32, 26, 26, 34, 28]
 
 const ORB_CFG: { ring: 'A' | 'B' | 'C'; localAngle: number }[] = [
-  { ring: 'A', localAngle: Math.PI / 2 },
-  { ring: 'B', localAngle: Math.PI / 2 },
-  { ring: 'C', localAngle: Math.PI / 2 },
-  { ring: 'A', localAngle: Math.PI / 2 + (2 * Math.PI) / 3 },
-  { ring: 'B', localAngle: Math.PI / 2 + (2 * Math.PI) / 3 },
-  { ring: 'C', localAngle: Math.PI / 2 + Math.PI },
-  { ring: 'B', localAngle: Math.PI / 2 + (4 * Math.PI) / 3 },
-  { ring: 'A', localAngle: Math.PI / 2 + (4 * Math.PI) / 3 },
+  { ring: 'A', localAngle: Math.PI / 2 },                          // 0 Ṛtam
+  { ring: 'B', localAngle: Math.PI / 2 },                          // 1 Ojas
+  { ring: 'B', localAngle: Math.PI / 2 + (4 * Math.PI) / 3 },     // 2 Vaṇijya (not in ring map yet)
+  { ring: 'C', localAngle: Math.PI / 2 },                          // 3 Mudrā
+  { ring: 'A', localAngle: Math.PI / 2 + (2 * Math.PI) / 3 },     // 4 Netra
+  { ring: 'B', localAngle: Math.PI / 2 + (2 * Math.PI) / 3 },     // 5 Ākṛti
+  { ring: 'C', localAngle: Math.PI / 2 + Math.PI },                // 6 Sūtra
+  { ring: 'B', localAngle: Math.PI / 2 + (4 * Math.PI) / 3 },     // 7 Chitra-Prāṇa
+  { ring: 'A', localAngle: Math.PI / 2 + (4 * Math.PI) / 3 },     // 8 Māyā
+  { ring: 'A', localAngle: Math.PI / 2 },                          // 9 Saṅgraha (not in ring map)
 ]
 
 const RING_RADII = { A: 280, B: 240, C: 200 } as const
@@ -1182,7 +1187,7 @@ function GyroScene({
         <points rotation={[Math.PI/2, 0, 0]} geometry={ringAGeo}>
           <primitive object={ringAMat} attach="material" />
         </points>
-        {[0, 3, 7].map(idx => (
+        {[0, 4, 8].map(idx => (
           <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
             ringType="A" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.A}
             isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
@@ -1198,7 +1203,7 @@ function GyroScene({
         <points rotation={[0, Math.PI/2, 0]} geometry={ringBGeo}>
           <primitive object={ringBMat} attach="material" />
         </points>
-        {[1, 4, 6].map(idx => (
+        {[1, 5, 7].map(idx => (
           <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
             ringType="B" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.B}
             isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}
@@ -1215,7 +1220,7 @@ function GyroScene({
           <points rotation={[Math.PI/2, 0, 0]} geometry={ringCGeo}>
             <primitive object={ringCMat} attach="material" />
           </points>
-          {[2, 5].map(idx => (
+          {[3, 6].map(idx => (
             <VistaraOrb key={idx} gateway={GATEWAYS[idx]} orbIdx={idx} orbSize={ORB_SIZES[idx]}
               ringType="C" localAngle={ORB_CFG[idx].localAngle} ringRadius={RING_RADII.C}
               isFocused={focusedIdx===idx} isHovered={hoveredId===GATEWAYS[idx].id}

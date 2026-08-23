@@ -40,6 +40,15 @@ export const GATEWAYS: Gateway[] = [
     pos: [ 22,   5, -14], w: 11, h:  7.5, rotX:  0.06, rotY: -0.28,
   },
   {
+    id: 'vanijya',
+    name: 'Vaṇijya',
+    tantra: 'VYAN VAṆIJYA',
+    tagline: 'A Medhā-Driven System for Market Intelligence',
+    description: 'Commerce, intelligence, market clarity. Medhā-powered insight tracing the invisible flows of global trade.',
+    color: '#8ab0e0',
+    pos: [ 18,   8, -20], w: 11, h:  7.5, rotX:  0.05, rotY: -0.22,
+  },
+  {
     id: 'mudra',
     name: 'Mudrā',
     tantra: 'VYAN MUDRĀ',
@@ -101,14 +110,5 @@ export const GATEWAYS: Gateway[] = [
     description: '',
     color: '#c8a0e8',
     pos: [-24,   6, -62], w: 12, h:  8.5, rotX: -0.06, rotY:  0.24,
-  },
-  {
-    id: 'vanijya',
-    name: 'Vaṇijya',
-    tantra: 'VYAN VAṆIJYA',
-    tagline: 'A Medhā-Driven System for Market Intelligence',
-    description: 'Commerce, intelligence, market clarity. Medhā-powered insight tracing the invisible flows of global trade.',
-    color: '#8ab0e0',
-    pos: [ 18,   8, -20], w: 11, h:  7.5, rotX:  0.05, rotY: -0.22,
   },
 ]

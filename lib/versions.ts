@@ -15,6 +15,21 @@ export interface VersionEntry {
 
 export const SITE_VERSIONS: VersionEntry[] = [
   {
+    version: '5.6',
+    date: '2026-08-22',
+    title: 'Vaṇijya — Correct Position in Sequence',
+    summary: 'Vaṇijya moved to index 2 (immediately after Ojas) in the GATEWAYS array. VistaraVoid ring index maps updated to compensate for the shift.',
+    changes: [
+      'Vaṇijya now at GATEWAYS[2] — sequence: Ṛtam → Ojas → Vaṇijya → Mudrā → …',
+      'VistaraVoid ring A updated [0,3,7] → [0,4,8] (Ṛtam, Netra, Māyā)',
+      'VistaraVoid ring B updated [1,4,6] → [1,5,7] (Ojas, Ākṛti, Chitra-Prāṇa)',
+      'VistaraVoid ring C updated [2,5] → [3,6] (Mudrā, Sūtra)',
+      'ORB_SIZES and ORB_CFG extended to 10 entries to cover all gateways',
+    ],
+    gitHash: 'PENDING',
+    pages: ['Vistara'],
+  },
+  {
     version: '5.5',
     date: '2026-08-22',
     title: 'Vaṇijya Gateway',
@@ -916,4 +931,4 @@ export const SITE_VERSIONS: VersionEntry[] = [
   },
 ]
 
-export const CURRENT_VERSION = '5.5'
+export const CURRENT_VERSION = '5.6'
