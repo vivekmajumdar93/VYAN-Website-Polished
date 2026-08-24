@@ -13,9 +13,22 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.7'
+export const CURRENT_VERSION = '6.8'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.8',
+    date: '2026-08-24',
+    title: 'Scaled App View in Panel',
+    summary: 'Live app is now CSS-scaled to fit completely inside the right panel column — no full-screen expansion, panel stays its normal size.',
+    changes: [
+      'ScaledIframe component scales app page down to fit the available panel space',
+      'Panel keeps its original dimensions — app shrinks to fit, not the other way around',
+      'Reverted full-screen panel override from v6.6',
+    ],
+    gitHash: '881c49c',
+    pages: ['Vistara', 'Vistara/[product]'],
+  },
   {
     version: '6.7',
     date: '2026-08-24',
