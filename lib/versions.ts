@@ -13,9 +13,21 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.3'
+export const CURRENT_VERSION = '6.4'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.4',
+    date: '2026-08-24',
+    title: 'Updated VYAN Shunyalekh Font',
+    summary: 'All four VYAN Shunyalekh woff2 files replaced with the latest version from the font repository — fixes the G glyph gap and includes all updated glyphs.',
+    changes: [
+      'Replaced VYANShunyalekh-Regular.woff2, Bold, Italic, BoldItalic with latest versions (Aug 24 build)',
+      'Removed outdated Aug 8 font files from the codebase',
+    ],
+    gitHash: '890a9e1',
+    pages: ['All pages'],
+  },
   {
     version: '6.3',
     date: '2026-08-24',
