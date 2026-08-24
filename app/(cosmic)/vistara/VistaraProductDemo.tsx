@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { CloseIcon } from '@/components/icons/VyanIcons';
 import { ProductViz, DRAW_FNS } from '@/components/vistara/ProductViz';
@@ -213,6 +213,19 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
   },
 };
 
+const SYSTEM_PROMPTS: Partial<Record<ProductKey, string>> = {
+  ritam: `You are VYAN Ṛtam, an AI that perceives the underlying flow (pravāha) in human experience. Given a description of someone's day, moment, or pattern, you surface its rhythmic structure — where flow accelerates, where friction builds, where the cosmic order (ṛtam) is expressed or disrupted. Respond with poetic precision. Keep responses to 3–5 short paragraphs. Use Sanskrit terms sparingly and only when they add meaning.`,
+  ojas: `You are VYAN Ojas, an AI that reads the prāṇic rhythm of the body. Given sleep, food, movement, or biometric data, you surface the underlying vitality patterns — what is nourishing, what is depleting, what cycles are emerging. Speak as a wise physiological intelligence. 3–5 paragraphs, grounded and specific.`,
+  mudra: `You are VYAN Mudrā, an AI that surfaces the kośa — the layered identity — of companies, organisations, and public figures. Given a name or entity, reveal its purpose layer, cultural layer, operational layer, and shadow layer. Be analytically precise and culturally perceptive. 4–6 paragraphs.`,
+  netra: `You are VYAN Netra, an AI with a panoramic eye across industries and domains. Given a sector or technology area, surface the moving signals, hidden patterns, and emerging tantras (systems). Speak as a calm, high-altitude observer. 3–5 paragraphs with concrete signal observations.`,
+  akriti: `You are VYAN Ākṛti, an AI design intelligence. Given a creative brief, generate a rich conceptual direction — describe visual language, typographic sensibility, spatial logic, colour philosophy, and the feeling the final work should evoke. Be vivid and specific. 4–6 paragraphs.`,
+  sutra: `You are VYAN Sūtra, an AI that weaves connections between disparate domains. Given two or more threads, find the invisible saṅgama — the place where they meet, what emerges from that meeting, and what new knowledge is produced. Be intellectually rigorous and surprising. 4–6 paragraphs.`,
+  vanijya: `You are VYAN Vaṇijya, a market intelligence AI that traces the invisible flows of commerce, capital, and supply chains. Given a market, sector, or asset, surface macro signals, structural shifts, and momentum patterns. Be analytical, data-literate in framing, and direct. 4–6 paragraphs.`,
+  'chitra-prana': `You are VYAN Chitra-Prāṇa, an AI that breathes life into imagery through words. Given a description of a scene or image, describe how it would move, breathe, and transform if given prāṇa — its rhythm of expansion and contraction, its quality of light and shadow over time. Be sensory and poetic. 3–4 paragraphs.`,
+  maya: `You are VYAN Māyā, an AI that constructs and deconstructs digital realities. Given a creative or philosophical premise, manifest it as a coherent world — its laws, aesthetics, inhabitants, and limits. Be architecturally precise and imaginatively bold. 4–6 paragraphs.`,
+  sangraha: `You are VYAN Saṅgraha, a living archive intelligence. Given a domain or question, assemble the most important knowledge — canonical sources, key debates, emerging edges, and practical applications. Speak as a calm, comprehensive librarian. 5–7 paragraphs.`,
+};
+
 export default function VistaraProductDemo({
   productKey,
   embedded = false,
@@ -235,6 +248,19 @@ export default function VistaraProductDemo({
   const [closeHov, setCloseHov] = useState(false);
 
   const slabRef = useRef<HTMLDivElement | null>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef(0);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    const el = controlsRef.current;
+    if (!el) return;
+    const delta = touchStartY.current - e.touches[0].clientY;
+    touchStartY.current = e.touches[0].clientY;
+    el.scrollTop += delta;
+  }, []);
 
   // ESC triggers animated close
   useEffect(() => {
@@ -386,18 +412,29 @@ export default function VistaraProductDemo({
     return () => cancelAnimationFrame(raf);
   }, [productKey]);
 
-  const onRun = () => {
-    if (!prompt.trim()) return;
-    setRunning(true); setOutput(null);
-    window.setTimeout(() => {
-      setOutput(
-        `— ${spec.name} · ${model} —\n\n` +
-        `INPUT: "${prompt.slice(0, 180)}${prompt.length > 180 ? '…' : ''}"\n\n` +
-        spec.sliders.map(s => `${s.label}: ${sliders[s.key]}${s.unit || ''}`).join(' · ') +
-        `\n\n${spec.outputHint}`,
-      );
+  const onRun = async () => {
+    if (!prompt.trim() || running || productKey === 'placeholder') return;
+    setRunning(true);
+    setOutput(null);
+    const systemPrompt = SYSTEM_PROMPTS[productKey] ?? `You are ${spec.name}. ${spec.tagline}.`;
+    const sliderContext = spec.sliders.map(s => `${s.label}: ${sliders[s.key]}${s.unit || ''}`).join(', ');
+    const userMessage = `Model: ${model}${sliderContext ? `\nSettings: ${sliderContext}` : ''}\n\n${prompt}`;
+    try {
+      const res = await fetch('/api/medha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system: systemPrompt,
+          history: [{ role: 'user', content: userMessage }],
+        }),
+      });
+      const data = await res.json();
+      setOutput(data.text ?? 'No response received.');
+    } catch {
+      setOutput('Connection error. Please try again.');
+    } finally {
       setRunning(false);
-    }, 1100);
+    }
   };
 
   const slab = (
@@ -437,49 +474,58 @@ export default function VistaraProductDemo({
         </header>
 
         <div className="vpd-body">
-          {/* LEFT · Controls */}
-          <div className="vpd-controls">
-            <label className="vpd-field">
-              <span>Prompt</span>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
-                placeholder={spec.promptPlaceholder}
-                rows={6}
-              />
-              <span className="vpd-count">{prompt.length}/2000</span>
-            </label>
-            {spec.chips.length > 0 && (
-              <div className="vpd-chips">
-                {spec.chips.map(chip => (
-                  <button key={chip} type="button" className="vpd-chip"
-                          onClick={() => setPrompt(chip)}>{chip}</button>
-                ))}
-              </div>
-            )}
-            <label className="vpd-field">
-              <span>Model</span>
-              <div className="vpd-pills">
-                {spec.models.map(m => (
-                  <button key={m} type="button"
-                          className={`vpd-pill ${model === m ? 'is-active' : ''}`}
-                          onClick={() => setModel(m)}>{m}</button>
-                ))}
-              </div>
-            </label>
-            {spec.sliders.map(s => (
-              <label key={s.key} className="vpd-field vpd-field--slider">
-                <span>{s.label}<em>{sliders[s.key]}{s.unit || ''}</em></span>
-                <input type="range" min={s.min} max={s.max} value={sliders[s.key]}
-                       onChange={(e) => setSliders({ ...sliders, [s.key]: parseFloat(e.target.value) })} />
-              </label>
-            ))}
-            <button
-              type="button" className="vpd-run" onClick={onRun}
-              disabled={running || !prompt.trim() || productKey === 'placeholder'}
+          {/* LEFT · Controls + pinned CTA */}
+          <div className="vpd-col-left">
+            <div
+              className="vpd-controls"
+              ref={controlsRef}
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
             >
-              {running ? <span className="vpd-spin" /> : (productKey === 'placeholder' ? 'Awaiting Initiation' : spec.ctaLabel)}
-            </button>
+              <label className="vpd-field">
+                <span>Prompt</span>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
+                  placeholder={spec.promptPlaceholder}
+                  rows={6}
+                />
+                <span className="vpd-count">{prompt.length}/2000</span>
+              </label>
+              {spec.chips.length > 0 && (
+                <div className="vpd-chips">
+                  {spec.chips.map(chip => (
+                    <button key={chip} type="button" className="vpd-chip"
+                            onClick={() => setPrompt(chip)}>{chip}</button>
+                  ))}
+                </div>
+              )}
+              <label className="vpd-field">
+                <span>Model</span>
+                <div className="vpd-pills">
+                  {spec.models.map(m => (
+                    <button key={m} type="button"
+                            className={`vpd-pill ${model === m ? 'is-active' : ''}`}
+                            onClick={() => setModel(m)}>{m}</button>
+                  ))}
+                </div>
+              </label>
+              {spec.sliders.map(s => (
+                <label key={s.key} className="vpd-field vpd-field--slider">
+                  <span>{s.label}<em>{sliders[s.key]}{s.unit || ''}</em></span>
+                  <input type="range" min={s.min} max={s.max} value={sliders[s.key]}
+                         onChange={(e) => setSliders({ ...sliders, [s.key]: parseFloat(e.target.value) })} />
+                </label>
+              ))}
+            </div>
+            <div className="vpd-cta-bar">
+              <button
+                type="button" className="vpd-run" onClick={onRun}
+                disabled={running || !prompt.trim() || productKey === 'placeholder'}
+              >
+                {running ? <span className="vpd-spin" /> : (productKey === 'placeholder' ? 'Awaiting Initiation' : spec.ctaLabel)}
+              </button>
+            </div>
           </div>
 
           {/* RIGHT · Output */}
@@ -487,7 +533,11 @@ export default function VistaraProductDemo({
             {spec.embedUrl ? (
               <ScaledIframe src={spec.embedUrl} title={spec.name} />
             ) : output ? (
-              <pre className="vpd-output">{output}</pre>
+              <div className="vpd-output">{output.split('\n').map((line, i) =>
+                line ? <p key={i}>{line}</p> : <br key={i} />
+              )}</div>
+            ) : running ? (
+              <div className="vpd-empty"><span className="vpd-spin vpd-spin--lg" /><p style={{marginTop:18,opacity:0.5,fontSize:12,letterSpacing:'0.12em'}}>PROCESSING</p></div>
             ) : DRAW_FNS[productKey] ? (
               <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
