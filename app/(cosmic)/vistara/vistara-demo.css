@@ -225,7 +225,11 @@
 }
 @keyframes vpd-spin { to { transform: rotate(360deg); } }
 
-/* Embed mode — split: controls left, live app right */
+/* Embed mode — wider slab + split: controls left, live app right */
+.vpd-slab.has-embed {
+  width: min(96vw, 1600px);
+  height: min(92vh, 900px);
+}
 .vpd-slab.has-embed .vpd-canvas {
   padding: 0;
   overflow: hidden;

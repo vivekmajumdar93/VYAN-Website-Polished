@@ -904,7 +904,14 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
           {/* Slide wrapper — positions panel on the appropriate side */}
           <div
             className={`qg-panel-wrapper ${isRight ? 'qg-panel-right' : 'qg-panel-left'}`}
-            style={{ animation: panelAnim }}
+            style={{
+              animation: panelAnim,
+              ...(expDef.appUrl ? {
+                left: '16px',
+                right: '16px',
+                width: 'auto',
+              } : {}),
+            }}
             onClick={e => e.stopPropagation()}
           >
             {/* Floating card — gradient border on all 4 sides + hover lift */}
