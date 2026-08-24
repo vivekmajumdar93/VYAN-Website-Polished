@@ -13,9 +13,21 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.6'
+export const CURRENT_VERSION = '6.7'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.7',
+    date: '2026-08-24',
+    title: 'Equal Split Panel Layout',
+    summary: 'Controls column and live app column are now equal width (1fr 1fr). The live app fills its half completely.',
+    changes: [
+      'Panel body grid changed from minmax(280px,380px) 1fr to 1fr 1fr — both sides equal',
+      'iframe fills its column with no overflow gaps',
+    ],
+    gitHash: 'ec52fb5',
+    pages: ['Vistara', 'Vistara/[product]'],
+  },
   {
     version: '6.6',
     date: '2026-08-24',
