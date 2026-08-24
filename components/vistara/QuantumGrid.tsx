@@ -972,27 +972,60 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
                   </div>
                 ) : null}
 
-                {/* Content — ScaledIframe fits the entire app in the panel without scroll */}
-                <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-                  {expDef.appUrl ? (
-                    <ScaledIframe src={expDef.appUrl} />
-                  ) : DRAW_FNS[expDef.id] ? (
-                    <ProductViz id={expDef.id} accent={expDef.color} />
-                  ) : (
-                    <div style={{
-                      width: '100%', height: '100%',
-                      display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center', gap: 20,
-                      fontFamily: 'var(--font-vyan)',
-                    }}>
-                      <img src="/logo-symbol.png" alt="VYAN"
-                        style={{ width: 54, opacity: 0.20 }} />
+                {/* Content — always show ProductViz; appUrl surfaces as an "Open App" button */}
+                <div style={{ flex: 1, overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    {DRAW_FNS[expDef.id] ? (
+                      <ProductViz id={expDef.id} accent={expDef.color} />
+                    ) : (
                       <div style={{
-                        color: '#ff2a4a', fontSize: '20px',
-                        letterSpacing: '0.10em', opacity: 0.55,
+                        width: '100%', height: '100%',
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center', gap: 20,
+                        fontFamily: 'var(--font-vyan)',
                       }}>
-                        {expDef.name}
+                        <img src="/logo-symbol.png" alt="VYAN"
+                          style={{ width: 54, opacity: 0.20 }} />
+                        <div style={{
+                          color: '#ff2a4a', fontSize: '20px',
+                          letterSpacing: '0.10em', opacity: 0.55,
+                        }}>
+                          {expDef.name}
+                        </div>
                       </div>
+                    )}
+                  </div>
+                  {expDef.appUrl && (
+                    <div style={{ flexShrink: 0, padding: '14px 28px', borderTop: '1px solid rgba(26,64,255,0.12)', display: 'flex', justifyContent: 'center' }}>
+                      <a
+                        href={expDef.appUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-block',
+                          padding: '9px 28px',
+                          border: '1px solid rgba(255,42,74,0.45)',
+                          color: 'rgba(255,42,74,0.85)',
+                          fontFamily: 'var(--font-vyan)',
+                          fontSize: '10px', letterSpacing: '0.32em',
+                          textTransform: 'uppercase', textDecoration: 'none',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={e => {
+                          const a = e.currentTarget as HTMLAnchorElement
+                          a.style.background = 'rgba(255,42,74,0.10)'
+                          a.style.borderColor = 'rgba(255,42,74,0.75)'
+                          a.style.color = '#ff2a4a'
+                        }}
+                        onMouseLeave={e => {
+                          const a = e.currentTarget as HTMLAnchorElement
+                          a.style.background = 'transparent'
+                          a.style.borderColor = 'rgba(255,42,74,0.45)'
+                          a.style.color = 'rgba(255,42,74,0.85)'
+                        }}
+                      >
+                        ENTER {expDef.name.toUpperCase()}
+                      </a>
                     </div>
                   )}
                 </div>
