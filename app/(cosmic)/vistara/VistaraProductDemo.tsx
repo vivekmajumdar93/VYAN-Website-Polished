@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CloseIcon } from '@/components/icons/VyanIcons';
 import { ProductViz, DRAW_FNS } from '@/components/vistara/ProductViz';
+import { ScaledIframe } from '@/components/vistara/ScaledIframe';
 import './vistara-demo.css';
 
 // ============================================================
@@ -484,7 +485,7 @@ export default function VistaraProductDemo({
           {/* RIGHT · Output */}
           <div className="vpd-canvas">
             {spec.embedUrl ? (
-              <iframe title={spec.name} src={spec.embedUrl} data-vyan-embed={spec.key} className="vpd-iframe" />
+              <ScaledIframe src={spec.embedUrl} title={spec.name} />
             ) : output ? (
               <pre className="vpd-output">{output}</pre>
             ) : DRAW_FNS[productKey] ? (

@@ -66,50 +66,7 @@ function makeCornerGeo(w: number, h: number, f: number): THREE.BufferGeometry {
   return g
 }
 
-// ─── Scaled iframe ────────────────────────────────────────────────────────────
-// Renders the embedded app at a tall "design height" and CSS-scales it down so
-// the entire page fits the panel with zero panel-level scroll.
-// The iframe viewport width = containerWidth / scale so content fills edge-to-edge.
-
-const IFRAME_DESIGN_H = 900
-
-function ScaledIframe({ src }: { src: string }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [frame, setFrame] = useState({ scale: 1, iframeW: 480 })
-
-  useEffect(() => {
-    const measure = () => {
-      const el = containerRef.current
-      if (!el) return
-      const { width, height } = el.getBoundingClientRect()
-      const scale = Math.min(height / IFRAME_DESIGN_H, 1)
-      // iframeW: at this scale the iframe renders at iframeW px → appears as width px
-      setFrame({ scale, iframeW: scale < 1 ? width / scale : width })
-    }
-    measure()
-    const ro = new ResizeObserver(measure)
-    if (containerRef.current) ro.observe(containerRef.current)
-    return () => ro.disconnect()
-  }, [])
-
-  return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
-      <div style={{
-        position: 'absolute', top: 0, left: 0,
-        width: frame.iframeW,
-        height: IFRAME_DESIGN_H,
-        transform: `scale(${frame.scale})`,
-        transformOrigin: 'top left',
-      }}>
-        <iframe
-          src={src}
-          style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-          allow="fullscreen"
-        />
-      </div>
-    </div>
-  )
-}
+import { ScaledIframe } from './ScaledIframe'
 
 // ─── Background rects ─────────────────────────────────────────────────────────
 
@@ -904,14 +861,7 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
           {/* Slide wrapper — positions panel on the appropriate side */}
           <div
             className={`qg-panel-wrapper ${isRight ? 'qg-panel-right' : 'qg-panel-left'}`}
-            style={{
-              animation: panelAnim,
-              ...(expDef.appUrl ? {
-                left: '16px',
-                right: '16px',
-                width: 'auto',
-              } : {}),
-            }}
+            style={{ animation: panelAnim }}
             onClick={e => e.stopPropagation()}
           >
             {/* Floating card — gradient border on all 4 sides + hover lift */}
