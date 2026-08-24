@@ -13,9 +13,22 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.2'
+export const CURRENT_VERSION = '6.3'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.3',
+    date: '2026-08-24',
+    title: 'Ṛtam Split View — Controls + Live App',
+    summary: 'Ṛtam panel now shows demo controls on the left and the live Ṛtam app on the right. All other panels show controls + canvas visualization in the same split layout.',
+    changes: [
+      'Ṛtam panel: live app (rtam.vyanlabs.com) embedded on the right, prompt/model/sliders on the left',
+      'Removed the old embed-only mode that hid controls — both columns now always visible',
+      'Controls column is scrollable so CTA button is always reachable',
+    ],
+    gitHash: 'f8eb5da',
+    pages: ['Vistara', 'Vistara/[product]'],
+  },
   {
     version: '6.2',
     date: '2026-08-24',
