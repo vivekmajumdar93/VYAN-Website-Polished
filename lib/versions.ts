@@ -13,9 +13,21 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.5'
+export const CURRENT_VERSION = '6.6'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.6',
+    date: '2026-08-24',
+    title: 'Full-Width Live App Panel',
+    summary: 'Panels with a live app now expand to near full-screen width so the embedded app is fully visible. Vaṇijya live app wired in previous release.',
+    changes: [
+      'QuantumGrid inline panel spans full viewport width (left: 16px, right: 16px) when gateway has a live app',
+      'Standalone /vistara/[product] slab expands to min(96vw, 1600px) × min(92vh, 900px) in embed mode',
+    ],
+    gitHash: 'b48f50d',
+    pages: ['Vistara', 'Vistara/[product]'],
+  },
   {
     version: '6.5',
     date: '2026-08-24',
