@@ -13,9 +13,21 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.0'
+export const CURRENT_VERSION = '6.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.1',
+    date: '2026-08-24',
+    title: 'Canvas Always Visible in Inline Panel',
+    summary: 'The product canvas visualization now always shows in the QuantumGrid inline panel. When a live app URL exists, an ENTER button appears below the visualization instead of replacing it.',
+    changes: [
+      'ProductViz canvas always renders in inline panel — no longer overridden by appUrl',
+      'appUrl surfaces as an "ENTER [NAME]" button at the panel bottom',
+    ],
+    gitHash: '6041b85',
+    pages: ['Vistara'],
+  },
   {
     version: '6.0',
     date: '2026-08-23',
