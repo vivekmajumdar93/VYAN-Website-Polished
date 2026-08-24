@@ -225,11 +225,9 @@
 }
 @keyframes vpd-spin { to { transform: rotate(360deg); } }
 
-/* Embed mode — single column, iframe fills the body */
-.vpd-slab.has-embed .vpd-body { grid-template-columns: 1fr; }
-.vpd-slab.has-embed .vpd-controls { display: none; }
+/* Embed mode — split: controls left, live app right */
 .vpd-slab.has-embed .vpd-canvas {
-  padding: 10px 14px 14px;
+  padding: 0;
   overflow: hidden;
   background: none;
 }

@@ -46,6 +46,7 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
       { key: 'window', label: 'Time horizon (days)', min: 1, max: 30, def: 7 },
     ],
     outputHint: 'The flow-lines of this moment will manifest here.',
+    embedUrl: 'https://rtam.vyanlabs.com',
   },
   ojas: {
     key: 'ojas', name: 'VYAN Ojas', tagline: 'Tracking Your Prāṇic Rhythm',
