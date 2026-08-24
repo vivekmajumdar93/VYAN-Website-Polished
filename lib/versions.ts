@@ -13,9 +13,24 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.8'
+export const CURRENT_VERSION = '6.9'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.9',
+    date: '2026-08-24',
+    title: 'Fully Functional Product Panels',
+    summary: 'Product panels are now fully functional: prompts call real AI, scroll works on touch, send button always visible, AI response renders in the right panel.',
+    changes: [
+      'Real AI responses via /api/medha — no placeholders',
+      'Per-product system prompts for all 9 products (Ṛtam, Ojas, Mudrā, Netra, Ākṛti, Sūtra, Vaṇijya, Chitra-Prāṇa, Māyā, Saṅgraha)',
+      'Send button pinned at bottom of controls column — always visible regardless of scroll position',
+      'Touch scroll fixed on controls column (JS touch handlers per CLAUDE.md)',
+      'AI response renders as formatted paragraphs in the right panel; loading spinner while waiting',
+    ],
+    gitHash: 'a4e0b74',
+    pages: ['Vistara', 'Vistara/[product]'],
+  },
   {
     version: '6.8',
     date: '2026-08-24',
