@@ -47,6 +47,7 @@ export const GATEWAYS: Gateway[] = [
     description: 'Commerce, intelligence, market clarity. Medhā-powered insight tracing the invisible flows of global trade.',
     color: '#8ab0e0',
     pos: [ 18,   8, -20], w: 11, h:  7.5, rotX:  0.05, rotY: -0.22,
+    appUrl: 'https://vanijya.vyanlabs.com',
   },
   {
     id: 'mudra',

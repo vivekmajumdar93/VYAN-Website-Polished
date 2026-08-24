@@ -149,6 +149,7 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
       { key: 'depth', label: 'Analysis depth', min: 1, max: 5, def: 3 },
     ],
     outputHint: 'The invisible flows of the market will surface here.',
+    embedUrl: 'https://vanijya.vyanlabs.com',
   },
   'chitra-prana': {
     key: 'chitra-prana', name: 'VYAN Chitra-Prāṇa', tagline: 'Breathing Life Into Imagery',
