@@ -13,9 +13,21 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.4'
+export const CURRENT_VERSION = '6.5'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.5',
+    date: '2026-08-24',
+    title: 'Vaṇijya Live App in Panel',
+    summary: 'The Vaṇijya panel now shows the live app at vanijya.vyanlabs.com on the right side, with demo controls on the left.',
+    changes: [
+      'Vaṇijya panel: vanijya.vyanlabs.com embedded on the right',
+      'Vaṇijya gateway square also wired with appUrl',
+    ],
+    gitHash: '154d941',
+    pages: ['Vistara', 'Vistara/[product]'],
+  },
   {
     version: '6.4',
     date: '2026-08-24',
