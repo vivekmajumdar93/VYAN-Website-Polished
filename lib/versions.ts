@@ -13,9 +13,22 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.1'
+export const CURRENT_VERSION = '6.2'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.2',
+    date: '2026-08-24',
+    title: 'Full Product Demo in Inline Panel',
+    summary: 'Clicking EXPERIENCE on any gateway square now shows the complete product demo UI — prompt, chips, model selector, sliders, canvas visualization — directly in the inline panel at /vistara.',
+    changes: [
+      'QuantumGrid inline panel now embeds the full VistaraProductDemo component for each gateway',
+      'Added embedded mode to VistaraProductDemo — no veil overlay, fills panel container, close button calls onClose callback',
+      'Prompt chips, model pills, sliders, and canvas viz all work inside the inline panel',
+    ],
+    gitHash: '5a5672c',
+    pages: ['Vistara'],
+  },
   {
     version: '6.1',
     date: '2026-08-24',
