@@ -5,7 +5,14 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { GATEWAYS, type Gateway } from '@/lib/vistara/gateways'
-import { ProductViz, DRAW_FNS } from './ProductViz'
+import VistaraProductDemo from '@/app/(cosmic)/vistara/VistaraProductDemo'
+import type { ProductKey } from '@/app/(cosmic)/vistara/VistaraProductDemo'
+
+const GW_TO_PRODUCT: Record<string, ProductKey> = {
+  rtam: 'ritam', ojas: 'ojas', vanijya: 'vanijya', mudra: 'mudra',
+  netra: 'netra', akriti: 'akriti', sutra: 'sutra',
+  'chitra-prana': 'chitra-prana', maya: 'maya', sangraha: 'sangraha',
+}
 
 // ─── Scene parameters ─────────────────────────────────────────────────────────
 
@@ -902,134 +909,12 @@ export function QuantumGrid({ onBack }: { onBack?: () => void }) {
           >
             {/* Floating card — gradient border on all 4 sides + hover lift */}
             <div className="qg-float-panel">
-
-              {/* Glass fill */}
-              <div className="qg-exp-glass" style={{
-                width: '100%', height: '100%',
-                boxSizing: 'border-box',
-                display: 'flex', flexDirection: 'column',
-              }}>
-
-                {/* Header */}
-                <div style={{
-                  padding: '22px 28px 18px',
-                  borderBottom: '1px solid rgba(26,64,255,0.14)',
-                  flexShrink: 0,
-                  display: 'flex', alignItems: 'center',
-                  justifyContent: 'space-between', gap: 14,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-                    <img src="/logo-symbol.png" alt="VYAN"
-                      style={{ width: 30, height: 30, objectFit: 'contain', opacity: 0.85, flexShrink: 0 }} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{
-                        color: '#ff2a4a', fontFamily: 'var(--font-vyan)',
-                        fontSize: '22px', letterSpacing: '0.08em',
-                        textShadow: '0 0 20px rgba(255,42,74,0.38)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {expDef.name}
-                      </div>
-                      <div style={{
-                        color: 'rgba(255,42,74,0.72)', fontFamily: 'var(--font-vyan)',
-                        fontSize: '8px', letterSpacing: '0.52em', marginTop: 3,
-                      }}>
-                        {expDef.tantra}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={closeExp}
-                    style={{
-                      background: 'none', border: '1px solid rgba(255,42,74,0.28)',
-                      color: 'rgba(255,42,74,0.55)', fontSize: '15px',
-                      cursor: 'pointer', fontFamily: 'var(--font-vyan)',
-                      padding: '5px 9px', lineHeight: 1, flexShrink: 0,
-                      transition: 'color 0.2s, border-color 0.2s',
-                    }}
-                    onMouseEnter={e => {
-                      const b = e.currentTarget as HTMLButtonElement
-                      b.style.color = '#ff2a4a'; b.style.borderColor = 'rgba(255,42,74,0.65)'
-                    }}
-                    onMouseLeave={e => {
-                      const b = e.currentTarget as HTMLButtonElement
-                      b.style.color = 'rgba(255,42,74,0.55)'; b.style.borderColor = 'rgba(255,42,74,0.28)'
-                    }}
-                  >✕</button>
-                </div>
-
-                {/* Tagline strip */}
-                {expDef.tagline ? (
-                  <div style={{
-                    padding: '10px 28px 9px', flexShrink: 0,
-                    color: 'rgba(190,210,255,0.82)', fontFamily: 'var(--font-vyan)',
-                    fontSize: '9px', letterSpacing: '0.30em',
-                    borderBottom: '1px solid rgba(26,64,255,0.12)',
-                    textTransform: 'uppercase',
-                  }}>
-                    {expDef.tagline}
-                  </div>
-                ) : null}
-
-                {/* Content — always show ProductViz; appUrl surfaces as an "Open App" button */}
-                <div style={{ flex: 1, overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ flex: 1, position: 'relative' }}>
-                    {DRAW_FNS[expDef.id] ? (
-                      <ProductViz id={expDef.id} accent={expDef.color} />
-                    ) : (
-                      <div style={{
-                        width: '100%', height: '100%',
-                        display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', justifyContent: 'center', gap: 20,
-                        fontFamily: 'var(--font-vyan)',
-                      }}>
-                        <img src="/logo-symbol.png" alt="VYAN"
-                          style={{ width: 54, opacity: 0.20 }} />
-                        <div style={{
-                          color: '#ff2a4a', fontSize: '20px',
-                          letterSpacing: '0.10em', opacity: 0.55,
-                        }}>
-                          {expDef.name}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {expDef.appUrl && (
-                    <div style={{ flexShrink: 0, padding: '14px 28px', borderTop: '1px solid rgba(26,64,255,0.12)', display: 'flex', justifyContent: 'center' }}>
-                      <a
-                        href={expDef.appUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: 'inline-block',
-                          padding: '9px 28px',
-                          border: '1px solid rgba(255,42,74,0.45)',
-                          color: 'rgba(255,42,74,0.85)',
-                          fontFamily: 'var(--font-vyan)',
-                          fontSize: '10px', letterSpacing: '0.32em',
-                          textTransform: 'uppercase', textDecoration: 'none',
-                          transition: 'all 0.2s ease',
-                        }}
-                        onMouseEnter={e => {
-                          const a = e.currentTarget as HTMLAnchorElement
-                          a.style.background = 'rgba(255,42,74,0.10)'
-                          a.style.borderColor = 'rgba(255,42,74,0.75)'
-                          a.style.color = '#ff2a4a'
-                        }}
-                        onMouseLeave={e => {
-                          const a = e.currentTarget as HTMLAnchorElement
-                          a.style.background = 'transparent'
-                          a.style.borderColor = 'rgba(255,42,74,0.45)'
-                          a.style.color = 'rgba(255,42,74,0.85)'
-                        }}
-                      >
-                        ENTER {expDef.name.toUpperCase()}
-                      </a>
-                    </div>
-                  )}
-                </div>
-
+              <div className="qg-exp-glass" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+                <VistaraProductDemo
+                  productKey={GW_TO_PRODUCT[expDef.id] ?? 'placeholder'}
+                  embedded
+                  onClose={closeExp}
+                />
               </div>
             </div>
           </div>

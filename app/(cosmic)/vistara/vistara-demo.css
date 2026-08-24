@@ -64,6 +64,21 @@
 .vpd-slab.is-closing {
   animation: vpd-slab-into-node 0.42s cubic-bezier(0.7, 0, 1, 0.5) forwards;
 }
+
+/* Embedded mode — inside QuantumGrid inline panel, no fixed positioning */
+.vpd-slab.vpd-slab--embedded {
+  position: relative !important;
+  inset: unset !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  transform: none !important;
+  animation: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transform-origin: unset !important;
+}
 @keyframes vpd-slab-into-node {
   from {
     opacity: 1;

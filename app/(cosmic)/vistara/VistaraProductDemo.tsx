@@ -12,7 +12,7 @@ import './vistara-demo.css';
 // before the panel appears.
 // ============================================================
 
-type ProductKey = 'ritam' | 'ojas' | 'vanijya' | 'mudra' | 'netra' | 'akriti' | 'sutra' | 'chitra-prana' | 'maya' | 'sangraha' | 'placeholder';
+export type ProductKey = 'ritam' | 'ojas' | 'vanijya' | 'mudra' | 'netra' | 'akriti' | 'sutra' | 'chitra-prana' | 'maya' | 'sangraha' | 'placeholder';
 
 type DemoSpec = {
   key: ProductKey;
@@ -210,7 +210,15 @@ const DEMOS: Record<ProductKey, DemoSpec> = {
   },
 };
 
-export default function VistaraProductDemo({ productKey }: { productKey: ProductKey }) {
+export default function VistaraProductDemo({
+  productKey,
+  embedded = false,
+  onClose,
+}: {
+  productKey: ProductKey;
+  embedded?: boolean;
+  onClose?: () => void;
+}) {
   const router = useRouter();
   const spec = DEMOS[productKey] ?? DEMOS.placeholder;
   const [prompt, setPrompt] = useState('');
@@ -245,6 +253,7 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
   // ── Animated close — panel shrinks back into node ──────────────────────────
   const handleClose = () => {
     if (closing) return;
+    if (embedded && onClose) { onClose(); return; }
     setClosing(true);
 
     // Tell CameraRig to return to orbital view
@@ -388,19 +397,14 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
     }, 1100);
   };
 
-  return (
+  const slab = (
     <div
-      className="vpd-veil"
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+      ref={slabRef}
+      className={`vpd-slab ${closing ? 'is-closing' : ''} ${spec.embedUrl ? 'has-embed' : ''} ${embedded ? 'vpd-slab--embedded' : ''}`}
+      style={{ ['--accent' as any]: spec.accent }}
     >
-      <div
-        ref={slabRef}
-        className={`vpd-slab ${closing ? 'is-closing' : ''} ${spec.embedUrl ? 'has-embed' : ''}`}
-        style={{ ['--accent' as any]: spec.accent }}
-      >
-        {/* Filament */}
+      {/* Filament — hidden when embedded */}
+      {!embedded && (
         <svg className="vpd-anchor-filament" aria-hidden="true">
           <defs>
             <linearGradient id={`vpd-fil-${productKey}`} x1="0" y1="0" x2="1" y2="0">
@@ -411,8 +415,9 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
           </defs>
           <path d="" stroke={`url(#vpd-fil-${productKey})`} strokeWidth="1.4" fill="none" />
         </svg>
+      )}
 
-        <header className="vpd-head">
+      <header className="vpd-head">
           <div className="vpd-domain">{spec.domain}</div>
           <h2 className="vpd-title">{spec.name}</h2>
           <p className="vpd-tagline">{spec.tagline}</p>
@@ -501,6 +506,18 @@ export default function VistaraProductDemo({ productKey }: { productKey: Product
           <span>VYAN · Vistāra · {spec.domain}</span>
         </footer>
       </div>
+  );
+
+  if (embedded) return slab;
+
+  return (
+    <div
+      className="vpd-veil"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+    >
+      {slab}
     </div>
   );
 }
