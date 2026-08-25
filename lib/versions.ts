@@ -13,9 +13,29 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.9'
+export const CURRENT_VERSION = '7.0'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '7.0',
+    date: '2026-08-25',
+    title: 'Acoustic Consciousness Console',
+    summary: 'Replaced the old SoundConsole with a fully redesigned Acoustic Consciousness panel — live Web Audio synthesis, 8 soundscapes, 12-band neural EQ, spatial audio, consciousness modes, spectrogram, and plasma ring visualizer.',
+    changes: [
+      'New AcousticConsole component with full Web Audio API engine',
+      '8 procedurally synthesized soundscapes (Void Silence, Neural Drift, Crystal Resonance, Vortex Descent, Cathedral Bloom, Solar Ignition, Deep Current, Prāṇic Pulse)',
+      '12-band draggable neural EQ with bezier curve visualization',
+      'Spatial audio pad with ripple visualizer and binaural beat presets',
+      '5 Medhā consciousness modes that reshape EQ curve (Prājña, Dhyāna, Akṣaya, Javā, Sañcāra)',
+      'Spectrogram waterfall display and BPM pulse indicator',
+      'Plasma ring frequency visualizer in header',
+      'Realm-aware theme: shunya (violet), medha (purple), vistara (blue) based on current page',
+      'Preserves vyan:sound-toggle event for external open/close',
+      'Removed SoundConsole.tsx and soundconsole.css',
+    ],
+    gitHash: 'e82a40c',
+    pages: ['All pages', 'SoundConsole → AcousticConsole'],
+  },
   {
     version: '6.9',
     date: '2026-08-24',
