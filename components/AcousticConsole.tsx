@@ -677,7 +677,7 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
           background: isOpen ? theme.primary + "30" : "rgba(0,0,0,0.6)",
           border: `1px solid ${theme.primary}50`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: "pointer", zIndex: 1000,
+          cursor: "pointer", zIndex: 9200,
           boxShadow: isOpen ? `0 0 24px ${theme.glow}` : "none",
           transition: "all 0.3s ease", backdropFilter: "blur(12px)",
         }}
@@ -699,7 +699,7 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
         <div style={{
           position: "fixed", bottom: 84, right: 24, width: 340,
           background: theme.bg, border: `1px solid ${theme.border}`,
-          borderRadius: 16, backdropFilter: "blur(32px)", zIndex: 999,
+          borderRadius: 16, backdropFilter: "blur(32px)", zIndex: 9150,
           boxShadow: `0 0 60px ${theme.glow}, 0 24px 48px rgba(0,0,0,0.6)`,
           overflow: "hidden", fontFamily: "system-ui, sans-serif",
         }}>

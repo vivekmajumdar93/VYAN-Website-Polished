@@ -1,14 +1,13 @@
 'use client'
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback } from 'react'
 import { SITE_VERSIONS, CURRENT_VERSION } from '@/lib/versions'
 
 export default function VersionPanel() {
   const [open, setOpen]         = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([CURRENT_VERSION]))
-  const scrollRef      = useRef<HTMLDivElement>(null)
-  const touchStartY    = useRef(0)
-  const scrollTouchY   = useRef(0)
-  const scrollTouchTop = useRef(0)
+  const scrollRef    = useRef<HTMLDivElement>(null)
+  const touchStartY  = useRef(0)
+  const listTouchY   = useRef(0)
 
   const close = useCallback(() => setOpen(false), [])
 
@@ -21,29 +20,18 @@ export default function VersionPanel() {
     })
   }, [])
 
-  // Non-passive touchmove on the scroll container so we can call preventDefault,
-  // which tells the browser this is a handled scroll (prevents click cancellation
-  // after a touchmove and ensures JS scrollTop update isn't fought by the browser).
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const onStart = (e: TouchEvent) => {
-      e.stopPropagation()
-      scrollTouchY.current   = e.touches[0].clientY
-      scrollTouchTop.current = el.scrollTop
-    }
-    const onMove = (e: TouchEvent) => {
-      e.stopPropagation()
-      e.preventDefault()   // prevent browser from cancelling the scroll gesture
-      el.scrollTop = scrollTouchTop.current + (scrollTouchY.current - e.touches[0].clientY)
-    }
-    el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchmove',  onMove,  { passive: false })
-    return () => {
-      el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchmove',  onMove)
-    }
-  }, [open])  // re-bind when panel opens (scrollRef becomes non-null)
+  // JS touch scroll on the list (touch-action:none is global — CSS overflow alone won't scroll)
+  const onListTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation()
+    listTouchY.current = e.touches[0].clientY
+  }
+  const onListTouchMove = (e: React.TouchEvent) => {
+    e.stopPropagation()
+    const el = scrollRef.current; if (!el) return
+    const delta = listTouchY.current - e.touches[0].clientY
+    listTouchY.current = e.touches[0].clientY
+    el.scrollTop += delta
+  }
 
   // Backdrop: swipe-down > 72 px closes the panel
   const onBackdropTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY }
@@ -139,6 +127,8 @@ export default function VersionPanel() {
             {/* Version list — scroll container */}
             <div
               ref={scrollRef}
+              onTouchStart={onListTouchStart}
+              onTouchMove={onListTouchMove}
               style={{
                 overflowY:'auto', flex:1,
                 padding:'16px 30px 32px',
