@@ -612,6 +612,17 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
   const [panY, setPanY] = useState(0)
   const [activeSoundscape, setActiveSoundscape] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
+  const panelScrollRef = useRef<HTMLDivElement>(null)
+  const panelTouchY = useRef(0)
+  const onPanelTouchStart = useCallback((e: React.TouchEvent) => {
+    panelTouchY.current = e.touches[0].clientY
+  }, [])
+  const onPanelTouchMove = useCallback((e: React.TouchEvent) => {
+    const el = panelScrollRef.current; if (!el) return
+    const delta = panelTouchY.current - e.touches[0].clientY
+    panelTouchY.current = e.touches[0].clientY
+    el.scrollTop += delta
+  }, [])
 
   // Animate the trigger icon
   useEffect(() => {
@@ -641,7 +652,7 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
 
   const handleSoundscapeSelect = useCallback(async (id: string) => {
     await audio.init()
-    if (audio.currentSoundscape === id) { audio.stop(); return }
+    if (audio.currentSoundscape === id) { audio.stop(); setActiveSoundscape(null); return }
     await audio.synthesizeSoundscape(id)
     setActiveSoundscape(id)
   }, [audio])
@@ -727,7 +738,8 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
           </div>
 
           {/* Tab content */}
-          <div style={{ padding: "14px 16px", maxHeight: 380, overflowY: "auto" }}>
+          <div ref={panelScrollRef} onTouchStart={onPanelTouchStart} onTouchMove={onPanelTouchMove}
+            style={{ padding: "14px 16px", maxHeight: 380, overflowY: "auto" }}>
 
             {/* ── SOUNDSCAPES ─────────────────────────────────────────────── */}
             {activeTab === "play" && (
