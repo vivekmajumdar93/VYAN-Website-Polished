@@ -1737,6 +1737,12 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   const worldPosRef       = useRef<Record<number, THREE.Vector3>>({})
   const screenPosRef      = useRef<Record<number, { x: number; y: number }>>({})
   const vortexAnimRef     = useRef<number>(0)
+  const acousticOpenRef   = useRef(false)
+  useEffect(() => {
+    const handler = (e: Event) => { acousticOpenRef.current = (e as CustomEvent<{ open: boolean }>).detail.open }
+    window.addEventListener('vyan:acoustic-panel', handler)
+    return () => window.removeEventListener('vyan:acoustic-panel', handler)
+  }, [])
 
   // ── Custom orbital cursor — mouse-only, hidden on touch/coarse devices ───────
   const hasFinePointer  = typeof window !== 'undefined' && window.matchMedia('(pointer:fine)').matches
@@ -1792,10 +1798,10 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
       cooldown = true; setTimeout(() => { cooldown = false }, 700)
       setFocusedIdx(prev => { const next=(prev+dir+8)%8; triggerTraverse(next); return next })
     }
-    const onWheel      = (e: WheelEvent)    => { if (isOverviewRef.current) return; if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
+    const onWheel      = (e: WheelEvent)    => { if (acousticOpenRef.current || isOverviewRef.current) return; if (Math.abs(e.deltaY)>5) go(e.deltaY>0?1:-1) }
     let tx = 0
     const onTouchStart = (e: TouchEvent)    => { tx = e.touches[0].clientX }
-    const onTouchEnd   = (e: TouchEvent)    => { if (isOverviewRef.current) return; const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
+    const onTouchEnd   = (e: TouchEvent)    => { if (acousticOpenRef.current || isOverviewRef.current) return; const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>=40) go(dx<0?1:-1) }
     window.addEventListener('wheel',      onWheel,      { passive:true })
     window.addEventListener('touchstart', onTouchStart, { passive:true })
     window.addEventListener('touchend',   onTouchEnd,   { passive:true })
@@ -1807,6 +1813,7 @@ export function VistaraVoid({ onBack, onGatewayEnter }: {
   }, [vortexPhase, triggerTraverse])
 
   const handleOrbClick = useCallback((idx: number, id: string) => {
+    if (acousticOpenRef.current) return
     // From overview: fly camera into close-up of this orb
     if (isOverview) {
       setIsOverview(false)

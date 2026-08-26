@@ -493,7 +493,7 @@ function NeuralEQ({ bands, onBandChange, theme }: {
       <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "4px" }}>
         {EQ_LABELS.map((l, i) => (
           <span key={i} style={{ fontSize: "7px", color: theme.primary + "80", letterSpacing: "0.05em",
-            fontFamily: "system-ui", width: `${100/EQ_LABELS.length}%`, textAlign: "center" }}>{l}</span>
+            fontFamily: "var(--font-vyan), system-ui", width: `${100/EQ_LABELS.length}%`, textAlign: "center" }}>{l}</span>
         ))}
       </div>
     </div>
@@ -564,7 +564,7 @@ function BPMPulse({ bpm, theme }: { bpm: number | null; theme: RealmTheme }) {
         boxShadow: pulse ? `0 0 12px ${theme.accent}` : "none",
         transition: "all 0.05s", flexShrink: 0 }} />
       <span style={{ fontSize: "9px", letterSpacing: "0.2em", color: theme.primary + "90",
-        fontFamily: "system-ui", textTransform: "uppercase" }}>
+        fontFamily: "var(--font-vyan), system-ui", textTransform: "uppercase" }}>
         {bpm ? `${bpm} BPM` : "∞"}
       </span>
     </div>
@@ -630,6 +630,11 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
     const id = setInterval(() => setTick(t => t + 1), 200)
     return () => clearInterval(id)
   }, [audio.isPlaying])
+
+  // Broadcast open state — VistaraVoid listens to block orb traversal while panel is open
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('vyan:acoustic-panel', { detail: { open: isOpen } }))
+  }, [isOpen])
 
   // External toggle — compatible with existing `vyan:sound-toggle` event
   useEffect(() => {
@@ -701,7 +706,7 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
           background: theme.bg, border: `1px solid ${theme.border}`,
           borderRadius: 16, backdropFilter: "blur(32px)", zIndex: 9150,
           boxShadow: `0 0 60px ${theme.glow}, 0 24px 48px rgba(0,0,0,0.6)`,
-          overflow: "hidden", fontFamily: "system-ui, sans-serif",
+          overflow: "hidden", fontFamily: "var(--font-vyan), system-ui, sans-serif",
         }}>
           <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${theme.primary}80, transparent)` }} />
 
@@ -732,7 +737,7 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
                 borderBottom: activeTab === tab.id ? `1px solid ${theme.primary}` : "1px solid transparent",
                 color: activeTab === tab.id ? theme.primary : theme.primary + "50",
                 fontSize: 8, letterSpacing: "0.15em", textTransform: "uppercase",
-                cursor: "pointer", transition: "all 0.2s", fontFamily: "system-ui",
+                cursor: "pointer", transition: "all 0.2s", fontFamily: "var(--font-vyan), system-ui",
               }}>{tab.label}</button>
             ))}
           </div>
@@ -788,7 +793,7 @@ export default function AcousticConsole({ realmId = "shunya" }: { realmId?: stri
                         borderRadius: 20, cursor: "pointer",
                         color: activeReverb === env.id ? theme.primary : "rgba(255,255,255,0.4)",
                         fontSize: 8, letterSpacing: "0.15em", textTransform: "uppercase",
-                        fontFamily: "system-ui", transition: "all 0.2s",
+                        fontFamily: "var(--font-vyan), system-ui", transition: "all 0.2s",
                       }}>{env.name}</button>
                     ))}
                   </div>
