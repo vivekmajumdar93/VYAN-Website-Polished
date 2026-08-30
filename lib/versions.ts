@@ -13,9 +13,27 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.0'
+export const CURRENT_VERSION = '6.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.1',
+    date: '2026-08-30',
+    title: 'Glass Console — Real Ambient Control',
+    summary: 'Sound Console redesigned as a floating glass panel (13% opacity, backdrop blur) that controls the real ambient.mp3 engine. Eight EQ presets shape the live track via bass/treble/lowpass/reverb; visualizer reads real FFT data.',
+    changes: [
+      'Rewrote SoundConsole as gold-accented glass panel matching approved design',
+      'Panel wired to window.__vyan.audio (AudioReactive) — controls real ambient.mp3',
+      'Circular canvas visualizer reads live AnalyserNode frequency data',
+      '65 frequency bars use real FFT when playing, synthetic preset profiles when muted',
+      'Eight sound mode presets (Void Silence, Neural Drift, Crystal, Vortex, Cathedral, Solar Ignition, Deep Current, Prāṇic Pulse)',
+      'Transport prev/next cycles EQ presets; play/pause toggles mute',
+      'Progress bar tracks ambient.mp3 loop position',
+      'Library view lists all presets',
+    ],
+    gitHash: '3641966',
+    pages: ['SoundConsole', 'All cosmic pages'],
+  },
   {
     version: '6.0',
     date: '2026-08-23',
