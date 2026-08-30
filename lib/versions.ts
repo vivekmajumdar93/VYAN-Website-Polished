@@ -13,9 +13,23 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '6.1'
+export const CURRENT_VERSION = '6.1.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '6.1.1',
+    date: '2026-08-30',
+    title: 'Console Layout Fix',
+    summary: 'Inline style injection was preventing flex layout from applying in production. CSS moved to SoundConsole.css; z-index raised so panel sits above site overlays.',
+    changes: [
+      'Moved SoundConsole styles from inline <style> to SoundConsole.css (proper Next.js import)',
+      'Added display:flex !important guards to prevent cascade overrides on panel and sidebar',
+      'Raised panel z-index from 9200 → 9350, trigger from 9300 → 9400',
+      'Added min-width:50px to sidebar to prevent collapse',
+    ],
+    gitHash: 'b533bd9',
+    pages: ['SoundConsole'],
+  },
   {
     version: '6.1',
     date: '2026-08-30',
