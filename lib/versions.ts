@@ -13,9 +13,21 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '7.0'
+export const CURRENT_VERSION = '7.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '7.1',
+    date: '2026-08-30',
+    title: 'Mute Toggle',
+    summary: 'Replaced AcousticConsole with a single mute/unmute button that controls the ambient track.',
+    changes: [
+      'AcousticConsole removed; replaced with a 36px mute button (top-left, z-index 9400)',
+      'Button toggles window.__vyan.audio mute state; icon reflects current state',
+    ],
+    gitHash: 'd0ac488',
+    pages: ['All cosmic pages'],
+  },
   {
     version: '7.0',
     date: '2026-08-25',
