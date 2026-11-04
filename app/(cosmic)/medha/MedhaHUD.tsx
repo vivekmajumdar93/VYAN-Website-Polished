@@ -1,784 +1,857 @@
 'use client';
 
-/**
- * MedhaHUD — New Visual Layer
- * Drop-in replacement for app/(cosmic)/medha/MedhaHUD.tsx
- *
- * KEEPS: quota, consent, storage, markdown, STT/TTS, history, settings,
- *        model greetings, back nav, file attach, forbidden query filter,
- *        orb color sync, camera node perspective, scope restrictions
- *
- * REPLACES: visual layer → void entity, roaming, peach bubbles, neural lines,
- *           faculty colors, particle burst, procedural entity states
- */
-
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { COGNITIVE_MODES, CognitiveModeKey, getMode, MODEL_GREETINGS } from '@/lib/medha/cognitive';
-import { chatComplete, type ChatMessage } from '@/lib/medha/MedhaClient';
+import React, {
+  useCallback, useEffect, useRef, useState,
+} from 'react';
+import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
+import { COGNITIVE_MODES, CognitiveModeKey, getMode } from '@/lib/medha/cognitive';
+import { chatStream, type ChatMessage } from '@/lib/medha/MedhaClient';
 import { renderMarkdown, isForbiddenQuery, SANDHI_REDIRECT_MARKDOWN } from '@/lib/medha/markdown';
-import { listChats, getChat, upsertChat, deleteChat, getCurrentChatId, setCurrentChatId, newChatId, type StoredChat, type StoredMsg } from '@/lib/medha/storage';
-import { STT, TTS } from '@/lib/medha/voice';
-import { incrementQuota, quotaRemaining, getUser, setUser, quotaLimit, type LocalUser } from '@/lib/quota/quota';
+import {
+  getChat, upsertChat, getCurrentChatId, setCurrentChatId, newChatId,
+  type StoredMsg,
+} from '@/lib/medha/storage';
+import { incrementQuota, quotaRemaining } from '@/lib/quota/quota';
 import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './MedhaConsentSlab';
-import { CosmicStream } from '@/components/CosmicStream';
-import { useCosmicStream } from '@/hooks/useCosmicStream';
-import { MedhaLair } from '@/components/MedhaLair';
-import { MedhaModel3D } from '@/components/MedhaModel3D';
-import { CosmicPortal } from '@/components/CosmicPortal';
-import { StardustRain } from '@/components/StardustRain';
-import { HangingOrbs } from '@/components/HangingOrbs';
-import { FloatingText } from '@/components/FloatingText';
-import { CloseIcon, SendIcon, AttachIcon, SpeakIcon, RefreshIcon } from '@/components/icons/VyanIcons';
-import { VerticalChatRail } from '@/components/VerticalChatRail';
-import { ChatHistoryModal } from '@/components/ChatHistoryModal';
 import './medha.css';
 
-// ─── Faculty colors ────────────────────────────────────────────────────────────
-const FC: Record<CognitiveModeKey, string> = {
-  prajna: '#2d9e7f', dhyana: '#c4622d', akshaya: '#00c4cc', java: '#a855f7', sanchara: '#e8b94f',
+// ── Phase state machine ────────────────────────────────────────────────────────
+type Phase = 'idle' | 'absorbing' | 'processing' | 'emerging' | 'responding' | 'error';
+
+// ── Mode colors (rgb components for canvas) ───────────────────────────────────
+const MC: Record<CognitiveModeKey, [number, number, number, number, number, number]> = {
+  prajna:   [255, 74,  74,  255, 138, 90 ],
+  dhyana:   [34,  224, 212, 154, 85,  255],
+  akshaya:  [58,  144, 255, 34,  224, 164],
+  java:     [255, 184, 77,  255, 42,  74 ],
+  sanchara: [255, 102, 136, 58,  212, 255],
 };
-
-// ─── Entity states ─────────────────────────────────────────────────────────────
-type ES = 'dormant'|'listening'|'thinking'|'responding'|'voice-listening'|'voice-active'|'switching'|'absorbing'|'processing'|'emerging';
-const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number;ps:number}> = {
-  dormant:         {sc:1.000,br:1.00,ro:0,  dy:10,dd:7,  ao:0.04,ps:6  },
-  listening:       {sc:1.020,br:1.02,ro:0,  dy:8, dd:5,  ao:0.07,ps:4  },
-  thinking:        {sc:1.015,br:1.02,ro:1,  dy:12,dd:3.5,ao:0.08,ps:3  },
-  responding:      {sc:1.022,br:1.04,ro:0,  dy:10,dd:2.8,ao:0.10,ps:1.8},
-  'voice-listening':{sc:0.995,br:1.01,ro:0, dy:6, dd:6,  ao:0.06,ps:5  },
-  'voice-active':  {sc:1.025,br:1.04,ro:0,  dy:8, dd:1.5,ao:0.12,ps:1.2},
-  switching:       {sc:1.070,br:1.20,ro:0,  dy:5, dd:2.2,ao:0.26,ps:1.6},
-  absorbing:       {sc:1.030,br:1.08,ro:1,  dy:8, dd:2.0,ao:0.14,ps:1.5},
-  processing:      {sc:1.025,br:1.06,ro:1,  dy:9, dd:1.8,ao:0.16,ps:1.2},
-  emerging:        {sc:1.018,br:1.05,ro:0,  dy:9, dd:2.2,ao:0.12,ps:1.8},
-};
-
-// ─── Entity anchor ────────────────────────────────────────────────────────────
-// The butterfly in medha-entity.mp4 sits at the visual centre of the frame.
-const ENTITY_POS = { x: 50, y: 42 };
-
-// ─── Void canvas ───────────────────────────────────────────────────────────────
-function VoidCanvas(){
-  const r=useRef<HTMLCanvasElement>(null);
-  useEffect(()=>{
-    const c=r.current;if(!c)return;const x=c.getContext('2d');if(!x)return;
-    let id:number,t=0;
-    type S={x:number;y:number;r:number;o:number;s:number;p:number;l:number};
-    type W={x:number;y:number;w:number;h:number;o:number;c:string;dx:number;dy:number};
-    let stars:S[]=[],wisps:W[]=[];
-    const ini=()=>{
-      c.width=window.innerWidth;c.height=window.innerHeight;
-      const a=c.width*c.height;stars=[];
-      for(let i=0;i<a/7000;i++)stars.push({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*0.4+0.1,o:Math.random()*0.08+0.02,s:Math.random()*0.0003+0.0001,p:Math.random()*6.28,l:0});
-      for(let i=0;i<a/16000;i++)stars.push({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*0.7+0.3,o:Math.random()*0.12+0.04,s:Math.random()*0.0005+0.0002,p:Math.random()*6.28,l:1});
-      for(let i=0;i<a/35000;i++)stars.push({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.0+0.6,o:Math.random()*0.16+0.07,s:Math.random()*0.0007+0.0003,p:Math.random()*6.28,l:2});
-      const cl=['rgba(26,26,255,','rgba(123,47,255,','rgba(192,38,211,','rgba(20,10,50,'];
-      wisps=[];for(let i=0;i<3;i++)wisps.push({x:Math.random()*c.width,y:Math.random()*c.height,w:c.width*(0.18+Math.random()*0.22),h:c.height*(0.10+Math.random()*0.10),o:Math.random()*0.009+0.002,c:cl[Math.floor(Math.random()*cl.length)],dx:(Math.random()-0.5)*0.012,dy:(Math.random()-0.5)*0.007});
-    };
-    const drw=()=>{
-      x.clearRect(0,0,c.width,c.height);t++;
-      for(const w of wisps){
-        w.x+=w.dx;w.y+=w.dy;
-        if(w.x<-w.w)w.x=c.width;if(w.x>c.width+w.w)w.x=-w.w;
-        if(w.y<-w.h)w.y=c.height;if(w.y>c.height+w.h)w.y=-w.h;
-        const b=0.7+0.3*Math.sin(t*0.003+w.x*0.001);
-        const g=x.createRadialGradient(w.x,w.y,0,w.x,w.y,w.w*0.5);
-        g.addColorStop(0,`${w.c}${w.o*b})`);g.addColorStop(0.5,`${w.c}${w.o*b*0.3})`);g.addColorStop(1,`${w.c}0)`);
-        x.save();x.translate(w.x,w.y);x.scale(1,w.h/w.w);x.translate(-w.x,-w.y);x.beginPath();x.arc(w.x,w.y,w.w*0.5,0,6.28);x.fillStyle=g;x.fill();x.restore();
-      }
-      for(const s of stars){
-        const op=s.o*(0.6+0.4*Math.sin(t*s.s*60+s.p));
-        if(s.l===2){const g=x.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r*3);g.addColorStop(0,`rgba(255,255,255,${op*0.22})`);g.addColorStop(1,'rgba(255,255,255,0)');x.beginPath();x.arc(s.x,s.y,s.r*3,0,6.28);x.fillStyle=g;x.fill();}
-        x.beginPath();x.arc(s.x,s.y,s.r,0,6.28);x.fillStyle=`rgba(255,255,255,${op})`;x.fill();
-      }
-      id=requestAnimationFrame(drw);
-    };
-    ini();drw();window.addEventListener('resize',ini);
-    return()=>{cancelAnimationFrame(id);window.removeEventListener('resize',ini);};
-  },[]);
-  return <canvas ref={r} style={{position:'fixed',inset:0,width:'100%',height:'100%',background:'#000',zIndex:0,pointerEvents:'none'}}/>;
+function rgba(r: number, g: number, b: number, a: number) {
+  return `rgba(${r},${g},${b},${a.toFixed(3)})`;
 }
 
-// ─── Neural dot line ───────────────────────────────────────────────────────────
-function NL({color,align}:{color:string;align:'left'|'right'}){
-  return(
-    <div style={{display:'flex',alignItems:'center',gap:'3px',flexDirection:align==='right'?'row-reverse':'row'}}>
-      {Array.from({length:7}).map((_,i)=>(
-        <motion.div key={i} animate={{opacity:[0.15,1,0.15],scale:[0.6,1,0.6]}}
-          transition={{duration:1.4,repeat:Infinity,delay:(align==='right'?6-i:i)*0.12,ease:'easeInOut'}}
-          style={{width:i===3?'5px':'3px',height:i===3?'5px':'3px',borderRadius:'50%',background:color,flexShrink:0}}/>
-      ))}
+// ── CosmicPortal ──────────────────────────────────────────────────────────────
+function CosmicPortal({
+  phase, modeKey, innerR = 130,
+}: { phase: Phase; modeKey: CognitiveModeKey; innerR?: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const phaseRef = useRef(phase);
+  const modeRef  = useRef(modeKey);
+  phaseRef.current = phase;
+  modeRef.current  = modeKey;
+
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const ctx = c.getContext('2d')!;
+    const pad = 90;
+    const S = innerR * 2 + pad * 2;
+    c.width = S; c.height = S;
+    const cx = S / 2, cy = S / 2;
+
+    type Spark = { a: number; spd: number; br: number; sz: number };
+    const sparks: Spark[] = Array.from({ length: 38 }, (_, i) => ({
+      a: (i / 38) * Math.PI * 2,
+      spd: 0.0025 + Math.random() * 0.0035,
+      br: 0.3 + Math.random() * 0.7,
+      sz: 1.0 + Math.random() * 1.8,
+    }));
+
+    let raf: number, t = 0;
+
+    const draw = () => {
+      t++;
+      ctx.clearRect(0, 0, S, S);
+      const ph = phaseRef.current;
+      const [r1, g1, b1, r2, g2, b2] = MC[modeRef.current];
+
+      let breathe = 0, spkMul = 1, glow = 1, innerB = 0, ringW = 1.5;
+      switch (ph) {
+        case 'idle':
+          breathe = 4 * Math.sin(t * 0.016); spkMul = 0.55; glow = 0.7; break;
+        case 'absorbing':
+          breathe = 12 * Math.sin(t * 0.09); spkMul = 4.5; glow = 1.7;
+          innerB = 0.35 + 0.25 * Math.sin(t * 0.11); ringW = 2.5; break;
+        case 'processing':
+          breathe = 6 * Math.sin(t * 0.045); spkMul = 2.6; glow = 1.15;
+          innerB = 0.18 + 0.12 * Math.sin(t * 0.065); ringW = 2.0; break;
+        case 'emerging':
+          breathe = 8 * Math.sin(t * 0.038); spkMul = 1.8; glow = 1.35;
+          innerB = 0.55 + 0.22 * Math.sin(t * 0.05); ringW = 2.2; break;
+        case 'responding':
+          breathe = 5 * Math.sin(t * 0.022); spkMul = 1.1; glow = 1.0;
+          innerB = 0.1; break;
+        case 'error':
+          breathe = 3 * Math.sin(t * 0.03); spkMul = 0.4; glow = 0.5; break;
+      }
+
+      const R = innerR + breathe;
+
+      // outer atmospheric halo
+      {
+        const hg = ctx.createRadialGradient(cx, cy, R * 0.8, cx, cy, R * 1.6);
+        hg.addColorStop(0, rgba(r1, g1, b1, 0.1 * glow));
+        hg.addColorStop(0.5, rgba(r2, g2, b2, 0.05 * glow));
+        hg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.arc(cx, cy, R * 1.6, 0, Math.PI * 2);
+        ctx.fillStyle = hg; ctx.fill();
+      }
+
+      // inner void
+      {
+        const vg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.98);
+        vg.addColorStop(0,   'rgba(0,0,0,0.99)');
+        vg.addColorStop(0.4, 'rgba(3,0,10,0.98)');
+        vg.addColorStop(0.75,'rgba(8,2,22,0.96)');
+        vg.addColorStop(1,   'rgba(16,3,42,0.93)');
+        ctx.beginPath(); ctx.arc(cx, cy, R * 0.98, 0, Math.PI * 2);
+        ctx.fillStyle = vg; ctx.fill();
+      }
+
+      // inner shimmer
+      if (innerB > 0) {
+        const sg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.65);
+        sg.addColorStop(0, rgba(r1, g1, b1, innerB * 0.28));
+        sg.addColorStop(0.5, rgba(r2, g2, b2, innerB * 0.14));
+        sg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.arc(cx, cy, R * 0.65, 0, Math.PI * 2);
+        ctx.fillStyle = sg; ctx.fill();
+      }
+
+      // ring wide glow
+      ctx.save();
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = rgba(r1, g1, b1, 0.16 * glow);
+      ctx.shadowColor = rgba(r2, g2, b2, 0.55 * glow);
+      ctx.shadowBlur = 28;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+
+      // ring edge (gradient, rotating)
+      {
+        const ang = t * 0.008;
+        const rg = ctx.createLinearGradient(
+          cx + R * Math.cos(ang), cy + R * Math.sin(ang),
+          cx + R * Math.cos(ang + Math.PI), cy + R * Math.sin(ang + Math.PI),
+        );
+        rg.addColorStop(0,    rgba(r1, g1, b1, 0.95 * glow));
+        rg.addColorStop(0.3,  rgba(r2, g2, b2, 0.78 * glow));
+        rg.addColorStop(0.6,  rgba(8, 4, 16, 0.6 * glow));
+        rg.addColorStop(1,    rgba(r1, g1, b1, 0.95 * glow));
+        ctx.save();
+        ctx.lineWidth = ringW;
+        ctx.strokeStyle = rg;
+        ctx.shadowColor = rgba(r1, g1, b1, 0.7 * glow);
+        ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+
+      // subtle inner ring
+      ctx.lineWidth = 0.6;
+      ctx.strokeStyle = rgba(r2, g2, b2, 0.12 * glow);
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.83, 0, Math.PI * 2); ctx.stroke();
+
+      // energy sparks
+      for (const sp of sparks) {
+        sp.a += sp.spd * spkMul;
+        const sx = cx + R * Math.cos(sp.a);
+        const sy = cy + R * Math.sin(sp.a);
+        const twinkle = 0.5 + 0.5 * Math.sin(t * 0.055 + sp.a * 3.1);
+        const op = sp.br * twinkle * Math.min(glow, 1.3);
+        const bigPhase = ph === 'absorbing' || ph === 'processing';
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(sx, sy, sp.sz * (bigPhase ? 1.7 : 1.0), 0, Math.PI * 2);
+        ctx.fillStyle = rgba(r1, g1, b1, op * 0.88);
+        ctx.shadowColor = rgba(r1, g1, b1, op * 0.45);
+        ctx.shadowBlur = 7;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      raf = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, [innerR]);
+
+  const S = innerR * 2 + 180;
+  return (
+    <canvas
+      ref={ref}
+      style={{
+        display: 'block',
+        width: Math.min(S, 400),
+        height: Math.min(S, 400),
+        maxWidth: '95vw',
+        maxHeight: '95vw',
+      }}
+    />
+  );
+}
+
+// ── Orb above portal ──────────────────────────────────────────────────────────
+function PortalOrb({ modeKey }: { modeKey: CognitiveModeKey }) {
+  const [r1, g1, b1] = MC[modeKey];
+  return (
+    <motion.div
+      animate={{ y: [0, -6, 0] }}
+      transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+      style={{
+        width: 20, height: 20, borderRadius: '50%',
+        background: `radial-gradient(circle at 35% 30%, rgba(255,255,255,0.9), ${rgba(r1,g1,b1,0.8)})`,
+        boxShadow: `0 0 14px ${rgba(r1,g1,b1,0.9)}, 0 0 28px ${rgba(r1,g1,b1,0.4)}`,
+        margin: '0 auto',
+      }}
+    />
+  );
+}
+
+// ── Chat bubble ───────────────────────────────────────────────────────────────
+function ChatBubble({
+  msg, modeKey, fresh = false,
+}: { msg: StoredMsg; modeKey: CognitiveModeKey; fresh?: boolean }) {
+  const isU = msg.role === 'user';
+  const [r1, g1, b1] = MC[modeKey];
+
+  return (
+    <motion.div
+      initial={fresh ? { opacity: 0, scale: isU ? 1 : 0.06, y: isU ? 10 : 0 } : false}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={fresh
+        ? isU
+          ? { duration: 0.35, ease: [0.16, 1, 0.3, 1] }
+          : { duration: 1.1,  ease: [0.08, 0.95, 0.3, 1.0] }
+        : { duration: 0 }
+      }
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: isU ? 'flex-end' : 'flex-start',
+        marginBottom: 10,
+        transformOrigin: isU ? 'bottom right' : 'top center',
+      }}
+    >
+      {!isU && (
+        <span style={{
+          fontSize: 9, letterSpacing: '0.22em', color: rgba(r1, g1, b1, 0.5),
+          marginBottom: 4, textTransform: 'uppercase', fontFamily: 'var(--font-vyan)',
+        }}>
+          MEDHĀ
+        </span>
+      )}
+      <div style={{
+        maxWidth: 'min(72vw, 320px)',
+        padding: isU ? '9px 13px' : '11px 14px',
+        background: isU
+          ? 'rgba(255,255,255,0.05)'
+          : `rgba(${r1},${g1},${b1},0.07)`,
+        border: isU
+          ? '1px solid rgba(255,255,255,0.08)'
+          : `1px solid ${rgba(r1, g1, b1, 0.18)}`,
+        borderRadius: isU ? '14px 14px 3px 14px' : '3px 14px 14px 14px',
+        fontSize: 12.5, lineHeight: '1.68', letterSpacing: '0.018em',
+        color: isU ? 'rgba(255,255,255,0.78)' : 'rgba(255,230,210,0.90)',
+        fontFamily: 'var(--font-vyan)',
+        wordBreak: 'break-word',
+        whiteSpace: 'pre-wrap',
+        textShadow: isU ? 'none'
+          : `0 0 12px ${rgba(r1,g1,b1,0.35)}, 0 0 28px ${rgba(r1,g1,b1,0.15)}`,
+      }}>
+        {msg.role === 'assistant'
+          ? <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} className="medha-md" />
+          : msg.content
+        }
+      </div>
+    </motion.div>
+  );
+}
+
+// ── StreamBubble: AI response being typed into existence ──────────────────────
+function StreamBubble({
+  text, modeKey,
+}: { text: string; modeKey: CognitiveModeKey }) {
+  const [r1, g1, b1] = MC[modeKey];
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.06, y: 0 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.95, ease: [0.08, 0.95, 0.3, 1.0] }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        marginBottom: 10,
+        transformOrigin: 'top center',
+      }}
+    >
+      <span style={{
+        fontSize: 9, letterSpacing: '0.22em', color: rgba(r1, g1, b1, 0.5),
+        marginBottom: 4, textTransform: 'uppercase', fontFamily: 'var(--font-vyan)',
+      }}>
+        MEDHĀ
+      </span>
+      <div style={{
+        maxWidth: 'min(72vw, 320px)',
+        padding: '11px 14px',
+        background: `rgba(${r1},${g1},${b1},0.07)`,
+        border: `1px solid ${rgba(r1, g1, b1, 0.18)}`,
+        borderRadius: '3px 14px 14px 14px',
+        fontSize: 12.5, lineHeight: '1.68', letterSpacing: '0.018em',
+        color: 'rgba(255,230,210,0.90)',
+        fontFamily: 'var(--font-vyan)',
+        wordBreak: 'break-word',
+        whiteSpace: 'pre-wrap',
+        textShadow: `0 0 12px ${rgba(r1,g1,b1,0.35)}, 0 0 28px ${rgba(r1,g1,b1,0.15)}`,
+        minHeight: 40,
+      }}>
+        <div dangerouslySetInnerHTML={{ __html: renderMarkdown(text || '…') }} className="medha-md" />
+        <motion.span
+          animate={{ opacity: [1, 0] }}
+          transition={{ duration: 0.6, repeat: Infinity }}
+          style={{ display: 'inline-block', width: 1, height: '1em', background: rgba(r1,g1,b1,0.8), marginLeft: 2, verticalAlign: 'text-bottom' }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Input bar ─────────────────────────────────────────────────────────────────
+interface InputBarProps {
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  disabled: boolean;
+  modeKey: CognitiveModeKey;
+  onModeChange: (k: CognitiveModeKey) => void;
+  quotaLeft: number;
+}
+
+function InputBar({ value, onChange, onSubmit, disabled, modeKey, onModeChange, quotaLeft }: InputBarProps) {
+  const [r1, g1, b1] = MC[modeKey];
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+      padding: '10px 14px 14px',
+      background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)',
+    }}>
+      {/* Mode pills */}
+      <div style={{
+        display: 'flex', gap: 5, justifyContent: 'center',
+        marginBottom: 8, overflowX: 'auto', paddingBottom: 2,
+      }}>
+        {COGNITIVE_MODES.map(m => {
+          const [mr, mg, mb] = MC[m.key];
+          const active = m.key === modeKey;
+          return (
+            <button key={m.key} onClick={() => onModeChange(m.key)}
+              style={{
+                padding: '3px 10px', borderRadius: 20,
+                border: active ? `1px solid ${rgba(mr,mg,mb,0.6)}` : '1px solid rgba(255,255,255,0.1)',
+                background: active ? rgba(mr,mg,mb,0.15) : 'transparent',
+                color: active ? rgba(mr,mg,mb,0.95) : 'rgba(255,255,255,0.3)',
+                fontSize: 9.5, letterSpacing: '0.16em', textTransform: 'uppercase',
+                fontFamily: 'var(--font-vyan)', cursor: 'pointer',
+                transition: 'all 0.2s', flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}>
+              {m.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Input row */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-end', gap: 8,
+        background: 'rgba(10,6,20,0.72)',
+        border: `1px solid ${rgba(r1,g1,b1,0.22)}`,
+        borderRadius: 20,
+        padding: '8px 10px 8px 14px',
+        backdropFilter: 'blur(14px)',
+        boxShadow: `0 0 28px ${rgba(r1,g1,b1,0.1)}`,
+      }}>
+        <textarea
+          ref={ref} value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={onKey}
+          disabled={disabled}
+          placeholder={disabled ? 'MEDHĀ is weaving…' : 'Enter the void…'}
+          rows={1}
+          style={{
+            flex: 1, background: 'transparent', border: 'none', outline: 'none',
+            color: 'rgba(255,230,200,0.88)', fontSize: 13.5,
+            fontFamily: 'var(--font-vyan)', resize: 'none', lineHeight: '1.5',
+            letterSpacing: '0.02em',
+            maxHeight: 100, overflowY: 'auto',
+          }}
+          onInput={e => {
+            const el = e.currentTarget;
+            el.style.height = '0';
+            el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+          }}
+        />
+        <button onClick={onSubmit} disabled={disabled || !value.trim()}
+          style={{
+            width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+            border: `1px solid ${rgba(r1,g1,b1, disabled || !value.trim() ? 0.2 : 0.55)}`,
+            background: disabled || !value.trim() ? 'transparent' : rgba(r1,g1,b1,0.18),
+            color: disabled || !value.trim() ? rgba(r1,g1,b1,0.25) : rgba(r1,g1,b1,0.95),
+            cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.2s',
+          }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+
+      {quotaLeft <= 3 && quotaLeft > 0 && (
+        <p style={{
+          textAlign: 'center', fontSize: 9.5, color: rgba(r1,g1,b1,0.4),
+          letterSpacing: '0.14em', margin: '6px 0 0',
+          fontFamily: 'var(--font-vyan)',
+        }}>
+          {quotaLeft} query{quotaLeft === 1 ? '' : 's'} remaining
+        </p>
+      )}
     </div>
   );
 }
 
-// ─── Intelligence bloom ────────────────────────────────────────────────────────
-// Soft stardust drifts inward and converges into a glowing halo around Medhā —
-// an arrival of cognition, not an explosion. Particles spiral gently inward,
-// brighten, and dissolve into a slow bloom-and-fade.
-function PB({color,active,ex=0.5,ey=0.5}:{color:string;active:boolean;ex?:number;ey?:number}){
-  const cr=useRef<HTMLCanvasElement>(null);const ar=useRef<number>(0);
-  useEffect(()=>{
-    if(!active)return;const c=cr.current;if(!c)return;const x=c.getContext('2d');if(!x)return;
-    c.width=window.innerWidth;c.height=window.innerHeight;
-    const cx=c.width*ex,cy=c.height*ey;
-    const ps=Array.from({length:48},()=>{
-      const a=Math.random()*Math.PI*2,r0=80+Math.random()*320;
-      return{a,r0,sz:0.6+Math.random()*2.2,ph:Math.random()*Math.PI*2};
-    });
-    const st=performance.now();const dur=2800;
-    const drw=(now:number)=>{
-      const e=Math.min((now-st)/dur,1);
-      if(e>=1){x.clearRect(0,0,c.width,c.height);return;}
-      x.clearRect(0,0,c.width,c.height);
-      // Bloom halo — swells then fades
-      const haloR=24+140*(1-Math.abs(e-0.5)*2);
-      const haloOp=Math.sin(e*Math.PI)*0.35;
-      const g=x.createRadialGradient(cx,cy,0,cx,cy,haloR);
-      g.addColorStop(0,`${color}${Math.floor(haloOp*255).toString(16).padStart(2,'0')}`);
-      g.addColorStop(1,`${color}00`);
-      x.beginPath();x.arc(cx,cy,haloR,0,Math.PI*2);x.fillStyle=g;x.fill();
-      // Stardust spiraling inward
-      const ease=1-Math.pow(1-e,3);
-      for(const p of ps){
-        const r=p.r0*(1-ease);
-        const px=cx+Math.cos(p.a+e*1.4)*r;
-        const py=cy+Math.sin(p.a+e*1.4)*r;
-        const twinkle=0.5+0.5*Math.sin(now*0.01+p.ph);
-        const op=(1-e)*twinkle;
-        x.beginPath();x.arc(px,py,p.sz*(1-e*0.4),0,Math.PI*2);
-        x.fillStyle=`rgba(255,255,255,${op*0.9})`;x.fill();
-      }
-      ar.current=requestAnimationFrame(drw);
-    };
-    ar.current=requestAnimationFrame(drw);
-    return()=>cancelAnimationFrame(ar.current);
-  },[active,color,ex,ey]);
-  if(!active)return null;
-  return <canvas ref={cr} style={{position:'fixed',inset:0,width:'100%',height:'100%',zIndex:60,pointerEvents:'none'}}/>;
-}
+// ── Processing label ──────────────────────────────────────────────────────────
+const PROCESS_LABELS = [
+  'MEDHĀ is weaving consciousness…',
+  'traversing the void…',
+  'cognition in motion…',
+  'distilling infinite signal…',
+];
 
+function ProcessingLabel({ modeKey }: { modeKey: CognitiveModeKey }) {
+  const [r1, g1, b1] = MC[modeKey];
+  const [idx, setIdx] = useState(0);
 
-// ─── Message bubble ────────────────────────────────────────────────────────────
-// Renders inline in the transcript — no floating/roaming position of its own.
-function Bubble({msg,fc,onCopy,isLast,onRegenerate}:{msg:StoredMsg;fc:string;onCopy:(m:StoredMsg)=>void;isLast?:boolean;onRegenerate?:()=>void}){
-  const isU=msg.role==='user';
-  return(
-    <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
-      style={{width:'100%',display:'flex',flexDirection:'column',alignItems:isU?'flex-end':'flex-start',gap:'6px'}}>
-      <div style={{display:'flex',alignItems:'flex-start',gap:'8px',flexDirection:isU?'row-reverse':'row'}}>
-        <div style={{paddingTop:'10px',flexShrink:0}}><NL color={isU?'rgba(255,255,255,0.3)':fc} align={isU?'right':'left'}/></div>
-        <div onClick={()=>onCopy(msg)} style={{maxWidth:'min(72vw,340px)',padding:isU?'10px 14px':'11px 15px',background:isU?'rgba(255,255,255,0.05)':'rgba(255,218,185,0.10)',border:isU?'1px solid rgba(255,255,255,0.07)':'1px solid rgba(255,200,160,0.18)',borderRadius:isU?'14px 14px 3px 14px':'3px 14px 14px 14px',fontSize:'12px',lineHeight:'1.68',letterSpacing:'0.02em',color:isU?'rgba(255,255,255,0.78)':'rgba(255,225,195,0.9)',fontFamily:'var(--font-vyan)',wordBreak:'break-word',whiteSpace:'pre-wrap',cursor:'pointer',textShadow:isU?'none':'0 0 10px rgba(255,200,150,0.55), 0 0 24px rgba(255,160,100,0.28)'}}>
-          {msg.role==='assistant'?<div dangerouslySetInnerHTML={{__html:renderMarkdown(msg.content)}} className="medha-md"/>:msg.content}
-        </div>
-      </div>
-      {!isU&&isLast&&onRegenerate&&(
-        <button onClick={onRegenerate} style={{marginLeft:'34px',display:'flex',alignItems:'center',gap:'5px',background:'transparent',border:'none',color:'rgba(255,255,255,0.25)',fontSize:'9px',letterSpacing:'0.18em',textTransform:'uppercase',fontFamily:'var(--font-vyan)',cursor:'pointer',padding:'2px 0'}}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
-          Regenerate
-        </button>
-      )}
-    </motion.div>
-  );
-}
-
-// ─── Typing indicator ──────────────────────────────────────────────────────────
-function ThinkingBubble({fc}:{fc:string}){
-  return(
-    <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:0.3}}
-      style={{width:'100%',display:'flex',flexDirection:'column',alignItems:'flex-start',gap:'6px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-        <div style={{width:'5px',height:'5px',borderRadius:'50%',background:fc,boxShadow:`0 0 4px ${fc}`}}/>
-        <span style={{fontSize:'9px',letterSpacing:'0.22em',color:'rgba(255,200,160,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)'}}>MEDHĀ</span>
-      </div>
-      <div style={{display:'flex',alignItems:'flex-start',gap:'8px'}}>
-        <div style={{paddingTop:'10px',flexShrink:0}}><NL color={fc} align="left"/></div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-const uid=()=>typeof crypto!=='undefined'&&(crypto as any).randomUUID?(crypto as any).randomUUID():Math.random().toString(36).slice(2);
-const sumTopic=(msgs:StoredMsg[])=>{const f=msgs.find(m=>m.role==='user')?.content?.trim()??'';return f.length>60?f.slice(0,57)+'…':f;};
-const GREET_NEW='Hello — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. What would you like to explore?';
-const contGreet=(t?:string)=>t&&t.length>6?`Welcome back. Last time we touched on ${t}. Shall we continue — or step into something new?`:'Welcome back. The conversation is still warm. Where shall we begin?';
-
-// ─── Absorption animation (message flying into portal) ─────────────────────────
-function AbsorptionText({ text }: { text: string }) {
-  return (
-    <AnimatePresence>
-      {text && (
-        <motion.div
-          key="absorption"
-          initial={{ opacity: 1, scale: 1, y: 0 }}
-          animate={{ opacity: 0, scale: 0.02, y: '-52vh' }}
-          transition={{ duration: 0.65, ease: [0.42, 0, 0.58, 1] }}
-          style={{
-            position: 'fixed', bottom: '138px', left: '50%',
-            transform: 'translateX(-50%)', zIndex: 72,
-            maxWidth: 'min(320px, 80vw)', textAlign: 'center',
-            padding: '9px 15px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '14px', backdropFilter: 'blur(8px)',
-            fontSize: '13px', color: 'rgba(255,255,255,0.82)',
-            fontFamily: 'var(--font-vyan)', lineHeight: 1.5,
-            pointerEvents: 'none', willChange: 'transform,opacity',
-          }}
-        >
-          {text.length > 90 ? text.slice(0, 87) + '…' : text}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// ─── Emergence animation (response growing from portal depth) ──────────────────
-function EmergenceText({ text, fc }: { text: string; fc: string }) {
-  return (
-    <AnimatePresence>
-      {text && (
-        <motion.div
-          key="emergence"
-          initial={{ opacity: 0, scale: 0.02, filter: 'blur(14px)' }}
-          animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, scale: 0.5, filter: 'blur(8px)' }}
-          transition={{ duration: 0.88, ease: [0.16, 1, 0.3, 1] }}
-          style={{
-            position: 'fixed', top: '44%', left: '50%',
-            transform: 'translate(-50%, -50%)', zIndex: 72,
-            maxWidth: 'min(360px, 85vw)', textAlign: 'center',
-            fontSize: '13px', lineHeight: 1.68,
-            color: 'rgba(255,210,185,0.95)',
-            fontFamily: 'var(--font-vyan)',
-            textShadow: `0 0 20px rgba(255,160,80,0.45), 0 0 40px ${fc}40`,
-            pointerEvents: 'none', willChange: 'transform,opacity,filter',
-          }}
-        >
-          {text.length > 160 ? text.slice(0, 157) + '…' : text}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// ─── Main ──────────────────────────────────────────────────────────────────────
-export default function MedhaHUD(){
-  const router=useRouter();const sp=useSearchParams();
-  const[mode,setMode]=useState<CognitiveModeKey>('prajna');
-  const[chatId,setChatId]=useState('');const[messages,setMessages]=useState<StoredMsg[]>([]);
-  const[composerText,setComposerText]=useState('');const[busy,setBusy]=useState(false);
-  const [stardustActive, setStardustActive] = useState(false);
-  const [stardustColor, setStardustColor] = useState('#7b2fff');
-  const [showChatHistory, setShowChatHistory] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
-  const [floatingText, setFloatingText] = useState('');
-  const [floatingRole, setFloatingRole] = useState<'assistant'|'user'>('assistant');
-  const [floatingVisible, setFloatingVisible] = useState(false);
-  const [userColor, setUserColor] = useState('#d4a853');
-  const[showSettings,setShowSettings]=useState(false);const[settingsCloseHovered,setSettingsCloseHovered]=useState(false);const[listening,setListening]=useState(false);
-  const[ttsEnabled,setTtsEnabled]=useState(false);const[chats,setChats]=useState<StoredChat[]>([]);
-  const[responseStyle,setResponseStyle]=useState<'concise'|'balanced'|'detailed'>('balanced');
-  const[quotaUser,setQuotaUser]=useState<LocalUser|null>(null);const[showQuotaLock,setShowQuotaLock]=useState(false);
-  const[regBusy,setRegBusy]=useState(false);const[regErr,setRegErr]=useState('');
-  const[regName,setRegName]=useState('');const[regEmail,setRegEmail]=useState('');
-  const[consentGranted,setConsentGranted]=useState(false);const[consentReady,setConsentReady]=useState(false);
-  const[greetingText,setGreetingText]=useState<string|null>(null);const[greetingMode,setGreetingMode]=useState<CognitiveModeKey>('prajna');
-  const[es,setEs]=useState<ES>('dormant');
-  const[burst,setBurst]=useState(false);const[burstColor,setBurstColor]=useState('#e8e4ff');
-  const[mounted,setMounted]=useState(false);
-  const[absorptionText,setAbsorptionText]=useState('');
-  const[emergenceText,setEmergenceText]=useState('');
-  const { stream, triggerStream, handleStreamComplete } = useCosmicStream();
-  // Ambient stream timer
-  const ambientStreamRef = useRef<ReturnType<typeof setTimeout>|null>(null);
-  const sttR=useRef<STT|null>(null);const ttsR=useRef<TTS|null>(null);
-  const gtR=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const floatingTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const transcriptRef=useRef<HTMLDivElement>(null);
-  const fileR=useRef<HTMLInputElement>(null);
-  const dataR=useRef({chatId:'',messages:[] as StoredMsg[],mode:'prajna' as CognitiveModeKey});
-  useEffect(()=>{dataR.current={chatId,messages,mode};},[chatId,messages,mode]);
-  const mdef=useMemo(()=>getMode(mode),[mode]);
-  const fc=FC[mode];
-
-  useEffect(()=>{
-    setMounted(true);
-    // Schedule ambient cosmic streams
-    const scheduleAmbient = () => {
-      ambientStreamRef.current = setTimeout(() => {
-        triggerStream('ambient');
-        scheduleAmbient();
-      }, 45000 + Math.random() * 45000);
-    };
-    scheduleAmbient();
-    return () => { if (ambientStreamRef.current) clearTimeout(ambientStreamRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-
-  // Init
-  useEffect(()=>{
-    const savedColor = typeof window !== 'undefined' ? localStorage.getItem('medha_user_color') : null;
-    if (savedColor) setUserColor(savedColor);
-    setConsentGranted(hasLocalConsent());setConsentReady(true);setQuotaUser(getUser());
-    sttR.current=new STT();ttsR.current=new TTS();
-    const rail=document.querySelector('.neural-depth') as HTMLElement|null;
-    const cap=document.querySelector('.shunya-caption') as HTMLElement|null;
-    if(rail){rail.style.opacity='0';rail.style.pointerEvents='none';}
-    if(cap)cap.style.opacity='0';
-    const stored=listChats();setChats(stored);
-    const cid=getCurrentChatId();
-    if(cid&&stored.find(c=>c.id===cid)){const c=getChat(cid)!;setChatId(c.id);setMessages(c.messages);}
-    else{const prev=stored[0];const id=newChatId();setChatId(id);setCurrentChatId(id);
-      const g:StoredMsg={id:uid(),role:'assistant',content:prev?contGreet(prev.topic):GREET_NEW,mode:'prajna',ts:Date.now()};
-      setMessages([g]);upsertChat({id,title:'New Conversation',messages:[g],createdAt:Date.now(),lastInteractionAt:Date.now()});}
-    const im=(sp?.get('model') as CognitiveModeKey)||'prajna';
-    const vi=COGNITIVE_MODES.find(x=>x.key===im)?im:'prajna';
-    setMode(vi);setGreetingText(MODEL_GREETINGS[vi]);setGreetingMode(vi);
-    gtR.current=setTimeout(()=>setGreetingText(null),5500);
-    return()=>{if(gtR.current)clearTimeout(gtR.current);
-      const rail=document.querySelector('.neural-depth') as HTMLElement|null;const cap=document.querySelector('.shunya-caption') as HTMLElement|null;
-      if(rail){rail.style.opacity='';rail.style.pointerEvents='';}if(cap)cap.style.opacity='';
-      try{document.body.classList.remove('vyan-paused');}catch{}};
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-
-  useEffect(()=>{document.body.classList.add('vyan-paused');return()=>{document.body.classList.remove('vyan-paused');};},[]);
-
-  useEffect(()=>{const m=sp?.get('model') as CognitiveModeKey|null;if(m&&COGNITIVE_MODES.find(x=>x.key===m))actModel(m,m===mode);}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ,[sp]);
-
-  useEffect(()=>{if(!chatId)return;const t=sumTopic(messages);
-    upsertChat({id:chatId,title:t?t.slice(0,36):'New Conversation',messages,createdAt:messages[0]?.ts??Date.now(),lastInteractionAt:Date.now(),topic:t});
-    setChats(listChats());},[chatId,messages]);
-
-  useEffect(()=>{const k=(e:KeyboardEvent)=>{if(e.key==='Escape'){if(showChatHistory||showSettings){setShowChatHistory(false);setShowSettings(false);return;}back();}};
-    window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[showChatHistory,showSettings]);
-
-  const back=()=>{try{const v=(window as any).__vyan;v?.worldRef?.cameraRig?.returnToMedhaOrbFull?.();}catch{}router.push('/shunya/medha');};
-
-  const actModel=useCallback((k:CognitiveModeKey,force=false)=>{
-    if(k===mode&&!force)return;setMode(k);
-    setBurstColor(FC[k]);setBurst(true);setTimeout(()=>setBurst(false),2400);
-    // New consciousness flowing in
-    setTimeout(() => triggerStream(k), 600);
-    setEs('switching');setTimeout(()=>setEs('dormant'),1200);
-    if(gtR.current)clearTimeout(gtR.current);setGreetingText(MODEL_GREETINGS[k]);setGreetingMode(k);
-    gtR.current=setTimeout(()=>setGreetingText(null),5500);
-    try{const v=(window as any).__vyan;const o=v?.worldRef?.realms?.shunya?.getOrbByKey?.('medha');
-      if(o?.setSocketColorsCinematic)o.setSocketColorsCinematic(FC[k],1500);else o?.setSocketColors?.(FC[k]);}catch{}
-    try{const v=(window as any).__vyan;const rig=v?.worldRef?.cameraRig;const sh=v?.worldRef?.realms?.shunya;
-      if(rig?.flyToMedhaNodePerspective&&sh){const mo=sh.getOrbByKey?.('medha');
-        if(mo?.socketGroup?.children?.length){const s=mo.socketGroup.children.find((c:any)=>c.userData?.isProductSocket&&c.userData?.productKey===k&&c.geometry);
-          if(s){const T=require('three');const np=new T.Vector3();s.getWorldPosition(np);rig.flyToMedhaNodePerspective(np,mo.group.position.clone());}}}}catch{}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[mode]);
-
-  const handleFacultyFromOrb = useCallback((key: string, color: string) => {
-    actModel(key as CognitiveModeKey);
-    setStardustColor(color);
-    setStardustActive(true);
-  }, [actModel]);
-
-  const showFloating = useCallback((text: string, role: 'assistant'|'user') => {
-    if (floatingTimerRef.current) clearTimeout(floatingTimerRef.current);
-    setFloatingText(text);
-    setFloatingRole(role);
-    setFloatingVisible(true);
-    floatingTimerRef.current = setTimeout(() => setFloatingVisible(false), 120000);
+  useEffect(() => {
+    const id = setInterval(() => setIdx(i => (i + 1) % PROCESS_LABELS.length), 2800);
+    return () => clearInterval(id);
   }, []);
 
-  // Shared completion runner — used by both send() and regenerate()
-  const runCompletion=useCallback(async(hist:ChatMessage[])=>{
-    setBusy(true);
-    // Phase 1: absorption — message flies into portal
-    setEs('absorbing');
-    await new Promise(r=>setTimeout(r,700));
-    setAbsorptionText('');
-    // Phase 2: processing — portal spins, API call in flight
-    setEs('processing');
-    const styleSuffix=responseStyle==='concise'?' Keep this response brief — a few sentences at most.'
-      :responseStyle==='detailed'?' Provide a thorough, detailed response with full context.'
-      :'';
-    const effMode=styleSuffix?{...mdef,systemPrompt:mdef.systemPrompt+styleSuffix}:mdef;
-    try{
-      const full=await chatComplete(effMode,hist);
-      // Phase 3: emergence — response grows from portal depth
-      const preview=full?(full.length>160?full.slice(0,157)+'…':full):'';
-      setEmergenceText(preview);
-      setEs('emerging');
-      await new Promise(r=>setTimeout(r,920));
-      setEmergenceText('');
-      setEs('responding');
-      const am:StoredMsg={id:uid(),role:'assistant',content:full||'I lost the signal for a moment. Try again?',mode,ts:Date.now()};
-      setMessages(p=>[...p,am]);
-      showFloating(am.content,'assistant');
-      setEs('dormant');
-      triggerStream(mode);
-      if(ttsEnabled&&ttsR.current?.isSupported()){const pl=full.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/[*_`#>]/g,'');setEs('voice-active');ttsR.current.speak(pl,{onEnd:()=>setEs('dormant')});}
-    }
-    catch{
-      setAbsorptionText('');setEmergenceText('');
-      const errMsg='Cognition is momentarily out of reach — try again in a breath.';
-      setMessages(p=>[...p,{id:uid(),role:'assistant',content:errMsg,mode,ts:Date.now()}]);
-      showFloating(errMsg,'assistant');
-      setEs('dormant');
-    }
-    finally{setBusy(false);}
-  },[mode,mdef,ttsEnabled,triggerStream,responseStyle,showFloating]);
-
-  const send=useCallback(async()=>{
-    const tx=composerText.trim();if(!tx||busy)return;
-    if(!quotaUser&&!getUser()){if(quotaRemaining('medha')<=0){setShowQuotaLock(true);return;}if(!incrementQuota('medha').ok){setShowQuotaLock(true);return;}}
-    setComposerText('');
-    const um:StoredMsg={id:uid(),role:'user',content:tx,mode,ts:Date.now()};
-    setMessages(p=>[...p,um]);
-    showFloating(tx, 'user');
-    setAbsorptionText(tx);
-    setEs('listening');
-    if(isForbiddenQuery(tx)){setAbsorptionText('');setTimeout(()=>{setMessages(p=>[...p,{id:uid(),role:'assistant',content:SANDHI_REDIRECT_MARKDOWN,mode,ts:Date.now()}]);setEs('dormant');},280);return;}
-    const hist:ChatMessage[]=[...dataR.current.messages,um].slice(-12).map(m=>({role:m.role,content:m.content}));
-    await runCompletion(hist);
-  },[composerText,busy,mode,quotaUser,runCompletion,showFloating]);
-
-  // Regenerate — drop the last assistant reply and ask again
-  const regenerate=useCallback(async()=>{
-    if(busy)return;
-    const msgs=dataR.current.messages;
-    const lastUserIdx=msgs.map(m=>m.role).lastIndexOf('user');
-    if(lastUserIdx===-1)return;
-    const trimmed=msgs.slice(0,lastUserIdx+1);
-    setMessages(trimmed);
-    const hist:ChatMessage[]=trimmed.slice(-12).map(m=>({role:m.role,content:m.content}));
-    await runCompletion(hist);
-  },[busy,runCompletion]);
-
-  // Edit a specific user message and rerun from that point
-  const editMessage=useCallback(async(id:string,newContent:string)=>{
-    if(busy)return;
-    const idx=dataR.current.messages.findIndex(m=>m.id===id);
-    if(idx===-1)return;
-    const newMsg:StoredMsg={...dataR.current.messages[idx],content:newContent,ts:Date.now()};
-    const trimmed=[...dataR.current.messages.slice(0,idx),newMsg];
-    setMessages(trimmed);
-    const hist:ChatMessage[]=trimmed.slice(-12).map(m=>({role:m.role,content:m.content}));
-    await runCompletion(hist);
-  },[busy,runCompletion]);
-
-  // Regenerate from a specific user message (drops that assistant reply onward)
-  const regenerateFrom=useCallback(async(userId:string)=>{
-    if(busy)return;
-    const idx=dataR.current.messages.findIndex(m=>m.id===userId);
-    if(idx===-1)return;
-    const trimmed=dataR.current.messages.slice(0,idx+1);
-    setMessages(trimmed);
-    const hist:ChatMessage[]=trimmed.slice(-12).map(m=>({role:m.role,content:m.content}));
-    await runCompletion(hist);
-  },[busy,runCompletion]);
-
-  const subReg=useCallback(async()=>{
-    if(!regEmail.trim()||regBusy)return;setRegBusy(true);setRegErr('');
-    try{const res=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:regName,email:regEmail,intent:'medha-unlock'})});
-      const d=await res.json();if(!res.ok||!d.ok){setRegErr(d?.error||'Registration failed.');return;}
-      const u:LocalUser=d.user||{email:regEmail,name:regName,registeredAt:Date.now(),verified:false};
-      setUser(u);setQuotaUser(u);setShowQuotaLock(false);setRegName('');setRegEmail('');}
-    catch{setRegErr('Network unavailable.');}finally{setRegBusy(false);}
-  },[regName,regEmail,regBusy]);
-
-  const newChat=()=>{const prev=chats[0];const id=newChatId();setChatId(id);setCurrentChatId(id);
-    const g:StoredMsg={id:uid(),role:'assistant',content:prev?contGreet(prev.topic):GREET_NEW,mode,ts:Date.now()};
-    setMessages([g]);};
-
-  const onKey=(e:React.KeyboardEvent<HTMLTextAreaElement>)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
-  const taR=useRef<HTMLTextAreaElement>(null);
-  useEffect(()=>{const el=taR.current;if(!el)return;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';},[composerText]);
-
-  const copyMsg=async(m:StoredMsg)=>{try{await navigator.clipboard.writeText(m.content);}catch{}};
-
-  // Stable stardust complete callback — won't cause StardustRain to re-trigger
-  const handleStardustComplete=useCallback(()=>setStardustActive(false),[]);
-
-  // Auto-scroll transcript when it's open
-  useEffect(()=>{if(!showTranscript)return;const el=transcriptRef.current;if(!el)return;el.scrollTop=el.scrollHeight;},[messages,busy,showTranscript]);
-
-  const canSend=composerText.trim().length>0&&!busy;
-
-  return(
-    <div className="mlv" data-mode={mode} style={{position:'fixed',inset:0,width:'100vw',height:'100vh',background:'#000',overflow:'hidden'}}>
-      {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
-      {mounted&&<VoidCanvas/>}
-      {mounted&&<CosmicPortal state={es} facultyColor={fc}/>}
-      {mounted&&<MedhaLair disableVideo/>}
-      {mounted&&<MedhaModel3D entityState={es} facultyColor={fc}/>}
-
-      {mounted&&<PB color={burstColor} active={burst} ex={ENTITY_POS.x/100} ey={ENTITY_POS.y/100}/>}
-      <AbsorptionText text={absorptionText}/>
-      <EmergenceText text={emergenceText} fc={fc}/>
-      {mounted&&<VerticalChatRail messages={messages} facultyColor={fc} onOpenTranscript={()=>setShowTranscript(v=>!v)} onEditMessage={editMessage} onRegenerate={regenerateFrom}/>}
-      {mounted&&stream.active&&(
-        <CosmicStream
-          active={stream.active}
-          color={stream.color}
-          colorSecondary={stream.colorSecondary}
-          entityX={ENTITY_POS.x/100}
-          entityY={ENTITY_POS.y/100}
-          duration={5000}
-          onComplete={handleStreamComplete}
-        />
-      )}
-
-      {/* Header — title + history only; Back/Settings/Faculty float via HangingOrbs */}
-      <div style={{position:'fixed',top:0,left:0,right:0,zIndex:50,padding:'16px 18px',display:'flex',justifyContent:'center',alignItems:'flex-start',pointerEvents:'none'}}>
-        <div style={{textAlign:'center',pointerEvents:'auto'}}>
-          <div style={{fontFamily:'var(--font-vyan)',fontSize:'12px',letterSpacing:'0.35em',color:'rgba(255,255,255,0.55)',textTransform:'uppercase'}}>MEDHĀ</div>
-          <div style={{fontSize:'9px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.20)',fontFamily:'var(--font-vyan)',marginTop:'2px',textTransform:'uppercase'}}>
-            {es.toUpperCase()}
-          </div>
-        </div>
-        {/* Chat history — anchored top-right, still accessible */}
-        <button onClick={()=>setShowChatHistory(true)} className="vyan-icon-btn" style={{position:'fixed',top:'14px',right:'clamp(116px,15vw,136px)',zIndex:50}}>
-          <RefreshIcon size={22} />
-        </button>
-      </div>
-
-      {/* Composer — bottom-right; darker gradient fully covers Hailuo watermark */}
-      <div style={{position:'fixed',right:0,left:'auto',width:'clamp(300px,62vw,560px)',bottom:0,zIndex:42,padding:'8px 14px 10px 14px',pointerEvents:'none',background:'linear-gradient(to top, rgba(3,1,10,0.97) 0px, rgba(3,1,10,0.90) 18px, rgba(3,1,10,0.60) 55px, rgba(3,1,10,0.18) 100px, transparent 148px)'}}>
-        <div style={{maxWidth:'clamp(260px,50vw,480px)',margin:'0 0 0 auto',pointerEvents:'auto'}}>
-          {/* Composer */}
-          <div style={{position:'relative',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'16px',backdropFilter:'blur(12px)'}}>
-            <textarea ref={taR} value={composerText}
-              onChange={e=>setComposerText(e.target.value)}
-              onKeyDown={onKey} placeholder={listening?'Listening…':'Interact with Medhā…'}
-              rows={1} disabled={busy} maxLength={1000}
-              style={{width:'100%',background:'transparent',border:'none',outline:'none',resize:'none',color:'rgba(255,255,255,0.8)',fontSize:'14px',lineHeight:'1.55',letterSpacing:'0.02em',fontFamily:'var(--font-vyan)',padding:'12px 106px 11px 14px',maxHeight:'120px',overflow:'auto',scrollbarWidth:'none',opacity:busy?0.5:1}}/>
-            <div style={{position:'absolute',right:'7px',bottom:'7px',display:'flex',gap:'5px',alignItems:'center'}}>
-              <button onClick={()=>fileR.current?.click()} title="Attach" className="vyan-icon-btn">
-                <AttachIcon size={22} />
-              </button>
-              <button
-                onClick={()=>{const s=sttR.current;if(!s?.isSupported())return;if(listening){s.stop();setListening(false);setEs('dormant');return;}setListening(true);setEs('voice-listening');s.start({onText:t=>setComposerText(t),onEnd:()=>{setListening(false);setEs('dormant');},onError:()=>{setListening(false);setEs('dormant');}});}}
-                className="vyan-icon-btn"
-                style={{background:listening?'rgba(220,38,38,0.18)':undefined,border:listening?'1px solid rgba(220,38,38,0.35)':undefined}}
-              >
-                {listening
-                  ? <motion.div animate={{scale:[1,1.3,1]}} transition={{duration:0.8,repeat:Infinity,ease:'easeInOut'}} style={{width:'7px',height:'7px',borderRadius:'50%',background:'#f87171'}}/>
-                  : <SpeakIcon size={22} />}
-              </button>
-              <button onClick={send} disabled={!canSend} className="vyan-icon-btn" style={{opacity:canSend?1:0.3,cursor:canSend?'pointer':'not-allowed'}}>
-                {busy
-                  ? <motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} style={{width:'8px',height:'8px',borderRadius:'50%',border:'1px solid rgba(255,255,255,0.5)',borderTopColor:'transparent'}}/>
-                  : <SendIcon size={22} />}
-              </button>
-            </div>
-            <AnimatePresence>{busy&&<motion.div initial={{scaleX:0,opacity:0}} animate={{scaleX:1,opacity:1}} exit={{scaleX:0,opacity:0}} style={{position:'absolute',bottom:0,left:'10px',right:'10px',height:'1px',background:`linear-gradient(90deg,${fc},#7b2fff,${fc})`,transformOrigin:'left',borderRadius:'1px'}}/>}</AnimatePresence>
-          </div>
-          <p style={{textAlign:'center',color:'rgba(255,255,255,0.11)',fontSize:'9px',letterSpacing:'0.16em',fontFamily:'var(--font-vyan)',textTransform:'uppercase',marginTop:'7px'}}>Enter · Shift+Enter new line</p>
-        </div>
-      </div>
-
-      {/* Settings */}
-      <AnimatePresence>
-        {showSettings&&(
-          <><motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setShowSettings(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:190,backdropFilter:'blur(4px)'}}/>
-          <motion.div initial={{opacity:0,x:'100%'}} animate={{opacity:1,x:0}} exit={{opacity:0,x:'100%'}} transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
-            style={{position:'fixed',top:0,right:0,bottom:0,width:'min(360px,100vw)',zIndex:200,background:'rgba(0,0,0,0.96)',borderLeft:'1px solid rgba(255,255,255,0.06)',backdropFilter:'blur(20px)',overflowY:'auto',padding:'24px',scrollbarWidth:'none'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'26px'}}>
-              <div style={{fontFamily:'var(--font-vyan)',fontSize:'13px',letterSpacing:'0.3em',color:'rgba(255,255,255,0.8)',textTransform:'uppercase'}}>Settings</div>
-              <button
-                onMouseEnter={()=>setSettingsCloseHovered(true)}
-                onMouseLeave={()=>setSettingsCloseHovered(false)}
-                onClick={()=>setShowSettings(false)}
-                className="vyan-icon-btn"
-              >
-                <CloseIcon size={22} isHovered={settingsCloseHovered} />
-              </button>
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:'22px'}}>
-              <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Active Mode</div>
-                <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 11px',background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',borderRadius:'10px',marginBottom:'8px'}}>
-                  <div style={{width:'7px',height:'7px',borderRadius:'50%',background:fc,boxShadow:`0 0 7px ${fc}`,flexShrink:0}}/>
-                  <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'var(--font-vyan)'}}>{mdef.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'var(--font-vyan)'}}>{mdef.englishName}</div></div>
-                </div>
-                <ul style={{margin:0,padding:'0 0 0 16px',display:'flex',flexDirection:'column',gap:'4px'}}>
-                  {mdef.capabilities.map(c=>(
-                    <li key={c} style={{fontSize:'11px',color:'rgba(255,255,255,0.4)',fontFamily:'var(--font-vyan)',lineHeight:'1.5'}}>{c}</li>
-                  ))}
-                </ul>
-                <div style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',fontFamily:'var(--font-vyan)',marginTop:'8px'}}>Switch modes from the faculty ring above.</div>
-              </section>
-              <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Response Style</div>
-                <div style={{display:'flex',gap:'6px'}}>
-                  {(['concise','balanced','detailed'] as const).map(s=>(
-                    <button key={s} onClick={()=>setResponseStyle(s)}
-                      style={{flex:1,padding:'8px 6px',background:responseStyle===s?'rgba(255,255,255,0.08)':'rgba(255,255,255,0.02)',border:`1px solid ${responseStyle===s?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.05)'}`,borderRadius:'8px',color:responseStyle===s?'rgba(255,255,255,0.85)':'rgba(255,255,255,0.35)',fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',fontFamily:'var(--font-vyan)',cursor:'pointer'}}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </section>
-              <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Voice</div>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)',fontFamily:'var(--font-vyan)'}}>Voice Reply (TTS)</span>
-                  <button onClick={()=>setTtsEnabled(v=>{if(v)ttsR.current?.cancel();return!v;})}
-                    style={{width:'40px',height:'22px',borderRadius:'11px',background:ttsEnabled?'rgba(123,47,255,0.6)':'rgba(255,255,255,0.1)',border:'none',cursor:'pointer',position:'relative',transition:'all 0.2s'}}>
-                    <div style={{position:'absolute',top:'3px',left:ttsEnabled?'21px':'3px',width:'16px',height:'16px',borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
-                  </button>
-                </div>
-              </section>
-              <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>Your Text Color</div>
-                <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                  {['#d4a853','#ffffff','#e8c4ff','#a8d8ea','#f0c4a0','#c8f0c8'].map(c=>(
-                    <button key={c} onClick={()=>{setUserColor(c);localStorage.setItem('medha_user_color',c);}}
-                      style={{width:'24px',height:'24px',borderRadius:'50%',background:c,border:userColor===c?'2px solid #fff':'2px solid transparent',cursor:'pointer',padding:0,outline:'none',boxShadow:userColor===c?`0 0 6px ${c}`:'none',transition:'all 0.2s'}}/>
-                  ))}
-                </div>
-              </section>
-              <section>
-                <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px',paddingBottom:'8px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>History</div>
-                <div style={{fontSize:'13px',color:'rgba(255,255,255,0.4)',fontFamily:'var(--font-vyan)',marginBottom:'10px'}}>{chats.length} conversation{chats.length!==1?'s':''} stored</div>
-                <button onClick={()=>{if(!confirm('Erase ALL conversations?'))return;chats.forEach(c=>deleteChat(c.id));setChats([]);newChat();}}
-                  style={{width:'100%',padding:'10px',background:'rgba(220,38,38,0.08)',border:'1px solid rgba(220,38,38,0.2)',borderRadius:'8px',color:'rgba(220,100,100,0.7)',fontSize:'11px',letterSpacing:'0.15em',textTransform:'uppercase',fontFamily:'var(--font-vyan)',cursor:'pointer'}}>
-                  Erase All Conversations
-                </button>
-              </section>
-            </div>
-          </motion.div></>
-        )}
-      </AnimatePresence>
-
-      {/* Quota lock */}
-      {showQuotaLock&&(
-        <div style={{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)',backdropFilter:'blur(8px)',padding:'24px'}}>
-          <div style={{maxWidth:'400px',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'32px',backdropFilter:'blur(20px)'}}>
-            <div style={{fontSize:'10px',letterSpacing:'0.25em',color:'rgba(255,200,160,0.5)',textTransform:'uppercase',fontFamily:'var(--font-vyan)',marginBottom:'10px'}}>Cognition Threshold</div>
-            <h2 style={{fontFamily:'var(--font-vyan)',fontSize:'18px',color:'rgba(255,255,255,0.85)',marginBottom:'10px'}}>You have reached the visitor limit.</h2>
-            <p style={{fontFamily:'var(--font-vyan)',fontSize:'13px',color:'rgba(255,255,255,0.5)',lineHeight:'1.65',marginBottom:'22px'}}>Medhā grants every wanderer <strong style={{color:'rgba(255,255,255,0.7)'}}>{quotaLimit('medha')} conversations</strong> as a first taste.</p>
-            <div style={{display:'flex',flexDirection:'column',gap:'9px',marginBottom:'18px'}}>
-              <input type="text" placeholder="Your name" value={regName} onChange={e=>setRegName(e.target.value)} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',color:'rgba(255,255,255,0.8)',fontSize:'13px',fontFamily:'var(--font-vyan)',padding:'9px 13px',outline:'none'}}/>
-              <input type="email" placeholder="you@domain.com" value={regEmail} onChange={e=>setRegEmail(e.target.value)} style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'10px',color:'rgba(255,255,255,0.8)',fontSize:'13px',fontFamily:'var(--font-vyan)',padding:'9px 13px',outline:'none'}}/>
-              {regErr&&<div style={{fontSize:'12px',color:'rgba(220,100,100,0.8)',fontFamily:'var(--font-vyan)'}}>{regErr}</div>}
-              <button onClick={subReg} disabled={regBusy||!regEmail.trim()} style={{padding:'11px',background:'rgba(123,47,255,0.2)',border:'1px solid rgba(123,47,255,0.3)',borderRadius:'10px',color:'rgba(200,160,255,0.9)',fontSize:'11px',letterSpacing:'0.18em',textTransform:'uppercase',fontFamily:'var(--font-vyan)',cursor:regBusy||!regEmail.trim()?'not-allowed':'pointer',opacity:regBusy||!regEmail.trim()?0.5:1}}>
-                {regBusy?'Transmitting…':'Register with VYAN'}
-              </button>
-            </div>
-            <p style={{fontSize:'11px',color:'rgba(255,255,255,0.2)',fontFamily:'var(--font-vyan)',textAlign:'center'}}>VYAN will send a verification to your address.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Stardust rain on faculty switch */}
-      {mounted && (
-        <StardustRain
-          active={stardustActive}
-          color={stardustColor}
-          onComplete={handleStardustComplete}
-        />
-      )}
-
-      {/* Floating nav buttons + faculty ring */}
-      <HangingOrbs
-        onSettingsOpen={() => setShowSettings(true)}
-        onFacultySelect={handleFacultyFromOrb}
-        onBack={back}
-        activeFaculty={mode}
-        entityPos={ENTITY_POS}
-      />
-
-      {/* Floating text following Medhā — auto-dismisses after 8s */}
-      <FloatingText
-        text={floatingText}
-        role={floatingRole}
-        facultyColor={fc}
-        visible={floatingVisible && !showSettings && !showChatHistory}
-        userColor={userColor}
-      />
-
-
-      {/* Conversation transcript — appears only on clicking Medhā */}
-      <AnimatePresence>
-        {showTranscript && (
-          <>
-            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-              onClick={()=>setShowTranscript(false)}
-              style={{position:'fixed',inset:0,zIndex:38,background:'rgba(0,0,0,0.35)',backdropFilter:'blur(4px)'}}/>
-            <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} exit={{opacity:0,y:16}}
-              transition={{duration:0.4,ease:[0.16,1,0.3,1]}}
-              style={{position:'fixed',left:'50%',transform:'translateX(-50%)',top:'10vh',bottom:'130px',
-                width:'min(560px,90vw)',zIndex:39,display:'flex',flexDirection:'column',
-                background:'rgba(4,2,14,0.88)',border:'1px solid rgba(255,255,255,0.07)',
-                borderRadius:'18px',backdropFilter:'blur(18px)',overflow:'hidden'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 16px',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{fontSize:'10px',letterSpacing:'0.28em',color:'rgba(255,255,255,0.4)',fontFamily:'var(--font-vyan)',textTransform:'uppercase'}}>Conversation</div>
-                <button onClick={()=>setShowTranscript(false)} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.3)',cursor:'pointer',fontSize:'14px',padding:'2px 6px'}}>✕</button>
-              </div>
-              <div ref={transcriptRef} style={{flex:1,overflowY:'auto',scrollbarWidth:'none',display:'flex',flexDirection:'column',gap:'14px',padding:'14px 16px',WebkitMaskImage:'linear-gradient(to bottom, transparent, black 24px)',maskImage:'linear-gradient(to bottom, transparent, black 24px)'}}>
-                {messages.map((m,i)=><Bubble key={m.id} msg={m} fc={fc} onCopy={copyMsg} isLast={i===messages.length-1&&!busy} onRegenerate={messages.length>1&&!busy?regenerate:undefined}/>)}
-                <AnimatePresence>{busy&&<ThinkingBubble key="thinking" fc={fc}/>}</AnimatePresence>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Chat history modal */}
-      <ChatHistoryModal
-        visible={showChatHistory}
-        chats={chats}
-        activeChatId={chatId}
-        onSelectChat={(id) => {
-          const ch = getChat(id);
-          if (!ch) return;
-          setChatId(ch.id);
-          setCurrentChatId(ch.id);
-          setMessages(ch.messages);
-        }}
-        onDeleteChat={(id) => {
-          deleteChat(id);
-          setChats(listChats());
-          if (id === chatId) newChat();
-        }}
-        onNewChat={newChat}
-        onClose={() => setShowChatHistory(false)}
-      />
-
-      <input ref={fileR} type="file" accept="image/*,.pdf,.txt,.md,.json,.csv" style={{display:'none'}}
-        onChange={e=>{const f=e.target.files?.[0];if(!f)return;setComposerText(c=>`${c}\n\n[attached: ${f.name} · ${(f.size/1024).toFixed(1)}KB]`);e.target.value='';}}/>
-
-    </div>
+  return (
+    <motion.p
+      key={idx}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.5 }}
+      style={{
+        fontSize: 9.5, letterSpacing: '0.22em', textTransform: 'uppercase',
+        color: rgba(r1, g1, b1, 0.55), fontFamily: 'var(--font-vyan)',
+        textAlign: 'center', margin: '6px 0 0',
+      }}
+    >
+      {PROCESS_LABELS[idx]}
+    </motion.p>
   );
 }
 
-// ─── Faculty selector ──────────────────────────────────────────────────────────
-function FacultySel({mode,onSelect}:{mode:CognitiveModeKey;onSelect:(k:CognitiveModeKey)=>void}){
-  const[open,setOpen]=useState(false);const cur=getMode(mode);const color=FC[mode];
-  return(
-    <div style={{position:'relative'}}>
-      <button onClick={()=>setOpen(!open)} style={{display:'flex',alignItems:'center',gap:'7px',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'5px 11px',cursor:'pointer'}}>
-        <div style={{width:'6px',height:'6px',borderRadius:'50%',background:color,boxShadow:`0 0 6px ${color}`}}/>
-        <span style={{fontSize:'11px',letterSpacing:'0.15em',color:'rgba(255,255,255,0.6)',fontFamily:'var(--font-vyan)',textTransform:'uppercase'}}>{cur.name}</span>
-        <span style={{fontSize:'9px',color:'rgba(255,255,255,0.25)'}}>▾</span>
-      </button>
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const uid = () =>
+  typeof crypto !== 'undefined' && (crypto as any).randomUUID
+    ? (crypto as any).randomUUID()
+    : Math.random().toString(36).slice(2);
+
+const GREET_NEW = 'Hello — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. What would you like to explore?';
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function MedhaHUD() {
+  const router = useRouter();
+
+  // ── Core state ──────────────────────────────────────────────────────────────
+  const [phase, setPhase]         = useState<Phase>('idle');
+  const [mode, setMode]           = useState<CognitiveModeKey>('dhyana');
+  const [chatId, setChatId]       = useState('');
+  const [messages, setMessages]   = useState<StoredMsg[]>([]);
+  const [input, setInput]         = useState('');
+  const [streamText, setStream]   = useState('');
+  const [errorMsg, setError]      = useState('');
+  const [freshIdx, setFreshIdx]   = useState(-1);  // index of the last fresh message
+  const [flyingText, setFlying]   = useState<string | null>(null);
+  const [flyDeltaY, setFlyDeltaY] = useState(0);
+  const [consentDone, setConsent] = useState(false);
+  const [quotaLeft, setQuota]     = useState(99);
+
+  const abortRef    = useRef<AbortController | null>(null);
+  const chatBotRef  = useRef<HTMLDivElement>(null);
+  const portalRef   = useRef<HTMLDivElement>(null);
+  const phaseRef    = useRef(phase);
+  const chatIdRef   = useRef(chatId);
+  const messagesRef = useRef(messages);
+  phaseRef.current    = phase;
+  chatIdRef.current   = chatId;
+  messagesRef.current = messages;
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const hasConsent = hasLocalConsent();
+    setConsent(hasConsent);
+    setQuota(quotaRemaining('medha'));
+
+    if (!hasConsent) return;
+
+    const id = getCurrentChatId() || newChatId();
+    setCurrentChatId(id);
+    setChatId(id);
+
+    const stored = getChat(id);
+    if (stored?.messages?.length) {
+      setMessages(stored.messages);
+    } else {
+      const greeting: StoredMsg = {
+        id: uid(), role: 'assistant', content: GREET_NEW, mode, ts: Date.now(),
+      };
+      setMessages([greeting]);
+      upsertChat({
+        id, title: 'New conversation',
+        messages: [greeting],
+        lastInteractionAt: Date.now(),
+        createdAt: Date.now(),
+      });
+    }
+  }, [consentDone]); // eslint-disable-line
+
+  // Auto-scroll
+  useEffect(() => {
+    if (chatBotRef.current) {
+      chatBotRef.current.scrollTop = chatBotRef.current.scrollHeight;
+    }
+  }, [messages, streamText]);
+
+  // ── Consent callback ───────────────────────────────────────────────────────
+  const onConsent = useCallback((_snap: ConsentSnapshot) => {
+    setConsent(true);
+    setQuota(quotaRemaining('medha'));
+  }, []);
+
+  // ── Mode switch ────────────────────────────────────────────────────────────
+  const switchMode = useCallback((k: CognitiveModeKey) => {
+    setMode(k);
+  }, []);
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  const submit = useCallback(async () => {
+    const text = input.trim();
+    if (!text || phaseRef.current !== 'idle') return;
+    if (quotaLeft <= 0) return;
+
+    if (isForbiddenQuery(text)) {
+      const sandhi: StoredMsg = { id: uid(), role: 'assistant', content: SANDHI_REDIRECT_MARKDOWN, mode, ts: Date.now() };
+      setMessages(prev => { const n = [...prev, sandhi]; setFreshIdx(n.length - 1); return n; });
+      setInput('');
+      return;
+    }
+
+    // Calculate flight delta for the animation
+    let deltaY = -300;
+    if (portalRef.current) {
+      const pr = portalRef.current.getBoundingClientRect();
+      const portalCenterY = pr.top + pr.height / 2;
+      const inputY = window.innerHeight - 90;
+      deltaY = portalCenterY - inputY;
+    }
+    setFlyDeltaY(deltaY);
+    setFlying(text);
+    setInput('');
+    setPhase('absorbing');
+
+    // Absorbing animation runs for 650ms, then we transition to processing
+    const { ok } = incrementQuota('medha');
+    setQuota(quotaRemaining('medha'));
+
+    const userMsg: StoredMsg = { id: uid(), role: 'user', content: text, mode, ts: Date.now() };
+
+    setTimeout(async () => {
+      setFlying(null);
+      setPhase('processing');
+
+      // Add user msg to history
+      setMessages(prev => {
+        const next = [...prev, userMsg];
+        setFreshIdx(next.length - 1);
+        return next;
+      });
+
+      // Start API call
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+
+      const history: ChatMessage[] = [
+        ...messagesRef.current.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        { role: 'user', content: text },
+      ];
+
+      let full = '';
+      let isFirst = true;
+
+      await chatStream(
+        getMode(mode),
+        history,
+        {
+          onChunk: (chunk) => {
+            if (isFirst) {
+              isFirst = false;
+              setPhase('emerging');
+              setStream(chunk);
+            } else {
+              setStream(prev => prev + chunk);
+            }
+            full += chunk;
+          },
+          onDone: (finalText) => {
+            full = finalText;
+            const assistantMsg: StoredMsg = {
+              id: uid(), role: 'assistant', content: finalText, mode, ts: Date.now(),
+            };
+            setMessages(prev => {
+              const next = [...prev, assistantMsg];
+              setFreshIdx(next.length - 1);
+              const cid = chatIdRef.current;
+              const summary = text.slice(0, 55);
+              upsertChat({
+                id: cid, title: summary,
+                messages: next,
+                lastInteractionAt: Date.now(),
+                createdAt: Date.now(),
+              });
+              return next;
+            });
+            setStream('');
+            setPhase('responding');
+            setTimeout(() => setPhase('idle'), 600);
+          },
+          onError: (err) => {
+            setError(err.message);
+            setStream('');
+            setPhase('error');
+            setTimeout(() => { setError(''); setPhase('idle'); }, 4000);
+          },
+        },
+        ctrl.signal,
+      );
+    }, 650);
+  }, [input, mode, messages, chatId, quotaLeft]);
+
+  // ── Back navigation ────────────────────────────────────────────────────────
+  const goBack = () => router.push('/vistara');
+
+  // ── Quota exhausted ────────────────────────────────────────────────────────
+  if (quotaLeft <= 0 && !consentDone) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', background: 'rgba(0,0,0,0.9)',
+        fontFamily: 'var(--font-vyan)', color: 'rgba(255,200,180,0.8)',
+        textAlign: 'center', padding: 24,
+      }}>
+        <div>
+          <p style={{ fontSize: 13, letterSpacing: '0.08em', marginBottom: 16 }}>
+            MEDHĀ quota reached. Please register to continue.
+          </p>
+          <MedhaConsentSlab onConsent={onConsent} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Consent gate ───────────────────────────────────────────────────────────
+  if (!consentDone) {
+    return <MedhaConsentSlab onConsent={onConsent} />;
+  }
+
+  const [r1, g1, b1] = MC[mode];
+  const isActive = phase !== 'idle' && phase !== 'error';
+
+  // Portal ring inner radius — responsive
+  const innerR = typeof window !== 'undefined'
+    ? Math.min(130, (window.innerWidth * 0.4) / 2)
+    : 130;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 30,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      overflow: 'hidden',
+    }}>
+
+      {/* ── Header bar ─────────────────────────────────────────────────── */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 16px',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)',
+      }}>
+        <button onClick={goBack} style={{
+          background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 20, padding: '5px 11px',
+          color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: '0.16em',
+          fontFamily: 'var(--font-vyan)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}>
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+          VISTĀRA
+        </button>
+
+        <span style={{
+          fontSize: 10, letterSpacing: '0.3em', color: rgba(r1, g1, b1, 0.5),
+          fontFamily: 'var(--font-vyan)', textTransform: 'uppercase',
+        }}>
+          MEDHĀ
+        </span>
+
+        <div style={{ width: 68 }} /> {/* spacer */}
+      </div>
+
+      {/* ── Portal section (upper half) ────────────────────────────────── */}
+      <div
+        ref={portalRef}
+        style={{
+          flex: '0 0 auto',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          paddingTop: 'max(60px, 8vh)',
+        }}
+      >
+        <PortalOrb modeKey={mode} />
+        <div style={{ marginTop: 8 }}>
+          <CosmicPortal phase={phase} modeKey={mode} innerR={innerR} />
+        </div>
+
+        {/* Status label */}
+        <div style={{ minHeight: 22, marginTop: 2 }}>
+          <AnimatePresence mode="wait">
+            {phase === 'processing' && (
+              <ProcessingLabel key="proc" modeKey={mode} />
+            )}
+            {phase === 'error' && (
+              <motion.p
+                key="err"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                style={{
+                  fontSize: 9.5, letterSpacing: '0.18em', color: 'rgba(255,100,100,0.65)',
+                  fontFamily: 'var(--font-vyan)', textAlign: 'center',
+                }}
+              >
+                {errorMsg || 'Signal lost — try again'}
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* ── Chat history ───────────────────────────────────────────────── */}
+      <div
+        ref={chatBotRef}
+        style={{
+          flex: 1, width: '100%', maxWidth: 520,
+          overflowY: 'auto', overflowX: 'hidden',
+          padding: '12px 16px 120px',
+          scrollbarWidth: 'none',
+        }}
+        onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+        onTouchMove={(e) => {
+          const el = e.currentTarget as HTMLDivElement;
+          const dy = (el as any)._touchY - e.touches[0].clientY;
+          (el as any)._touchY = e.touches[0].clientY;
+          el.scrollTop += dy;
+        }}
+      >
+        {/* fade top */}
+        <div style={{
+          position: 'sticky', top: 0, height: 36,
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)',
+          pointerEvents: 'none', marginBottom: -36, zIndex: 1,
+        }} />
+
+        {messages.map((m, i) => (
+          <ChatBubble
+            key={m.id} msg={m} modeKey={mode}
+            fresh={i === freshIdx}
+          />
+        ))}
+
+        {/* Streaming response */}
+        <AnimatePresence>
+          {streamText && (
+            <StreamBubble key="stream" text={streamText} modeKey={mode} />
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Lotus decoration ───────────────────────────────────────────── */}
+      <div style={{
+        position: 'fixed', bottom: 155, left: '50%', transform: 'translateX(-50%)',
+        pointerEvents: 'none', opacity: 0.18,
+      }}>
+        <svg width="28" height="18" viewBox="0 0 60 36" fill="none">
+          <path d="M30 32 C18 32 8 24 8 16 C8 10 14 6 20 8 C22 2 26 0 30 0 C34 0 38 2 40 8 C46 6 52 10 52 16 C52 24 42 32 30 32Z"
+            fill={rgba(r1, g1, b1, 1)} />
+          <path d="M30 32 C22 28 16 20 16 14 C16 10 22 8 26 10 C27 6 28 4 30 4 C32 4 33 6 34 10 C38 8 44 10 44 14 C44 20 38 28 30 32Z"
+            fill={rgba(r1, g1, b1, 0.5)} />
+        </svg>
+      </div>
+
+      {/* ── Input bar ──────────────────────────────────────────────────── */}
+      <InputBar
+        value={input}
+        onChange={setInput}
+        onSubmit={submit}
+        disabled={phase !== 'idle'}
+        modeKey={mode}
+        onModeChange={switchMode}
+        quotaLeft={quotaLeft}
+      />
+
+      {/* ── Flying text overlay (absorption animation) ─────────────────── */}
       <AnimatePresence>
-        {open&&(
-          <motion.div initial={{opacity:0,y:-8,scale:0.96}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:-8,scale:0.96}} transition={{duration:0.18}}
-            style={{position:'absolute',bottom:'100%',right:0,marginBottom:'8px',background:'rgba(0,0,0,0.97)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'14px',padding:'6px',minWidth:'220px',zIndex:100,backdropFilter:'blur(20px)'}}>
-            {COGNITIVE_MODES.map(m=>(
-              <button key={m.key} onClick={()=>{onSelect(m.key);setOpen(false);}}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'9px 11px',background:mode===m.key?'rgba(255,255,255,0.05)':'transparent',border:'none',borderRadius:'9px',cursor:'pointer',textAlign:'left'}}>
-                <div style={{width:'7px',height:'7px',borderRadius:'50%',background:FC[m.key],boxShadow:`0 0 7px ${FC[m.key]}`,flexShrink:0}}/>
-                <div><div style={{fontSize:'12px',color:'rgba(255,255,255,0.8)',fontFamily:'var(--font-vyan)'}}>{m.name}</div><div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',fontFamily:'var(--font-vyan)'}}>{m.englishName}</div></div>
-              </button>
-            ))}
+        {flyingText && (
+          <motion.div
+            initial={{ opacity: 1, scale: 1, y: 0 }}
+            animate={{ opacity: 0, scale: 0.04, y: flyDeltaY }}
+            transition={{ duration: 0.65, ease: [0.4, 0, 0.8, 1] }}
+            style={{
+              position: 'fixed',
+              bottom: 86,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 200,
+              maxWidth: 280,
+              padding: '9px 13px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              borderRadius: '14px 14px 3px 14px',
+              fontSize: 12.5, lineHeight: '1.6',
+              color: 'rgba(255,255,255,0.78)',
+              fontFamily: 'var(--font-vyan)',
+              pointerEvents: 'none',
+              textAlign: 'center',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              transformOrigin: 'center bottom',
+            }}
+          >
+            {flyingText}
           </motion.div>
         )}
       </AnimatePresence>
