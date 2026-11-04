@@ -5,7 +5,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { Center, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 
-type ES = 'dormant'|'listening'|'thinking'|'responding'|'voice-listening'|'voice-active'|'switching'
+type ES = 'dormant'|'listening'|'thinking'|'responding'|'voice-listening'|'voice-active'|'switching'|'absorbing'|'processing'|'emerging'
 
 // Per-state emissive brightness and rotation speed
 const BRIGHTNESS: Record<ES, number> = {
@@ -16,6 +16,9 @@ const BRIGHTNESS: Record<ES, number> = {
   'voice-listening': 0.18,
   'voice-active':   0.44,
   switching:        0.70,
+  absorbing:        0.42,
+  processing:       0.60,
+  emerging:         0.38,
 }
 
 const ROT_SPEED: Record<ES, number> = {
@@ -26,6 +29,9 @@ const ROT_SPEED: Record<ES, number> = {
   'voice-listening': 0.14,
   'voice-active':   0.24,
   switching:        0.07,
+  absorbing:        0.44,
+  processing:       0.62,
+  emerging:         0.20,
 }
 
 function MedhaGLB({ entityState, facultyColor }: { entityState: ES; facultyColor: string }) {

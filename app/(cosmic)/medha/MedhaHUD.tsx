@@ -26,6 +26,7 @@ import { CosmicStream } from '@/components/CosmicStream';
 import { useCosmicStream } from '@/hooks/useCosmicStream';
 import { MedhaLair } from '@/components/MedhaLair';
 import { MedhaModel3D } from '@/components/MedhaModel3D';
+import { CosmicPortal } from '@/components/CosmicPortal';
 import { StardustRain } from '@/components/StardustRain';
 import { HangingOrbs } from '@/components/HangingOrbs';
 import { FloatingText } from '@/components/FloatingText';
@@ -40,7 +41,7 @@ const FC: Record<CognitiveModeKey, string> = {
 };
 
 // ─── Entity states ─────────────────────────────────────────────────────────────
-type ES = 'dormant'|'listening'|'thinking'|'responding'|'voice-listening'|'voice-active'|'switching';
+type ES = 'dormant'|'listening'|'thinking'|'responding'|'voice-listening'|'voice-active'|'switching'|'absorbing'|'processing'|'emerging';
 const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number;ps:number}> = {
   dormant:         {sc:1.000,br:1.00,ro:0,  dy:10,dd:7,  ao:0.04,ps:6  },
   listening:       {sc:1.020,br:1.02,ro:0,  dy:8, dd:5,  ao:0.07,ps:4  },
@@ -48,8 +49,10 @@ const SC: Record<ES,{sc:number;br:number;ro:number;dy:number;dd:number;ao:number
   responding:      {sc:1.022,br:1.04,ro:0,  dy:10,dd:2.8,ao:0.10,ps:1.8},
   'voice-listening':{sc:0.995,br:1.01,ro:0, dy:6, dd:6,  ao:0.06,ps:5  },
   'voice-active':  {sc:1.025,br:1.04,ro:0,  dy:8, dd:1.5,ao:0.12,ps:1.2},
-  // Ethereal "gaining intelligence" bloom — no shake, just a slow luminous swell.
   switching:       {sc:1.070,br:1.20,ro:0,  dy:5, dd:2.2,ao:0.26,ps:1.6},
+  absorbing:       {sc:1.030,br:1.08,ro:1,  dy:8, dd:2.0,ao:0.14,ps:1.5},
+  processing:      {sc:1.025,br:1.06,ro:1,  dy:9, dd:1.8,ao:0.16,ps:1.2},
+  emerging:        {sc:1.018,br:1.05,ro:0,  dy:9, dd:2.2,ao:0.12,ps:1.8},
 };
 
 // ─── Entity anchor ────────────────────────────────────────────────────────────
@@ -203,6 +206,65 @@ const sumTopic=(msgs:StoredMsg[])=>{const f=msgs.find(m=>m.role==='user')?.conte
 const GREET_NEW='Hello — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. What would you like to explore?';
 const contGreet=(t?:string)=>t&&t.length>6?`Welcome back. Last time we touched on ${t}. Shall we continue — or step into something new?`:'Welcome back. The conversation is still warm. Where shall we begin?';
 
+// ─── Absorption animation (message flying into portal) ─────────────────────────
+function AbsorptionText({ text }: { text: string }) {
+  return (
+    <AnimatePresence>
+      {text && (
+        <motion.div
+          key="absorption"
+          initial={{ opacity: 1, scale: 1, y: 0 }}
+          animate={{ opacity: 0, scale: 0.02, y: '-52vh' }}
+          transition={{ duration: 0.65, ease: [0.42, 0, 0.58, 1] }}
+          style={{
+            position: 'fixed', bottom: '138px', left: '50%',
+            transform: 'translateX(-50%)', zIndex: 72,
+            maxWidth: 'min(320px, 80vw)', textAlign: 'center',
+            padding: '9px 15px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '14px', backdropFilter: 'blur(8px)',
+            fontSize: '13px', color: 'rgba(255,255,255,0.82)',
+            fontFamily: 'var(--font-vyan)', lineHeight: 1.5,
+            pointerEvents: 'none', willChange: 'transform,opacity',
+          }}
+        >
+          {text.length > 90 ? text.slice(0, 87) + '…' : text}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ─── Emergence animation (response growing from portal depth) ──────────────────
+function EmergenceText({ text, fc }: { text: string; fc: string }) {
+  return (
+    <AnimatePresence>
+      {text && (
+        <motion.div
+          key="emergence"
+          initial={{ opacity: 0, scale: 0.02, filter: 'blur(14px)' }}
+          animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, scale: 0.5, filter: 'blur(8px)' }}
+          transition={{ duration: 0.88, ease: [0.16, 1, 0.3, 1] }}
+          style={{
+            position: 'fixed', top: '44%', left: '50%',
+            transform: 'translate(-50%, -50%)', zIndex: 72,
+            maxWidth: 'min(360px, 85vw)', textAlign: 'center',
+            fontSize: '13px', lineHeight: 1.68,
+            color: 'rgba(255,210,185,0.95)',
+            fontFamily: 'var(--font-vyan)',
+            textShadow: `0 0 20px rgba(255,160,80,0.45), 0 0 40px ${fc}40`,
+            pointerEvents: 'none', willChange: 'transform,opacity,filter',
+          }}
+        >
+          {text.length > 160 ? text.slice(0, 157) + '…' : text}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function MedhaHUD(){
   const router=useRouter();const sp=useSearchParams();
@@ -228,6 +290,8 @@ export default function MedhaHUD(){
   const[es,setEs]=useState<ES>('dormant');
   const[burst,setBurst]=useState(false);const[burstColor,setBurstColor]=useState('#e8e4ff');
   const[mounted,setMounted]=useState(false);
+  const[absorptionText,setAbsorptionText]=useState('');
+  const[emergenceText,setEmergenceText]=useState('');
   const { stream, triggerStream, handleStreamComplete } = useCosmicStream();
   // Ambient stream timer
   const ambientStreamRef = useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -332,20 +396,40 @@ export default function MedhaHUD(){
 
   // Shared completion runner — used by both send() and regenerate()
   const runCompletion=useCallback(async(hist:ChatMessage[])=>{
-    setBusy(true);await new Promise(r=>setTimeout(r,400));setEs('thinking');
+    setBusy(true);
+    // Phase 1: absorption — message flies into portal
+    setEs('absorbing');
+    await new Promise(r=>setTimeout(r,700));
+    setAbsorptionText('');
+    // Phase 2: processing — portal spins, API call in flight
+    setEs('processing');
     const styleSuffix=responseStyle==='concise'?' Keep this response brief — a few sentences at most.'
       :responseStyle==='detailed'?' Provide a thorough, detailed response with full context.'
       :'';
     const effMode=styleSuffix?{...mdef,systemPrompt:mdef.systemPrompt+styleSuffix}:mdef;
-    try{const full=await chatComplete(effMode,hist);setEs('responding');
+    try{
+      const full=await chatComplete(effMode,hist);
+      // Phase 3: emergence — response grows from portal depth
+      const preview=full?(full.length>160?full.slice(0,157)+'…':full):'';
+      setEmergenceText(preview);
+      setEs('emerging');
+      await new Promise(r=>setTimeout(r,920));
+      setEmergenceText('');
+      setEs('responding');
       const am:StoredMsg={id:uid(),role:'assistant',content:full||'I lost the signal for a moment. Try again?',mode,ts:Date.now()};
       setMessages(p=>[...p,am]);
-      showFloating(am.content, 'assistant');
+      showFloating(am.content,'assistant');
       setEs('dormant');
-      // Intelligence arrives — trigger stream
       triggerStream(mode);
-      if(ttsEnabled&&ttsR.current?.isSupported()){const pl=full.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/[*_`#>]/g,'');setEs('voice-active');ttsR.current.speak(pl,{onEnd:()=>setEs('dormant')});}}
-    catch{const errMsg='Cognition is momentarily out of reach — try again in a breath.';setMessages(p=>[...p,{id:uid(),role:'assistant',content:errMsg,mode,ts:Date.now()}]);showFloating(errMsg,'assistant');setEs('dormant');}
+      if(ttsEnabled&&ttsR.current?.isSupported()){const pl=full.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/[*_`#>]/g,'');setEs('voice-active');ttsR.current.speak(pl,{onEnd:()=>setEs('dormant')});}
+    }
+    catch{
+      setAbsorptionText('');setEmergenceText('');
+      const errMsg='Cognition is momentarily out of reach — try again in a breath.';
+      setMessages(p=>[...p,{id:uid(),role:'assistant',content:errMsg,mode,ts:Date.now()}]);
+      showFloating(errMsg,'assistant');
+      setEs('dormant');
+    }
     finally{setBusy(false);}
   },[mode,mdef,ttsEnabled,triggerStream,responseStyle,showFloating]);
 
@@ -356,8 +440,9 @@ export default function MedhaHUD(){
     const um:StoredMsg={id:uid(),role:'user',content:tx,mode,ts:Date.now()};
     setMessages(p=>[...p,um]);
     showFloating(tx, 'user');
+    setAbsorptionText(tx);
     setEs('listening');
-    if(isForbiddenQuery(tx)){setTimeout(()=>{setMessages(p=>[...p,{id:uid(),role:'assistant',content:SANDHI_REDIRECT_MARKDOWN,mode,ts:Date.now()}]);setEs('dormant');},280);return;}
+    if(isForbiddenQuery(tx)){setAbsorptionText('');setTimeout(()=>{setMessages(p=>[...p,{id:uid(),role:'assistant',content:SANDHI_REDIRECT_MARKDOWN,mode,ts:Date.now()}]);setEs('dormant');},280);return;}
     const hist:ChatMessage[]=[...dataR.current.messages,um].slice(-12).map(m=>({role:m.role,content:m.content}));
     await runCompletion(hist);
   },[composerText,busy,mode,quotaUser,runCompletion,showFloating]);
@@ -428,10 +513,13 @@ export default function MedhaHUD(){
     <div className="mlv" data-mode={mode} style={{position:'fixed',inset:0,width:'100vw',height:'100vh',background:'#000',overflow:'hidden'}}>
       {consentReady&&!consentGranted&&<MedhaConsentSlab onGranted={(_:ConsentSnapshot)=>setConsentGranted(true)}/>}
       {mounted&&<VoidCanvas/>}
+      {mounted&&<CosmicPortal state={es} facultyColor={fc}/>}
       {mounted&&<MedhaLair disableVideo/>}
       {mounted&&<MedhaModel3D entityState={es} facultyColor={fc}/>}
 
       {mounted&&<PB color={burstColor} active={burst} ex={ENTITY_POS.x/100} ey={ENTITY_POS.y/100}/>}
+      <AbsorptionText text={absorptionText}/>
+      <EmergenceText text={emergenceText} fc={fc}/>
       {mounted&&<VerticalChatRail messages={messages} facultyColor={fc} onOpenTranscript={()=>setShowTranscript(v=>!v)} onEditMessage={editMessage} onRegenerate={regenerateFrom}/>}
       {mounted&&stream.active&&(
         <CosmicStream
