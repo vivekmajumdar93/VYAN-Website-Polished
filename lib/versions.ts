@@ -13,9 +13,24 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '7.1'
+export const CURRENT_VERSION = '7.2'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '7.2',
+    date: '2026-11-04',
+    title: 'MEDHĀ Cosmic Portal COE',
+    summary: 'Medhā gains a living cosmic portal ring and cinematic absorption/emergence animations — messages physically fly into the portal on send and responses grow from depth on receive.',
+    changes: [
+      'New CosmicPortal canvas: animated 3-ring portal (gold outer, violet mid, electric blue micro) with state-reactive spin and intensity',
+      'AbsorptionText: user message flies upward from input field to portal center (650ms, perspective scale to zero)',
+      'EmergenceText: AI response grows from portal depth (blur→sharp, 880ms) before appearing in transcript',
+      'Extended entity state machine: absorbing → processing → emerging sequence added to MedhaHUD and MedhaModel3D',
+      'MedhaModel3D brightness/rotation updated for absorbing (0.42), processing (0.60), emerging (0.38) states',
+    ],
+    gitHash: '4ace1e5',
+    pages: ['Medhā'],
+  },
   {
     version: '7.1',
     date: '2026-08-30',
