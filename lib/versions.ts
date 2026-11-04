@@ -13,9 +13,28 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '7.2'
+export const CURRENT_VERSION = '8.0'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.0',
+    date: '2026-11-04',
+    title: 'MEDHĀ — Consciousness of VYAN',
+    summary: 'Complete rewrite of MedhaHUD as a cinematic Cognitive Operating Environment: messages physically absorb into a living cosmic portal, and responses emerge from infinite depth.',
+    changes: [
+      'Canvas 2D cosmic portal ring: obsidian/gold/violet gradient, 38 rotating energy sparks, inner void gradient',
+      'Phase-reactive portal: idle breathing → absorption flare (4.5× sparks) → processing pulse → emergence glow',
+      'Message absorption animation: text flies from input to portal center (Framer Motion, scale 1→0.04, 650ms)',
+      'Response emergence: AI bubble scales from 0.06→1 with 1.1s depth ease (from portal void)',
+      'StreamBubble with letter-by-letter reveal and animated cursor during streaming',
+      'Mode selector pills for all 5 cognitive modes (Prājña / Dhyāna / Akṣaya / Javā / Sañcāra)',
+      'Portal orb (floating orb above ring) + lotus decoration below input',
+      'JS touch scroll handlers for touch-action:none global CSS compatibility',
+      'Full quota / consent / storage / chatStream integration preserved',
+    ],
+    gitHash: '45842e1',
+    pages: ['Medhā'],
+  },
   {
     version: '7.2',
     date: '2026-11-04',
