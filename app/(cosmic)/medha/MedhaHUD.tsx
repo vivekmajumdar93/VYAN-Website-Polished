@@ -916,13 +916,13 @@ export default function MedhaHUD() {
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)', fontFamily: 'var(--font-vyan)', color: 'rgba(255,200,180,0.8)', textAlign: 'center', padding: 24 }}>
         <div>
           <p style={{ fontSize: 13, letterSpacing: '0.08em', marginBottom: 16 }}>MEDHĀ quota reached. Please register to continue.</p>
-          <MedhaConsentSlab onConsent={onConsent} />
+          <MedhaConsentSlab onGranted={onConsent} />
         </div>
       </div>
     );
   }
 
-  if (!consentDone) return <MedhaConsentSlab onConsent={onConsent} />;
+  if (!consentDone) return <MedhaConsentSlab onGranted={onConsent} />;
 
   const [r1, g1, b1] = MC[mode];
   const innerR = typeof window !== 'undefined' ? Math.min(130, (window.innerWidth * 0.4) / 2) : 130;
