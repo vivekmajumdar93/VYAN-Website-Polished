@@ -13,9 +13,26 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.0'
+export const CURRENT_VERSION = '8.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.1',
+    date: '2026-11-04',
+    title: 'MEDHĀ — Everything Alive',
+    summary: 'Every visual element on the Medhā page now animates in constant cinematic loops — undulating ring, void tunnel, flowing particles, nebula background, orbiting satellites.',
+    changes: [
+      'VoidBackground canvas: mode-colored nebula blobs drifting across full viewport, 250-star field with per-star twinkle phases',
+      'Portal ring undulates sinusoidally (5 wave crests, amplitude varies by phase: idle 2px → absorbing 8px)',
+      'Traveling 60° brightness sweep arc + 3 energy orbs running continuous laps around ring',
+      'Void interior: 10 concentric tunnel rings rotating at alternating CW/CCW speeds — always spinning',
+      '~40 void particles constantly flowing toward vanishing-point center, resetting at ring edge',
+      'Orb above portal: pulsing core glow + 2 tiny satellites in perpetual orbit',
+      'All animations run on every frame — phase only changes intensity, nothing ever stops',
+    ],
+    gitHash: '7161ce1',
+    pages: ['Medhā'],
+  },
   {
     version: '8.0',
     date: '2026-11-04',
