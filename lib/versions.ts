@@ -13,9 +13,28 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.3.1'
+export const CURRENT_VERSION = '8.4'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.4',
+    date: '2026-11-06',
+    title: 'Medhā — Asteroid Ring & Void Consciousness',
+    summary: 'Complete Medhā visual overhaul: thick rocky asteroid ring with orange/gold fire and purple corona, response text emerging inside the void, and a new header with grid navigation and sound toggle.',
+    changes: [
+      'CosmicPortal rewritten: thick textured asteroid ring (RING_WIDTH = innerR * 0.52) with fixed orange/gold inner fire + purple outer corona',
+      '340 pre-computed rocky texture dots in the ring annulus for a stone-like surface',
+      'Crystal orb rendered at top of ring with concentric golden arcs',
+      'Golden lotus rendered at bottom with bead chain and elliptical water ripples',
+      'Void text overlay: response text appears centered inside the ring during emerging/responding phases with scale-up animation',
+      'Header redesigned: grid/apps back icon · MEDHĀ title + The Consciousness of VYAN subtitle · sound toggle',
+      'innerR increased to Math.min(150, 35vw) for a larger portal',
+      'DOM lotus decoration removed — now rendered in canvas',
+      'StreamBubble hidden during emerging/responding (text shown in void instead)',
+    ],
+    gitHash: '4e7c831',
+    pages: ['Medhā'],
+  },
   {
     version: '8.3.1',
     date: '2026-11-06',
