@@ -13,7 +13,11 @@ import {
   type StoredMsg,
 } from '@/lib/medha/storage';
 import { incrementQuota, quotaRemaining } from '@/lib/quota/quota';
-import MedhaConsentSlab, { hasLocalConsent, type ConsentSnapshot } from './MedhaConsentSlab';
+import MedhaConsentSlab, {
+  hasLocalConsent, clearLocalConsent,
+  getStoredConsentName, getStoredConsentPurpose,
+  type ConsentSnapshot,
+} from './MedhaConsentSlab';
 import './medha.css';
 
 // ── Phase state machine ────────────────────────────────────────────────────────
@@ -781,7 +785,89 @@ const uid = () =>
     ? (crypto as any).randomUUID()
     : Math.random().toString(36).slice(2);
 
-const GREET_NEW = 'Hello — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. What would you like to explore?';
+function buildGreeting(name: string, purpose: string): string {
+  const n = name?.trim();
+  const p = purpose?.trim();
+  if (!n) return 'Hello — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. What would you like to explore?';
+  if (!p || p.length < 6) return `Welcome, ${n} — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. Where shall we begin?`;
+  return `Welcome, ${n}. You have come seeking: "${p}". I am Medhā — and this is precisely where we begin.`;
+}
+
+// ── RevisitGate ───────────────────────────────────────────────────────────────
+function RevisitGate({ name, onYes, onNo }: { name: string; onYes: () => void; onNo: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
+      }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 24 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+        style={{
+          background: 'linear-gradient(145deg, rgba(12,6,28,0.92), rgba(6,3,16,0.95))',
+          border: '1px solid rgba(154,85,255,0.22)',
+          borderRadius: 20, padding: '40px 32px 36px',
+          maxWidth: 340, width: '90vw', textAlign: 'center',
+        }}
+      >
+        <motion.p
+          animate={{ opacity: [0.35, 0.65, 0.35] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          style={{
+            fontSize: 9, letterSpacing: '0.32em', textTransform: 'uppercase',
+            color: 'rgba(154,85,255,0.6)', fontFamily: 'var(--font-vyan)', marginBottom: 24,
+          }}
+        >
+          MEDHĀ REMEMBERS
+        </motion.p>
+        <h2 style={{
+          fontSize: 17, fontFamily: 'var(--font-vyan)',
+          color: 'rgba(255,230,210,0.88)', marginBottom: 8, letterSpacing: '0.03em', fontWeight: 400,
+        }}>
+          The void remembers you.
+        </h2>
+        <p style={{
+          fontSize: 13.5, color: 'rgba(220,200,185,0.65)', fontFamily: 'var(--font-vyan)',
+          marginBottom: 36, letterSpacing: '0.02em', lineHeight: 1.65,
+        }}>
+          Are you <strong style={{ color: 'rgba(255,230,210,0.9)', fontWeight: 500 }}>{name || 'you'}</strong>?
+        </p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <motion.button
+            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            onClick={onYes}
+            style={{
+              padding: '10px 22px', borderRadius: 50, cursor: 'pointer',
+              border: '1px solid rgba(154,85,255,0.48)',
+              background: 'rgba(154,85,255,0.13)',
+              color: 'rgba(200,170,255,0.92)',
+              fontSize: 10.5, letterSpacing: '0.16em', textTransform: 'uppercase',
+              fontFamily: 'var(--font-vyan)',
+            }}
+          >Yes, it is I</motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            onClick={onNo}
+            style={{
+              padding: '10px 22px', borderRadius: 50, cursor: 'pointer',
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.3)',
+              fontSize: 10.5, letterSpacing: '0.16em', textTransform: 'uppercase',
+              fontFamily: 'var(--font-vyan)',
+            }}
+          >No, I am another</motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function MedhaHUD() {
@@ -797,7 +883,8 @@ export default function MedhaHUD() {
   const [freshIdx, setFreshIdx]   = useState(-1);
   const [flyingText, setFlying]   = useState<string | null>(null);
   const [flyDeltaY, setFlyDeltaY] = useState(0);
-  const [consentDone, setConsent] = useState(false);
+  const [gatePhase, setGatePhase] = useState<'checking' | 'consent' | 'revisit' | 'active'>('checking');
+  const [revisitName, setRevisitName] = useState('');
   const [quotaLeft, setQuota]     = useState(99);
 
   const abortRef    = useRef<AbortController | null>(null);
@@ -810,12 +897,21 @@ export default function MedhaHUD() {
   chatIdRef.current   = chatId;
   messagesRef.current = messages;
 
-  // Init
+  // Gate init
   useEffect(() => {
-    const hasConsent = hasLocalConsent();
-    setConsent(hasConsent);
     setQuota(quotaRemaining('medha'));
-    if (!hasConsent) return;
+    if (hasLocalConsent()) {
+      setRevisitName(getStoredConsentName());
+      setGatePhase('revisit');
+    } else {
+      setGatePhase('consent');
+    }
+  }, []); // eslint-disable-line
+
+  // Chat init when active
+  useEffect(() => {
+    if (gatePhase !== 'active') return;
+    setQuota(quotaRemaining('medha'));
     const id = getCurrentChatId() || newChatId();
     setCurrentChatId(id);
     setChatId(id);
@@ -823,20 +919,30 @@ export default function MedhaHUD() {
     if (stored?.messages?.length) {
       setMessages(stored.messages);
     } else {
-      const greeting: StoredMsg = { id: uid(), role: 'assistant', content: GREET_NEW, mode, ts: Date.now() };
+      const greeting: StoredMsg = {
+        id: uid(), role: 'assistant',
+        content: buildGreeting(getStoredConsentName(), getStoredConsentPurpose()),
+        mode, ts: Date.now(),
+      };
       setMessages([greeting]);
       upsertChat({ id, title: 'New conversation', messages: [greeting], lastInteractionAt: Date.now(), createdAt: Date.now() });
     }
-  }, [consentDone]); // eslint-disable-line
+  }, [gatePhase]); // eslint-disable-line
 
   // Auto-scroll
   useEffect(() => {
     if (chatBotRef.current) chatBotRef.current.scrollTop = chatBotRef.current.scrollHeight;
   }, [messages, streamText]);
 
-  const onConsent = useCallback((_snap: ConsentSnapshot) => {
-    setConsent(true);
-    setQuota(quotaRemaining('medha'));
+  const onConsented = useCallback((_snap: ConsentSnapshot) => {
+    setGatePhase('active');
+  }, []);
+
+  const onRevisitYes = useCallback(() => setGatePhase('active'), []);
+
+  const onRevisitNo = useCallback(() => {
+    clearLocalConsent();
+    setGatePhase('consent');
   }, []);
 
   const switchMode = useCallback((k: CognitiveModeKey) => setMode(k), []);
@@ -911,112 +1017,111 @@ export default function MedhaHUD() {
 
   const goBack = () => router.push('/vistara');
 
-  if (quotaLeft <= 0 && !consentDone) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)', fontFamily: 'var(--font-vyan)', color: 'rgba(255,200,180,0.8)', textAlign: 'center', padding: 24 }}>
-        <div>
-          <p style={{ fontSize: 13, letterSpacing: '0.08em', marginBottom: 16 }}>MEDHĀ quota reached. Please register to continue.</p>
-          <MedhaConsentSlab onGranted={onConsent} />
-        </div>
-      </div>
-    );
-  }
-
-  if (!consentDone) return <MedhaConsentSlab onGranted={onConsent} />;
-
   const [r1, g1, b1] = MC[mode];
-  const innerR = typeof window !== 'undefined' ? Math.min(130, (window.innerWidth * 0.4) / 2) : 130;
+  const innerR = typeof window !== 'undefined' ? Math.min(140, window.innerWidth * 0.30) : 140;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9200, background: '#000', overflow: 'hidden' }}>
 
-      {/* ── Background canvas layer ──────────────────────────────── */}
-      <VoidBackground modeKey={mode} />
+      {/* Background — after checking */}
+      {gatePhase !== 'checking' && <VoidBackground modeKey={mode} />}
 
-      {/* ── Header ──────────────────────────────────────────────── */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 16px',
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 100%)',
-      }}>
-        <button onClick={goBack} style={{
-          background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 20, padding: '5px 11px',
-          color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: '0.16em',
-          fontFamily: 'var(--font-vyan)', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: 5,
-        }}>
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M15 18l-6-6 6-6"/>
-          </svg>
-          VISTĀRA
-        </button>
-        <motion.span
-          animate={{ opacity: [0.4, 0.75, 0.4] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ fontSize: 10, letterSpacing: '0.3em', color: rgba(r1, g1, b1, 0.6), fontFamily: 'var(--font-vyan)', textTransform: 'uppercase' }}
-        >
-          MEDHĀ
-        </motion.span>
-        <div style={{ width: 68 }} />
-      </div>
+      {/* Consent gate */}
+      {gatePhase === 'consent' && <MedhaConsentSlab onGranted={onConsented} />}
 
-      {/* ── Portal section ───────────────────────────────────────── */}
-      <div
-        ref={portalRef}
-        style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'max(60px, 8vh)', position: 'relative', zIndex: 5 }}
-      >
-        <PortalOrb modeKey={mode} />
-        <div style={{ marginTop: 8 }}>
-          <CosmicPortal phase={phase} modeKey={mode} innerR={innerR} />
+      {/* Revisit gate */}
+      {gatePhase === 'revisit' && (
+        <RevisitGate name={revisitName} onYes={onRevisitYes} onNo={onRevisitNo} />
+      )}
+
+      {/* Active chat interface */}
+      {gatePhase === 'active' && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden' }}>
+
+          {/* ── Header ──────────────────────────────────────────────── */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 16px',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 100%)',
+          }}>
+            <button onClick={goBack} style={{
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '5px 11px',
+              color: 'rgba(255,255,255,0.4)', fontSize: 10, letterSpacing: '0.16em',
+              fontFamily: 'var(--font-vyan)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M15 18l-6-6 6-6"/>
+              </svg>
+              VISTĀRA
+            </button>
+            <motion.span
+              animate={{ opacity: [0.4, 0.75, 0.4] }}
+              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ fontSize: 10, letterSpacing: '0.3em', color: rgba(r1, g1, b1, 0.6), fontFamily: 'var(--font-vyan)', textTransform: 'uppercase' }}
+            >
+              MEDHĀ
+            </motion.span>
+            <div style={{ width: 68 }} />
+          </div>
+
+          {/* ── Portal section ───────────────────────────────────────── */}
+          <div
+            ref={portalRef}
+            style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'max(60px, 8vh)', position: 'relative', zIndex: 5 }}
+          >
+            <CosmicPortal phase={phase} modeKey={mode} innerR={innerR} />
+            <div style={{ minHeight: 22, marginTop: 4 }}>
+              <AnimatePresence mode="wait">
+                {phase === 'processing' && <ProcessingLabel key="proc" modeKey={mode} />}
+                {phase === 'error' && (
+                  <motion.p key="err" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    style={{ fontSize: 9.5, letterSpacing: '0.18em', color: 'rgba(255,100,100,0.65)', fontFamily: 'var(--font-vyan)', textAlign: 'center' }}>
+                    {errorMsg || 'Signal lost — try again'}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* ── Chat history ─────────────────────────────────────────── */}
+          <div
+            ref={chatBotRef}
+            style={{ flex: 1, width: '100%', maxWidth: 520, overflowY: 'auto', overflowX: 'hidden', padding: '12px 16px 120px', scrollbarWidth: 'none', position: 'relative', zIndex: 5 }}
+            onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+            onTouchMove={(e) => {
+              const el = e.currentTarget as HTMLDivElement;
+              const dy = (el as any)._touchY - e.touches[0].clientY;
+              (el as any)._touchY = e.touches[0].clientY;
+              el.scrollTop += dy;
+            }}
+          >
+            <div style={{ position: 'sticky', top: 0, height: 36, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)', pointerEvents: 'none', marginBottom: -36, zIndex: 1 }} />
+            {messages.map((m, i) => <ChatBubble key={m.id} msg={m} modeKey={mode} fresh={i === freshIdx} />)}
+            <AnimatePresence>
+              {streamText && <StreamBubble key="stream" text={streamText} modeKey={mode} />}
+            </AnimatePresence>
+          </div>
+
+          {/* ── Lotus decoration ─────────────────────────────────────── */}
+          <motion.div
+            animate={{ opacity: [0.14, 0.26, 0.14] }}
+            transition={{ duration: 4.0, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ position: 'fixed', bottom: 155, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 5 }}
+          >
+            <svg width="28" height="18" viewBox="0 0 60 36" fill="none">
+              <path d="M30 32 C18 32 8 24 8 16 C8 10 14 6 20 8 C22 2 26 0 30 0 C34 0 38 2 40 8 C46 6 52 10 52 16 C52 24 42 32 30 32Z" fill={rgba(r1, g1, b1, 1)} />
+              <path d="M30 32 C22 28 16 20 16 14 C16 10 22 8 26 10 C27 6 28 4 30 4 C32 4 33 6 34 10 C38 8 44 10 44 14 C44 20 38 28 30 32Z" fill={rgba(r1, g1, b1, 0.5)} />
+            </svg>
+          </motion.div>
+
+          {/* ── Input bar ────────────────────────────────────────────── */}
+          <InputBar value={input} onChange={setInput} onSubmit={submit} disabled={phase !== 'idle'} modeKey={mode} onModeChange={switchMode} quotaLeft={quotaLeft} />
+
         </div>
-        <div style={{ minHeight: 22, marginTop: 2 }}>
-          <AnimatePresence mode="wait">
-            {phase === 'processing' && <ProcessingLabel key="proc" modeKey={mode} />}
-            {phase === 'error' && (
-              <motion.p key="err" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                style={{ fontSize: 9.5, letterSpacing: '0.18em', color: 'rgba(255,100,100,0.65)', fontFamily: 'var(--font-vyan)', textAlign: 'center' }}>
-                {errorMsg || 'Signal lost — try again'}
-              </motion.p>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* ── Chat history ─────────────────────────────────────────── */}
-      <div
-        ref={chatBotRef}
-        style={{ flex: 1, width: '100%', maxWidth: 520, overflowY: 'auto', overflowX: 'hidden', padding: '12px 16px 120px', scrollbarWidth: 'none', position: 'relative', zIndex: 5 }}
-        onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
-        onTouchMove={(e) => {
-          const el = e.currentTarget as HTMLDivElement;
-          const dy = (el as any)._touchY - e.touches[0].clientY;
-          (el as any)._touchY = e.touches[0].clientY;
-          el.scrollTop += dy;
-        }}
-      >
-        <div style={{ position: 'sticky', top: 0, height: 36, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)', pointerEvents: 'none', marginBottom: -36, zIndex: 1 }} />
-        {messages.map((m, i) => <ChatBubble key={m.id} msg={m} modeKey={mode} fresh={i === freshIdx} />)}
-        <AnimatePresence>
-          {streamText && <StreamBubble key="stream" text={streamText} modeKey={mode} />}
-        </AnimatePresence>
-      </div>
-
-      {/* ── Lotus decoration ─────────────────────────────────────── */}
-      <motion.div
-        animate={{ opacity: [0.14, 0.26, 0.14] }}
-        transition={{ duration: 4.0, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ position: 'fixed', bottom: 155, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 5 }}
-      >
-        <svg width="28" height="18" viewBox="0 0 60 36" fill="none">
-          <path d="M30 32 C18 32 8 24 8 16 C8 10 14 6 20 8 C22 2 26 0 30 0 C34 0 38 2 40 8 C46 6 52 10 52 16 C52 24 42 32 30 32Z" fill={rgba(r1, g1, b1, 1)} />
-          <path d="M30 32 C22 28 16 20 16 14 C16 10 22 8 26 10 C27 6 28 4 30 4 C32 4 33 6 34 10 C38 8 44 10 44 14 C44 20 38 28 30 32Z" fill={rgba(r1, g1, b1, 0.5)} />
-        </svg>
-      </motion.div>
-
-      {/* ── Input bar ────────────────────────────────────────────── */}
-      <InputBar value={input} onChange={setInput} onSubmit={submit} disabled={phase !== 'idle'} modeKey={mode} onModeChange={switchMode} quotaLeft={quotaLeft} />
+      )}
 
       {/* ── Flying text overlay (absorption) ─────────────────────── */}
       <AnimatePresence>

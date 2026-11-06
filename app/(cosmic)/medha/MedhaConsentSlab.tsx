@@ -10,6 +10,8 @@ import React, { useEffect, useState } from 'react';
 
 const LOCAL_KEY = 'vyan.medha.consent';
 const LOCAL_EMAIL = 'vyan.medha.consent.email';
+const LOCAL_NAME = 'vyan.medha.consent.name';
+const LOCAL_PURPOSE = 'vyan.medha.consent.purpose';
 
 export type ConsentSnapshot = {
   name: string;
@@ -25,8 +27,19 @@ export function hasLocalConsent(): boolean {
 export function getStoredConsentEmail(): string {
   try { return localStorage.getItem(LOCAL_EMAIL) || ''; } catch { return ''; }
 }
+export function getStoredConsentName(): string {
+  try { return localStorage.getItem(LOCAL_NAME) || ''; } catch { return ''; }
+}
+export function getStoredConsentPurpose(): string {
+  try { return localStorage.getItem(LOCAL_PURPOSE) || ''; } catch { return ''; }
+}
 export function clearLocalConsent() {
-  try { localStorage.removeItem(LOCAL_KEY); localStorage.removeItem(LOCAL_EMAIL); } catch {}
+  try {
+    localStorage.removeItem(LOCAL_KEY);
+    localStorage.removeItem(LOCAL_EMAIL);
+    localStorage.removeItem(LOCAL_NAME);
+    localStorage.removeItem(LOCAL_PURPOSE);
+  } catch {}
 }
 
 export default function MedhaConsentSlab({ onGranted }: { onGranted: (snap: ConsentSnapshot) => void }) {
@@ -81,6 +94,8 @@ export default function MedhaConsentSlab({ onGranted }: { onGranted: (snap: Cons
       try {
         localStorage.setItem(LOCAL_KEY, '1');
         localStorage.setItem(LOCAL_EMAIL, email.trim().toLowerCase());
+        localStorage.setItem(LOCAL_NAME, name.trim());
+        localStorage.setItem(LOCAL_PURPOSE, purpose.trim());
       } catch {}
       onGranted({
         name: name.trim(),
