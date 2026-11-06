@@ -40,11 +40,29 @@ export default function MedhaConsentSlab({
 
   return (
     <div className="mcc-veil" role="dialog" aria-modal="true">
-      <div className="mcc-card">
+      <div
+        className="mcc-card"
+        onTouchStart={e => { (e.currentTarget as any)._tY = e.touches[0].clientY; }}
+        onTouchMove={e => {
+          const el = e.currentTarget as HTMLDivElement;
+          const dy = (el as any)._tY - e.touches[0].clientY;
+          (el as any)._tY = e.touches[0].clientY;
+          el.scrollTop += dy;
+        }}
+      >
         <div className="mcc-kicker">Before you enter the void</div>
         <h2 className="mcc-title">Cognitive Interaction Policy</h2>
 
-        <div className="mcc-policy">
+        <div
+          className="mcc-policy"
+          onTouchStart={e => { (e.currentTarget as any)._tY = e.touches[0].clientY; }}
+          onTouchMove={e => {
+            const el = e.currentTarget as HTMLDivElement;
+            const dy = (el as any)._tY - e.touches[0].clientY;
+            (el as any)._tY = e.touches[0].clientY;
+            el.scrollTop += dy;
+          }}
+        >
           <section className="mcc-policy__section">
             <h3 className="mcc-policy__heading">What Medhā may collect</h3>
             <p className="mcc-policy__body">
