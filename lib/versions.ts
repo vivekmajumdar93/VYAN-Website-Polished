@@ -13,9 +13,24 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.4'
+export const CURRENT_VERSION = '8.4.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.4.1',
+    date: '2026-11-06',
+    title: 'Medhā — Ring Visibility & Void Greeting',
+    summary: 'The asteroid ring is now fully visible in idle state: warmer rocky body, bright purple outer edge, and the greeting appears inside the void rather than as a card below.',
+    changes: [
+      'Idle phase brightness raised (glow 0.72→1.05, coronaInt 0.45→0.90, fireInt 0.55→0.95)',
+      'Ring body gradient warmed — ochre/amber inner wall gives the rocky mass visible colour',
+      'Added bright purple/magenta outer edge stroke at RING_OUTER with 28px shadow bloom',
+      'Void text overlay extended to idle phase at 82% opacity — ring shows last AI message in resting state',
+      'Initial auto-greeting suppressed as ChatBubble when first load — shows in void instead',
+    ],
+    gitHash: 'afb372f',
+    pages: ['Medhā'],
+  },
   {
     version: '8.4',
     date: '2026-11-06',
