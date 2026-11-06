@@ -213,12 +213,12 @@ function CosmicPortal({
       // Phase modifiers
       let glow = 1.0, coronaInt = 0.6, fireInt = 0.75, voidBright = 0.0, spkMul = 1.0;
       switch (ph) {
-        case 'idle':       glow = 0.72; coronaInt = 0.45; fireInt = 0.55; break;
+        case 'idle':       glow = 1.05; coronaInt = 0.90; fireInt = 0.95; break;
         case 'absorbing':  glow = 1.9;  coronaInt = 1.1;  fireInt = 1.5;  spkMul = 4.2; break;
-        case 'processing': glow = 1.2;  coronaInt = 0.78; fireInt = 0.90; voidBright = 0.65; spkMul = 2.0; break;
-        case 'emerging':   glow = 1.4;  coronaInt = 0.90; fireInt = 1.05; voidBright = 0.90; spkMul = 1.5; break;
-        case 'responding': glow = 1.0;  fireInt = 0.70;   voidBright = 0.18; break;
-        case 'error':      glow = 0.48; coronaInt = 0.28; fireInt = 0.30; break;
+        case 'processing': glow = 1.3;  coronaInt = 1.0;  fireInt = 1.10; voidBright = 0.65; spkMul = 2.0; break;
+        case 'emerging':   glow = 1.5;  coronaInt = 1.05; fireInt = 1.20; voidBright = 0.90; spkMul = 1.5; break;
+        case 'responding': glow = 1.1;  coronaInt = 0.85; fireInt = 0.85; voidBright = 0.18; break;
+        case 'error':      glow = 0.55; coronaInt = 0.35; fireInt = 0.38; break;
       }
 
       const breath = 2.8 * Math.sin(t * 0.016);
@@ -263,11 +263,11 @@ function CosmicPortal({
       ctx.arc(cx, cy, R - 2, 0, TWO_PI, true);
       ctx.clip();
       const rg = ctx.createRadialGradient(cx, cy, R, cx, cy, RING_OUTER);
-      rg.addColorStop(0,    'rgba(32,10,0,0.72)');
-      rg.addColorStop(0.22, 'rgba(12,4,2,0.82)');
-      rg.addColorStop(0.55, 'rgba(5,2,12,0.86)');
-      rg.addColorStop(0.85, 'rgba(8,2,24,0.76)');
-      rg.addColorStop(1,    'rgba(20,5,42,0.60)');
+      rg.addColorStop(0,    'rgba(80,32,4,0.92)');
+      rg.addColorStop(0.18, 'rgba(44,16,6,0.96)');
+      rg.addColorStop(0.42, 'rgba(16,6,22,0.96)');
+      rg.addColorStop(0.72, 'rgba(14,5,38,0.90)');
+      rg.addColorStop(1,    'rgba(32,8,65,0.78)');
       ctx.fillStyle = rg; ctx.fillRect(0, 0, S, S);
       ctx.restore();
 
@@ -301,6 +301,16 @@ function CosmicPortal({
         ctx.strokeStyle = `rgba(255,185,0,${(0.95 * fireInt * glow).toFixed(3)})`;
         ctx.shadowColor = 'rgba(255,140,0,0.9)'; ctx.shadowBlur = 20;
         ctx.beginPath(); ctx.arc(cx, cy, R, 0, TWO_PI); ctx.stroke();
+        ctx.restore();
+      }
+
+      // Purple outer ring edge — makes the ring body thickness visible
+      {
+        ctx.save();
+        ctx.lineWidth = 2.4 + 1.4 * Math.sin(t * 0.019 + 1.2);
+        ctx.strokeStyle = `rgba(210,60,255,${(0.92 * coronaInt * glow).toFixed(3)})`;
+        ctx.shadowColor = 'rgba(180,0,255,0.90)'; ctx.shadowBlur = 28;
+        ctx.beginPath(); ctx.arc(cx, cy, RING_OUTER, 0, TWO_PI); ctx.stroke();
         ctx.restore();
       }
 
@@ -1167,13 +1177,13 @@ export default function MedhaHUD() {
 
               {/* Text inside the void — appears during emerging/responding */}
               <AnimatePresence>
-                {(phase === 'emerging' || phase === 'responding') && (streamText || messages.length > 0) && (
+                {(phase === 'idle' || phase === 'emerging' || phase === 'responding') && (streamText || messages.length > 0) && (
                   <motion.div
-                    key={phase === 'emerging' ? 'stream' : 'resp'}
-                    initial={{ opacity: 0, scale: 0.25 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    key={phase === 'idle' ? 'idle-resp' : phase === 'emerging' ? 'stream' : 'resp'}
+                    initial={{ opacity: 0, scale: 0.3 }}
+                    animate={{ opacity: phase === 'idle' ? 0.82 : 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.1 }}
-                    transition={{ duration: 0.9, ease: [0.08, 0.95, 0.3, 1.0] }}
+                    transition={{ duration: phase === 'idle' ? 1.6 : 0.9, ease: [0.08, 0.95, 0.3, 1.0] }}
                     style={{
                       position: 'absolute',
                       top: '50%', left: '50%',
@@ -1240,7 +1250,11 @@ export default function MedhaHUD() {
             }}
           >
             <div style={{ position: 'sticky', top: 0, height: 24, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)', pointerEvents: 'none', marginBottom: -24, zIndex: 1 }} />
-            {messages.map((m, i) => <ChatBubble key={m.id} msg={m} modeKey={mode} fresh={i === freshIdx} />)}
+            {messages.map((m, i) => {
+              // suppress the first auto-greeting — it shows in the void instead
+              if (i === 0 && m.role === 'assistant' && messages.length === 1) return null;
+              return <ChatBubble key={m.id} msg={m} modeKey={mode} fresh={i === freshIdx} />;
+            })}
             <AnimatePresence>
               {streamText && phase !== 'emerging' && phase !== 'responding' && <StreamBubble key="stream" text={streamText} modeKey={mode} />}
             </AnimatePresence>
