@@ -13,9 +13,27 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.2'
+export const CURRENT_VERSION = '8.3'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.3',
+    date: '2026-11-06',
+    title: 'MEDHĀ — Policy Consent Gate',
+    summary: 'The consent form is replaced with a Cognitive Interaction Policy. Users agree to full features or proceed as a guest with temporary, non-persistent conversations.',
+    changes: [
+      'MedhaConsentSlab fully rewritten — no form fields, policy text with 4 sections instead',
+      'Agree path: localStorage key vyan.medha.consent=1, full features and persistent chat',
+      'Deny path: localStorage key vyan.medha.consent.denied=1, guest mode — temporary session only',
+      'Guest greeting explicitly states conversations will not be saved',
+      'Returning consented users enter Medhā directly (revisit gate removed — simpler flow)',
+      'Guest mode banner shown in header: "GUEST SESSION · TEMPORARY" with "Consent & Unlock" button',
+      'Chat persistence skipped (upsertChat not called) in guest mode',
+      'New hasLocalDenial() export; clearLocalConsent() now clears both consent and denial flags',
+    ],
+    gitHash: '6a05fa8',
+    pages: ['Medhā'],
+  },
   {
     version: '8.2',
     date: '2026-11-06',
