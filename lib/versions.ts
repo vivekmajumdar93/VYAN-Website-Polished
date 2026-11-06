@@ -13,9 +13,25 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.5'
+export const CURRENT_VERSION = '8.6'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.6',
+    date: '2026-11-06',
+    title: 'Medhā — Cinematic Tilt Transition',
+    summary: 'Orientation change is now seamless: the ring geometry interpolates smoothly over 820 ms with no blank screen, no snap, no flash.',
+    changes: [
+      'Canvas set once to max(screen.width, screen.height) — never resized on rotation, eliminating the blank-flash',
+      'curGeo / tgtGeo GeoState objects lerp over 820 ms using ease-in-out cubic on every resize or orientationchange',
+      'Mid-flight rotations snapshot the current interpolated position so back-and-forth tilts stay continuous',
+      '460 texture dots use a seeded PRNG; their (x,y) positions lerp each frame so the rocky texture migrates with the ring',
+      'Canvas is position:fixed (z-index:1); void text overlay and processing label are also position:fixed',
+      '68svh layout spacer reserves flow space for chat history below the ring on portrait screens',
+    ],
+    gitHash: 'c6650ea',
+    pages: ['Medhā'],
+  },
   {
     version: '8.5',
     date: '2026-11-06',
