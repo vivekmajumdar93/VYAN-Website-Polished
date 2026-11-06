@@ -13,9 +13,21 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.3'
+export const CURRENT_VERSION = '8.3.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.3.1',
+    date: '2026-11-06',
+    title: 'Fix: Consent Policy Scroll on iOS',
+    summary: 'Policy text in the consent gate is now scrollable on iOS — touch handlers added to both the card and the policy text area.',
+    changes: [
+      'onTouchStart/onTouchMove added to .mcc-policy div — policy sections now scroll on iOS',
+      'onTouchStart/onTouchMove added to .mcc-card div — full card scrolls on small screens',
+    ],
+    gitHash: 'c1fbe61',
+    pages: ['Medhā'],
+  },
   {
     version: '8.3',
     date: '2026-11-06',
