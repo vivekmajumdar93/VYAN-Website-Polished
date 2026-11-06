@@ -14,8 +14,7 @@ import {
 } from '@/lib/medha/storage';
 import { incrementQuota, quotaRemaining } from '@/lib/quota/quota';
 import MedhaConsentSlab, {
-  hasLocalConsent, clearLocalConsent,
-  getStoredConsentName, getStoredConsentPurpose,
+  hasLocalConsent, hasLocalDenial, clearLocalConsent,
   type ConsentSnapshot,
 } from './MedhaConsentSlab';
 import './medha.css';
@@ -785,88 +784,9 @@ const uid = () =>
     ? (crypto as any).randomUUID()
     : Math.random().toString(36).slice(2);
 
-function buildGreeting(name: string, purpose: string): string {
-  const n = name?.trim();
-  const p = purpose?.trim();
-  if (!n) return 'Hello — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. What would you like to explore?';
-  if (!p || p.length < 6) return `Welcome, ${n} — I am Medhā, the Cognitive Intelligence of VYAN. It is a quiet honour to meet you. Where shall we begin?`;
-  return `Welcome, ${n}. You have come seeking: "${p}". I am Medhā — and this is precisely where we begin.`;
-}
-
-// ── RevisitGate ───────────────────────────────────────────────────────────────
-function RevisitGate({ name, onYes, onNo }: { name: string; onYes: () => void; onNo: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 100,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
-      }}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.94, y: 24 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-        style={{
-          background: 'linear-gradient(145deg, rgba(12,6,28,0.92), rgba(6,3,16,0.95))',
-          border: '1px solid rgba(154,85,255,0.22)',
-          borderRadius: 20, padding: '40px 32px 36px',
-          maxWidth: 340, width: '90vw', textAlign: 'center',
-        }}
-      >
-        <motion.p
-          animate={{ opacity: [0.35, 0.65, 0.35] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          style={{
-            fontSize: 9, letterSpacing: '0.32em', textTransform: 'uppercase',
-            color: 'rgba(154,85,255,0.6)', fontFamily: 'var(--font-vyan)', marginBottom: 24,
-          }}
-        >
-          MEDHĀ REMEMBERS
-        </motion.p>
-        <h2 style={{
-          fontSize: 17, fontFamily: 'var(--font-vyan)',
-          color: 'rgba(255,230,210,0.88)', marginBottom: 8, letterSpacing: '0.03em', fontWeight: 400,
-        }}>
-          The void remembers you.
-        </h2>
-        <p style={{
-          fontSize: 13.5, color: 'rgba(220,200,185,0.65)', fontFamily: 'var(--font-vyan)',
-          marginBottom: 36, letterSpacing: '0.02em', lineHeight: 1.65,
-        }}>
-          Are you <strong style={{ color: 'rgba(255,230,210,0.9)', fontWeight: 500 }}>{name || 'you'}</strong>?
-        </p>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <motion.button
-            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-            onClick={onYes}
-            style={{
-              padding: '10px 22px', borderRadius: 50, cursor: 'pointer',
-              border: '1px solid rgba(154,85,255,0.48)',
-              background: 'rgba(154,85,255,0.13)',
-              color: 'rgba(200,170,255,0.92)',
-              fontSize: 10.5, letterSpacing: '0.16em', textTransform: 'uppercase',
-              fontFamily: 'var(--font-vyan)',
-            }}
-          >Yes, it is I</motion.button>
-          <motion.button
-            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-            onClick={onNo}
-            style={{
-              padding: '10px 22px', borderRadius: 50, cursor: 'pointer',
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: 'transparent',
-              color: 'rgba(255,255,255,0.3)',
-              fontSize: 10.5, letterSpacing: '0.16em', textTransform: 'uppercase',
-              fontFamily: 'var(--font-vyan)',
-            }}
-          >No, I am another</motion.button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
+function buildGreeting(isGuest: boolean): string {
+  if (isGuest) return 'Hello — I am Medhā. You have entered in guest mode. Our conversation is temporary and will not be saved after you leave. What would you like to explore?';
+  return 'Hello — I am Medhā, the Cognitive Intelligence of VYAN. Your conversations here are remembered and await your return. What would you like to explore?';
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -883,26 +803,31 @@ export default function MedhaHUD() {
   const [freshIdx, setFreshIdx]   = useState(-1);
   const [flyingText, setFlying]   = useState<string | null>(null);
   const [flyDeltaY, setFlyDeltaY] = useState(0);
-  const [gatePhase, setGatePhase] = useState<'checking' | 'consent' | 'revisit' | 'active'>('checking');
-  const [revisitName, setRevisitName] = useState('');
+  const [gatePhase, setGatePhase] = useState<'checking' | 'consent' | 'active'>('checking');
+  const [guestMode, setGuestMode] = useState(false);
   const [quotaLeft, setQuota]     = useState(99);
 
-  const abortRef    = useRef<AbortController | null>(null);
-  const chatBotRef  = useRef<HTMLDivElement>(null);
-  const portalRef   = useRef<HTMLDivElement>(null);
-  const phaseRef    = useRef(phase);
-  const chatIdRef   = useRef(chatId);
-  const messagesRef = useRef(messages);
-  phaseRef.current    = phase;
-  chatIdRef.current   = chatId;
-  messagesRef.current = messages;
+  const abortRef     = useRef<AbortController | null>(null);
+  const chatBotRef   = useRef<HTMLDivElement>(null);
+  const portalRef    = useRef<HTMLDivElement>(null);
+  const phaseRef     = useRef(phase);
+  const chatIdRef    = useRef(chatId);
+  const messagesRef  = useRef(messages);
+  const guestModeRef = useRef(guestMode);
+  phaseRef.current     = phase;
+  chatIdRef.current    = chatId;
+  messagesRef.current  = messages;
+  guestModeRef.current = guestMode;
 
   // Gate init
   useEffect(() => {
     setQuota(quotaRemaining('medha'));
     if (hasLocalConsent()) {
-      setRevisitName(getStoredConsentName());
-      setGatePhase('revisit');
+      setGuestMode(false);
+      setGatePhase('active');
+    } else if (hasLocalDenial()) {
+      setGuestMode(true);
+      setGatePhase('active');
     } else {
       setGatePhase('consent');
     }
@@ -912,22 +837,33 @@ export default function MedhaHUD() {
   useEffect(() => {
     if (gatePhase !== 'active') return;
     setQuota(quotaRemaining('medha'));
-    const id = getCurrentChatId() || newChatId();
-    setCurrentChatId(id);
-    setChatId(id);
-    const stored = getChat(id);
-    if (stored?.messages?.length) {
-      setMessages(stored.messages);
-    } else {
+    if (guestMode) {
+      const id = newChatId();
+      setChatId(id);
       const greeting: StoredMsg = {
         id: uid(), role: 'assistant',
-        content: buildGreeting(getStoredConsentName(), getStoredConsentPurpose()),
+        content: buildGreeting(true),
         mode, ts: Date.now(),
       };
       setMessages([greeting]);
-      upsertChat({ id, title: 'New conversation', messages: [greeting], lastInteractionAt: Date.now(), createdAt: Date.now() });
+    } else {
+      const id = getCurrentChatId() || newChatId();
+      setCurrentChatId(id);
+      setChatId(id);
+      const stored = getChat(id);
+      if (stored?.messages?.length) {
+        setMessages(stored.messages);
+      } else {
+        const greeting: StoredMsg = {
+          id: uid(), role: 'assistant',
+          content: buildGreeting(false),
+          mode, ts: Date.now(),
+        };
+        setMessages([greeting]);
+        upsertChat({ id, title: 'New conversation', messages: [greeting], lastInteractionAt: Date.now(), createdAt: Date.now() });
+      }
     }
-  }, [gatePhase]); // eslint-disable-line
+  }, [gatePhase, guestMode]); // eslint-disable-line
 
   // Auto-scroll
   useEffect(() => {
@@ -935,14 +871,13 @@ export default function MedhaHUD() {
   }, [messages, streamText]);
 
   const onConsented = useCallback((_snap: ConsentSnapshot) => {
+    setGuestMode(false);
     setGatePhase('active');
   }, []);
 
-  const onRevisitYes = useCallback(() => setGatePhase('active'), []);
-
-  const onRevisitNo = useCallback(() => {
-    clearLocalConsent();
-    setGatePhase('consent');
+  const onDenied = useCallback(() => {
+    setGuestMode(true);
+    setGatePhase('active');
   }, []);
 
   const switchMode = useCallback((k: CognitiveModeKey) => setMode(k), []);
@@ -998,7 +933,9 @@ export default function MedhaHUD() {
           setMessages(prev => {
             const next = [...prev, assistantMsg];
             setFreshIdx(next.length - 1);
-            upsertChat({ id: chatIdRef.current, title: text.slice(0, 55), messages: next, lastInteractionAt: Date.now(), createdAt: Date.now() });
+            if (!guestModeRef.current) {
+              upsertChat({ id: chatIdRef.current, title: text.slice(0, 55), messages: next, lastInteractionAt: Date.now(), createdAt: Date.now() });
+            }
             return next;
           });
           setStream('');
@@ -1027,12 +964,7 @@ export default function MedhaHUD() {
       {gatePhase !== 'checking' && <VoidBackground modeKey={mode} />}
 
       {/* Consent gate */}
-      {gatePhase === 'consent' && <MedhaConsentSlab onGranted={onConsented} />}
-
-      {/* Revisit gate */}
-      {gatePhase === 'revisit' && (
-        <RevisitGate name={revisitName} onYes={onRevisitYes} onNo={onRevisitNo} />
-      )}
+      {gatePhase === 'consent' && <MedhaConsentSlab onGranted={onConsented} onDenied={onDenied} />}
 
       {/* Active chat interface */}
       {gatePhase === 'active' && (
@@ -1066,6 +998,35 @@ export default function MedhaHUD() {
             </motion.span>
             <div style={{ width: 68 }} />
           </div>
+
+          {/* ── Guest mode banner ────────────────────────────────────── */}
+          {guestMode && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                position: 'absolute', top: 46, left: 0, right: 0, zIndex: 9,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                padding: '5px 16px',
+                background: 'rgba(255,160,80,0.07)',
+                borderBottom: '1px solid rgba(255,160,80,0.10)',
+              }}
+            >
+              <span style={{ fontSize: 9, letterSpacing: '0.22em', color: 'rgba(255,180,100,0.60)', fontFamily: 'var(--font-vyan)', textTransform: 'uppercase' }}>
+                GUEST SESSION · TEMPORARY
+              </span>
+              <button
+                onClick={() => { clearLocalConsent(); setGuestMode(false); setGatePhase('consent'); setMessages([]); }}
+                style={{
+                  background: 'none', border: '1px solid rgba(255,180,100,0.28)', borderRadius: 20,
+                  padding: '2px 8px', color: 'rgba(255,180,100,0.60)', fontSize: 8.5,
+                  letterSpacing: '0.14em', textTransform: 'uppercase', fontFamily: 'var(--font-vyan)', cursor: 'pointer',
+                }}
+              >
+                Consent &amp; Unlock
+              </button>
+            </motion.div>
+          )}
 
           {/* ── Portal section ───────────────────────────────────────── */}
           <div
