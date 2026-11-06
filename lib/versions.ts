@@ -13,9 +13,26 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.1'
+export const CURRENT_VERSION = '8.2'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.2',
+    date: '2026-11-06',
+    title: 'MEDHĀ — Gate Fixed, Greeting Personal',
+    summary: 'NebulaFooter no longer covers the Medhā input. Returning users see a cosmic revisit gate. First-time greeting is personalised from consent purpose.',
+    changes: [
+      'Root z-index raised 30→9200 — MedhaHUD now covers NebulaFooter (z-index 9100) on all pages',
+      'PortalOrb widget removed; CosmicPortal ring is the sole dominant visual element',
+      'Portal ring scaled larger: innerR = min(140, screenWidth×0.30) instead of fixed 78px on mobile',
+      'Revisit gate: returning users see "Are you [Name]? Yes / No" — No clears consent and shows full form',
+      'Greeting personalised from stored consent name and purpose, not a generic placeholder',
+      'MedhaConsentSlab now persists name and purpose to localStorage (vyan.medha.consent.name / .purpose)',
+      'Gate phase state machine (checking→consent|revisit→active) replaces boolean consentDone flag',
+    ],
+    gitHash: '5026ed6',
+    pages: ['Medhā'],
+  },
   {
     version: '8.1',
     date: '2026-11-04',
