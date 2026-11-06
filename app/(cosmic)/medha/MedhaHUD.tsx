@@ -135,11 +135,9 @@ function VoidBackground({ modeKey }: { modeKey: CognitiveModeKey }) {
   );
 }
 
-// ── CosmicPortal: textured asteroid ring + crystal orb + lotus ────────────────
-function CosmicPortal({
-  phase, modeKey, innerR = 150,
-}: { phase: Phase; modeKey: CognitiveModeKey; innerR?: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+// ── CosmicPortal: responsive ellipse ring (portrait=circle, landscape=oval) ─────
+function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveModeKey }) {
+  const ref      = useRef<HTMLCanvasElement>(null);
   const phaseRef = useRef(phase);
   const modeRef  = useRef(modeKey);
   phaseRef.current = phase;
@@ -148,134 +146,191 @@ function CosmicPortal({
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
-    const ctx = c.getContext('2d')!;
     const TWO_PI = Math.PI * 2;
-    const pad = 115;
-    const S = innerR * 2 + pad * 2;
-    c.width = S; c.height = S;
-    const cx = S / 2, cy = S / 2;
-
-    // Ring geometry (thick, rocky)
-    const RING_WIDTH = innerR * 0.52;
-    const RING_MID   = innerR + RING_WIDTH * 0.5;
-    const RING_OUTER = innerR + RING_WIDTH;
-
-    // Orb (top of ring) and Lotus (bottom of ring)
-    const ORB_Y   = cy - RING_MID;
-    const ORB_R   = innerR * 0.11;
-    const LOTUS_Y = cy + RING_MID;
-    const LOTUS_S = innerR * 0.105;
-
-    // Pre-compute texture dots for rocky ring surface
-    type TexDot = { x: number; y: number; r: number; c: string };
-    const texDots: TexDot[] = [];
-    for (let i = 0; i < 340; i++) {
-      const angle  = Math.random() * TWO_PI;
-      const radius = innerR + 2 + Math.random() * (RING_WIDTH - 4);
-      const x = cx + radius * Math.cos(angle);
-      const y = cy + radius * Math.sin(angle);
-      const dotR = 0.5 + Math.random() * 1.9;
-      const a = 0.07 + Math.random() * 0.24;
-      const warm = Math.random() > 0.4;
-      const cr = warm ? 50 + Math.floor(Math.random() * 55) : 15 + Math.floor(Math.random() * 25);
-      const cg = warm ? 10 + Math.floor(Math.random() * 18) : 4;
-      const cb = warm ? Math.floor(Math.random() * 14) : 28 + Math.floor(Math.random() * 55);
-      texDots.push({ x, y, r: dotR, c: `rgba(${cr},${cg},${cb},${a.toFixed(2)})` });
-    }
-
-    // Fire sparks travelling the inner edge
-    type Spark = { a: number; spd: number; br: number; sz: number };
-    const sparks: Spark[] = Array.from({ length: 54 }, (_, i) => ({
-      a: (i / 54) * TWO_PI,
-      spd: 0.0016 + Math.random() * 0.0026,
-      br: 0.3 + Math.random() * 0.7,
-      sz: 0.8 + Math.random() * 1.9,
-    }));
-
-    // Void particles (flow inward during active phases)
-    type VP = { r: number; a: number; spd: number; br: number; sz: number };
-    const voidPs: VP[] = Array.from({ length: 32 }, () => ({
-      r: innerR * (0.1 + Math.random() * 0.85),
-      a: Math.random() * TWO_PI,
-      spd: 0.0018 + Math.random() * 0.0038,
-      br: 0.2 + Math.random() * 0.5,
-      sz: 0.5 + Math.random() * 1.1,
-    }));
-
     let raf: number, t = 0;
 
+    // ── geometry computed on (re)size ──────────────────────────────────────
+    type Dims = {
+      ctx: CanvasRenderingContext2D; dpr: number;
+      cw: number; ch: number; cx: number; cy: number;
+      rxi: number; ryi: number;          // inner ellipse radii (void edge)
+      ringW: number;
+      rx_mid: number; ry_mid: number;    // ring mass-centre radii
+      rx_out: number; ry_out: number;    // outer ring surface radii
+      ORB_Y: number; ORB_R: number;
+      LOTUS_Y: number; LOTUS_S: number;
+      RIPPLE_Y: number;
+      texDots: { x:number; y:number; r:number; c:string }[];
+    };
+    let dims: Dims | null = null;
+
+    const setup = (): Dims => {
+      const ctx = c.getContext('2d')!;
+      const dpr  = Math.min(window.devicePixelRatio || 1, 2);
+      const W    = window.innerWidth;
+      const H    = window.innerHeight;
+      const land = W > H * 1.1;
+
+      // canvas logical size
+      const cw = land ? Math.min(W * 0.98, 1400) : Math.min(W * 0.96, 500);
+      const ch = land ? Math.min(H * 0.70, 480)  : cw * 1.42;
+      c.width  = Math.round(cw * dpr);
+      c.height = Math.round(ch * dpr);
+      c.style.width  = cw + 'px';
+      c.style.height = ch + 'px';
+
+      const cx = cw / 2;
+      const cy = land ? ch * 0.50 : ch * 0.42;
+
+      // inner radii (void edge)
+      const rxi = land ? cw * 0.40 : cw * 0.42;
+      const ryi = land ? ch * 0.37 : rxi * 0.98;
+
+      const ringW  = Math.min(rxi, ryi) * 0.36;
+      const rx_mid = rxi + ringW * 0.5;
+      const ry_mid = ryi + ringW * 0.5;
+      const rx_out = rxi + ringW;
+      const ry_out = ryi + ringW;
+
+      // orb sits at top outer ring surface
+      const ORB_R = Math.min(rxi, ryi) * 0.092;
+      const ORB_Y = cy - ry_out;
+
+      // lotus sits just below outer ring bottom
+      const LOTUS_S = Math.min(rxi, ryi) * 0.082;
+      const LOTUS_Y = cy + ry_out + LOTUS_S * 0.8;
+
+      const RIPPLE_Y = ch * 0.90;
+
+      // ring texture dots (ellipse annulus)
+      const texDots: { x:number; y:number; r:number; c:string }[] = [];
+      for (let i = 0; i < 460; i++) {
+        const ang   = Math.random() * TWO_PI;
+        const frac  = Math.random();
+        const ex    = (rxi + frac * ringW) * Math.cos(ang);
+        const ey    = (ryi + frac * ringW) * Math.sin(ang);
+        const outer = frac > 0.6;
+        texDots.push({
+          x: cx + ex, y: cy + ey,
+          r: 0.5 + Math.random() * 1.9,
+          c: outer
+            ? `rgba(${80 + Math.random()*60|0},${15+Math.random()*18|0},${90+Math.random()*80|0},${(0.28+Math.random()*0.38).toFixed(2)})`
+            : `rgba(${95 + Math.random()*85|0},${35+Math.random()*28|0},${8 +Math.random()*14|0},${(0.22+Math.random()*0.32).toFixed(2)})`,
+        });
+      }
+
+      return { ctx, dpr, cw, ch, cx, cy, rxi, ryi, ringW, rx_mid, ry_mid, rx_out, ry_out, ORB_Y, ORB_R, LOTUS_Y, LOTUS_S, RIPPLE_Y, texDots };
+    };
+
+    dims = setup();
+
+    const onResize = () => { dims = setup(); };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => setTimeout(onResize, 120));
+
+    // ── draw loop ──────────────────────────────────────────────────────────
     const draw = () => {
       t++;
-      ctx.clearRect(0, 0, S, S);
-      const ph = phaseRef.current;
-      const [mr, mg, mb] = MC[modeRef.current]; // mode color → void interior only
+      if (!dims) { raf = requestAnimationFrame(draw); return; }
+      const { ctx, dpr, cw, ch, cx, cy, rxi, ryi, ringW, rx_mid, ry_mid, rx_out, ry_out, ORB_Y, ORB_R, LOTUS_Y, LOTUS_S, RIPPLE_Y, texDots } = dims;
 
-      // Phase modifiers
-      let glow = 1.0, coronaInt = 0.6, fireInt = 0.75, voidBright = 0.0, spkMul = 1.0;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cw, ch);
+
+      const ph = phaseRef.current;
+      const [mr, mg, mb] = MC[modeRef.current];
+
+      let glow = 1.05, coronaInt = 0.90, fireInt = 0.95, voidBright = 0.0, spkMul = 1.0;
       switch (ph) {
-        case 'idle':       glow = 1.05; coronaInt = 0.90; fireInt = 0.95; break;
-        case 'absorbing':  glow = 1.9;  coronaInt = 1.1;  fireInt = 1.5;  spkMul = 4.2; break;
-        case 'processing': glow = 1.3;  coronaInt = 1.0;  fireInt = 1.10; voidBright = 0.65; spkMul = 2.0; break;
-        case 'emerging':   glow = 1.5;  coronaInt = 1.05; fireInt = 1.20; voidBright = 0.90; spkMul = 1.5; break;
+        case 'idle':       glow = 1.05; coronaInt = 0.92; fireInt = 0.98; break;
+        case 'absorbing':  glow = 1.9;  coronaInt = 1.1;  fireInt = 1.5;  spkMul = 4.5; break;
+        case 'processing': glow = 1.3;  coronaInt = 1.0;  fireInt = 1.1;  voidBright = 0.65; spkMul = 2.2; break;
+        case 'emerging':   glow = 1.5;  coronaInt = 1.05; fireInt = 1.2;  voidBright = 0.90; spkMul = 1.5; break;
         case 'responding': glow = 1.1;  coronaInt = 0.85; fireInt = 0.85; voidBright = 0.18; break;
         case 'error':      glow = 0.55; coronaInt = 0.35; fireInt = 0.38; break;
       }
 
-      const breath = 2.8 * Math.sin(t * 0.016);
-      const R = innerR + breath;
+      const breath    = 2.6 * Math.sin(t * 0.016);
       const fireBreath = 0.75 + 0.25 * Math.sin(t * 0.028);
+      const rxi_b = rxi + breath * 0.7;
+      const ryi_b = ryi + breath * 0.7 * (ryi / rxi);
 
-      // ── 1. Outer purple / magenta corona ────────────────────────────────
+      // helper: ellipse path at any radii (uses current cx/cy)
+      const ePath = (erx: number, ery: number, ccw = false) =>
+        ctx.ellipse(cx, cy, erx, ery, 0, 0, TWO_PI, ccw);
+
+      // ── 0. Dark base + blue side nebula ───────────────────────────────────
+      ctx.fillStyle = 'rgba(2,0,14,1)';
+      ctx.fillRect(0, 0, cw, ch);
       {
-        const cg = ctx.createRadialGradient(cx, cy, RING_OUTER * 0.85, cx, cy, RING_OUTER * 1.62);
-        cg.addColorStop(0,   `rgba(165,0,255,${(0.68 * coronaInt * glow).toFixed(3)})`);
-        cg.addColorStop(0.3, `rgba(105,0,215,${(0.42 * coronaInt * glow).toFixed(3)})`);
-        cg.addColorStop(0.65,`rgba(55,0,145,${(0.18 * coronaInt * glow).toFixed(3)})`);
-        cg.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(cx, cy, RING_OUTER * 1.62, 0, TWO_PI);
+        // blue-cyan wisps: left side
+        const bg1 = ctx.createRadialGradient(cx - rx_out * 0.95, cy, 0, cx - rx_out * 0.95, cy, rx_out * 1.2);
+        bg1.addColorStop(0,   `rgba(0,80,210,${(0.14*glow).toFixed(2)})`);
+        bg1.addColorStop(0.4, `rgba(0,120,255,${(0.07*glow).toFixed(2)})`);
+        bg1.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = bg1; ctx.fillRect(0, 0, cw, ch);
+        // right side
+        const bg2 = ctx.createRadialGradient(cx + rx_out * 0.95, cy, 0, cx + rx_out * 0.95, cy, rx_out * 1.2);
+        bg2.addColorStop(0,   `rgba(0,60,190,${(0.14*glow).toFixed(2)})`);
+        bg2.addColorStop(0.4, `rgba(0,100,240,${(0.07*glow).toFixed(2)})`);
+        bg2.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = bg2; ctx.fillRect(0, 0, cw, ch);
+        // ground mist
+        const gm = ctx.createLinearGradient(0, ch * 0.70, 0, ch);
+        gm.addColorStop(0, 'rgba(0,0,0,0)');
+        gm.addColorStop(1, `rgba(0,25,90,${(0.16*glow).toFixed(2)})`);
+        ctx.fillStyle = gm; ctx.fillRect(0, 0, cw, ch);
+      }
+
+      // ── 1. Corona radial glow ──────────────────────────────────────────────
+      {
+        const cg = ctx.createRadialGradient(cx, cy, Math.min(rx_out,ry_out)*0.88, cx, cy, Math.max(rx_out,ry_out)*1.80);
+        cg.addColorStop(0,    `rgba(165,0,255,${(0.72*coronaInt*glow).toFixed(2)})`);
+        cg.addColorStop(0.28, `rgba(100,0,220,${(0.44*coronaInt*glow).toFixed(2)})`);
+        cg.addColorStop(0.60, `rgba(50,0,140,${(0.18*coronaInt*glow).toFixed(2)})`);
+        cg.addColorStop(1,    'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(rx_out,ry_out)*1.80, 0, TWO_PI);
         ctx.fillStyle = cg; ctx.fill();
       }
-      // Rotating magenta wisps
+      // Rotating corona wisps (4)
       {
-        const wa = t * 0.007;
-        for (let k = 0; k < 3; k++) {
-          const wx = cx + RING_OUTER * 0.4 * Math.cos(wa + k * TWO_PI / 3);
-          const wy = cy + RING_OUTER * 0.4 * Math.sin(wa + k * TWO_PI / 3);
-          const wg = ctx.createRadialGradient(wx, wy, 0, wx, wy, RING_OUTER * 0.68);
-          wg.addColorStop(0, `rgba(230,0,185,${(0.12 * glow).toFixed(3)})`);
+        const wa = t * 0.006;
+        for (let k = 0; k < 4; k++) {
+          const a   = wa + k * Math.PI / 2;
+          const wx  = cx + rx_out * 0.52 * Math.cos(a);
+          const wy  = cy + ry_out * 0.52 * Math.sin(a);
+          const wr  = Math.min(rx_out, ry_out) * 0.78;
+          const wg  = ctx.createRadialGradient(wx, wy, 0, wx, wy, wr);
+          wg.addColorStop(0, `rgba(230,0,210,${(0.11*glow).toFixed(2)})`);
           wg.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.beginPath(); ctx.arc(wx, wy, RING_OUTER * 0.68, 0, TWO_PI);
+          ctx.beginPath(); ctx.arc(wx, wy, wr, 0, TWO_PI);
           ctx.fillStyle = wg; ctx.fill();
         }
       }
 
-      // ── 2. Rocky ring body (thick dark stroke) ───────────────────────────
+      // ── 2. Rocky ring body (thick dark stroke) ────────────────────────────
       ctx.save();
-      ctx.lineWidth = RING_WIDTH + breath * 0.25;
-      ctx.strokeStyle = '#030110';
-      ctx.beginPath(); ctx.arc(cx, cy, RING_MID, 0, TWO_PI); ctx.stroke();
+      ctx.lineWidth = ringW + breath * 0.3;
+      ctx.strokeStyle = '#050118';
+      ctx.beginPath(); ePath(rx_mid, ry_mid); ctx.stroke();
       ctx.restore();
 
-      // Ring body gradient overlay (clipped to annulus)
+      // Ring body gradient (clipped to annulus)
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, RING_OUTER + 2, 0, TWO_PI, false);
-      ctx.arc(cx, cy, R - 2, 0, TWO_PI, true);
+      ctx.beginPath(); ePath(rx_out + 2, ry_out + 2); ePath(rxi_b - 2, ryi_b - 2, true);
       ctx.clip();
-      const rg = ctx.createRadialGradient(cx, cy, R, cx, cy, RING_OUTER);
-      rg.addColorStop(0,    'rgba(80,32,4,0.92)');
-      rg.addColorStop(0.18, 'rgba(44,16,6,0.96)');
-      rg.addColorStop(0.42, 'rgba(16,6,22,0.96)');
-      rg.addColorStop(0.72, 'rgba(14,5,38,0.90)');
-      rg.addColorStop(1,    'rgba(32,8,65,0.78)');
-      ctx.fillStyle = rg; ctx.fillRect(0, 0, S, S);
+      const rg = ctx.createRadialGradient(cx, cy, Math.min(rxi_b, ryi_b), cx, cy, Math.max(rx_out, ry_out));
+      rg.addColorStop(0,    'rgba(95,38,8,0.96)');
+      rg.addColorStop(0.18, 'rgba(50,20,8,0.98)');
+      rg.addColorStop(0.44, 'rgba(16,6,24,0.98)');
+      rg.addColorStop(0.75, 'rgba(14,5,40,0.94)');
+      rg.addColorStop(1,    'rgba(32,8,68,0.82)');
+      ctx.fillStyle = rg; ctx.fillRect(0, 0, cw, ch);
       ctx.restore();
 
-      // Texture dots on ring (also clipped)
+      // Ring texture dots (clipped)
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, RING_OUTER + 1, 0, TWO_PI, false);
-      ctx.arc(cx, cy, R - 1, 0, TWO_PI, true);
+      ctx.beginPath(); ePath(rx_out + 1, ry_out + 1); ePath(rxi_b - 1, ryi_b - 1, true);
       ctx.clip();
       for (const td of texDots) {
         ctx.beginPath(); ctx.arc(td.x, td.y, td.r, 0, TWO_PI);
@@ -283,62 +338,77 @@ function CosmicPortal({
       }
       ctx.restore();
 
-      // ── 3. Inner fire glow (orange/gold on ring inner face) ──────────────
+      // ── Energy streamers along ring surface (3 sinusoidal streams) ────────
+      for (let s = 0; s < 3; s++) {
+        const phOff = (s / 3) * TWO_PI + t * 0.004;
+        const amp   = ringW * 0.26;
+        ctx.beginPath();
+        for (let i = 0; i <= 160; i++) {
+          const a   = (i / 160) * TWO_PI;
+          const wave = amp * Math.sin(a * 4 + phOff);
+          const ex  = (rx_mid + wave) * Math.cos(a);
+          const ey  = (ry_mid + wave * (ry_mid / rx_mid)) * Math.sin(a);
+          i === 0 ? ctx.moveTo(cx + ex, cy + ey) : ctx.lineTo(cx + ex, cy + ey);
+        }
+        ctx.closePath();
+        const sAlpha = 0.16 + 0.11 * Math.sin(t * 0.011 + s * 1.3);
+        ctx.lineWidth = 0.95;
+        ctx.strokeStyle = `rgba(255,185,80,${(sAlpha * glow).toFixed(2)})`;
+        ctx.stroke();
+      }
+
+      // ── 3. Inner fire glow + hard edge ────────────────────────────────────
       {
-        const fg = ctx.createRadialGradient(cx, cy, R * 0.90, cx, cy, RING_OUTER * 0.68);
+        const fg = ctx.createRadialGradient(cx, cy, Math.min(rxi_b,ryi_b)*0.86, cx, cy, Math.min(rx_mid,ry_mid)*1.06);
         fg.addColorStop(0,    'rgba(255,220,0,0)');
-        fg.addColorStop(0.08, `rgba(255,205,0,${(0.72 * fireInt * fireBreath * glow).toFixed(3)})`);
-        fg.addColorStop(0.3,  `rgba(255,130,0,${(0.82 * fireInt * fireBreath * glow).toFixed(3)})`);
-        fg.addColorStop(0.65, `rgba(255,45,0,${(0.36 * fireInt * glow).toFixed(3)})`);
+        fg.addColorStop(0.10, `rgba(255,200,0,${(0.70*fireInt*fireBreath*glow).toFixed(2)})`);
+        fg.addColorStop(0.38, `rgba(255,120,0,${(0.80*fireInt*fireBreath*glow).toFixed(2)})`);
+        fg.addColorStop(0.72, `rgba(255,40,0,${(0.30*fireInt*glow).toFixed(2)})`);
         fg.addColorStop(1,    'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(cx, cy, RING_OUTER * 0.68, 0, TWO_PI);
+        ctx.beginPath(); ctx.ellipse(cx, cy, Math.min(rx_mid,ry_mid)*1.06, Math.min(rx_mid,ry_mid)*1.06*(ryi/rxi), 0, 0, TWO_PI);
         ctx.fillStyle = fg; ctx.fill();
       }
-      // Fire edge hard line
-      {
-        ctx.save();
-        ctx.lineWidth = 2.5 + 1.5 * Math.sin(t * 0.022);
-        ctx.strokeStyle = `rgba(255,185,0,${(0.95 * fireInt * glow).toFixed(3)})`;
-        ctx.shadowColor = 'rgba(255,140,0,0.9)'; ctx.shadowBlur = 20;
-        ctx.beginPath(); ctx.arc(cx, cy, R, 0, TWO_PI); ctx.stroke();
-        ctx.restore();
-      }
+      ctx.save();
+      ctx.lineWidth = 2.6 + 1.6 * Math.sin(t * 0.022);
+      ctx.strokeStyle = `rgba(255,188,0,${(0.95*fireInt*glow).toFixed(2)})`;
+      ctx.shadowColor = 'rgba(255,145,0,0.95)'; ctx.shadowBlur = 26;
+      ctx.beginPath(); ePath(rxi_b, ryi_b); ctx.stroke();
+      ctx.restore();
 
-      // Purple outer ring edge — makes the ring body thickness visible
-      {
-        ctx.save();
-        ctx.lineWidth = 2.4 + 1.4 * Math.sin(t * 0.019 + 1.2);
-        ctx.strokeStyle = `rgba(210,60,255,${(0.92 * coronaInt * glow).toFixed(3)})`;
-        ctx.shadowColor = 'rgba(180,0,255,0.90)'; ctx.shadowBlur = 28;
-        ctx.beginPath(); ctx.arc(cx, cy, RING_OUTER, 0, TWO_PI); ctx.stroke();
-        ctx.restore();
-      }
+      // Purple outer edge
+      ctx.save();
+      ctx.lineWidth = 2.4 + 1.4 * Math.sin(t * 0.019 + 1.2);
+      ctx.strokeStyle = `rgba(210,60,255,${(0.92*coronaInt*glow).toFixed(2)})`;
+      ctx.shadowColor = 'rgba(185,0,255,0.92)'; ctx.shadowBlur = 32;
+      ctx.beginPath(); ePath(rx_out, ry_out); ctx.stroke();
+      ctx.restore();
 
-      // ── 4. Inner void (black) ────────────────────────────────────────────
+      // ── 4. Inner void (black ellipse) ─────────────────────────────────────
       {
-        const vg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+        const vg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(rxi_b, ryi_b));
         vg.addColorStop(0,    'rgba(0,0,0,0.99)');
-        vg.addColorStop(0.5,  'rgba(2,0,8,0.98)');
-        vg.addColorStop(0.80, 'rgba(8,2,20,0.96)');
+        vg.addColorStop(0.55, 'rgba(2,0,10,0.98)');
+        vg.addColorStop(0.85, 'rgba(8,2,22,0.96)');
         vg.addColorStop(1,    'rgba(18,4,38,0.92)');
-        ctx.beginPath(); ctx.arc(cx, cy, R, 0, TWO_PI);
+        ctx.beginPath(); ePath(rxi_b, ryi_b);
         ctx.fillStyle = vg; ctx.fill();
       }
 
-      // ── 5. Void interior: mode shimmer + tunnel rings + processing glow ───
+      // ── 5. Void interior: mode shimmer + tunnel rings ─────────────────────
       {
         const shim = 0.025 + 0.025 * Math.sin(t * 0.018);
-        const sg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.60);
+        const sg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(rxi_b, ryi_b) * 0.60);
         sg.addColorStop(0,   `rgba(${mr},${mg},${mb},${(shim * 0.28).toFixed(3)})`);
         sg.addColorStop(0.6, `rgba(${mr},${mg},${mb},${(shim * 0.08).toFixed(3)})`);
         sg.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(cx, cy, R * 0.60, 0, TWO_PI);
+        ctx.beginPath(); ctx.ellipse(cx, cy, Math.min(rxi_b,ryi_b)*0.60, Math.min(rxi_b,ryi_b)*0.60*(ryi/rxi), 0, 0, TWO_PI);
         ctx.fillStyle = sg; ctx.fill();
 
+        // Rotating inner tunnel rings
         for (let i = 0; i < 7; i++) {
           const frac = (i + 1) / 8;
-          const tr  = R * frac * 0.95;
-          const rot = t * 0.003 * (1 + i * 0.3) * (i % 2 === 0 ? 1 : -1);
+          const tr   = Math.min(rxi_b, ryi_b) * frac * 0.95;
+          const rot  = t * 0.003 * (1 + i * 0.3) * (i % 2 === 0 ? 1 : -1);
           ctx.save();
           ctx.translate(cx, cy); ctx.rotate(rot); ctx.translate(-cx, -cy);
           ctx.lineWidth = 0.4;
@@ -349,160 +419,199 @@ function CosmicPortal({
 
         if (voidBright > 0) {
           const pulse = 0.5 + 0.5 * Math.sin(t * 0.07);
-          const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.44);
-          cg.addColorStop(0,    `rgba(255,235,185,${(0.95 * voidBright * pulse).toFixed(3)})`);
-          cg.addColorStop(0.3,  `rgba(255,165,80,${(0.55 * voidBright * pulse).toFixed(3)})`);
-          cg.addColorStop(0.65, `rgba(140,55,255,${(0.22 * voidBright * pulse).toFixed(3)})`);
-          cg.addColorStop(1,    'rgba(0,0,0,0)');
-          ctx.beginPath(); ctx.arc(cx, cy, R * 0.44, 0, TWO_PI);
-          ctx.fillStyle = cg; ctx.fill();
+          const cg2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(rxi_b, ryi_b) * 0.44);
+          cg2.addColorStop(0,    `rgba(255,235,185,${(0.95*voidBright*pulse).toFixed(3)})`);
+          cg2.addColorStop(0.3,  `rgba(255,165,80,${(0.55*voidBright*pulse).toFixed(3)})`);
+          cg2.addColorStop(0.65, `rgba(140,55,255,${(0.22*voidBright*pulse).toFixed(3)})`);
+          cg2.addColorStop(1,    'rgba(0,0,0,0)');
+          ctx.beginPath(); ctx.ellipse(cx, cy, Math.min(rxi_b,ryi_b)*0.44, Math.min(rxi_b,ryi_b)*0.44*(ryi/rxi), 0, 0, TWO_PI);
+          ctx.fillStyle = cg2; ctx.fill();
         }
 
         if (ph === 'absorbing' || ph === 'processing' || ph === 'emerging') {
           const pSpdMul = ph === 'absorbing' ? 4.2 : ph === 'emerging' ? 0.5 : 1.0;
-          for (const vp of voidPs) {
-            vp.r *= (1 - vp.spd * pSpdMul);
-            if (vp.r < 2) { vp.r = R * 0.95; vp.a = Math.random() * TWO_PI; }
-            const vx = cx + vp.r * Math.cos(vp.a);
-            const vy = cy + vp.r * Math.sin(vp.a);
-            const op = vp.br * (vp.r / (R * 0.95)) * 0.45;
-            ctx.beginPath(); ctx.arc(vx, vy, vp.sz, 0, TWO_PI);
-            ctx.fillStyle = `rgba(255,160,60,${op.toFixed(3)})`; ctx.fill();
+          for (let i = 0; i < 28; i++) {
+            const a2 = (i / 28) * TWO_PI + t * 0.008 * pSpdMul;
+            const r2 = Math.min(rxi_b, ryi_b) * (0.1 + 0.8 * Math.random()) * (1 - spkMul * 0.05);
+            const alpha2 = 0.2 + 0.6 * Math.random();
+            ctx.beginPath(); ctx.arc(cx + r2 * Math.cos(a2), cy + r2 * Math.sin(a2), 0.8, 0, TWO_PI);
+            ctx.fillStyle = `rgba(255,${150+Math.random()*80|0},0,${(alpha2 * Math.min(spkMul, 1.5) * 0.6).toFixed(2)})`;
+            ctx.fill();
           }
         }
       }
 
-      // ── 6. Fire sparks on inner ring edge ────────────────────────────────
+      // ── 6. Fire sparks (inner edge) ───────────────────────────────────────
       {
-        for (const sp of sparks) {
-          sp.a += sp.spd * spkMul;
-          const sx = cx + R * Math.cos(sp.a);
-          const sy = cy + R * Math.sin(sp.a);
-          const twinkle = 0.4 + 0.6 * Math.sin(t * 0.05 + sp.a * 3);
-          const op = sp.br * twinkle * Math.min(glow, 1.5) * fireInt * 0.9;
-          const hue = 100 + Math.floor(sp.br * 100);
-          ctx.beginPath(); ctx.arc(sx, sy, sp.sz * (spkMul > 1.5 ? 2.1 : 1.3), 0, TWO_PI);
-          ctx.fillStyle = `rgba(255,${hue},0,${op.toFixed(3)})`;
-          ctx.shadowColor = 'rgba(255,140,0,0.4)'; ctx.shadowBlur = 7;
-          ctx.fill();
+        const spkCount = 28 + Math.floor(spkMul * 10);
+        for (let i = 0; i < spkCount; i++) {
+          const a    = (i / spkCount) * TWO_PI + t * 0.003 * (i % 2 === 0 ? 1 : -1.3);
+          const flick = 0.82 + 0.18 * Math.sin(t * 0.11 + i * 0.73);
+          const dist  = (rxi_b + 2 + 10 * Math.random() * spkMul * flick);
+          const sx = cx + dist * Math.cos(a);
+          const sy = cy + dist * (ryi_b / rxi_b) * Math.sin(a);
+          const al = Math.min((0.3 + 0.7 * flick) * Math.min(spkMul, 1.5) * fireInt * glow, 1);
+          ctx.beginPath(); ctx.arc(sx, sy, 0.9 + Math.random() * 0.6, 0, TWO_PI);
+          ctx.fillStyle = `rgba(255,${120 + Math.random()*120|0},0,${al.toFixed(2)})`; ctx.fill();
         }
-        ctx.shadowBlur = 0;
       }
 
-      // ── 7. Crystal orb at top of ring ────────────────────────────────────
+      // ── 7. Crystal orb at top of ring ─────────────────────────────────────
       {
-        const orbPulse = 0.88 + 0.12 * Math.sin(t * 0.028);
-        const ox = cx, oy = ORB_Y;
+        const ox = cx;
+        const oy = ORB_Y;
+        const OR = ORB_R;
 
-        const hg = ctx.createRadialGradient(ox, oy, 0, ox, oy, ORB_R * 4.5);
-        hg.addColorStop(0,    `rgba(255,235,120,${(0.75 * orbPulse * glow).toFixed(3)})`);
-        hg.addColorStop(0.3,  `rgba(220,160,255,${(0.42 * orbPulse * glow).toFixed(3)})`);
-        hg.addColorStop(0.65, `rgba(140,0,255,${(0.15 * glow).toFixed(3)})`);
-        hg.addColorStop(1,    'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(ox, oy, ORB_R * 4.5, 0, TWO_PI);
-        ctx.fillStyle = hg; ctx.fill();
+        // Halo glow
+        const og = ctx.createRadialGradient(ox, oy, 0, ox, oy, OR * 2.6);
+        og.addColorStop(0,   `rgba(255,210,180,${(0.55*glow).toFixed(2)})`);
+        og.addColorStop(0.4, `rgba(255,140,80,${(0.28*glow).toFixed(2)})`);
+        og.addColorStop(0.8, `rgba(165,0,255,${(0.12*glow).toFixed(2)})`);
+        og.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.arc(ox, oy, OR * 2.6, 0, TWO_PI);
+        ctx.fillStyle = og; ctx.fill();
 
-        // Concentric golden arcs above orb
-        for (let i = 0; i < 4; i++) {
-          const cr = ORB_R * (1.7 + i * 1.0);
-          const alpha = (0.52 - i * 0.10) * orbPulse * glow;
-          const sweep = t * 0.011 * (1 + i * 0.3);
+        // Concentric arcs above orb (5 arcs, upper semicircle only)
+        for (let i = 0; i < 5; i++) {
+          const arcR  = OR * (1.9 + i * 0.95);
+          const alpha = Math.max(0.55 - i * 0.09, 0.08) * glow;
           ctx.save();
-          ctx.lineWidth = 0.9;
-          ctx.strokeStyle = `rgba(255,195,80,${alpha.toFixed(3)})`;
-          ctx.shadowColor = 'rgba(255,180,0,0.4)'; ctx.shadowBlur = 4;
-          ctx.beginPath(); ctx.arc(ox, oy, cr, Math.PI + sweep, TWO_PI * 2 + sweep);
-          ctx.stroke(); ctx.restore();
+          ctx.lineWidth = Math.max(0.9 - i * 0.1, 0.4);
+          ctx.strokeStyle = `rgba(255,185,80,${alpha.toFixed(2)})`;
+          ctx.shadowColor  = 'rgba(255,160,50,0.6)'; ctx.shadowBlur = 7;
+          ctx.beginPath(); ctx.arc(ox, oy, arcR, Math.PI, 0, false);
+          ctx.stroke();
+          // endpoint dots
+          ctx.shadowBlur = 0;
+          ctx.beginPath(); ctx.arc(ox - arcR, oy, 1.4, 0, TWO_PI); ctx.fillStyle = `rgba(255,185,80,${(alpha*1.4).toFixed(2)})`; ctx.fill();
+          ctx.beginPath(); ctx.arc(ox + arcR, oy, 1.4, 0, TWO_PI); ctx.fillStyle = `rgba(255,185,80,${(alpha*1.4).toFixed(2)})`; ctx.fill();
+          ctx.restore();
         }
-        ctx.shadowBlur = 0;
+        // top dot above all arcs
+        const topDotY = oy - OR * (1.9 + 4 * 0.95) - 5;
+        ctx.beginPath(); ctx.arc(ox, topDotY, 2.6, 0, TWO_PI);
+        ctx.fillStyle = `rgba(255,205,100,${(0.92*glow).toFixed(2)})`; ctx.fill();
 
-        // Stem orb → ring
+        // Vertical stem connector (orb → ring surface)
         ctx.save();
-        const stemG = ctx.createLinearGradient(ox, oy + ORB_R, ox, cy - R);
-        stemG.addColorStop(0, 'rgba(255,200,100,0.5)');
-        stemG.addColorStop(1, 'rgba(255,180,0,0.12)');
-        ctx.lineWidth = 1.2; ctx.strokeStyle = stemG;
-        ctx.beginPath(); ctx.moveTo(ox, oy + ORB_R); ctx.lineTo(ox, cy - R + 2); ctx.stroke();
+        const stemAlpha = 0.48 + 0.28 * Math.sin(t * 0.015);
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = `rgba(255,185,80,${stemAlpha.toFixed(2)})`;
+        ctx.shadowColor = 'rgba(255,140,0,0.7)'; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.moveTo(ox, oy + OR); ctx.lineTo(ox, oy + OR * 2.5); ctx.stroke();
+        ctx.shadowBlur = 0;
+        // small diamond bead
+        ctx.beginPath(); ctx.arc(ox, oy + OR * 2.9, 2.2, 0, TWO_PI);
+        ctx.fillStyle = `rgba(255,205,80,${stemAlpha.toFixed(2)})`; ctx.fill();
         ctx.restore();
 
-        // Orb glass body
-        const og = ctx.createRadialGradient(ox - ORB_R * 0.32, oy - ORB_R * 0.32, 0, ox, oy, ORB_R);
-        og.addColorStop(0,    'rgba(255,255,255,0.97)');
-        og.addColorStop(0.28, 'rgba(230,210,255,0.88)');
-        og.addColorStop(0.65, 'rgba(170,80,255,0.72)');
-        og.addColorStop(1,    'rgba(80,0,180,0.90)');
-        ctx.beginPath(); ctx.arc(ox, oy, ORB_R, 0, TWO_PI);
-        ctx.fillStyle = og;
-        ctx.shadowColor = 'rgba(200,180,255,0.9)'; ctx.shadowBlur = 20;
-        ctx.fill(); ctx.shadowBlur = 0;
+        // Orb body (glass/crystal)
+        const ig = ctx.createRadialGradient(ox - OR*0.3, oy - OR*0.3, 0, ox, oy, OR);
+        ig.addColorStop(0,    'rgba(240,220,255,0.90)');
+        ig.addColorStop(0.26, 'rgba(180,140,255,0.72)');
+        ig.addColorStop(0.56, 'rgba(80,20,180,0.76)');
+        ig.addColorStop(0.80, 'rgba(20,0,80,0.82)');
+        ig.addColorStop(1,    'rgba(0,0,22,0.90)');
+        ctx.beginPath(); ctx.arc(ox, oy, OR, 0, TWO_PI);
+        ctx.fillStyle = ig; ctx.fill();
+
+        // Orb rim
+        ctx.save();
+        ctx.lineWidth = 1.1;
+        ctx.strokeStyle = `rgba(200,160,255,${(0.70*glow).toFixed(2)})`;
+        ctx.shadowColor = 'rgba(165,0,255,0.80)'; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(ox, oy, OR, 0, TWO_PI); ctx.stroke();
+        ctx.restore();
+
+        // Specular highlight
+        const sh = ctx.createRadialGradient(ox - OR*0.28, oy - OR*0.28, 0, ox - OR*0.28, oy - OR*0.28, OR*0.44);
+        sh.addColorStop(0, 'rgba(255,255,255,0.78)');
+        sh.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.beginPath(); ctx.arc(ox, oy, OR, 0, TWO_PI);
+        ctx.fillStyle = sh; ctx.fill();
       }
 
-      // ── 8. Golden lotus at bottom of ring ────────────────────────────────
+      // ── 8. Golden lotus + crystal drops + water ripples ───────────────────
       {
-        const lotusPulse = 0.80 + 0.20 * Math.sin(t * 0.021 + Math.PI);
-        const ls = LOTUS_S;
-        const lx = cx, ly = LOTUS_Y;
+        const lx = cx;
+        const ly = LOTUS_Y;
+        const LS = LOTUS_S;
 
-        const lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, ls * 3.5);
-        lg.addColorStop(0,   `rgba(255,200,80,${(0.72 * lotusPulse * glow).toFixed(3)})`);
-        lg.addColorStop(0.4, `rgba(255,140,20,${(0.30 * lotusPulse * glow).toFixed(3)})`);
-        lg.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(lx, ly, ls * 3.5, 0, TWO_PI);
-        ctx.fillStyle = lg; ctx.fill();
+        // Lotus halo
+        const lhg = ctx.createRadialGradient(lx, ly, 0, lx, ly, LS * 3.8);
+        lhg.addColorStop(0,   `rgba(255,195,60,${(0.68*glow).toFixed(2)})`);
+        lhg.addColorStop(0.4, `rgba(255,120,20,${(0.32*glow).toFixed(2)})`);
+        lhg.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = lhg;
+        ctx.beginPath(); ctx.arc(lx, ly, LS * 3.8, 0, TWO_PI); ctx.fill();
 
+        // Petals (7, fanned upward)
+        const petals = [-0.56, -0.34, -0.15, 0, 0.15, 0.34, 0.56];
+        const pColors = [0.68, 0.78, 0.84, 0.90, 0.84, 0.78, 0.68];
         ctx.save();
-        const sG = ctx.createLinearGradient(lx, cy + R, lx, ly - ls);
-        sG.addColorStop(0, 'rgba(255,180,0,0.14)');
-        sG.addColorStop(1, 'rgba(255,200,80,0.44)');
-        ctx.lineWidth = 1.2; ctx.strokeStyle = sG;
-        ctx.beginPath(); ctx.moveTo(lx, cy + R - 2); ctx.lineTo(lx, ly - ls * 0.8); ctx.stroke();
+        ctx.shadowColor = 'rgba(255,160,0,0.60)'; ctx.shadowBlur = 10;
+        for (let i = 0; i < petals.length; i++) {
+          ctx.save();
+          ctx.translate(lx, ly);
+          ctx.rotate(petals[i] - Math.PI / 2);
+          ctx.beginPath();
+          ctx.ellipse(0, -LS * 0.95, LS * 0.26, LS * 0.92, 0, 0, TWO_PI);
+          ctx.fillStyle = `rgba(255,185,0,${(pColors[i]*glow).toFixed(2)})`;
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.restore();
+        // Centre glow dot
+        ctx.beginPath(); ctx.arc(lx, ly, LS * 0.22, 0, TWO_PI);
+        ctx.fillStyle = `rgba(255,235,160,${(0.96*glow).toFixed(2)})`; ctx.fill();
+
+        // Thin stem below lotus
+        const stemTop = ly + LS * 0.5;
+        const stemBot = ly + LS * 1.4;
+        ctx.save();
+        ctx.lineWidth = 1.0;
+        ctx.strokeStyle = `rgba(255,185,80,${(0.42*glow).toFixed(2)})`;
+        ctx.beginPath(); ctx.moveTo(lx, stemTop); ctx.lineTo(lx, stemBot); ctx.stroke();
         ctx.restore();
 
-        ctx.save(); ctx.translate(lx, ly);
-        for (let p = 0; p < 7; p++) {
-          const pa = (p / 7) * TWO_PI - Math.PI / 2;
-          const px = Math.cos(pa) * ls * 0.65;
-          const py = Math.sin(pa) * ls * 0.65;
-          const pg = ctx.createRadialGradient(px * 0.3, py * 0.3, 0, px, py, ls * 0.95);
-          pg.addColorStop(0,   `rgba(255,248,185,${(0.92 * lotusPulse).toFixed(3)})`);
-          pg.addColorStop(0.5, `rgba(255,172,55,${(0.70 * lotusPulse).toFixed(3)})`);
-          pg.addColorStop(1,   'rgba(0,0,0,0)');
-          ctx.beginPath(); ctx.ellipse(px, py, ls * 0.42, ls * 0.68, pa, 0, TWO_PI);
-          ctx.fillStyle = pg; ctx.fill();
-        }
-        const coreG = ctx.createRadialGradient(0, 0, 0, 0, 0, ls * 0.38);
-        coreG.addColorStop(0, `rgba(255,255,220,${lotusPulse.toFixed(3)})`);
-        coreG.addColorStop(1, 'rgba(255,200,80,0)');
-        ctx.beginPath(); ctx.arc(0, 0, ls * 0.38, 0, TWO_PI);
-        ctx.fillStyle = coreG; ctx.fill(); ctx.restore();
-
-        // Bead chain
-        const beads = [ls * 2.2, ls * 3.2, ls * 4.0];
-        let prevBY = ly + ls * 0.5;
-        for (let i = 0; i < beads.length; i++) {
-          const bY = ly + beads[i];
-          const bR = ls * (0.19 - i * 0.038);
-          ctx.save(); ctx.lineWidth = 0.7;
-          ctx.strokeStyle = 'rgba(255,195,80,0.26)';
-          ctx.beginPath(); ctx.moveTo(lx, prevBY); ctx.lineTo(lx, bY - bR); ctx.stroke(); ctx.restore();
-          prevBY = bY + bR;
-          const bg = ctx.createRadialGradient(lx - bR * 0.3, bY - bR * 0.3, 0, lx, bY, bR);
-          bg.addColorStop(0,   'rgba(255,255,220,0.92)');
-          bg.addColorStop(0.5, 'rgba(255,205,100,0.75)');
-          bg.addColorStop(1,   'rgba(255,160,50,0.28)');
-          ctx.beginPath(); ctx.arc(lx, bY, bR, 0, TWO_PI);
-          ctx.fillStyle = bg; ctx.fill();
+        // Crystal drop chain (4 diminishing crystal beads)
+        {
+          const sizes   = [LS*0.17, LS*0.12, LS*0.085, LS*0.060];
+          const gaps    = [LS*0.60, LS*0.46, LS*0.36];
+          let dy = stemBot;
+          for (let d = 0; d < 4; d++) {
+            dy += d === 0 ? LS * 0.26 : gaps[d - 1];
+            const dg = ctx.createRadialGradient(lx - sizes[d]*0.3, dy - sizes[d]*0.3, 0, lx, dy, sizes[d]);
+            dg.addColorStop(0,   'rgba(240,210,255,0.86)');
+            dg.addColorStop(0.5, 'rgba(180,100,255,0.60)');
+            dg.addColorStop(1,   'rgba(55,0,120,0.80)');
+            ctx.beginPath(); ctx.arc(lx, dy, sizes[d], 0, TWO_PI);
+            ctx.fillStyle = dg; ctx.fill();
+            ctx.lineWidth = 0.8;
+            ctx.strokeStyle = `rgba(200,150,255,${(0.60*glow).toFixed(2)})`;
+            ctx.stroke();
+          }
         }
 
-        // Water ripples
-        const rippleY = ly + beads[2] + ls * 1.4;
-        for (let i = 0; i < 4; i++) {
-          const rw = ls * (1.3 + i * 0.85) * (0.9 + 0.1 * Math.sin(t * 0.014 + i * 0.9));
-          const alpha = (0.30 - i * 0.055) * glow;
-          ctx.save(); ctx.lineWidth = 0.8;
-          ctx.strokeStyle = `rgba(255,180,55,${alpha.toFixed(3)})`;
-          ctx.beginPath(); ctx.ellipse(lx, rippleY, rw, rw * 0.28, 0, 0, TWO_PI);
-          ctx.stroke(); ctx.restore();
+        // Water ripples (concentric ellipses at canvas bottom)
+        {
+          const ry2 = RIPPLE_Y;
+          for (let r = 0; r < 5; r++) {
+            const ph2   = ((t * 0.016 + r * 0.38) % 1 + 1) % 1;
+            const maxRX = Math.min(rx_out * 0.52, cw * 0.28) * (0.28 + r * 0.17);
+            const al    = (0.55 - ph2 * 0.55) * 0.65 * glow;
+            if (al <= 0.01) continue;
+            ctx.save();
+            ctx.lineWidth = 1.1;
+            ctx.strokeStyle = `rgba(255,185,80,${al.toFixed(2)})`;
+            ctx.shadowColor = 'rgba(255,160,0,0.4)'; ctx.shadowBlur = 5;
+            ctx.beginPath(); ctx.ellipse(lx, ry2, maxRX, maxRX * 0.20, 0, 0, TWO_PI);
+            ctx.stroke();
+            ctx.restore();
+          }
+          // Bright reflection point
+          ctx.beginPath(); ctx.arc(lx, ry2, 2.6, 0, TWO_PI);
+          ctx.fillStyle = `rgba(255,205,80,${(0.68*glow).toFixed(2)})`; ctx.fill();
         }
       }
 
@@ -510,25 +619,15 @@ function CosmicPortal({
     };
 
     draw();
-    return () => cancelAnimationFrame(raf);
-  }, [innerR]);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
 
-  const pad = 115;
-  const S = innerR * 2 + pad * 2;
-  const cssSize = Math.min(S, 420);
-  return (
-    <canvas
-      ref={ref}
-      style={{
-        display: 'block',
-        width: cssSize,
-        height: cssSize,
-        maxWidth: '95vw',
-        maxHeight: '95vw',
-      }}
-    />
-  );
+  return <canvas ref={ref} style={{ display: 'block', maxWidth: '100%' }} />;
 }
+
 
 // ── PortalOrb: pulsing orb with orbiting satellites ───────────────────────────
 function PortalOrb({ modeKey }: { modeKey: CognitiveModeKey }) {
@@ -1073,7 +1172,7 @@ export default function MedhaHUD() {
   const goBack = () => router.push('/vistara');
 
   const [r1, g1, b1] = MC[mode];
-  const innerR = typeof window !== 'undefined' ? Math.min(150, window.innerWidth * 0.35) : 150;
+  // innerR no longer needed — CosmicPortal self-sizes responsively
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9200, background: '#000', overflow: 'hidden' }}>
@@ -1170,10 +1269,10 @@ export default function MedhaHUD() {
           {/* ── Portal section + void text overlay ───────────────────── */}
           <div
             ref={portalRef}
-            style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'max(52px, 7vh)', position: 'relative', zIndex: 5 }}
+            style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'max(44px, 5vh)', position: 'relative', zIndex: 5, width: '100%' }}
           >
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              <CosmicPortal phase={phase} modeKey={mode} innerR={innerR} />
+              <CosmicPortal phase={phase} modeKey={mode} />
 
               {/* Text inside the void — appears during emerging/responding */}
               <AnimatePresence>
@@ -1186,10 +1285,10 @@ export default function MedhaHUD() {
                     transition={{ duration: phase === 'idle' ? 1.6 : 0.9, ease: [0.08, 0.95, 0.3, 1.0] }}
                     style={{
                       position: 'absolute',
-                      top: '50%', left: '50%',
+                      top: '42%', left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      width: '52%',
-                      maxHeight: '48%',
+                      width: 'min(46%, 320px)',
+                      maxHeight: '38%',
                       overflow: 'hidden',
                       textAlign: 'center',
                       pointerEvents: 'none',
