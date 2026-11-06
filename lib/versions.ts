@@ -13,9 +13,26 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.4.1'
+export const CURRENT_VERSION = '8.5'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.5',
+    date: '2026-11-06',
+    title: 'Medhā — Responsive Reference Ring',
+    summary: 'CosmicPortal rewritten to match reference images exactly: circular in portrait, stadium oval in landscape, with energy streamers, concentric orb arcs, crystal drop chain and water ripples.',
+    changes: [
+      'Ring shape adapts: near-circle on portrait, wide oval on landscape/desktop — reacts to orientation changes',
+      'Warm ochre inner wall, 460 texture dots, 3 animated sinusoidal energy streamers on ring surface',
+      'Crystal orb: 5 concentric upper arcs with endpoint dots + top dot + glowing stem + diamond bead',
+      'Golden lotus: 7 elliptical petals + 4 diminishing crystal drop beads below',
+      '5 expanding water ripple ellipses at canvas bottom',
+      'Blue-cyan nebula wisps on left/right sides matching reference background',
+      'All elements self-size — no innerR prop; canvas fills available width automatically',
+    ],
+    gitHash: 'af45475',
+    pages: ['Medhā'],
+  },
   {
     version: '8.4.1',
     date: '2026-11-06',
