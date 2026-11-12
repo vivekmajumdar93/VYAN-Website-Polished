@@ -1,8 +1,11 @@
 'use client';
 
 import React, {
-  useCallback, useEffect, useRef, useState,
+  useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+import gsap from 'gsap';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { COGNITIVE_MODES, CognitiveModeKey, getMode } from '@/lib/medha/cognitive';
@@ -135,485 +138,349 @@ function VoidBackground({ modeKey }: { modeKey: CognitiveModeKey }) {
   );
 }
 
-// ── CosmicPortal: fixed full-screen canvas, geometry lerps on orientation change ──
-// Canvas is set ONCE to max(screen.width, screen.height) — never resized.
-// curGeo / tgtGeo interpolate over 800 ms (ease-in-out cubic) on every resize.
-// texDots positions also lerp, so the rocky texture migrates with the ring shape.
-function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveModeKey }) {
-  const ref      = useRef<HTMLCanvasElement>(null);
-  const phaseRef = useRef(phase);
-  const modeRef  = useRef(modeKey);
-  phaseRef.current = phase;
-  modeRef.current  = modeKey;
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PORTAL SHADER — vertex (NDC pass-through, full-screen quad)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const PORTAL_VERT = /* glsl */`
+  void main() {
+    gl_Position = vec4(position, 1.0);
+  }
+`;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PORTAL SHADER — fragment  (fBM + ring + orb + lotus + ripples)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const PORTAL_FRAG = /* glsl */`
+precision highp float;
+uniform float u_time;
+uniform vec2  u_viewport;
+uniform float u_intensity;
+uniform float u_speed;
+uniform float u_phase;
+uniform float u_mr;
+uniform float u_mg;
+uniform float u_mb;
+
+float hash(vec2 p) {
+  p = fract(p * vec2(234.34, 435.345));
+  p += dot(p, p + 34.23);
+  return fract(p.x * p.y);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0,0.0)), u.x),
+             mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 6; i++) {
+    v += a * vnoise(p);
+    p = p * 2.07 + vec2(31.41, 92.65);
+    a *= 0.5;
+  }
+  return v;
+}
+
+void main() {
+  float W = u_viewport.x;
+  float H = u_viewport.y;
+  float t = u_time * u_speed;
+
+  // CSS-convention coords (y=0 at top)
+  float px = gl_FragCoord.x;
+  float py = H - gl_FragCoord.y;
+
+  bool isLand = W > H * 1.1;
+
+  // Ring geometry
+  float cx  = W * 0.5;
+  float cy  = isLand ? H * 0.50 : H * 0.44;
+  float rxi = isLand ? W * 0.40 : min(W * 0.42, H * 0.32);
+  float ryi = isLand ? H * 0.37 : rxi * 0.98;
+  float ringW   = min(rxi, ryi) * 0.36;
+  float rx_out  = rxi + ringW;
+  float ry_out  = ryi + ringW;
+  float rx_mid  = rxi + ringW * 0.5;
+  float ry_mid  = ryi + ringW * 0.5;
+
+  // Breathing
+  float breath  = 2.6 * sin(t * 0.016);
+  float rxi_b   = max(rxi + breath * 0.7, 1.0);
+  float ryi_b   = max(ryi + breath * 0.7 * (ryi / max(rxi, 1.0)), 1.0);
+  float rx_out_b = rxi_b + ringW;
+  float ry_out_b = ryi_b + ringW;
+
+  float dx = px - cx;
+  float dy = py - cy;
+
+  float d_inner = length(vec2(dx / rxi_b, dy / ryi_b));
+  float d_outer = length(vec2(dx / max(rx_out_b,1.0), dy / max(ry_out_b,1.0)));
+  float d_mid   = length(vec2(dx / max(rx_mid,1.0),   dy / max(ry_mid,1.0)));
+
+  float glow         = u_intensity;
+  float breath_pulse = 0.75 + 0.25 * sin(t * 1.68);
+
+  // 0. Dark base
+  vec3 color = vec3(0.008, 0.0, 0.055);
+
+  // 1. Blue nebula wisps
+  {
+    float dL = length(vec2(px-(cx-rx_out*0.95), py-cy)) / max(rx_out*1.3, 1.0);
+    float dR = length(vec2(px-(cx+rx_out*0.95), py-cy)) / max(rx_out*1.3, 1.0);
+    color += vec3(0.0,0.08,0.42) * max(0.0, 1.0-dL) * 0.14 * glow;
+    color += vec3(0.0,0.08,0.42) * max(0.0, 1.0-dR) * 0.14 * glow;
+    float mist = max(0.0, (py/max(H,1.0) - 0.65) / 0.35);
+    color += vec3(0.0,0.03,0.14) * mist * 0.16 * glow;
+  }
+
+  // 2. Corona + 4 rotating wisps
+  {
+    float cFade = max(0.0, 1.0 - d_outer / 1.80);
+    color += vec3(0.35,0.0,0.70) * pow(cFade, 1.5) * 0.72 * glow;
+    for (int k = 0; k < 4; k++) {
+      float wa = t*0.006 + float(k)*1.5708;
+      float wx = cx + rxi*0.52*cos(wa);
+      float wy = cy + ryi*0.52*sin(wa);
+      float wr = min(rx_out,ry_out)*0.78;
+      float wd = length(vec2(px-wx, py-wy)) / max(wr, 1.0);
+      color += vec3(0.90,0.0,0.82) * max(0.0, 1.0-wd) * 0.11 * glow;
+    }
+  }
+
+  // 3. Rocky ring body
+  float ringMask = smoothstep(0.97, 1.0, d_inner) * (1.0 - smoothstep(0.97, 1.0, d_outer));
+  if (ringMask > 0.001) {
+    float rf = clamp((d_inner-1.0)/max(d_outer-d_inner,0.001), 0.0, 1.0);
+    vec2  rp = vec2(dx,dy)*0.008 + t*0.04*vec2(1.0,0.0);
+    float n  = fbm(rp);
+    vec3 inner = mix(vec3(0.37,0.14,0.03), vec3(0.06,0.02,0.01), n);
+    vec3 outer = mix(vec3(0.06,0.02,0.15), vec3(0.14,0.03,0.26), n*0.8);
+    color = mix(color, mix(inner,outer,rf)*(0.8+0.2*n), ringMask);
+    float dots = fbm(vec2(dx,dy)*0.022 + t*0.02);
+    color += ringMask*(dots-0.4)*vec3(0.08,0.04,0.0)*0.4;
+    float ang = atan(dy,dx);
+    for (int s = 0; s < 3; s++) {
+      float sa = float(s)*2.094 + t*0.004;
+      float str = sin(ang*4.0+sa)*0.5+0.5;
+      color += ringMask*str*vec3(1.0,0.72,0.31)*0.14*glow;
+    }
+  }
+
+  // 4. Inner fire gradient
+  if (d_inner < 1.2) {
+    float fs  = pow(clamp(d_inner,0.0,1.0),1.5)*breath_pulse*0.85*glow;
+    vec3  fc2 = mix(vec3(1.0,0.75,0.0),vec3(1.0,0.25,0.0),d_inner);
+    color += fc2*fs*smoothstep(1.1,0.9,d_inner);
+  }
+
+  // 5. Inner fire edge line
+  {
+    float innerEdge = smoothstep(0.04,0.0,abs(d_inner-1.0))*step(d_inner,1.1);
+    color += vec3(1.0,0.74,0.0)*innerEdge*0.9*glow;
+  }
+
+  // 6. Inner void
+  if (d_inner < 1.0) {
+    float va = smoothstep(1.0,0.82,d_inner);
+    color = mix(color, vec3(0.004,0.0,0.015), va*0.95);
+    float shim = 0.025+0.025*sin(t*1.08);
+    vec3  mc2 = vec3(u_mr,u_mg,u_mb)/255.0;
+    color += mc2*shim*0.28*(1.0-d_inner*d_inner);
+    for (int i = 0; i < 7; i++) {
+      float tr = (float(i)+1.0)/8.0*0.95;
+      float td = abs(d_inner - tr*tr);
+      color += mc2*max(0.0, 0.015-td*20.0)*glow;
+    }
+    if (u_phase > 0.1) {
+      float pulse = 0.5+0.5*sin(t*4.2);
+      color += vec3(1.0,0.92,0.72)*u_phase*pulse*0.65*pow(1.0-d_inner,2.0);
+    }
+  }
+
+  // 7. fBM filaments around ring band
+  {
+    vec2  fUV = vec2(dx,dy)*0.004;
+    float fil = fbm(fUV + t*0.3);
+    float rp2 = max(0.0, 1.0-abs(d_mid-1.0)*3.5);
+    color += vec3(0.5,0.0,1.0)*fil*rp2*0.18*glow;
+  }
+
+  // 8. Purple outer edge
+  {
+    float oe = smoothstep(0.04,0.0,abs(d_outer-1.0))*step(1.0,d_inner);
+    color += vec3(0.82,0.24,1.0)*oe*0.9*glow;
+  }
+
+  // 9. Crystal orb  (above ring in CSS = smaller y)
+  {
+    float orbR = min(rxi_b,ryi_b)*0.092;
+    float ox   = cx;
+    float oy   = cy - ry_out_b;
+    float odx  = px-ox, ody = py-oy;
+    float orbD = length(vec2(odx,ody));
+
+    color += vec3(0.60,0.30,1.00)*max(0.0,1.0-orbD/(max(orbR,0.001)*2.6))*0.55*glow;
+    color += vec3(1.0,0.72,0.31)*max(0.0,1.0-orbD/(max(orbR,0.001)*3.5))*0.28*glow;
+
+    for (int i = 0; i < 5; i++) {
+      float arcR = orbR*(1.9+float(i)*0.95);
+      float arcD = abs(orbD-arcR);
+      float arcA = max(0.0, 0.55-float(i)*0.09)*glow;
+      float upper = step(ody, 0.0);  // 1.0 when above orb center (ody<=0 in CSS)
+      color += vec3(1.0,0.72,0.31)*max(0.0,1.0-arcD/(max(orbR,0.001)*0.5))*arcA*upper;
+    }
+
+    // Top dot above arcs
+    float topDotY = oy - orbR*(1.9+4.0*0.95) - 5.0;
+    float topDot  = length(vec2(px-ox, py-topDotY));
+    color += vec3(1.0,0.80,0.39)*max(0.0,1.0-topDot/(max(orbR,0.001)*0.3))*0.92*glow;
+
+    if (orbD < orbR) {
+      float g2 = 1.0-orbD/orbR;
+      color = mix(color, mix(vec3(0.08,0.0,0.32),vec3(0.70,0.55,1.00),pow(g2,0.4)), g2*0.9);
+      float spec = max(0.0,1.0-length(vec2(odx+orbR*0.28,ody+orbR*0.28))/(max(orbR,0.001)*0.44));
+      color += pow(spec,2.0)*0.75;
+    }
+    color += vec3(0.78,0.63,1.0)*max(0.0,1.0-abs(orbD-orbR)/(max(orbR,0.001)*0.3))*0.70*glow;
+
+    // Stem connecting orb to ring
+    float stemT = smoothstep(0.0,1.0,clamp((py-oy-orbR)/(max(orbR,0.001)*1.5),0.0,1.0));
+    float stem  = max(0.0,1.0-abs(px-ox)/(1.5+orbR*0.05))*stemT;
+    color += vec3(1.0,0.72,0.31)*stem*0.42*glow;
+  }
+
+  // 10. Golden lotus + drop bead chain (below ring in CSS = larger y)
+  {
+    float ls  = min(rxi_b,ryi_b)*0.082;
+    float lx  = cx;
+    float ly  = cy + ry_out_b + ls*0.8;
+    float ldx = px-lx, ldy = py-ly;
+    float ld  = length(vec2(ldx,ldy));
+
+    color += vec3(1.0,0.76,0.24)*max(0.0,1.0-ld/(max(ls,0.001)*3.8))*0.68*glow;
+
+    for (int i = 0; i < 7; i++) {
+      float pAng  = -1.5708 + (float(i)-3.0)*0.17;
+      vec2  pOff  = vec2(cos(pAng),sin(pAng))*ls*0.5;
+      float pDist = length(vec2(ldx-pOff.x, ldy-pOff.y));
+      float pA    = max(0.0, 0.68-abs(float(i)-3.0)*0.07)*glow;
+      color += vec3(1.0,0.72,0.0)*max(0.0,1.0-pDist/(max(ls,0.001)*0.9))*pA;
+    }
+    color += vec3(1.0,0.92,0.63)*max(0.0,1.0-ld/(max(ls,0.001)*0.22))*0.96*glow;
+
+    // Bead 1
+    { float bs=ls*0.17; float by=ly+ls*1.4+ls*0.26;
+      float bd=length(vec2(px-lx,py-by));
+      color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
+      if(bd<bs) color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);
+      else color+=vec3(0.78,0.59,1.0)*max(0.0,1.0-abs(bd-bs)/(max(bs,0.001)*0.3))*0.60*glow; }
+    // Bead 2
+    { float bs=ls*0.12; float by=ly+ls*1.4+ls*0.26+ls*0.60;
+      float bd=length(vec2(px-lx,py-by));
+      color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
+      if(bd<bs) color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85); }
+    // Bead 3
+    { float bs=ls*0.085; float by=ly+ls*1.4+ls*0.26+ls*0.60+ls*0.46;
+      float bd=length(vec2(px-lx,py-by));
+      color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
+      if(bd<bs) color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85); }
+    // Bead 4
+    { float bs=ls*0.060; float by=ly+ls*1.4+ls*0.26+ls*0.60+ls*0.46+ls*0.36;
+      float bd=length(vec2(px-lx,py-by));
+      color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
+      if(bd<bs) color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85); }
+  }
+
+  // 11. Water ripples at base
+  {
+    float ripY = H*0.91;
+    float lx2  = cx;
+    vec2  rRef = vec2(px-lx2, py-ripY);
+    float rx_base = min(rx_out*0.52, W*0.28);
+    for (int r = 0; r < 5; r++) {
+      float rph    = fract(t*0.016 + float(r)*0.38);
+      float rMaxRX = max(rx_base*(0.28+float(r)*0.17), 1.0);
+      float rAl    = (0.55-rph*0.55)*0.65*glow;
+      if (rAl > 0.01) {
+        float rEll = length(vec2(rRef.x/rMaxRX, rRef.y/max(rMaxRX*0.20,1.0)));
+        color += vec3(1.0,0.72,0.31)*max(0.0,1.0-abs(rEll-1.0)*12.0)*rAl;
+      }
+    }
+  }
+
+  gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+}
+`;
+
+// ── MedhaPortalShader: drives uniforms each frame ─────────────────────────────
+function MedhaPortalShader({ phase, modeKey }: { phase: Phase; modeKey: CognitiveModeKey }) {
+  const { size } = useThree();
+
+  const uniforms = useMemo(() => ({
+    u_time:      { value: 0 },
+    u_viewport:  { value: new THREE.Vector2(size.width, size.height) },
+    u_intensity: { value: 1.0 },
+    u_speed:     { value: 1.0 },
+    u_phase:     { value: 0.0 },
+    u_mr:        { value: MC[modeKey][0] },
+    u_mg:        { value: MC[modeKey][1] },
+    u_mb:        { value: MC[modeKey][2] },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
+  const vpTarget = useRef(new THREE.Vector2(size.width, size.height));
 
   useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const TWO_PI = Math.PI * 2;
-    const ctx    = c.getContext('2d')!;
+    vpTarget.current.set(size.width, size.height);
+  }, [size]);
 
-    // Set canvas ONCE to max screen dimension — portrait or landscape rotation
-    // cannot exceed this, so we never need to resize (and never flash blank).
-    const dpr    = Math.min(window.devicePixelRatio || 1, 2);
-    const maxDim = Math.round(Math.max(
-      screen.width  || window.innerWidth,
-      screen.height || window.innerHeight
-    ) * dpr);
-    c.width = c.height = maxDim;
-    // CSS size must equal the logical dimension — without this the canvas
-    // renders at c.width CSS pixels (1688px on DPR=2) instead of LD (844px).
-    c.style.width  = (maxDim / dpr) + 'px';
-    c.style.height = (maxDim / dpr) + 'px';
-    const LD = maxDim / dpr; // logical max dimension
+  useEffect(() => {
+    uniforms.u_mr.value = MC[modeKey][0];
+    uniforms.u_mg.value = MC[modeKey][1];
+    uniforms.u_mb.value = MC[modeKey][2];
+  }, [modeKey, uniforms]);
 
-    // ── geometry ────────────────────────────────────────────────────────────
-    type Geo = {
-      cx: number; cy: number;
-      rxi: number; ryi: number; ringW: number;
-      rx_mid: number; ry_mid: number;
-      rx_out: number; ry_out: number;
-      ORB_Y: number; ORB_R: number;
-      LOTUS_Y: number; LOTUS_S: number;
-      RIPPLE_Y: number;
-    };
-    type Dot = { x: number; y: number; r: number; c: string };
+  const phaseRef2 = useRef(phase);
+  phaseRef2.current = phase;
 
-    const computeGeo = (): Geo => {
-      const vW = window.innerWidth, vH = window.innerHeight;
-      const land   = vW > vH * 1.1;
-      const cx     = vW / 2;
-      const cy     = land ? vH * 0.50 : vH * 0.44;
-      const rxi    = land ? vW * 0.40 : Math.min(vW * 0.42, vH * 0.32);
-      const ryi    = land ? vH * 0.37 : rxi * 0.98;
-      const ringW  = Math.min(rxi, ryi) * 0.36;
-      const rx_mid = rxi + ringW * 0.5;
-      const ry_mid = ryi + ringW * 0.5;
-      const rx_out = rxi + ringW;
-      const ry_out = ryi + ringW;
-      const ORB_R  = Math.min(rxi, ryi) * 0.092;
-      const ORB_Y  = cy - ry_out;
-      const LOTUS_S = Math.min(rxi, ryi) * 0.082;
-      const LOTUS_Y = cy + ry_out + LOTUS_S * 0.8;
-      const RIPPLE_Y = vH * 0.91;
-      return { cx, cy, rxi, ryi, ringW, rx_mid, ry_mid, rx_out, ry_out, ORB_Y, ORB_R, LOTUS_Y, LOTUS_S, RIPPLE_Y };
-    };
+  useFrame((_, dt) => {
+    uniforms.u_time.value += dt;
+    // Smooth viewport lerp (~820ms transition on orientation change)
+    uniforms.u_viewport.value.lerp(vpTarget.current, Math.min(dt * 5.5, 1));
+    // Phase-driven intensity / speed
+    const p = phaseRef2.current;
+    const tgtI = p === 'processing' ? 2.5 : p === 'absorbing' ? 1.9 : 1.05;
+    const tgtS = p === 'processing' ? 2.0 : 1.0;
+    const tgtP = p === 'processing' ? 1.0 : (p === 'emerging' || p === 'responding') ? 0.5 : 0.0;
+    const lf   = Math.min(dt * 2.0, 1);
+    uniforms.u_intensity.value += (tgtI - uniforms.u_intensity.value) * lf;
+    uniforms.u_speed.value     += (tgtS - uniforms.u_speed.value)     * lf;
+    uniforms.u_phase.value     += (tgtP - uniforms.u_phase.value)     * Math.min(dt * 3, 1);
+  });
 
-    // seeded pseudo-random for reproducible dot layouts
-    const mkRng = (seed: number) => { let s = seed; return () => { s ^= s<<13; s ^= s>>17; s ^= s<<5; return (s>>>0)/0xffffffff; }; };
+  return (
+    <mesh>
+      <planeGeometry args={[2, 2]} />
+      <shaderMaterial
+        vertexShader={PORTAL_VERT}
+        fragmentShader={PORTAL_FRAG}
+        uniforms={uniforms}
+      />
+    </mesh>
+  );
+}
 
-    const computeDots = (g: Geo, seed = 42): Dot[] => {
-      const rng = mkRng(seed);
-      return Array.from({ length: 460 }, () => {
-        const ang   = rng() * TWO_PI;
-        const frac  = rng();
-        const outer = frac > 0.6;
-        return {
-          x: g.cx + (g.rxi + frac * g.ringW) * Math.cos(ang),
-          y: g.cy + (g.ryi + frac * g.ringW) * Math.sin(ang),
-          r: 0.5 + rng() * 1.9,
-          c: outer
-            ? `rgba(${80+rng()*60|0},${15+rng()*18|0},${90+rng()*80|0},${(0.28+rng()*0.38).toFixed(2)})`
-            : `rgba(${95+rng()*85|0},${35+rng()*28|0},${8 +rng()*14|0},${(0.22+rng()*0.32).toFixed(2)})`,
-        };
-      });
-    };
-
-    // ── transition state ────────────────────────────────────────────────────
-    const TRANS_DUR = 820;
-    const eio = (x: number) => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x+2,3)/2;
-
-    let curGeo  = computeGeo();
-    let tgtGeo  = { ...curGeo };
-    let curDots = computeDots(curGeo, 42);
-    let tgtDots = computeDots(tgtGeo, 99);
-    let transStart = -1;
-
-    const lerpGeo = (a: Geo, b: Geo, p: number): Geo => {
-      const L = (x: number, y: number) => x + (y - x) * p;
-      return {
-        cx: L(a.cx,b.cx), cy: L(a.cy,b.cy),
-        rxi: L(a.rxi,b.rxi), ryi: L(a.ryi,b.ryi), ringW: L(a.ringW,b.ringW),
-        rx_mid: L(a.rx_mid,b.rx_mid), ry_mid: L(a.ry_mid,b.ry_mid),
-        rx_out: L(a.rx_out,b.rx_out), ry_out: L(a.ry_out,b.ry_out),
-        ORB_Y: L(a.ORB_Y,b.ORB_Y), ORB_R: L(a.ORB_R,b.ORB_R),
-        LOTUS_Y: L(a.LOTUS_Y,b.LOTUS_Y), LOTUS_S: L(a.LOTUS_S,b.LOTUS_S),
-        RIPPLE_Y: L(a.RIPPLE_Y,b.RIPPLE_Y),
-      };
-    };
-
-    const onResize = () => {
-      const now = performance.now();
-      // snapshot mid-flight position so transition starts from wherever we are
-      if (transStart >= 0) {
-        const p = eio(Math.min((now - transStart) / TRANS_DUR, 1));
-        curGeo  = lerpGeo(curGeo, tgtGeo, p);
-        const L = (a: number, b: number) => a + (b - a) * p;
-        curDots = curDots.map((d, i) => ({ ...d, x: L(d.x, tgtDots[i].x), y: L(d.y, tgtDots[i].y) }));
-      }
-      tgtGeo  = computeGeo();
-      tgtDots = computeDots(tgtGeo, 99);
-      transStart = now;
-    };
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', () => setTimeout(onResize, 60));
-
-    // ── draw loop ───────────────────────────────────────────────────────────
-    let raf: number, t = 0;
-
-    const draw = () => {
-      t++;
-
-      // interpolated geometry this frame
-      let g    = curGeo;
-      let dots = curDots;
-      if (transStart >= 0) {
-        const raw = Math.min((performance.now() - transStart) / TRANS_DUR, 1);
-        const p   = eio(raw);
-        const L   = (a: number, b: number) => a + (b - a) * p;
-        g    = lerpGeo(curGeo, tgtGeo, p);
-        dots = curDots.map((d, i) => ({ ...d, x: L(d.x, tgtDots[i].x), y: L(d.y, tgtDots[i].y) }));
-        if (raw >= 1) { curGeo = tgtGeo; curDots = tgtDots; transStart = -1; }
-      }
-
-      const { cx, cy, rxi, ryi, ringW, rx_mid, ry_mid, rx_out, ry_out, ORB_Y, ORB_R, LOTUS_Y, LOTUS_S, RIPPLE_Y } = g;
-
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, LD, LD);
-
-      const ph = phaseRef.current;
-      const [mr, mg, mb] = MC[modeRef.current];
-
-      let glow = 1.05, coronaInt = 0.92, fireInt = 0.98, voidBright = 0.0, spkMul = 1.0;
-      switch (ph) {
-        case 'idle':       glow = 1.05; coronaInt = 0.92; fireInt = 0.98; break;
-        case 'absorbing':  glow = 1.9;  coronaInt = 1.1;  fireInt = 1.5;  spkMul = 4.5; break;
-        case 'processing': glow = 1.3;  coronaInt = 1.0;  fireInt = 1.1;  voidBright = 0.65; spkMul = 2.2; break;
-        case 'emerging':   glow = 1.5;  coronaInt = 1.05; fireInt = 1.2;  voidBright = 0.90; spkMul = 1.5; break;
-        case 'responding': glow = 1.1;  coronaInt = 0.85; fireInt = 0.85; voidBright = 0.18; break;
-        case 'error':      glow = 0.55; coronaInt = 0.35; fireInt = 0.38; break;
-      }
-
-      const breath     = 2.6 * Math.sin(t * 0.016);
-      const fireBreath = 0.75 + 0.25 * Math.sin(t * 0.028);
-      const rxi_b = rxi + breath * 0.7;
-      const ryi_b = ryi + breath * 0.7 * (ryi / rxi);
-
-      const eP = (erx: number, ery: number, ccw = false) =>
-        ctx.ellipse(cx, cy, erx, ery, 0, 0, TWO_PI, ccw);
-
-      // ── 0. Dark base + blue side nebula ───────────────────────────────────
-      ctx.fillStyle = 'rgba(2,0,14,1)';
-      ctx.fillRect(0, 0, LD, LD);
-      {
-        const bf = (ox: number) => {
-          const bg = ctx.createRadialGradient(ox, cy, 0, ox, cy, rx_out * 1.3);
-          bg.addColorStop(0,   `rgba(0,80,210,${(0.14*glow).toFixed(2)})`);
-          bg.addColorStop(0.5, `rgba(0,100,255,${(0.07*glow).toFixed(2)})`);
-          bg.addColorStop(1,   'rgba(0,0,0,0)');
-          ctx.fillStyle = bg; ctx.fillRect(0, 0, LD, LD);
-        };
-        bf(cx - rx_out * 0.95); bf(cx + rx_out * 0.95);
-        const gm = ctx.createLinearGradient(0, LD * 0.70, 0, LD);
-        gm.addColorStop(0, 'rgba(0,0,0,0)');
-        gm.addColorStop(1, `rgba(0,25,90,${(0.16*glow).toFixed(2)})`);
-        ctx.fillStyle = gm; ctx.fillRect(0, 0, LD, LD);
-      }
-
-      // ── 1. Corona radial glow + rotating wisps ────────────────────────────
-      {
-        const cg = ctx.createRadialGradient(cx, cy, Math.min(rx_out,ry_out)*0.88, cx, cy, Math.max(rx_out,ry_out)*1.80);
-        cg.addColorStop(0,    `rgba(165,0,255,${(0.72*coronaInt*glow).toFixed(2)})`);
-        cg.addColorStop(0.28, `rgba(100,0,220,${(0.44*coronaInt*glow).toFixed(2)})`);
-        cg.addColorStop(0.60, `rgba(50,0,140,${(0.18*coronaInt*glow).toFixed(2)})`);
-        cg.addColorStop(1,    'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(cx, cy, Math.max(rx_out,ry_out)*1.80, 0, TWO_PI);
-        ctx.fillStyle = cg; ctx.fill();
-      }
-      {
-        const wa = t * 0.006;
-        for (let k = 0; k < 4; k++) {
-          const a = wa + k * Math.PI / 2;
-          const wx = cx + rx_out * 0.52 * Math.cos(a);
-          const wy = cy + ry_out * 0.52 * Math.sin(a);
-          const wr = Math.min(rx_out, ry_out) * 0.78;
-          const wg = ctx.createRadialGradient(wx, wy, 0, wx, wy, wr);
-          wg.addColorStop(0, `rgba(230,0,210,${(0.11*glow).toFixed(2)})`);
-          wg.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.beginPath(); ctx.arc(wx, wy, wr, 0, TWO_PI);
-          ctx.fillStyle = wg; ctx.fill();
-        }
-      }
-
-      // ── 2. Rocky ring body ────────────────────────────────────────────────
-      ctx.save();
-      ctx.lineWidth   = ringW + breath * 0.3;
-      ctx.strokeStyle = '#050118';
-      ctx.beginPath(); eP(rx_mid, ry_mid); ctx.stroke();
-      ctx.restore();
-
-      // Ring body gradient (clipped to annulus)
-      ctx.save();
-      ctx.beginPath(); eP(rx_out+2, ry_out+2); eP(rxi_b-2, ryi_b-2, true);
-      ctx.clip();
-      const rg = ctx.createRadialGradient(cx,cy,Math.min(rxi_b,ryi_b), cx,cy,Math.max(rx_out,ry_out));
-      rg.addColorStop(0,    'rgba(95,38,8,0.96)');
-      rg.addColorStop(0.18, 'rgba(50,20,8,0.98)');
-      rg.addColorStop(0.44, 'rgba(16,6,24,0.98)');
-      rg.addColorStop(0.75, 'rgba(14,5,40,0.94)');
-      rg.addColorStop(1,    'rgba(32,8,68,0.82)');
-      ctx.fillStyle = rg; ctx.fillRect(0, 0, LD, LD);
-      ctx.restore();
-
-      // Texture dots (clipped, positions lerped)
-      ctx.save();
-      ctx.beginPath(); eP(rx_out+1, ry_out+1); eP(rxi_b-1, ryi_b-1, true);
-      ctx.clip();
-      for (const d of dots) {
-        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, TWO_PI);
-        ctx.fillStyle = d.c; ctx.fill();
-      }
-      ctx.restore();
-
-      // ── Energy streamers (3) ─────────────────────────────────────────────
-      for (let s = 0; s < 3; s++) {
-        const phOff = (s / 3) * TWO_PI + t * 0.004;
-        const amp   = ringW * 0.26;
-        ctx.beginPath();
-        for (let i = 0; i <= 160; i++) {
-          const a = (i / 160) * TWO_PI;
-          const w = amp * Math.sin(a * 4 + phOff);
-          const x = (rx_mid + w) * Math.cos(a);
-          const y = (ry_mid + w * (ry_mid / rx_mid)) * Math.sin(a);
-          i === 0 ? ctx.moveTo(cx+x, cy+y) : ctx.lineTo(cx+x, cy+y);
-        }
-        ctx.closePath();
-        ctx.lineWidth   = 0.95;
-        ctx.strokeStyle = `rgba(255,185,80,${(0.16+0.11*Math.sin(t*0.011+s*1.3))*glow}.toFixed(2)})`;
-        ctx.strokeStyle = `rgba(255,185,80,${((0.16+0.11*Math.sin(t*0.011+s*1.3))*glow).toFixed(2)})`;
-        ctx.stroke();
-      }
-
-      // ── 3. Inner fire glow + hard edge ────────────────────────────────────
-      {
-        const fg = ctx.createRadialGradient(cx,cy,Math.min(rxi_b,ryi_b)*0.86, cx,cy,Math.min(rx_mid,ry_mid)*1.06);
-        fg.addColorStop(0,    'rgba(255,220,0,0)');
-        fg.addColorStop(0.10, `rgba(255,200,0,${(0.70*fireInt*fireBreath*glow).toFixed(2)})`);
-        fg.addColorStop(0.38, `rgba(255,120,0,${(0.80*fireInt*fireBreath*glow).toFixed(2)})`);
-        fg.addColorStop(0.72, `rgba(255,40,0,${(0.30*fireInt*glow).toFixed(2)})`);
-        fg.addColorStop(1,    'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.ellipse(cx,cy,Math.min(rx_mid,ry_mid)*1.06,Math.min(rx_mid,ry_mid)*1.06*(ryi/rxi),0,0,TWO_PI);
-        ctx.fillStyle = fg; ctx.fill();
-      }
-      ctx.save();
-      ctx.lineWidth   = 2.6 + 1.6 * Math.sin(t * 0.022);
-      ctx.strokeStyle = `rgba(255,188,0,${(0.95*fireInt*glow).toFixed(2)})`;
-      ctx.shadowColor = 'rgba(255,145,0,0.95)'; ctx.shadowBlur = 26;
-      ctx.beginPath(); eP(rxi_b, ryi_b); ctx.stroke();
-      ctx.restore();
-
-      // Purple outer edge
-      ctx.save();
-      ctx.lineWidth   = 2.4 + 1.4 * Math.sin(t * 0.019 + 1.2);
-      ctx.strokeStyle = `rgba(210,60,255,${(0.92*coronaInt*glow).toFixed(2)})`;
-      ctx.shadowColor = 'rgba(185,0,255,0.92)'; ctx.shadowBlur = 32;
-      ctx.beginPath(); eP(rx_out, ry_out); ctx.stroke();
-      ctx.restore();
-
-      // ── 4. Inner void ─────────────────────────────────────────────────────
-      {
-        const vg = ctx.createRadialGradient(cx,cy,0, cx,cy,Math.min(rxi_b,ryi_b));
-        vg.addColorStop(0,    'rgba(0,0,0,0.99)');
-        vg.addColorStop(0.55, 'rgba(2,0,10,0.98)');
-        vg.addColorStop(0.85, 'rgba(8,2,22,0.96)');
-        vg.addColorStop(1,    'rgba(18,4,38,0.92)');
-        ctx.beginPath(); eP(rxi_b, ryi_b);
-        ctx.fillStyle = vg; ctx.fill();
-      }
-
-      // ── 5. Void interior ──────────────────────────────────────────────────
-      {
-        const shim = 0.025 + 0.025 * Math.sin(t * 0.018);
-        const sg = ctx.createRadialGradient(cx,cy,0, cx,cy,Math.min(rxi_b,ryi_b)*0.60);
-        sg.addColorStop(0,   `rgba(${mr},${mg},${mb},${(shim*0.28).toFixed(3)})`);
-        sg.addColorStop(0.6, `rgba(${mr},${mg},${mb},${(shim*0.08).toFixed(3)})`);
-        sg.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.ellipse(cx,cy,Math.min(rxi_b,ryi_b)*0.60,Math.min(rxi_b,ryi_b)*0.60*(ryi/rxi),0,0,TWO_PI);
-        ctx.fillStyle = sg; ctx.fill();
-
-        for (let i = 0; i < 7; i++) {
-          const tr  = Math.min(rxi_b,ryi_b) * (i+1) / 8 * 0.95;
-          const rot = t * 0.003 * (1+i*0.3) * (i%2===0?1:-1);
-          ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot); ctx.translate(-cx,-cy);
-          ctx.lineWidth   = 0.4;
-          ctx.strokeStyle = `rgba(${mr},${mg},${mb},${(0.013*glow).toFixed(3)})`;
-          ctx.beginPath(); ctx.arc(cx,cy,tr,0,TWO_PI); ctx.stroke();
-          ctx.restore();
-        }
-
-        if (voidBright > 0) {
-          const pulse = 0.5 + 0.5 * Math.sin(t * 0.07);
-          const cg2 = ctx.createRadialGradient(cx,cy,0, cx,cy,Math.min(rxi_b,ryi_b)*0.44);
-          cg2.addColorStop(0,    `rgba(255,235,185,${(0.95*voidBright*pulse).toFixed(3)})`);
-          cg2.addColorStop(0.3,  `rgba(255,165,80,${(0.55*voidBright*pulse).toFixed(3)})`);
-          cg2.addColorStop(0.65, `rgba(140,55,255,${(0.22*voidBright*pulse).toFixed(3)})`);
-          cg2.addColorStop(1,    'rgba(0,0,0,0)');
-          ctx.beginPath(); ctx.ellipse(cx,cy,Math.min(rxi_b,ryi_b)*0.44,Math.min(rxi_b,ryi_b)*0.44*(ryi/rxi),0,0,TWO_PI);
-          ctx.fillStyle = cg2; ctx.fill();
-        }
-      }
-
-      // ── 6. Fire sparks ────────────────────────────────────────────────────
-      {
-        const spkCount = 28 + Math.floor(spkMul * 10);
-        for (let i = 0; i < spkCount; i++) {
-          const a    = (i/spkCount)*TWO_PI + t*0.003*(i%2===0?1:-1.3);
-          const flick = 0.82 + 0.18*Math.sin(t*0.11+i*0.73);
-          const dist  = rxi_b + 2 + 10*Math.random()*spkMul*flick;
-          const sx = cx + dist*Math.cos(a);
-          const sy = cy + dist*(ryi_b/rxi_b)*Math.sin(a);
-          const al = Math.min((0.3+0.7*flick)*Math.min(spkMul,1.5)*fireInt*glow, 1);
-          ctx.beginPath(); ctx.arc(sx,sy,0.9+Math.random()*0.6,0,TWO_PI);
-          ctx.fillStyle = `rgba(255,${120+Math.random()*120|0},0,${al.toFixed(2)})`; ctx.fill();
-        }
-      }
-
-      // ── 7. Crystal orb at top ─────────────────────────────────────────────
-      {
-        const ox = cx, oy = ORB_Y, OR = ORB_R;
-
-        // Halo
-        const og = ctx.createRadialGradient(ox,oy,0, ox,oy,OR*2.6);
-        og.addColorStop(0,   `rgba(255,210,180,${(0.55*glow).toFixed(2)})`);
-        og.addColorStop(0.4, `rgba(255,140,80,${(0.28*glow).toFixed(2)})`);
-        og.addColorStop(0.8, `rgba(165,0,255,${(0.12*glow).toFixed(2)})`);
-        og.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(ox,oy,OR*2.6,0,TWO_PI); ctx.fillStyle=og; ctx.fill();
-
-        // Concentric arcs above (5, upper semicircle)
-        for (let i = 0; i < 5; i++) {
-          const arcR  = OR*(1.9+i*0.95);
-          const alpha = Math.max(0.55-i*0.09,0.08)*glow;
-          ctx.save();
-          ctx.lineWidth   = Math.max(0.9-i*0.1,0.4);
-          ctx.strokeStyle = `rgba(255,185,80,${alpha.toFixed(2)})`;
-          ctx.shadowColor = 'rgba(255,160,50,0.6)'; ctx.shadowBlur = 7;
-          ctx.beginPath(); ctx.arc(ox,oy,arcR,Math.PI,0,false); ctx.stroke();
-          ctx.shadowBlur = 0;
-          ctx.beginPath(); ctx.arc(ox-arcR,oy,1.4,0,TWO_PI); ctx.fillStyle=`rgba(255,185,80,${(alpha*1.4).toFixed(2)})`; ctx.fill();
-          ctx.beginPath(); ctx.arc(ox+arcR,oy,1.4,0,TWO_PI); ctx.fillStyle=`rgba(255,185,80,${(alpha*1.4).toFixed(2)})`; ctx.fill();
-          ctx.restore();
-        }
-        ctx.beginPath(); ctx.arc(ox, oy-OR*(1.9+4*0.95)-5, 2.6, 0, TWO_PI);
-        ctx.fillStyle=`rgba(255,205,100,${(0.92*glow).toFixed(2)})`; ctx.fill();
-
-        // Stem
-        ctx.save();
-        const sA = 0.48+0.28*Math.sin(t*0.015);
-        ctx.lineWidth=1.2; ctx.strokeStyle=`rgba(255,185,80,${sA.toFixed(2)})`;
-        ctx.shadowColor='rgba(255,140,0,0.7)'; ctx.shadowBlur=8;
-        ctx.beginPath(); ctx.moveTo(ox,oy+OR); ctx.lineTo(ox,oy+OR*2.5); ctx.stroke();
-        ctx.shadowBlur=0;
-        ctx.beginPath(); ctx.arc(ox,oy+OR*2.9,2.2,0,TWO_PI);
-        ctx.fillStyle=`rgba(255,205,80,${sA.toFixed(2)})`; ctx.fill();
-        ctx.restore();
-
-        // Orb body
-        const ig = ctx.createRadialGradient(ox-OR*0.3,oy-OR*0.3,0, ox,oy,OR);
-        ig.addColorStop(0,   'rgba(240,220,255,0.90)');
-        ig.addColorStop(0.26,'rgba(180,140,255,0.72)');
-        ig.addColorStop(0.56,'rgba(80,20,180,0.76)');
-        ig.addColorStop(0.80,'rgba(20,0,80,0.82)');
-        ig.addColorStop(1,   'rgba(0,0,22,0.90)');
-        ctx.beginPath(); ctx.arc(ox,oy,OR,0,TWO_PI); ctx.fillStyle=ig; ctx.fill();
-
-        // Rim
-        ctx.save();
-        ctx.lineWidth=1.1; ctx.strokeStyle=`rgba(200,160,255,${(0.70*glow).toFixed(2)})`;
-        ctx.shadowColor='rgba(165,0,255,0.80)'; ctx.shadowBlur=12;
-        ctx.beginPath(); ctx.arc(ox,oy,OR,0,TWO_PI); ctx.stroke();
-        ctx.restore();
-
-        // Specular
-        const sh = ctx.createRadialGradient(ox-OR*0.28,oy-OR*0.28,0, ox-OR*0.28,oy-OR*0.28,OR*0.44);
-        sh.addColorStop(0,'rgba(255,255,255,0.78)'); sh.addColorStop(1,'rgba(255,255,255,0)');
-        ctx.beginPath(); ctx.arc(ox,oy,OR,0,TWO_PI); ctx.fillStyle=sh; ctx.fill();
-      }
-
-      // ── 8. Lotus + crystal drops + water ripples ──────────────────────────
-      {
-        const lx = cx, ly = LOTUS_Y, LS = LOTUS_S;
-
-        // Lotus halo
-        const lhg = ctx.createRadialGradient(lx,ly,0, lx,ly,LS*3.8);
-        lhg.addColorStop(0,  `rgba(255,195,60,${(0.68*glow).toFixed(2)})`);
-        lhg.addColorStop(0.4,`rgba(255,120,20,${(0.32*glow).toFixed(2)})`);
-        lhg.addColorStop(1,  'rgba(0,0,0,0)');
-        ctx.fillStyle=lhg; ctx.beginPath(); ctx.arc(lx,ly,LS*3.8,0,TWO_PI); ctx.fill();
-
-        // Petals (7)
-        const petals = [-0.56,-0.34,-0.15,0,0.15,0.34,0.56];
-        const pAlpha = [0.68,0.78,0.84,0.90,0.84,0.78,0.68];
-        ctx.save(); ctx.shadowColor='rgba(255,160,0,0.60)'; ctx.shadowBlur=10;
-        for (let i = 0; i < 7; i++) {
-          ctx.save(); ctx.translate(lx,ly); ctx.rotate(petals[i]-Math.PI/2);
-          ctx.beginPath(); ctx.ellipse(0,-LS*0.95,LS*0.26,LS*0.92,0,0,TWO_PI);
-          ctx.fillStyle=`rgba(255,185,0,${(pAlpha[i]*glow).toFixed(2)})`; ctx.fill();
-          ctx.restore();
-        }
-        ctx.restore();
-        ctx.beginPath(); ctx.arc(lx,ly,LS*0.22,0,TWO_PI);
-        ctx.fillStyle=`rgba(255,235,160,${(0.96*glow).toFixed(2)})`; ctx.fill();
-
-        // Stem
-        ctx.save(); ctx.lineWidth=1.0;
-        ctx.strokeStyle=`rgba(255,185,80,${(0.42*glow).toFixed(2)})`;
-        ctx.beginPath(); ctx.moveTo(lx,ly+LS*0.5); ctx.lineTo(lx,ly+LS*1.4); ctx.stroke();
-        ctx.restore();
-
-        // Crystal drop chain (4 beads)
-        const sizes=[LS*0.17,LS*0.12,LS*0.085,LS*0.060];
-        const gaps=[LS*0.60,LS*0.46,LS*0.36];
-        let dy = ly + LS * 1.4;
-        for (let d = 0; d < 4; d++) {
-          dy += d===0 ? LS*0.26 : gaps[d-1];
-          const dg = ctx.createRadialGradient(lx-sizes[d]*0.3,dy-sizes[d]*0.3,0, lx,dy,sizes[d]);
-          dg.addColorStop(0,  'rgba(240,210,255,0.86)');
-          dg.addColorStop(0.5,'rgba(180,100,255,0.60)');
-          dg.addColorStop(1,  'rgba(55,0,120,0.80)');
-          ctx.beginPath(); ctx.arc(lx,dy,sizes[d],0,TWO_PI);
-          ctx.fillStyle=dg; ctx.fill();
-          ctx.lineWidth=0.8; ctx.strokeStyle=`rgba(200,150,255,${(0.60*glow).toFixed(2)})`;
-          ctx.stroke();
-        }
-
-        // Water ripples
-        for (let r = 0; r < 5; r++) {
-          const ph2 = ((t*0.016 + r*0.38) % 1 + 1) % 1;
-          const maxRX = Math.min(rx_out*0.52, window.innerWidth*0.28) * (0.28+r*0.17);
-          const al = (0.55-ph2*0.55)*0.65*glow;
-          if (al <= 0.01) continue;
-          ctx.save(); ctx.lineWidth=1.1;
-          ctx.strokeStyle=`rgba(255,185,80,${al.toFixed(2)})`;
-          ctx.shadowColor='rgba(255,160,0,0.4)'; ctx.shadowBlur=5;
-          ctx.beginPath(); ctx.ellipse(lx,RIPPLE_Y,maxRX,maxRX*0.20,0,0,TWO_PI);
-          ctx.stroke(); ctx.restore();
-        }
-        ctx.beginPath(); ctx.arc(lx,RIPPLE_Y,2.6,0,TWO_PI);
-        ctx.fillStyle=`rgba(255,205,80,${(0.68*glow).toFixed(2)})`; ctx.fill();
-      }
-
-      raf = requestAnimationFrame(draw);
-    };
-
-    draw();
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', onResize);
-    };
-  }, []);
-
-  // position: fixed, z:2 — above the starfield (z:1) but below the UI (z:5+)
-  return <canvas ref={ref} style={{ position: 'fixed', top: 0, left: 0, zIndex: 2, pointerEvents: 'none', display: 'block' }} />;
+// ── CosmicPortal: R3F canvas (full-screen, z:2, behind all UI) ────────────────
+function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveModeKey }) {
+  return (
+    <Canvas
+      style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none' }}
+      gl={{ antialias: false, alpha: false, depth: false }}
+    >
+      <MedhaPortalShader phase={phase} modeKey={modeKey} />
+    </Canvas>
+  );
 }
 
 
@@ -1008,13 +875,17 @@ export default function MedhaHUD() {
   const [freshIdx, setFreshIdx]   = useState(-1);
   const [flyingText, setFlying]   = useState<string | null>(null);
   const [flyDeltaY, setFlyDeltaY] = useState(0);
+  const [gsapQueryText, setGsapQueryText]       = useState('');
+  const [gsapResponseText, setGsapResponseText] = useState('');
   const [gatePhase, setGatePhase] = useState<'checking' | 'consent' | 'active'>('checking');
   const [guestMode, setGuestMode] = useState(false);
   const [quotaLeft, setQuota]     = useState(99);
 
-  const abortRef     = useRef<AbortController | null>(null);
-  const chatBotRef   = useRef<HTMLDivElement>(null);
-  const portalRef    = useRef<HTMLDivElement>(null);
+  const abortRef        = useRef<AbortController | null>(null);
+  const chatBotRef      = useRef<HTMLDivElement>(null);
+  const portalRef       = useRef<HTMLDivElement>(null);
+  const queryGSAPRef    = useRef<HTMLDivElement>(null);
+  const responseGSAPRef = useRef<HTMLDivElement>(null);
   const phaseRef     = useRef(phase);
   const chatIdRef    = useRef(chatId);
   const messagesRef  = useRef(messages);
@@ -1023,6 +894,80 @@ export default function MedhaHUD() {
   chatIdRef.current    = chatId;
   messagesRef.current  = messages;
   guestModeRef.current = guestMode;
+
+  // ── GSAP: initialize centering on mount ───────────────────────────────────
+  useEffect(() => {
+    if (queryGSAPRef.current)
+      gsap.set(queryGSAPRef.current,    { xPercent: -50, yPercent: -50, opacity: 0 });
+    if (responseGSAPRef.current)
+      gsap.set(responseGSAPRef.current, { xPercent: -50, yPercent: -50, opacity: 0 });
+  }, []);
+
+  // ── GSAP: 6-step animation timeline driven by phase ────────────────────────
+  useEffect(() => {
+    const q = queryGSAPRef.current;
+    const r = responseGSAPRef.current;
+    if (!q || !r) return;
+
+    if (phase === 'absorbing') {
+      const userMsg = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+      setGsapQueryText(renderMarkdown(userMsg));
+      gsap.killTweensOf([q, r]);
+      gsap.set(r, { opacity: 0 });
+      // Step 2: query flies from bottom to center
+      gsap.fromTo(q,
+        { y: 80, scale: 0.85, opacity: 0, z: 0, filter: 'blur(0px)' },
+        { y: 0,  scale: 1,    opacity: 1, duration: 0.45, ease: 'power2.out',
+          onComplete: () => {
+            // Step 3: suck into void
+            gsap.to(q, { z: -1200, scale: 0.08, opacity: 0, filter: 'blur(12px)',
+              duration: 0.85, ease: 'power2.in' });
+          }
+        }
+      );
+    }
+
+    if (phase === 'emerging') {
+      const content = streamText || [...messages].reverse().find(m => m.role === 'assistant')?.content || '';
+      setGsapResponseText(renderMarkdown(content));
+      gsap.killTweensOf(r);
+      // Step 5: response emerges from void
+      gsap.fromTo(r,
+        { z: -1200, scale: 0.3, opacity: 0, filter: 'blur(16px)', y: 0 },
+        { z: 0,     scale: 1,   opacity: 1, filter: 'blur(0px)',
+          duration: 1.5, ease: 'power2.out' }
+      );
+    }
+
+    if (phase === 'responding') {
+      gsap.to(r, { opacity: 1, z: 0, scale: 1, filter: 'blur(0px)', duration: 0.3 });
+    }
+
+    if (phase === 'idle') {
+      // Show initial greeting / last response faded
+      gsap.killTweensOf([q, r]);
+      gsap.to(q, { opacity: 0, duration: 0.4 });
+      const lastAsst = [...messages].reverse().find(m => m.role === 'assistant')?.content || '';
+      if (lastAsst) {
+        setGsapResponseText(renderMarkdown(lastAsst));
+        gsap.to(r, { opacity: 0.82, z: 0, scale: 1, filter: 'blur(0px)', duration: 1.2, ease: 'power1.out' });
+      } else {
+        gsap.to(r, { opacity: 0, duration: 0.4 });
+      }
+    }
+
+    if (phase === 'error') {
+      gsap.to([q, r], { opacity: 0, duration: 0.4 });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // ── GSAP: keep response text live during streaming ─────────────────────────
+  useEffect(() => {
+    if ((phase === 'emerging' || phase === 'responding') && streamText) {
+      setGsapResponseText(renderMarkdown(streamText));
+    }
+  }, [streamText, phase]);
 
   // Gate init
   useEffect(() => {
@@ -1257,55 +1202,58 @@ export default function MedhaHUD() {
           {/* ── CosmicPortal: position:fixed background canvas (z:1) ── */}
           <CosmicPortal phase={phase} modeKey={mode} />
 
-          {/* ── Void text overlay — position:fixed, tracks ring center ── */}
-          <AnimatePresence>
-            {(phase === 'idle' || phase === 'emerging' || phase === 'responding') && (streamText || messages.length > 0) && (
-              <motion.div
-                key={phase === 'idle' ? 'idle-resp' : phase === 'emerging' ? 'stream' : 'resp'}
-                initial={{ opacity: 0, scale: 0.3 }}
-                animate={{ opacity: phase === 'idle' ? 0.82 : 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.1 }}
-                transition={{ duration: phase === 'idle' ? 1.6 : 0.9, ease: [0.08, 0.95, 0.3, 1.0] }}
-                style={{
-                  position: 'fixed',
-                  top: '42svh', left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  width: 'min(44vw, 300px)',
-                  maxHeight: '28svh',
-                  overflow: 'hidden',
-                  textAlign: 'center',
-                  pointerEvents: 'none',
-                  zIndex: 15,
-                }}
-              >
-                <div
-                  className="medha-md"
-                  style={{
-                    fontSize: 11,
-                    lineHeight: 1.65,
-                    letterSpacing: '0.018em',
-                    color: 'rgba(255,235,195,0.95)',
-                    fontFamily: 'var(--font-vyan)',
-                    textShadow: '0 0 18px rgba(255,160,0,0.55), 0 0 36px rgba(255,100,0,0.28)',
-                    wordBreak: 'break-word',
-                    whiteSpace: 'pre-wrap',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 7,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
-                  dangerouslySetInnerHTML={{
-                    __html: renderMarkdown(
-                      streamText ||
-                      [...messages].reverse().find(m => m.role === 'assistant')?.content || ''
-                    )
-                  }}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* ── GSAP text animation layer (perspective parent for z-axis) ── */}
+          <div style={{ position: 'fixed', inset: 0, perspective: '1200px', pointerEvents: 'none', zIndex: 15 }}>
+            {/* Query text — flies to center then sucks into void */}
+            <div
+              ref={queryGSAPRef}
+              className="medha-md"
+              style={{
+                position: 'absolute',
+                top: '42svh', left: '50%',
+                width: 'min(44vw, 300px)',
+                textAlign: 'center',
+                mixBlendMode: 'screen',
+                color: 'rgba(255,235,195,0.95)',
+                fontSize: 13,
+                lineHeight: 1.65,
+                letterSpacing: '0.018em',
+                fontFamily: 'var(--font-vyan)',
+                textShadow: '0 0 20px rgba(255,160,0,0.75)',
+                wordBreak: 'break-word',
+                pointerEvents: 'none',
+              }}
+              dangerouslySetInnerHTML={{ __html: gsapQueryText }}
+            />
+            {/* Response text — emerges from void */}
+            <div
+              ref={responseGSAPRef}
+              className="medha-md"
+              style={{
+                position: 'absolute',
+                top: '42svh', left: '50%',
+                width: 'min(44vw, 300px)',
+                maxHeight: '30svh',
+                overflow: 'hidden',
+                textAlign: 'center',
+                mixBlendMode: 'screen',
+                color: 'rgba(255,235,195,0.95)',
+                fontSize: 11,
+                lineHeight: 1.65,
+                letterSpacing: '0.018em',
+                fontFamily: 'var(--font-vyan)',
+                textShadow: '0 0 18px rgba(255,160,0,0.55)',
+                wordBreak: 'break-word',
+                WebkitLineClamp: 7,
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                pointerEvents: 'none',
+              }}
+              dangerouslySetInnerHTML={{ __html: gsapResponseText }}
+            />
+          </div>
 
-          {/* ── Processing / error label — position:fixed ──────────────── */}
+          {/* ── Error label — position:fixed ──────────────────────────── */}
           <div style={{ position: 'fixed', top: '53svh', left: '50%', transform: 'translateX(-50%)', zIndex: 15 }}>
             <AnimatePresence mode="wait">
               {phase === 'processing' && <ProcessingLabel key="proc" modeKey={mode} />}
