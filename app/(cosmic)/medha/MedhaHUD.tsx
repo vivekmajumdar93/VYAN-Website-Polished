@@ -154,7 +154,7 @@ const PORTAL_VERT = /* glsl */`
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const PORTAL_FRAG = /* glsl */`
 precision highp float;
-varying vec2 vUv;
+varying vec2  vUv;
 uniform float u_time;
 uniform vec2  u_viewport;
 uniform float u_intensity;
@@ -164,256 +164,225 @@ uniform float u_mr;
 uniform float u_mg;
 uniform float u_mb;
 
-float hash(vec2 p) {
-  p = fract(p * vec2(234.34, 435.345));
-  p += dot(p, p + 34.23);
-  return fract(p.x * p.y);
+/* ── Noise ── */
+float hash(vec2 p){p=fract(p*vec2(234.34,435.345));p+=dot(p,p+34.23);return fract(p.x*p.y);}
+float vnoise(vec2 p){
+  vec2 i=floor(p),f=fract(p),u=f*f*(3.0-2.0*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
 }
-float vnoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash(i), hash(i + vec2(1.0,0.0)), u.x),
-             mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
-}
-float fbm(vec2 p) {
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 6; i++) {
-    v += a * vnoise(p);
-    p = p * 2.07 + vec2(31.41, 92.65);
-    a *= 0.5;
-  }
+float fbm(vec2 p){
+  float v=0.0,a=0.5;
+  for(int i=0;i<7;i++){v+=a*vnoise(p);p=p*2.07+vec2(31.41,92.65);a*=0.5;}
   return v;
 }
 
-void main() {
-  float W = u_viewport.x;
-  float H = u_viewport.y;
-  float t = u_time * u_speed;
+void main(){
+  float W=u_viewport.x, H=u_viewport.y, t=u_time*u_speed;
 
-  // UV → CSS coords (DPR-agnostic; gl_FragCoord is in physical pixels, vUv is always 0-1)
-  // vUv: (0,0)=bottom-left, (1,1)=top-right; CSS: (0,0)=top-left, so flip Y
-  float px = vUv.x * W;
-  float py = (1.0 - vUv.y) * H;
+  /* DPR-agnostic CSS coords */
+  float px=vUv.x*W, py=(1.0-vUv.y)*H;
 
-  bool isLand = W > H * 1.1;
+  bool  isLand = W>H*1.1;
+  float cx = W*0.5;
+  float cy = isLand ? H*0.50 : H*0.44;
+  float rxi= isLand ? W*0.40 : min(W*0.42,H*0.32);
+  float ryi= isLand ? H*0.37 : rxi*0.98;
+  float ringW = min(rxi,ryi)*0.36;
 
-  // Ring geometry
-  float cx  = W * 0.5;
-  float cy  = isLand ? H * 0.50 : H * 0.44;
-  float rxi = isLand ? W * 0.40 : min(W * 0.42, H * 0.32);
-  float ryi = isLand ? H * 0.37 : rxi * 0.98;
-  float ringW   = min(rxi, ryi) * 0.36;
-  float rx_out  = rxi + ringW;
-  float ry_out  = ryi + ringW;
-  float rx_mid  = rxi + ringW * 0.5;
-  float ry_mid  = ryi + ringW * 0.5;
+  float breath  = 2.4*sin(t*0.016+0.5);
+  float rxi_b   = max(rxi +breath*0.6,       1.0);
+  float ryi_b   = max(ryi +breath*0.6*ryi/max(rxi,1.0), 1.0);
+  float rx_out_b= rxi_b+ringW;
+  float ry_out_b= ryi_b+ringW;
 
-  // Breathing
-  float breath  = 2.6 * sin(t * 0.016);
-  float rxi_b   = max(rxi + breath * 0.7, 1.0);
-  float ryi_b   = max(ryi + breath * 0.7 * (ryi / max(rxi, 1.0)), 1.0);
-  float rx_out_b = rxi_b + ringW;
-  float ry_out_b = ryi_b + ringW;
+  float dx=px-cx, dy=py-cy;
+  float d_in =length(vec2(dx/rxi_b,  dy/ryi_b));
+  float d_out=length(vec2(dx/max(rx_out_b,1.0), dy/max(ry_out_b,1.0)));
+  float ang  =atan(dy,dx);
+  float angN =(ang+3.14159)/6.28318;   /* 0–1 around ring */
 
-  float dx = px - cx;
-  float dy = py - cy;
+  float glow=u_intensity;
 
-  float d_inner = length(vec2(dx / rxi_b, dy / ryi_b));
-  float d_outer = length(vec2(dx / max(rx_out_b,1.0), dy / max(ry_out_b,1.0)));
-  float d_mid   = length(vec2(dx / max(rx_mid,1.0),   dy / max(ry_mid,1.0)));
+  /* ── 0. Deep space ── */
+  vec3 color=vec3(0.003,0.0,0.015);
 
-  float glow         = u_intensity;
-  float breath_pulse = 0.75 + 0.25 * sin(t * 1.68);
-
-  // 0. Dark base
-  vec3 color = vec3(0.008, 0.0, 0.055);
-
-  // 1. Blue nebula wisps
+  /* ── 1. Outer corona + rotating wisps ── */
   {
-    float dL = length(vec2(px-(cx-rx_out*0.95), py-cy)) / max(rx_out*1.3, 1.0);
-    float dR = length(vec2(px-(cx+rx_out*0.95), py-cy)) / max(rx_out*1.3, 1.0);
-    color += vec3(0.0,0.08,0.42) * max(0.0, 1.0-dL) * 0.14 * glow;
-    color += vec3(0.0,0.08,0.42) * max(0.0, 1.0-dR) * 0.14 * glow;
-    float mist = max(0.0, (py/max(H,1.0) - 0.65) / 0.35);
-    color += vec3(0.0,0.03,0.14) * mist * 0.16 * glow;
-  }
-
-  // 2. Corona + 4 rotating wisps
-  {
-    float cFade = max(0.0, 1.0 - d_outer / 1.80);
-    color += vec3(0.35,0.0,0.70) * pow(cFade, 1.5) * 0.72 * glow;
-    for (int k = 0; k < 4; k++) {
-      float wa = t*0.006 + float(k)*1.5708;
-      float wx = cx + rxi*0.52*cos(wa);
-      float wy = cy + ryi*0.52*sin(wa);
-      float wr = min(rx_out,ry_out)*0.78;
-      float wd = length(vec2(px-wx, py-wy)) / max(wr, 1.0);
-      color += vec3(0.90,0.0,0.82) * max(0.0, 1.0-wd) * 0.11 * glow;
+    float cf=max(0.0,1.0-d_out/1.9);
+    color+=vec3(0.20,0.0,0.36)*pow(cf,1.6)*0.75*glow;
+    for(int k=0;k<4;k++){
+      float wa=t*0.005+float(k)*1.5708;
+      float wr=min(rx_out_b,ry_out_b)*0.80;
+      float wd=length(vec2(px-(cx+rxi_b*0.6*cos(wa)),py-(cy+ryi_b*0.6*sin(wa))))/max(wr,1.0);
+      color+=vec3(0.75,0.0,0.65)*max(0.0,1.0-wd)*0.09*glow;
     }
   }
 
-  // 3. Rocky ring body
-  float ringMask = smoothstep(0.97, 1.0, d_inner) * (1.0 - smoothstep(0.97, 1.0, d_outer));
-  if (ringMask > 0.001) {
-    float rf = clamp((d_inner-1.0)/max(d_outer-d_inner,0.001), 0.0, 1.0);
-    vec2  rp = vec2(dx,dy)*0.008 + t*0.04*vec2(1.0,0.0);
-    float n  = fbm(rp);
-    vec3 inner = mix(vec3(0.37,0.14,0.03), vec3(0.06,0.02,0.01), n);
-    vec3 outer = mix(vec3(0.06,0.02,0.15), vec3(0.14,0.03,0.26), n*0.8);
-    color = mix(color, mix(inner,outer,rf)*(0.8+0.2*n), ringMask);
-    float dots = fbm(vec2(dx,dy)*0.022 + t*0.02);
-    color += ringMask*(dots-0.4)*vec3(0.08,0.04,0.0)*0.4;
-    float ang = atan(dy,dx);
-    for (int s = 0; s < 3; s++) {
-      float sa = float(s)*2.094 + t*0.004;
-      float str = sin(ang*4.0+sa)*0.5+0.5;
-      color += ringMask*str*vec3(1.0,0.72,0.31)*0.14*glow;
+  /* ── 2. LIVE FIRE — fBM turbulence erupting from inner ring edge ── */
+  if(d_in>0.88 && d_out<1.45){
+    /* rOff: 0 at inner edge, positive going outward through ring and beyond */
+    float rOff = max(0.0, d_in-1.0);
+
+    /* Fire UV: tangential + radial-outward scroll */
+    float fU = angN*7.5;
+    float fV = rOff*3.2;        /* 0 at inner edge, grows outward */
+
+    /* Two-layer turbulence at different scroll speeds */
+    float fn1 = fbm(vec2(fU +t*0.22,  -fV-t*3.8));
+    float fn2 = fbm(vec2(fU*1.6-t*0.15,-fV*0.8-t*5.2));
+    float fN  = fn1*0.60+fn2*0.40;
+
+    /* Fire shape: solid base at inner edge, flickers into licks */
+    float fBase = max(0.0,1.0-fV*0.55)*(0.50+fN*0.95);
+    float fLick = max(0.0,(fN-0.28)*2.4)*max(0.0,1.0-fV*0.38);
+    float fFinal= clamp(max(fBase,fLick),0.0,1.0);
+
+    /* Color gradient: white-yellow core → orange → dark red */
+    vec3 hot  = vec3(1.00,0.97,0.82);
+    vec3 mid  = vec3(1.00,0.42,0.02);
+    vec3 cool = vec3(0.48,0.0, 0.0 );
+    vec3 fCol = mix(cool, mid,  clamp(fFinal*2.0,0.0,1.0));
+        fCol  = mix(fCol, hot,  clamp(fFinal*3.2-1.6,0.0,1.0));
+
+    /* Fade: starts just inside void edge, fades at outer fire boundary */
+    float fMask = fFinal
+      * smoothstep(0.86,1.0,d_in)
+      * smoothstep(1.42,0.95,d_out);
+
+    color  = mix(color, fCol, fMask*glow*0.92);
+    color += fCol * fFinal*0.45 * smoothstep(1.38,0.90,d_out) * glow;
+  }
+
+  /* ── 3. Rocky ring (dark base under fire) ── */
+  {
+    float rMask=smoothstep(0.97,1.0,d_in)*(1.0-smoothstep(0.97,1.0,d_out));
+    if(rMask>0.001){
+      float n=fbm(vec2(dx,dy)*0.009+t*0.03);
+      float rf=clamp((d_in-1.0)/max(d_out-d_in,0.001),0.0,1.0);
+      vec3 rock=mix(vec3(0.09,0.03,0.0),vec3(0.03,0.01,0.01),n);
+      color=mix(color,rock,rMask*0.45);
     }
   }
 
-  // 4. Inner fire gradient
-  if (d_inner < 1.2) {
-    float fs  = pow(clamp(d_inner,0.0,1.0),1.5)*breath_pulse*0.85*glow;
-    vec3  fc2 = mix(vec3(1.0,0.75,0.0),vec3(1.0,0.25,0.0),d_inner);
-    color += fc2*fs*smoothstep(1.1,0.9,d_inner);
-  }
-
-  // 5. Inner fire edge line
+  /* ── 4. Blazing inner-edge line ── */
   {
-    float innerEdge = smoothstep(0.04,0.0,abs(d_inner-1.0))*step(d_inner,1.1);
-    color += vec3(1.0,0.74,0.0)*innerEdge*0.9*glow;
+    float ied=abs(d_in-1.0);
+    float pulse=0.75+0.25*sin(t*3.0+ang*4.0);
+    float ie=max(0.0,1.0-ied*max(rxi_b,1.0)*0.09)*step(1.0,d_in)*pulse;
+    color+=vec3(1.0,0.78,0.0)*ie*1.5*glow;
+    color+=vec3(1.0,0.97,0.82)*max(0.0,ie-0.4)*2.2*glow;
   }
 
-  // 6. Inner void
-  if (d_inner < 1.0) {
-    float va = smoothstep(1.0,0.82,d_inner);
-    color = mix(color, vec3(0.004,0.0,0.015), va*0.95);
-    float shim = 0.025+0.025*sin(t*1.08);
+  /* ── 5. INFINITE VOID (logarithmic-depth perspective tunnel) ── */
+  if(d_in<1.02){
+    /* logD→∞ as center approached; rings in log-space = even depth spacing */
+    float logD = -log(max(d_in,0.0003))*1.5;
+
+    /* Spinning depth rings + subtle spiral */
+    float rings  = sin(logD*26.0 - t*1.8)      *0.5+0.5;
+    float spiral = sin(logD*17.0 + ang*3.0 + t*0.07 - t)*0.5+0.5;
+    float depth  = rings*0.65+spiral*0.35;
+
+    float eD  = d_in;   /* 0=center, 1=ring edge */
     vec3  mc2 = vec3(u_mr,u_mg,u_mb)/255.0;
-    color += mc2*shim*0.28*(1.0-d_inner*d_inner);
-    for (int i = 0; i < 7; i++) {
-      float tr = (float(i)+1.0)/8.0*0.95;
-      float td = abs(d_inner - tr*tr);
-      color += mc2*max(0.0, 0.015-td*20.0)*glow;
-    }
-    if (u_phase > 0.1) {
-      float pulse = 0.5+0.5*sin(t*4.2);
-      color += vec3(1.0,0.92,0.72)*u_phase*pulse*0.65*pow(1.0-d_inner,2.0);
-    }
-  }
 
-  // 7. fBM filaments around ring band
-  {
-    vec2  fUV = vec2(dx,dy)*0.004;
-    float fil = fbm(fUV + t*0.3);
-    float rp2 = max(0.0, 1.0-abs(d_mid-1.0)*3.5);
-    color += vec3(0.5,0.0,1.0)*fil*rp2*0.18*glow;
-  }
+    /* Near-black void — faint color only on the tunnel walls near edge */
+    vec3 vCol = vec3(0.006,0.0,0.022)*pow(eD,1.3);
+    vCol += mc2 * 0.022 * depth * pow(eD,2.5);
+    vCol += vec3(0.010,0.003,0.038)*rings*pow(eD,2.2);
 
-  // 8. Purple outer edge
-  {
-    float oe = smoothstep(0.04,0.0,abs(d_outer-1.0))*step(1.0,d_inner);
-    color += vec3(0.82,0.24,1.0)*oe*0.9*glow;
-  }
+    /* Absolute black at centre */
+    vCol = mix(vec3(0.0), vCol, pow(clamp(eD,0.0,1.0),0.45));
 
-  // 9. Crystal orb  (above ring in CSS = smaller y)
-  {
-    float orbR = min(rxi_b,ryi_b)*0.092;
-    float ox   = cx;
-    float oy   = cy - ry_out_b;
-    float odx  = px-ox, ody = py-oy;
-    float orbD = length(vec2(odx,ody));
-
-    color += vec3(0.60,0.30,1.00)*max(0.0,1.0-orbD/(max(orbR,0.001)*2.6))*0.55*glow;
-    color += vec3(1.0,0.72,0.31)*max(0.0,1.0-orbD/(max(orbR,0.001)*3.5))*0.28*glow;
-
-    for (int i = 0; i < 5; i++) {
-      float arcR = orbR*(1.9+float(i)*0.95);
-      float arcD = abs(orbD-arcR);
-      float arcA = max(0.0, 0.55-float(i)*0.09)*glow;
-      float upper = step(ody, 0.0);  // 1.0 when above orb center (ody<=0 in CSS)
-      color += vec3(1.0,0.72,0.31)*max(0.0,1.0-arcD/(max(orbR,0.001)*0.5))*arcA*upper;
+    /* Processing phase: faint pulse radiates outward from void */
+    if(u_phase>0.1){
+      float pp=0.5+0.5*sin(t*4.5);
+      vCol+=mc2*u_phase*pp*0.4*pow(eD,1.5);
     }
 
-    // Top dot above arcs
-    float topDotY = oy - orbR*(1.9+4.0*0.95) - 5.0;
-    float topDot  = length(vec2(px-ox, py-topDotY));
-    color += vec3(1.0,0.80,0.39)*max(0.0,1.0-topDot/(max(orbR,0.001)*0.3))*0.92*glow;
-
-    if (orbD < orbR) {
-      float g2 = 1.0-orbD/orbR;
-      color = mix(color, mix(vec3(0.08,0.0,0.32),vec3(0.70,0.55,1.00),pow(g2,0.4)), g2*0.9);
-      float spec = max(0.0,1.0-length(vec2(odx+orbR*0.28,ody+orbR*0.28))/(max(orbR,0.001)*0.44));
-      color += pow(spec,2.0)*0.75;
-    }
-    color += vec3(0.78,0.63,1.0)*max(0.0,1.0-abs(orbD-orbR)/(max(orbR,0.001)*0.3))*0.70*glow;
-
-    // Stem connecting orb to ring
-    float stemT = smoothstep(0.0,1.0,clamp((py-oy-orbR)/(max(orbR,0.001)*1.5),0.0,1.0));
-    float stem  = max(0.0,1.0-abs(px-ox)/(1.5+orbR*0.05))*stemT;
-    color += vec3(1.0,0.72,0.31)*stem*0.42*glow;
+    color=mix(color, vCol, smoothstep(1.02,0.86,d_in)*0.98);
   }
 
-  // 10. Golden lotus + drop bead chain (below ring in CSS = larger y)
+  /* ── 6. Outer purple rim ── */
   {
-    float ls  = min(rxi_b,ryi_b)*0.082;
-    float lx  = cx;
-    float ly  = cy + ry_out_b + ls*0.8;
-    float ldx = px-lx, ldy = py-ly;
-    float ld  = length(vec2(ldx,ldy));
-
-    color += vec3(1.0,0.76,0.24)*max(0.0,1.0-ld/(max(ls,0.001)*3.8))*0.68*glow;
-
-    for (int i = 0; i < 7; i++) {
-      float pAng  = -1.5708 + (float(i)-3.0)*0.17;
-      vec2  pOff  = vec2(cos(pAng),sin(pAng))*ls*0.5;
-      float pDist = length(vec2(ldx-pOff.x, ldy-pOff.y));
-      float pA    = max(0.0, 0.68-abs(float(i)-3.0)*0.07)*glow;
-      color += vec3(1.0,0.72,0.0)*max(0.0,1.0-pDist/(max(ls,0.001)*0.9))*pA;
-    }
-    color += vec3(1.0,0.92,0.63)*max(0.0,1.0-ld/(max(ls,0.001)*0.22))*0.96*glow;
-
-    // Bead 1
-    { float bs=ls*0.17; float by=ly+ls*1.4+ls*0.26;
-      float bd=length(vec2(px-lx,py-by));
-      color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
-      if(bd<bs) color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);
-      else color+=vec3(0.78,0.59,1.0)*max(0.0,1.0-abs(bd-bs)/(max(bs,0.001)*0.3))*0.60*glow; }
-    // Bead 2
-    { float bs=ls*0.12; float by=ly+ls*1.4+ls*0.26+ls*0.60;
-      float bd=length(vec2(px-lx,py-by));
-      color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
-      if(bd<bs) color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85); }
-    // Bead 3
-    { float bs=ls*0.085; float by=ly+ls*1.4+ls*0.26+ls*0.60+ls*0.46;
-      float bd=length(vec2(px-lx,py-by));
-      color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
-      if(bd<bs) color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85); }
-    // Bead 4
-    { float bs=ls*0.060; float by=ly+ls*1.4+ls*0.26+ls*0.60+ls*0.46+ls*0.36;
-      float bd=length(vec2(px-lx,py-by));
-      color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
-      if(bd<bs) color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85); }
+    float oe=max(0.0,1.0-abs(d_out-1.0)*max(rx_out_b,1.0)*0.065)*step(1.0,d_in);
+    float oP=0.82+0.18*sin(t*2.0+ang*2.0);
+    color+=vec3(0.70,0.10,1.0)*oe*0.95*glow*oP;
   }
 
-  // 11. Water ripples at base
+  /* ── 7. Crystal orb ── */
   {
-    float ripY = H*0.91;
-    float lx2  = cx;
-    vec2  rRef = vec2(px-lx2, py-ripY);
-    float rx_base = min(rx_out*0.52, W*0.28);
-    for (int r = 0; r < 5; r++) {
-      float rph    = fract(t*0.016 + float(r)*0.38);
-      float rMaxRX = max(rx_base*(0.28+float(r)*0.17), 1.0);
-      float rAl    = (0.55-rph*0.55)*0.65*glow;
-      if (rAl > 0.01) {
-        float rEll = length(vec2(rRef.x/rMaxRX, rRef.y/max(rMaxRX*0.20,1.0)));
-        color += vec3(1.0,0.72,0.31)*max(0.0,1.0-abs(rEll-1.0)*12.0)*rAl;
+    float orbR=min(rxi_b,ryi_b)*0.092;
+    float ox=cx, oy=cy-ry_out_b;
+    float odx=px-ox, ody=py-oy;
+    float orbD=length(vec2(odx,ody));
+    color+=vec3(0.60,0.30,1.00)*max(0.0,1.0-orbD/(max(orbR,0.001)*2.6))*0.55*glow;
+    color+=vec3(1.0,0.72,0.31)*max(0.0,1.0-orbD/(max(orbR,0.001)*3.5))*0.28*glow;
+    for(int i=0;i<5;i++){
+      float arcR=orbR*(1.9+float(i)*0.95);
+      float arcA=max(0.0,0.55-float(i)*0.09)*glow;
+      color+=vec3(1.0,0.75,0.35)*max(0.0,1.0-abs(orbD-arcR)/(max(orbR,0.001)*0.5))*arcA*step(ody,0.0);
+    }
+    float topDot=length(vec2(px-ox,py-(oy-orbR*(1.9+4.0*0.95)-5.0)));
+    color+=vec3(1.0,0.82,0.42)*max(0.0,1.0-topDot/(max(orbR,0.001)*0.3))*0.9*glow;
+    if(orbD<orbR){
+      float g2=1.0-orbD/orbR;
+      color=mix(color,mix(vec3(0.08,0.0,0.32),vec3(0.70,0.55,1.00),pow(g2,0.4)),g2*0.9);
+      float spec=max(0.0,1.0-length(vec2(odx+orbR*0.28,ody+orbR*0.28))/(max(orbR,0.001)*0.44));
+      color+=pow(spec,2.0)*0.75;
+    }
+    color+=vec3(0.78,0.63,1.0)*max(0.0,1.0-abs(orbD-orbR)/(max(orbR,0.001)*0.3))*0.70*glow;
+    float stem=max(0.0,1.0-abs(px-ox)/(1.5+orbR*0.05))
+              *smoothstep(0.0,1.0,clamp((py-oy-orbR)/(max(orbR,0.001)*1.5),0.0,1.0));
+    color+=vec3(1.0,0.72,0.31)*stem*0.42*glow;
+  }
+
+  /* ── 8. Golden lotus + drop beads ── */
+  {
+    float ls=min(rxi_b,ryi_b)*0.082;
+    float lx=cx, ly=cy+ry_out_b+ls*0.8;
+    float ldx=px-lx, ldy=py-ly;
+    float ld=length(vec2(ldx,ldy));
+    color+=vec3(1.0,0.76,0.24)*max(0.0,1.0-ld/(max(ls,0.001)*3.8))*0.68*glow;
+    for(int i=0;i<7;i++){
+      float pa=-1.5708+(float(i)-3.0)*0.17;
+      vec2  po=vec2(cos(pa),sin(pa))*ls*0.5;
+      float pd=length(vec2(ldx-po.x,ldy-po.y));
+      float pA=max(0.0,0.68-abs(float(i)-3.0)*0.07)*glow;
+      color+=vec3(1.0,0.72,0.0)*max(0.0,1.0-pd/(max(ls,0.001)*0.9))*pA;
+    }
+    color+=vec3(1.0,0.92,0.63)*max(0.0,1.0-ld/(max(ls,0.001)*0.22))*0.96*glow;
+    {float bs=ls*0.17; float by=ly+ls*1.4+ls*0.26; float bd=length(vec2(px-lx,py-by));
+     color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
+     if(bd<bs)color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);
+     else color+=vec3(0.78,0.59,1.0)*max(0.0,1.0-abs(bd-bs)/(max(bs,0.001)*0.3))*0.60*glow;}
+    {float bs=ls*0.12; float by=ly+ls*1.4+ls*0.26+ls*0.60; float bd=length(vec2(px-lx,py-by));
+     color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
+     if(bd<bs)color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);}
+    {float bs=ls*0.085;float by=ly+ls*1.4+ls*0.26+ls*0.60+ls*0.46;float bd=length(vec2(px-lx,py-by));
+     color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
+     if(bd<bs)color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);}
+    {float bs=ls*0.060;float by=ly+ls*1.4+ls*0.26+ls*0.60+ls*0.46+ls*0.36;float bd=length(vec2(px-lx,py-by));
+     color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
+     if(bd<bs)color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);}
+  }
+
+  /* ── 9. Water ripples ── */
+  {
+    vec2  rRef=vec2(px-cx,py-H*0.91);
+    float rxB=min(rx_out_b*0.52,W*0.28);
+    for(int r=0;r<5;r++){
+      float rph=fract(t*0.016+float(r)*0.38);
+      float rMx=max(rxB*(0.28+float(r)*0.17),1.0);
+      float rAl=(0.55-rph*0.55)*0.65*glow;
+      if(rAl>0.01){
+        float rE=length(vec2(rRef.x/rMx,rRef.y/max(rMx*0.20,1.0)));
+        color+=vec3(1.0,0.72,0.31)*max(0.0,1.0-abs(rE-1.0)*12.0)*rAl;
       }
     }
   }
 
-  gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+  gl_FragColor=vec4(clamp(color,0.0,1.0),1.0);
 }
 `;
 
