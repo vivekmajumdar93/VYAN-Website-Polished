@@ -25,7 +25,7 @@ export const SITE_VERSIONS: VersionEntry[] = [
       'Set c.style.width/height = LD px after c.width/height = maxDim to enforce correct CSS display size',
       'Bumped CosmicPortal canvas z-index from 1 to 2 so it always sits above the starfield layer',
     ],
-    gitHash: 'PENDING',
+    gitHash: 'e530d26',
     pages: ['Medhā'],
   },
   {
