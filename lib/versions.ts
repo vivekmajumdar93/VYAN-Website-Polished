@@ -13,9 +13,29 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '9.0'
+export const CURRENT_VERSION = '9.1'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '9.1',
+    date: '2026-11-12',
+    title: 'Medhā — Pixel-perfect Image Backdrop',
+    summary: 'Replaced GLSL fragment shader with the reference AI-art portal image as a CSS cover background. Animated Canvas 2D overlay (mix-blend-mode: screen) adds fire particles, energy arcs, orb pulse, lotus glow, and ripples mapped to the exact image geometry.',
+    changes: [
+      'Base visual: AI-art medha-portal.png (1024×1536) served as CSS background-size:cover, centered top',
+      'Fire particles: 100 radial-gradient dots along inner ring ellipse, inward flicker keyed to sin(t×6+i×0.47+sin(t×2.3))',
+      'Inner edge glow line: animated ellipse stroke with orange shadow bloom',
+      'Energy sweep: two bright arcs 180° apart sweeping the ring at t×1.2 rad/s',
+      'Mode-colored outer shimmer: reactive to cognitive mode + phase intensity',
+      'Crystal orb: radial glow + 3 arc halos (top half only), pulsing',
+      'Lotus: golden radial glow at bottom of ring',
+      'Ripples: 4-phase expanding ellipses at image ripple position',
+      'Processing phase: mode-colored void pulse emanates inward',
+      'Removed: React Three Fiber, THREE.js, GLSL shaders, VoidBackground starfield',
+    ],
+    gitHash: '50a6d31',
+    pages: ['Medhā'],
+  },
   {
     version: '9.0',
     date: '2026-11-12',
