@@ -160,6 +160,10 @@ function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveMode
       screen.height || window.innerHeight
     ) * dpr);
     c.width = c.height = maxDim;
+    // CSS size must equal the logical dimension — without this the canvas
+    // renders at c.width CSS pixels (1688px on DPR=2) instead of LD (844px).
+    c.style.width  = (maxDim / dpr) + 'px';
+    c.style.height = (maxDim / dpr) + 'px';
     const LD = maxDim / dpr; // logical max dimension
 
     // ── geometry ────────────────────────────────────────────────────────────
@@ -608,8 +612,8 @@ function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveMode
     };
   }, []);
 
-  // position: fixed — no layout space consumed, sits behind everything at z-index 1
-  return <canvas ref={ref} style={{ position: 'fixed', top: 0, left: 0, zIndex: 1, pointerEvents: 'none', display: 'block' }} />;
+  // position: fixed, z:2 — above the starfield (z:1) but below the UI (z:5+)
+  return <canvas ref={ref} style={{ position: 'fixed', top: 0, left: 0, zIndex: 2, pointerEvents: 'none', display: 'block' }} />;
 }
 
 

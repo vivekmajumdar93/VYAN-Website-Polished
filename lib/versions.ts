@@ -13,9 +13,21 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.6'
+export const CURRENT_VERSION = '8.7'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.7',
+    date: '2026-11-12',
+    title: 'Medhā — Canvas Size Fix',
+    summary: 'Fixed critical bug where the portal canvas rendered at 1688×1688 CSS pixels on DPR=2 devices instead of the correct 844×844, causing the ring to appear displaced and the layout to break.',
+    changes: [
+      'Set c.style.width/height = LD px after c.width/height = maxDim to enforce correct CSS display size',
+      'Bumped CosmicPortal canvas z-index from 1 to 2 so it always sits above the starfield layer',
+    ],
+    gitHash: 'PENDING',
+    pages: ['Medhā'],
+  },
   {
     version: '8.6',
     date: '2026-11-06',
