@@ -142,7 +142,9 @@ function VoidBackground({ modeKey }: { modeKey: CognitiveModeKey }) {
 // PORTAL SHADER — vertex (NDC pass-through, full-screen quad)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const PORTAL_VERT = /* glsl */`
+  varying vec2 vUv;
   void main() {
+    vUv = uv;
     gl_Position = vec4(position, 1.0);
   }
 `;
@@ -152,6 +154,7 @@ const PORTAL_VERT = /* glsl */`
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const PORTAL_FRAG = /* glsl */`
 precision highp float;
+varying vec2 vUv;
 uniform float u_time;
 uniform vec2  u_viewport;
 uniform float u_intensity;
@@ -187,9 +190,10 @@ void main() {
   float H = u_viewport.y;
   float t = u_time * u_speed;
 
-  // CSS-convention coords (y=0 at top)
-  float px = gl_FragCoord.x;
-  float py = H - gl_FragCoord.y;
+  // UV → CSS coords (DPR-agnostic; gl_FragCoord is in physical pixels, vUv is always 0-1)
+  // vUv: (0,0)=bottom-left, (1,1)=top-right; CSS: (0,0)=top-left, so flip Y
+  float px = vUv.x * W;
+  float py = (1.0 - vUv.y) * H;
 
   bool isLand = W > H * 1.1;
 
@@ -1283,8 +1287,8 @@ export default function MedhaHUD() {
           >
             <div style={{ position: 'sticky', top: 0, height: 24, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)', pointerEvents: 'none', marginBottom: -24, zIndex: 1 }} />
             {messages.map((m, i) => {
-              // suppress the first auto-greeting — it shows in the void instead
-              if (i === 0 && m.role === 'assistant' && messages.length === 1) return null;
+              // first assistant message always shows in the void overlay, never as a bubble
+              if (i === 0 && m.role === 'assistant') return null;
               return <ChatBubble key={m.id} msg={m} modeKey={mode} fresh={i === freshIdx} />;
             })}
             <AnimatePresence>
