@@ -13,9 +13,22 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.8'
+export const CURRENT_VERSION = '8.9'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.9',
+    date: '2026-11-12',
+    title: 'Medhā — GLSL DPR Fix',
+    summary: 'Fixed critical GLSL coordinate mismatch: gl_FragCoord is in physical pixels (DPR×CSS) but u_viewport was CSS pixels, causing the ring to appear in the bottom-left corner on high-DPR phones. Now uses UV coordinates (always 0–1, DPR-agnostic) for correct placement on all devices.',
+    changes: [
+      'PORTAL_VERT now outputs vUv (uv attribute from PlaneGeometry)',
+      'PORTAL_FRAG uses px = vUv.x * W, py = (1-vUv.y) * H instead of gl_FragCoord — DPR-agnostic',
+      'First assistant message always suppressed as a ChatBubble (always shown in GSAP void overlay)',
+    ],
+    gitHash: 'e7394f4',
+    pages: ['Medhā'],
+  },
   {
     version: '8.8',
     date: '2026-11-12',
