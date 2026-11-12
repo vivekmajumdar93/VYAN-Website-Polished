@@ -1,10 +1,8 @@
 'use client';
 
 import React, {
-  useCallback, useEffect, useMemo, useRef, useState,
+  useCallback, useEffect, useRef, useState,
 } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import * as THREE from 'three';
 import gsap from 'gsap';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -37,425 +35,235 @@ function rgba(r: number, g: number, b: number, a: number) {
   return `rgba(${r},${g},${b},${a.toFixed(3)})`;
 }
 
-// ── VoidBackground: full-viewport nebula + star field ─────────────────────────
-function VoidBackground({ modeKey }: { modeKey: CognitiveModeKey }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const modeRef = useRef(modeKey);
-  modeRef.current = modeKey;
+// (VoidBackground removed — image provides the full backdrop)
+
+// (GLSL shaders removed — image provides the visual base)
+
+// ── CosmicPortal: image backdrop + Canvas 2D animated overlay ────────────────
+function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveModeKey }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const phaseRef  = useRef(phase);
+  const modeRef   = useRef(modeKey);
+  phaseRef.current = phase;
+  modeRef.current  = modeKey;
 
   useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const ctx = c.getContext('2d')!;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
 
-    type Star = { x: number; y: number; r: number; ph: number; spd: number; layer: number };
-    type Blob = { x: number; y: number; br: number; dx: number; dy: number; ch: number; ph: number };
+    // Ring geometry measured from reference image (1024×1536)
+    const IMG_W = 1024, IMG_H = 1536;
+    const IMG_CX = 512, IMG_CY = 580;
+    const IMG_RX = 295, IMG_RY = 245;
+    const IMG_ORB_Y = 275;
+    const IMG_LOTUS_Y = 940;
+    const IMG_RIPPLE_Y = 1330;
 
-    const stars: Star[] = Array.from({ length: 260 }, () => ({
-      x: Math.random(), y: Math.random(),
-      r: 0.4 + Math.random() * 1.4,
-      ph: Math.random() * Math.PI * 2,
-      spd: 0.0008 + Math.random() * 0.0028,
-      layer: Math.floor(Math.random() * 3),
-    }));
-
-    // 4 nebula blobs — positions as fractions of viewport
-    const blobs: Blob[] = [
-      { x: 0.28, y: 0.22, br: 0.32, dx:  0.000055, dy:  0.000040, ch: 0, ph: 0.0 },
-      { x: 0.72, y: 0.58, br: 0.28, dx: -0.000048, dy:  0.000060, ch: 1, ph: 1.8 },
-      { x: 0.50, y: 0.78, br: 0.24, dx:  0.000038, dy: -0.000070, ch: 0, ph: 3.5 },
-      { x: 0.18, y: 0.65, br: 0.26, dx:  0.000068, dy:  0.000030, ch: 1, ph: 5.0 },
-    ];
-
-    let W = 0, H = 0;
-    const resize = () => {
-      W = c.width  = window.innerWidth;
-      H = c.height = window.innerHeight;
-    };
+    function resize() {
+      const W = window.innerWidth, H = window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      canvas.width  = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width  = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     resize();
     window.addEventListener('resize', resize);
 
-    let raf: number, t = 0;
-    const draw = () => {
-      t++;
-      if (!W || !H) { raf = requestAnimationFrame(draw); return; }
-      ctx.clearRect(0, 0, W, H);
+    function getGeo() {
+      const W = window.innerWidth, H = window.innerHeight;
+      const sc = Math.max(W / IMG_W, H / IMG_H);
+      const ox = (IMG_W * sc - W) / 2;
+      const oy = (IMG_H * sc - H) / 2;
+      const spx = (ix: number) => ix * sc - ox;
+      const spy = (iy: number) => iy * sc - oy;
+      return {
+        W, H, sc,
+        cx: spx(IMG_CX), cy: spy(IMG_CY),
+        rX: IMG_RX * sc, rY: IMG_RY * sc,
+        orbX: spx(IMG_CX), orbY: spy(IMG_ORB_Y),
+        lotusX: spx(IMG_CX), lotusY: spy(IMG_LOTUS_Y),
+        rippleX: spx(IMG_CX), rippleY: spy(IMG_RIPPLE_Y),
+      };
+    }
 
-      const [r1, g1, b1, r2, g2, b2] = MC[modeRef.current];
+    let raf: number;
+    const t0 = performance.now();
 
-      // Nebula blobs
-      for (const bl of blobs) {
-        bl.x += bl.dx; bl.y += bl.dy;
-        if (bl.x < -0.1) bl.x = 1.1; if (bl.x > 1.1) bl.x = -0.1;
-        if (bl.y < -0.1) bl.y = 1.1; if (bl.y > 1.1) bl.y = -0.1;
-        const bx = bl.x * W, by = bl.y * H;
-        const bR = bl.br * Math.min(W, H);
-        const pulse = 0.6 + 0.4 * Math.sin(t * 0.004 + bl.ph);
-        const [br, bg, bb] = bl.ch === 0 ? [r1, g1, b1] : [r2, g2, b2];
-        const bg2 = ctx.createRadialGradient(bx, by, 0, bx, by, bR);
-        bg2.addColorStop(0, rgba(br, bg, bb, 0.045 * pulse));
-        bg2.addColorStop(0.5, rgba(br, bg, bb, 0.018 * pulse));
-        bg2.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(bx, by, bR, 0, Math.PI * 2);
-        ctx.fillStyle = bg2; ctx.fill();
+    function draw() {
+      const t = (performance.now() - t0) / 1000;
+      const geo = getGeo();
+      const ph  = phaseRef.current;
+      const mk  = modeRef.current;
+      const [mr, mg, mb] = MC[mk];
+      const intensity = ph === 'processing' ? 1.8 : ph === 'absorbing' ? 1.4 : 1.0;
+
+      ctx.clearRect(0, 0, geo.W, geo.H);
+
+      // 1. Fire particles along inner ring edge
+      for (let i = 0; i < 100; i++) {
+        const ang = (i / 100) * Math.PI * 2;
+        const flicker = Math.pow(
+          Math.max(0, Math.sin(t * 6 + i * 0.47 + Math.sin(t * 2.3 + i * 0.3))),
+          0.5,
+        );
+        const inward = flicker * 20 * geo.sc;
+        const x = geo.cx + (geo.rX - inward) * Math.cos(ang);
+        const y = geo.cy + (geo.rY - inward) * Math.sin(ang);
+        const sz = (2 + 9 * flicker) * geo.sc * intensity;
+        const alpha = 0.65 * flicker * intensity;
+        if (alpha < 0.01) continue;
+        const gr = ctx.createRadialGradient(x, y, 0, x, y, sz);
+        gr.addColorStop(0,    `rgba(255,248,200,${alpha.toFixed(3)})`);
+        gr.addColorStop(0.35, `rgba(255,140,0,${(alpha * 0.8).toFixed(3)})`);
+        gr.addColorStop(1,    'rgba(255,40,0,0)');
+        ctx.beginPath(); ctx.arc(x, y, sz, 0, Math.PI * 2);
+        ctx.fillStyle = gr; ctx.fill();
       }
 
-      // Stars
-      for (const s of stars) {
-        const twinkle = 0.4 + 0.6 * Math.sin(t * s.spd * 60 + s.ph);
-        const baseOp = s.layer === 0 ? 0.06 : s.layer === 1 ? 0.10 : 0.16;
-        const op = baseOp * twinkle;
-        const sx = s.x * W, sy = s.y * H;
-        if (s.layer === 2) {
-          const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, s.r * 2.5);
-          sg.addColorStop(0, `rgba(255,255,255,${(op * 0.3).toFixed(3)})`);
-          sg.addColorStop(1, 'rgba(255,255,255,0)');
-          ctx.beginPath(); ctx.arc(sx, sy, s.r * 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = sg; ctx.fill();
+      // 2. Inner ring edge glow line
+      const edgePulse = 0.65 + 0.35 * Math.sin(t * 3.0);
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(geo.cx, geo.cy, geo.rX, geo.rY, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,200,80,${(edgePulse * 0.55 * intensity).toFixed(3)})`;
+      ctx.lineWidth = 2.5 * geo.sc;
+      ctx.shadowColor = 'rgba(255,160,0,0.9)';
+      ctx.shadowBlur = 18 * geo.sc;
+      ctx.stroke();
+      ctx.restore();
+
+      // 3. Energy sweep arcs (2 arcs, 180° apart)
+      ctx.save();
+      for (let s = 0; s < 2; s++) {
+        const baseAng = t * 1.2 + s * Math.PI;
+        for (let w = 0; w < 2; w++) {
+          const r = w === 0 ? 1.0 : 1.03;
+          ctx.beginPath();
+          ctx.ellipse(geo.cx, geo.cy, geo.rX * r, geo.rY * r, 0, baseAng, baseAng + Math.PI * 0.5);
+          ctx.strokeStyle = w === 0
+            ? `rgba(255,180,50,${(0.9 * intensity).toFixed(3)})`
+            : `rgba(255,120,20,${(0.4 * intensity).toFixed(3)})`;
+          ctx.lineWidth = (w === 0 ? 3 : 1) * geo.sc;
+          ctx.shadowColor = `rgba(255,140,0,${(0.8 * intensity).toFixed(3)})`;
+          ctx.shadowBlur = 20;
+          ctx.stroke();
         }
-        ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,255,255,${op.toFixed(3)})`; ctx.fill();
+      }
+      ctx.restore();
+
+      // 4. Mode-colored outer ring shimmer
+      {
+        const rX2 = geo.rX * 1.34, rY2 = geo.rY * 1.34;
+        const outerPulse = 0.5 + 0.5 * Math.sin(t * 2.0);
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(geo.cx, geo.cy, rX2, rY2, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${mr},${mg},${mb},${(0.18 * outerPulse * intensity).toFixed(3)})`;
+        ctx.lineWidth = 2 * geo.sc;
+        ctx.shadowColor = `rgba(${mr},${mg},${mb},0.6)`;
+        ctx.shadowBlur = 25 * geo.sc;
+        ctx.stroke();
+        ctx.restore();
       }
 
-      // Centre vignette (draws depth toward portal)
-      const vg = ctx.createRadialGradient(W * 0.5, H * 0.38, 0, W * 0.5, H * 0.38, Math.min(W, H) * 0.55);
-      vg.addColorStop(0, 'rgba(0,0,0,0)');
-      vg.addColorStop(1, 'rgba(0,0,0,0.42)');
-      ctx.fillStyle = vg;
-      ctx.fillRect(0, 0, W, H);
+      // 5. Crystal orb pulse
+      {
+        const orbPulse = 0.8 + 0.2 * Math.sin(t * 2.5);
+        const orbR = 32 * geo.sc * orbPulse;
+        ctx.save();
+        const og = ctx.createRadialGradient(geo.orbX, geo.orbY, 0, geo.orbX, geo.orbY, orbR * 2.5);
+        og.addColorStop(0,   `rgba(255,255,255,${(0.45 * intensity).toFixed(3)})`);
+        og.addColorStop(0.3, `rgba(200,120,255,${(0.35 * intensity).toFixed(3)})`);
+        og.addColorStop(1,   'rgba(100,50,255,0)');
+        ctx.beginPath(); ctx.arc(geo.orbX, geo.orbY, orbR * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = og; ctx.fill();
+        for (let i = 0; i < 3; i++) {
+          const arcR  = orbR * (1.8 + i * 0.8);
+          const arcA  = (0.4 - i * 0.1) * intensity;
+          ctx.beginPath();
+          ctx.arc(geo.orbX, geo.orbY, arcR, Math.PI, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255,185,80,${arcA.toFixed(3)})`;
+          ctx.lineWidth = 1.5 * geo.sc;
+          ctx.shadowColor = 'rgba(255,160,50,0.6)'; ctx.shadowBlur = 10;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // 6. Lotus glow
+      {
+        const lotusPulse = 0.75 + 0.25 * Math.sin(t * 1.8 + 1.2);
+        const lotusR = 28 * geo.sc * lotusPulse;
+        ctx.save();
+        const lg = ctx.createRadialGradient(geo.lotusX, geo.lotusY, 0, geo.lotusX, geo.lotusY, lotusR * 3);
+        lg.addColorStop(0,   `rgba(255,210,80,${(0.5 * intensity).toFixed(3)})`);
+        lg.addColorStop(0.4, `rgba(255,160,20,${(0.3 * intensity).toFixed(3)})`);
+        lg.addColorStop(1,   'rgba(255,120,0,0)');
+        ctx.beginPath(); ctx.arc(geo.lotusX, geo.lotusY, lotusR * 3, 0, Math.PI * 2);
+        ctx.fillStyle = lg; ctx.fill();
+        ctx.restore();
+      }
+
+      // 7. Water ripples
+      ctx.save();
+      for (let r = 0; r < 4; r++) {
+        const ph_r    = ((t * 0.65 + r * 0.5) % 2.0) / 2.0;
+        const ripR    = geo.rX * 0.52 * (0.3 + ph_r);
+        const ripAlpha = (1 - ph_r) * 0.55 * intensity;
+        if (ripAlpha < 0.01) continue;
+        ctx.beginPath();
+        ctx.ellipse(geo.rippleX, geo.rippleY, ripR, ripR * 0.18, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255,165,50,${ripAlpha.toFixed(3)})`;
+        ctx.lineWidth = 1.5 * geo.sc;
+        ctx.shadowColor = 'rgba(255,140,0,0.4)'; ctx.shadowBlur = 8;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 8. Processing mode: void pulse
+      if (ph === 'processing') {
+        const pp = 0.5 + 0.5 * Math.sin(t * 4.5);
+        ctx.save();
+        const vg = ctx.createRadialGradient(geo.cx, geo.cy, 0, geo.cx, geo.cy, geo.rX * 0.9);
+        vg.addColorStop(0,   `rgba(${mr},${mg},${mb},0)`);
+        vg.addColorStop(0.5, `rgba(${mr},${mg},${mb},${(pp * 0.08).toFixed(3)})`);
+        vg.addColorStop(1,   `rgba(${mr},${mg},${mb},0)`);
+        ctx.beginPath();
+        ctx.ellipse(geo.cx, geo.cy, geo.rX * 0.9, geo.rY * 0.9, 0, 0, Math.PI * 2);
+        ctx.fillStyle = vg; ctx.fill();
+        ctx.restore();
+      }
 
       raf = requestAnimationFrame(draw);
-    };
+    }
+
     draw();
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
   }, []);
 
   return (
-    <canvas
-      ref={ref}
-      style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 1, pointerEvents: 'none' }}
-    />
-  );
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// PORTAL SHADER — vertex (NDC pass-through, full-screen quad)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const PORTAL_VERT = /* glsl */`
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = vec4(position, 1.0);
-  }
-`;
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// PORTAL SHADER — fragment  (fBM + ring + orb + lotus + ripples)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const PORTAL_FRAG = /* glsl */`
-precision highp float;
-varying vec2  vUv;
-uniform float u_time;
-uniform vec2  u_viewport;
-uniform float u_intensity;
-uniform float u_speed;
-uniform float u_phase;
-uniform float u_mr;
-uniform float u_mg;
-uniform float u_mb;
-
-/* ── Noise ── */
-float hash(vec2 p){p=fract(p*vec2(234.34,435.345));p+=dot(p,p+34.23);return fract(p.x*p.y);}
-float vnoise(vec2 p){
-  vec2 i=floor(p),f=fract(p),u=f*f*(3.0-2.0*f);
-  return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
-}
-float fbm(vec2 p){
-  float v=0.0,a=0.5;
-  for(int i=0;i<7;i++){v+=a*vnoise(p);p=p*2.07+vec2(31.41,92.65);a*=0.5;}
-  return v;
-}
-
-void main(){
-  float W=u_viewport.x, H=u_viewport.y, t=u_time*u_speed;
-
-  /* DPR-agnostic CSS coords */
-  float px=vUv.x*W, py=(1.0-vUv.y)*H;
-
-  bool  isLand = W>H*1.1;
-  float cx = W*0.5;
-  float cy = isLand ? H*0.50 : H*0.44;
-  float rxi= isLand ? W*0.40 : min(W*0.42,H*0.32);
-  float ryi= isLand ? H*0.37 : rxi*0.98;
-  float ringW = min(rxi,ryi)*0.36;
-
-  float breath  = 2.4*sin(t*0.016+0.5);
-  float rxi_b   = max(rxi +breath*0.6,       1.0);
-  float ryi_b   = max(ryi +breath*0.6*ryi/max(rxi,1.0), 1.0);
-  float rx_out_b= rxi_b+ringW;
-  float ry_out_b= ryi_b+ringW;
-
-  float dx=px-cx, dy=py-cy;
-  float d_in =length(vec2(dx/rxi_b,  dy/ryi_b));
-  float d_out=length(vec2(dx/max(rx_out_b,1.0), dy/max(ry_out_b,1.0)));
-  float ang  =atan(dy,dx);
-  float angN =(ang+3.14159)/6.28318;   /* 0–1 around ring */
-
-  float glow=u_intensity;
-
-  /* ── 0. Deep space ── */
-  vec3 color=vec3(0.003,0.0,0.015);
-
-  /* ── 1. Outer corona + rotating wisps ── */
-  {
-    float cf=max(0.0,1.0-d_out/1.9);
-    color+=vec3(0.20,0.0,0.36)*pow(cf,1.6)*0.75*glow;
-    for(int k=0;k<4;k++){
-      float wa=t*0.005+float(k)*1.5708;
-      float wr=min(rx_out_b,ry_out_b)*0.80;
-      float wd=length(vec2(px-(cx+rxi_b*0.6*cos(wa)),py-(cy+ryi_b*0.6*sin(wa))))/max(wr,1.0);
-      color+=vec3(0.75,0.0,0.65)*max(0.0,1.0-wd)*0.09*glow;
-    }
-  }
-
-  /* ── 2. LIVE FIRE — fBM turbulence erupting from inner ring edge ── */
-  if(d_in>0.88 && d_out<1.45){
-    /* rOff: 0 at inner edge, positive going outward through ring and beyond */
-    float rOff = max(0.0, d_in-1.0);
-
-    /* Fire UV: tangential + radial-outward scroll */
-    float fU = angN*7.5;
-    float fV = rOff*3.2;        /* 0 at inner edge, grows outward */
-
-    /* Two-layer turbulence at different scroll speeds */
-    float fn1 = fbm(vec2(fU +t*0.22,  -fV-t*3.8));
-    float fn2 = fbm(vec2(fU*1.6-t*0.15,-fV*0.8-t*5.2));
-    float fN  = fn1*0.60+fn2*0.40;
-
-    /* Fire shape: solid base at inner edge, flickers into licks */
-    float fBase = max(0.0,1.0-fV*0.55)*(0.50+fN*0.95);
-    float fLick = max(0.0,(fN-0.28)*2.4)*max(0.0,1.0-fV*0.38);
-    float fFinal= clamp(max(fBase,fLick),0.0,1.0);
-
-    /* Color gradient: white-yellow core → orange → dark red */
-    vec3 hot  = vec3(1.00,0.97,0.82);
-    vec3 mid  = vec3(1.00,0.42,0.02);
-    vec3 cool = vec3(0.48,0.0, 0.0 );
-    vec3 fCol = mix(cool, mid,  clamp(fFinal*2.0,0.0,1.0));
-        fCol  = mix(fCol, hot,  clamp(fFinal*3.2-1.6,0.0,1.0));
-
-    /* Fade: starts just inside void edge, fades at outer fire boundary */
-    float fMask = fFinal
-      * smoothstep(0.86,1.0,d_in)
-      * smoothstep(1.42,0.95,d_out);
-
-    color  = mix(color, fCol, fMask*glow*0.92);
-    color += fCol * fFinal*0.45 * smoothstep(1.38,0.90,d_out) * glow;
-  }
-
-  /* ── 3. Rocky ring (dark base under fire) ── */
-  {
-    float rMask=smoothstep(0.97,1.0,d_in)*(1.0-smoothstep(0.97,1.0,d_out));
-    if(rMask>0.001){
-      float n=fbm(vec2(dx,dy)*0.009+t*0.03);
-      float rf=clamp((d_in-1.0)/max(d_out-d_in,0.001),0.0,1.0);
-      vec3 rock=mix(vec3(0.09,0.03,0.0),vec3(0.03,0.01,0.01),n);
-      color=mix(color,rock,rMask*0.45);
-    }
-  }
-
-  /* ── 4. Blazing inner-edge line ── */
-  {
-    float ied=abs(d_in-1.0);
-    float pulse=0.75+0.25*sin(t*3.0+ang*4.0);
-    float ie=max(0.0,1.0-ied*max(rxi_b,1.0)*0.09)*step(1.0,d_in)*pulse;
-    color+=vec3(1.0,0.78,0.0)*ie*1.5*glow;
-    color+=vec3(1.0,0.97,0.82)*max(0.0,ie-0.4)*2.2*glow;
-  }
-
-  /* ── 5. INFINITE VOID (logarithmic-depth perspective tunnel) ── */
-  if(d_in<1.02){
-    /* logD→∞ as center approached; rings in log-space = even depth spacing */
-    float logD = -log(max(d_in,0.0003))*1.5;
-
-    /* Spinning depth rings + subtle spiral */
-    float rings  = sin(logD*26.0 - t*1.8)      *0.5+0.5;
-    float spiral = sin(logD*17.0 + ang*3.0 + t*0.07 - t)*0.5+0.5;
-    float depth  = rings*0.65+spiral*0.35;
-
-    float eD  = d_in;   /* 0=center, 1=ring edge */
-    vec3  mc2 = vec3(u_mr,u_mg,u_mb)/255.0;
-
-    /* Near-black void — faint color only on the tunnel walls near edge */
-    vec3 vCol = vec3(0.006,0.0,0.022)*pow(eD,1.3);
-    vCol += mc2 * 0.022 * depth * pow(eD,2.5);
-    vCol += vec3(0.010,0.003,0.038)*rings*pow(eD,2.2);
-
-    /* Absolute black at centre */
-    vCol = mix(vec3(0.0), vCol, pow(clamp(eD,0.0,1.0),0.45));
-
-    /* Processing phase: faint pulse radiates outward from void */
-    if(u_phase>0.1){
-      float pp=0.5+0.5*sin(t*4.5);
-      vCol+=mc2*u_phase*pp*0.4*pow(eD,1.5);
-    }
-
-    color=mix(color, vCol, smoothstep(1.02,0.86,d_in)*0.98);
-  }
-
-  /* ── 6. Outer purple rim ── */
-  {
-    float oe=max(0.0,1.0-abs(d_out-1.0)*max(rx_out_b,1.0)*0.065)*step(1.0,d_in);
-    float oP=0.82+0.18*sin(t*2.0+ang*2.0);
-    color+=vec3(0.70,0.10,1.0)*oe*0.95*glow*oP;
-  }
-
-  /* ── 7. Crystal orb ── */
-  {
-    float orbR=min(rxi_b,ryi_b)*0.092;
-    float ox=cx, oy=cy-ry_out_b;
-    float odx=px-ox, ody=py-oy;
-    float orbD=length(vec2(odx,ody));
-    color+=vec3(0.60,0.30,1.00)*max(0.0,1.0-orbD/(max(orbR,0.001)*2.6))*0.55*glow;
-    color+=vec3(1.0,0.72,0.31)*max(0.0,1.0-orbD/(max(orbR,0.001)*3.5))*0.28*glow;
-    for(int i=0;i<5;i++){
-      float arcR=orbR*(1.9+float(i)*0.95);
-      float arcA=max(0.0,0.55-float(i)*0.09)*glow;
-      color+=vec3(1.0,0.75,0.35)*max(0.0,1.0-abs(orbD-arcR)/(max(orbR,0.001)*0.5))*arcA*step(ody,0.0);
-    }
-    float topDot=length(vec2(px-ox,py-(oy-orbR*(1.9+4.0*0.95)-5.0)));
-    color+=vec3(1.0,0.82,0.42)*max(0.0,1.0-topDot/(max(orbR,0.001)*0.3))*0.9*glow;
-    if(orbD<orbR){
-      float g2=1.0-orbD/orbR;
-      color=mix(color,mix(vec3(0.08,0.0,0.32),vec3(0.70,0.55,1.00),pow(g2,0.4)),g2*0.9);
-      float spec=max(0.0,1.0-length(vec2(odx+orbR*0.28,ody+orbR*0.28))/(max(orbR,0.001)*0.44));
-      color+=pow(spec,2.0)*0.75;
-    }
-    color+=vec3(0.78,0.63,1.0)*max(0.0,1.0-abs(orbD-orbR)/(max(orbR,0.001)*0.3))*0.70*glow;
-    float stem=max(0.0,1.0-abs(px-ox)/(1.5+orbR*0.05))
-              *smoothstep(0.0,1.0,clamp((py-oy-orbR)/(max(orbR,0.001)*1.5),0.0,1.0));
-    color+=vec3(1.0,0.72,0.31)*stem*0.42*glow;
-  }
-
-  /* ── 8. Golden lotus + drop beads ── */
-  {
-    float ls=min(rxi_b,ryi_b)*0.082;
-    float lx=cx, ly=cy+ry_out_b+ls*0.8;
-    float ldx=px-lx, ldy=py-ly;
-    float ld=length(vec2(ldx,ldy));
-    color+=vec3(1.0,0.76,0.24)*max(0.0,1.0-ld/(max(ls,0.001)*3.8))*0.68*glow;
-    for(int i=0;i<7;i++){
-      float pa=-1.5708+(float(i)-3.0)*0.17;
-      vec2  po=vec2(cos(pa),sin(pa))*ls*0.5;
-      float pd=length(vec2(ldx-po.x,ldy-po.y));
-      float pA=max(0.0,0.68-abs(float(i)-3.0)*0.07)*glow;
-      color+=vec3(1.0,0.72,0.0)*max(0.0,1.0-pd/(max(ls,0.001)*0.9))*pA;
-    }
-    color+=vec3(1.0,0.92,0.63)*max(0.0,1.0-ld/(max(ls,0.001)*0.22))*0.96*glow;
-    {float bs=ls*0.17; float by=ly+ls*1.4+ls*0.26; float bd=length(vec2(px-lx,py-by));
-     color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
-     if(bd<bs)color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);
-     else color+=vec3(0.78,0.59,1.0)*max(0.0,1.0-abs(bd-bs)/(max(bs,0.001)*0.3))*0.60*glow;}
-    {float bs=ls*0.12; float by=ly+ls*1.4+ls*0.26+ls*0.60; float bd=length(vec2(px-lx,py-by));
-     color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
-     if(bd<bs)color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);}
-    {float bs=ls*0.085;float by=ly+ls*1.4+ls*0.26+ls*0.60+ls*0.46;float bd=length(vec2(px-lx,py-by));
-     color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
-     if(bd<bs)color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);}
-    {float bs=ls*0.060;float by=ly+ls*1.4+ls*0.26+ls*0.60+ls*0.46+ls*0.36;float bd=length(vec2(px-lx,py-by));
-     color+=vec3(0.55,0.0,0.85)*max(0.0,1.0-bd/(max(bs,0.001)*2.5))*0.5*glow;
-     if(bd<bs)color=mix(color,vec3(0.70,0.40,1.0),(1.0-bd/bs)*0.85);}
-  }
-
-  /* ── 9. Water ripples ── */
-  {
-    vec2  rRef=vec2(px-cx,py-H*0.91);
-    float rxB=min(rx_out_b*0.52,W*0.28);
-    for(int r=0;r<5;r++){
-      float rph=fract(t*0.016+float(r)*0.38);
-      float rMx=max(rxB*(0.28+float(r)*0.17),1.0);
-      float rAl=(0.55-rph*0.55)*0.65*glow;
-      if(rAl>0.01){
-        float rE=length(vec2(rRef.x/rMx,rRef.y/max(rMx*0.20,1.0)));
-        color+=vec3(1.0,0.72,0.31)*max(0.0,1.0-abs(rE-1.0)*12.0)*rAl;
-      }
-    }
-  }
-
-  gl_FragColor=vec4(clamp(color,0.0,1.0),1.0);
-}
-`;
-
-// ── MedhaPortalShader: drives uniforms each frame ─────────────────────────────
-function MedhaPortalShader({ phase, modeKey }: { phase: Phase; modeKey: CognitiveModeKey }) {
-  const { size } = useThree();
-
-  const uniforms = useMemo(() => ({
-    u_time:      { value: 0 },
-    u_viewport:  { value: new THREE.Vector2(size.width, size.height) },
-    u_intensity: { value: 1.0 },
-    u_speed:     { value: 1.0 },
-    u_phase:     { value: 0.0 },
-    u_mr:        { value: MC[modeKey][0] },
-    u_mg:        { value: MC[modeKey][1] },
-    u_mb:        { value: MC[modeKey][2] },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), []);
-
-  const vpTarget = useRef(new THREE.Vector2(size.width, size.height));
-
-  useEffect(() => {
-    vpTarget.current.set(size.width, size.height);
-  }, [size]);
-
-  useEffect(() => {
-    uniforms.u_mr.value = MC[modeKey][0];
-    uniforms.u_mg.value = MC[modeKey][1];
-    uniforms.u_mb.value = MC[modeKey][2];
-  }, [modeKey, uniforms]);
-
-  const phaseRef2 = useRef(phase);
-  phaseRef2.current = phase;
-
-  useFrame((_, dt) => {
-    uniforms.u_time.value += dt;
-    // Smooth viewport lerp (~820ms transition on orientation change)
-    uniforms.u_viewport.value.lerp(vpTarget.current, Math.min(dt * 5.5, 1));
-    // Phase-driven intensity / speed
-    const p = phaseRef2.current;
-    const tgtI = p === 'processing' ? 2.5 : p === 'absorbing' ? 1.9 : 1.05;
-    const tgtS = p === 'processing' ? 2.0 : 1.0;
-    const tgtP = p === 'processing' ? 1.0 : (p === 'emerging' || p === 'responding') ? 0.5 : 0.0;
-    const lf   = Math.min(dt * 2.0, 1);
-    uniforms.u_intensity.value += (tgtI - uniforms.u_intensity.value) * lf;
-    uniforms.u_speed.value     += (tgtS - uniforms.u_speed.value)     * lf;
-    uniforms.u_phase.value     += (tgtP - uniforms.u_phase.value)     * Math.min(dt * 3, 1);
-  });
-
-  return (
-    <mesh>
-      <planeGeometry args={[2, 2]} />
-      <shaderMaterial
-        vertexShader={PORTAL_VERT}
-        fragmentShader={PORTAL_FRAG}
-        uniforms={uniforms}
+    <>
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 2,
+        backgroundImage: "url('/medha-portal.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center top',
+        backgroundRepeat: 'no-repeat',
+      }} />
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 3,
+          pointerEvents: 'none',
+          mixBlendMode: 'screen',
+        } as React.CSSProperties}
       />
-    </mesh>
+    </>
   );
 }
-
-// ── CosmicPortal: R3F canvas (full-screen, z:2, behind all UI) ────────────────
-function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveModeKey }) {
-  return (
-    <Canvas
-      style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none' }}
-      gl={{ antialias: false, alpha: false, depth: false }}
-    >
-      <MedhaPortalShader phase={phase} modeKey={modeKey} />
-    </Canvas>
-  );
-}
-
 
 // ── PortalOrb: pulsing orb with orbiting satellites ───────────────────────────
 function PortalOrb({ modeKey }: { modeKey: CognitiveModeKey }) {
@@ -1082,9 +890,6 @@ export default function MedhaHUD() {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9200, background: '#000', overflow: 'hidden' }}>
-
-      {/* Background — after checking */}
-      {gatePhase !== 'checking' && <VoidBackground modeKey={mode} />}
 
       {/* Consent gate */}
       {gatePhase === 'consent' && <MedhaConsentSlab onGranted={onConsented} onDenied={onDenied} />}
