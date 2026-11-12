@@ -13,9 +13,23 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.9'
+export const CURRENT_VERSION = '9.0'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '9.0',
+    date: '2026-11-12',
+    title: 'Medhā — Fire Ring + Infinite Void',
+    summary: 'Complete GLSL visual overhaul: live fBM fire erupting from the ring\'s inner edge with two independent flicker layers, and a logarithmic-depth perspective tunnel in the void center that gets infinitely denser toward absolute black.',
+    changes: [
+      'Fire system: 7-octave fBM turbulence in ring-local UV, two noise layers at different tangential speeds, fire active from d_in>0.88 through outer ring + beyond, additive bloom glow pass',
+      'Fire color: white-yellow hot core → intense orange → dark red tips; blazing edge line at inner boundary pulses with time×3+ang×4',
+      'Void: logarithmic depth logD=-log(d_in)×1.5 creates 26-band depth rings and 17-band spiral in log-space (evenly spaced in perspective); near-black (0.006,0,0.022) with pow(eD,0.45) black punch',
+      'Mode-color shimmer survives on tunnel walls near ring edge only (pow(eD,2.5) falloff)',
+    ],
+    gitHash: 'df2b20a',
+    pages: ['Medhā'],
+  },
   {
     version: '8.9',
     date: '2026-11-12',
