@@ -13,9 +13,24 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '8.7'
+export const CURRENT_VERSION = '8.8'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '8.8',
+    date: '2026-11-12',
+    title: 'Medhā — R3F + GLSL Portal + GSAP Depth',
+    summary: 'Replaced Canvas 2D portal with a React Three Fiber full-screen quad running a custom fBM GLSL fragment shader. Added a 6-step GSAP animation timeline with 3D z-axis depth for query/response text, plus mix-blend-mode: screen integration.',
+    changes: [
+      'New GLSL fBM fragment shader: dark void, blue nebula wisps, corona, rocky ring with energy streamers, inner fire, void interior with mode shimmer, fBM filaments, purple outer edge, crystal orb with concentric arcs, golden lotus with 7 petals + drop bead chain, water ripples',
+      'Shader uniforms phase-driven in useFrame: u_intensity×2.5 and u_speed×2 during processing, u_phase for void glow on emerging/responding',
+      'Seamless orientation transition: u_viewport lerped each frame (~820ms) so ring shape morphs smoothly portrait↔landscape',
+      'GSAP 6-step timeline: absorbing→query flies to center then sucks into void (z:-1200, blur); emerging→response materialises from void (1.5s power2.out); idle→last response fades in softly',
+      'perspective: 1200px wrapper for 3D z-axis transforms; mix-blend-mode: screen on both text overlay divs',
+    ],
+    gitHash: 'ae5bcf9',
+    pages: ['Medhā'],
+  },
   {
     version: '8.7',
     date: '2026-11-12',
