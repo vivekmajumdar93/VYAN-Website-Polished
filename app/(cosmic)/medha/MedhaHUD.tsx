@@ -123,18 +123,6 @@ function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveMode
         ctx.fillStyle = gr; ctx.fill();
       }
 
-      // 2. Inner ring edge glow line
-      const edgePulse = 0.65 + 0.35 * Math.sin(t * 3.0);
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(geo.cx, geo.cy, geo.rX, geo.rY, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,200,80,${(edgePulse * 0.55 * intensity).toFixed(3)})`;
-      ctx.lineWidth = 2.5 * geo.sc;
-      ctx.shadowColor = 'rgba(255,160,0,0.9)';
-      ctx.shadowBlur = 18 * geo.sc;
-      ctx.stroke();
-      ctx.restore();
-
       // 3. Energy sweep arcs (2 arcs, 180° apart)
       ctx.save();
       for (let s = 0; s < 2; s++) {
@@ -154,22 +142,7 @@ function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveMode
       }
       ctx.restore();
 
-      // 4. Mode-colored outer ring shimmer
-      {
-        const rX2 = geo.rX * 1.34, rY2 = geo.rY * 1.34;
-        const outerPulse = 0.5 + 0.5 * Math.sin(t * 2.0);
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(geo.cx, geo.cy, rX2, rY2, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(${mr},${mg},${mb},${(0.18 * outerPulse * intensity).toFixed(3)})`;
-        ctx.lineWidth = 2 * geo.sc;
-        ctx.shadowColor = `rgba(${mr},${mg},${mb},0.6)`;
-        ctx.shadowBlur = 25 * geo.sc;
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // 5. Crystal orb pulse
+      // 4. Crystal orb pulse
       {
         const orbPulse = 0.8 + 0.2 * Math.sin(t * 2.5);
         const orbR = 32 * geo.sc * orbPulse;
@@ -467,10 +440,34 @@ interface InputBarProps {
 
 function InputBar({ value, onChange, onSubmit, disabled, modeKey, onModeChange, quotaLeft }: InputBarProps) {
   const [r1, g1, b1] = MC[modeKey];
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); }
   };
+
+  const toggleVoice = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const SR = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    if (!SR) return;
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.onstart = () => setIsListening(true);
+    rec.onend   = () => setIsListening(false);
+    rec.onerror = () => setIsListening(false);
+    rec.onresult = (e: any) => {
+      const t = Array.from(e.results as any[]).map((r: any) => r[0].transcript).join('');
+      onChange(t);
+    };
+    recognitionRef.current = rec;
+    rec.start();
+  }, [isListening, onChange]);
 
   return (
     <div style={{
@@ -499,11 +496,11 @@ function InputBar({ value, onChange, onSubmit, disabled, modeKey, onModeChange, 
               } : { boxShadow: '0 0 0px transparent' }}
               transition={active ? { duration: 2.0, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
               style={{
-                padding: '3px 10px', borderRadius: 20,
-                border: active ? `1px solid ${rgba(mr,mg,mb,0.6)}` : '1px solid rgba(255,255,255,0.1)',
-                background: active ? rgba(mr,mg,mb,0.15) : 'transparent',
-                color: active ? rgba(mr,mg,mb,0.95) : 'rgba(255,255,255,0.3)',
-                fontSize: 9.5, letterSpacing: '0.16em', textTransform: 'uppercase',
+                padding: '5px 13px', borderRadius: 20,
+                border: active ? `1px solid ${rgba(mr,mg,mb,0.65)}` : '1px solid rgba(255,255,255,0.14)',
+                background: active ? rgba(mr,mg,mb,0.18) : 'rgba(0,0,0,0.3)',
+                color: active ? rgba(mr,mg,mb,0.98) : 'rgba(255,255,255,0.45)',
+                fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase',
                 fontFamily: 'var(--font-vyan)', cursor: 'pointer',
                 transition: 'background 0.2s, color 0.2s, border-color 0.2s',
                 flexShrink: 0, whiteSpace: 'nowrap',
@@ -570,7 +567,27 @@ function InputBar({ value, onChange, onSubmit, disabled, modeKey, onModeChange, 
               el.style.height = Math.min(el.scrollHeight, 100) + 'px';
             }}
           />
-          {/* send button is rendered outside the pill — see fixed button below */}
+          {/* Mic / voice button */}
+          <button
+            onClick={toggleVoice}
+            title={isListening ? 'Stop listening' : 'Voice input'}
+            style={{
+              background: 'transparent', border: 'none', padding: '4px 6px',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0,
+              color: isListening ? rgba(r1,g1,b1,1) : 'rgba(255,255,255,0.28)',
+              transition: 'color 0.2s', position: 'relative', zIndex: 2,
+            }}
+          >
+            {isListening
+              ? <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 0.8, repeat: Infinity }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+                </motion.div>
+              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+            }
+          </button>
         </div>
       </div>
 
@@ -583,7 +600,14 @@ function InputBar({ value, onChange, onSubmit, disabled, modeKey, onModeChange, 
         </p>
       )}
 
-      {/* ── Send button — fixed bottom-right, fully opaque, covers Gemini watermark ── */}
+      {/* ── Watermark cover — solid black patch behind send button ── */}
+      <div style={{
+        position: 'fixed', right: 0, bottom: 0,
+        width: 80, height: 68,
+        background: 'rgba(0,0,0,0.98)',
+        zIndex: 54, pointerEvents: 'none',
+      }} />
+      {/* ── Send button — fixed bottom-right, fully opaque ── */}
       <button
         onClick={onSubmit}
         disabled={disabled || !value.trim()}
@@ -682,6 +706,7 @@ export default function MedhaHUD() {
   const [guestMode, setGuestMode] = useState(false);
   const [quotaLeft, setQuota]     = useState(99);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [modeFlash, setModeFlash]     = useState(0);
 
   const abortRef        = useRef<AbortController | null>(null);
   const chatBotRef      = useRef<HTMLDivElement>(null);
@@ -697,13 +722,17 @@ export default function MedhaHUD() {
   messagesRef.current  = messages;
   guestModeRef.current = guestMode;
 
-  // ── GSAP: initialize centering on mount ───────────────────────────────────
+  // ── GSAP: initialize centering once the active UI actually mounts ─────────
   useEffect(() => {
-    if (queryGSAPRef.current)
-      gsap.set(queryGSAPRef.current,    { xPercent: -50, yPercent: -50, opacity: 0 });
-    if (responseGSAPRef.current)
-      gsap.set(responseGSAPRef.current, { xPercent: -50, yPercent: -50, opacity: 0 });
-  }, []);
+    if (gatePhase !== 'active') return;
+    // rAF ensures refs are populated after the conditional render
+    requestAnimationFrame(() => {
+      if (queryGSAPRef.current)
+        gsap.set(queryGSAPRef.current,    { xPercent: -50, yPercent: -50, opacity: 0 });
+      if (responseGSAPRef.current)
+        gsap.set(responseGSAPRef.current, { xPercent: -50, yPercent: -50, opacity: 0 });
+    });
+  }, [gatePhase]);
 
   // ── GSAP: 6-step animation timeline driven by phase ────────────────────────
   useEffect(() => {
@@ -789,14 +818,12 @@ export default function MedhaHUD() {
   useEffect(() => {
     if (gatePhase !== 'active') return;
     setQuota(quotaRemaining('medha'));
+    let voidContent = '';
     if (guestMode) {
       const id = newChatId();
       setChatId(id);
-      const greeting: StoredMsg = {
-        id: uid(), role: 'assistant',
-        content: buildGreeting(true),
-        mode, ts: Date.now(),
-      };
+      voidContent = buildGreeting(true);
+      const greeting: StoredMsg = { id: uid(), role: 'assistant', content: voidContent, mode, ts: Date.now() };
       setMessages([greeting]);
     } else {
       const id = getCurrentChatId() || newChatId();
@@ -805,15 +832,21 @@ export default function MedhaHUD() {
       const stored = getChat(id);
       if (stored?.messages?.length) {
         setMessages(stored.messages);
+        voidContent = stored.messages.slice().reverse().find(m => m.role === 'assistant')?.content || '';
       } else {
-        const greeting: StoredMsg = {
-          id: uid(), role: 'assistant',
-          content: buildGreeting(false),
-          mode, ts: Date.now(),
-        };
+        voidContent = buildGreeting(false);
+        const greeting: StoredMsg = { id: uid(), role: 'assistant', content: voidContent, mode, ts: Date.now() };
         setMessages([greeting]);
         upsertChat({ id, title: 'New conversation', messages: [greeting], lastInteractionAt: Date.now(), createdAt: Date.now() });
       }
+    }
+    // Show greeting / last response in void immediately
+    if (voidContent) {
+      setTimeout(() => {
+        setGsapResponseText(renderMarkdown(voidContent));
+        const r = responseGSAPRef.current;
+        if (r) gsap.to(r, { opacity: 0.82, z: 0, scale: 1, filter: 'blur(0px)', duration: 1.6, ease: 'power1.out' });
+      }, 350);
     }
   }, [gatePhase, guestMode]); // eslint-disable-line
 
@@ -832,7 +865,11 @@ export default function MedhaHUD() {
     setGatePhase('active');
   }, []);
 
-  const switchMode = useCallback((k: CognitiveModeKey) => setMode(k), []);
+  const switchMode = useCallback((k: CognitiveModeKey) => {
+    setMode(k);
+    setModeFlash(Date.now());
+    setTimeout(() => setModeFlash(0), 500);
+  }, []);
 
   const submit = useCallback(async () => {
     const text = input.trim();
@@ -1119,28 +1156,39 @@ export default function MedhaHUD() {
               style={{
                 position: 'absolute',
                 top: '44svh', left: '50%',
-                width: 'min(62vw, 380px)',
-                maxHeight: '22svh',
+                width: 'min(66vw, 360px)',
+                maxHeight: '24svh',
                 overflow: 'hidden',
                 textAlign: 'center',
                 mixBlendMode: 'screen',
                 color: 'rgba(255,235,195,0.95)',
-                fontSize: 12,
+                fontSize: 12.5,
                 lineHeight: 1.72,
                 letterSpacing: '0.022em',
                 fontFamily: 'var(--font-vyan)',
                 textShadow: '0 0 20px rgba(255,160,0,0.60), 0 0 40px rgba(200,120,255,0.20)',
                 wordBreak: 'break-word',
-                WebkitLineClamp: 8,
-                display: '-webkit-box',
-                WebkitBoxOrient: 'vertical',
                 pointerEvents: 'none',
               }}
               dangerouslySetInnerHTML={{ __html: gsapResponseText }}
             />
           </div>
 
-          {/* ── Error label — position:fixed ──────────────────────────── */}
+          {/* ── Mode change flash ────────────────────────────────────── */}
+          {modeFlash > 0 && (
+            <motion.div
+              key={modeFlash}
+              initial={{ opacity: 0.4 }}
+              animate={{ opacity: 0 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 100, pointerEvents: 'none',
+                background: `radial-gradient(ellipse at 50% 42%, ${rgba(r1,g1,b1,0.45)} 0%, transparent 65%)`,
+              }}
+            />
+          )}
+
+          {/* ── Processing / error label ──────────────────────────────── */}
           <div style={{ position: 'fixed', top: '53svh', left: '50%', transform: 'translateX(-50%)', zIndex: 15 }}>
             <AnimatePresence mode="wait">
               {phase === 'processing' && <ProcessingLabel key="proc" modeKey={mode} />}
@@ -1170,13 +1218,11 @@ export default function MedhaHUD() {
           >
             <div style={{ position: 'sticky', top: 0, height: 24, background: 'linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)', pointerEvents: 'none', marginBottom: -24, zIndex: 1 }} />
             {messages.map((m, i) => {
-              // first assistant message always shows in the void overlay, never as a bubble
-              if (i === 0 && m.role === 'assistant') return null;
+              // All assistant responses live in the void overlay — only user messages as bubbles
+              if (m.role === 'assistant') return null;
               return <ChatBubble key={m.id} msg={m} modeKey={mode} fresh={i === freshIdx} />;
             })}
-            <AnimatePresence>
-              {streamText && phase !== 'emerging' && phase !== 'responding' && <StreamBubble key="stream" text={streamText} modeKey={mode} />}
-            </AnimatePresence>
+            {/* StreamBubble removed — streaming content shows in the void via GSAP */}
           </div>
 
           {/* ── Input bar ────────────────────────────────────────────── */}
