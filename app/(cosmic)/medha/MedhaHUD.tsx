@@ -563,24 +563,7 @@ function InputBar({ value, onChange, onSubmit, disabled, modeKey, onModeChange, 
               el.style.height = Math.min(el.scrollHeight, 100) + 'px';
             }}
           />
-          <button
-            onClick={onSubmit}
-            disabled={disabled || !value.trim()}
-            style={{
-              width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-              border: `1px solid ${rgba(r1,g1,b1, disabled || !value.trim() ? 0.18 : 0.55)}`,
-              background: disabled || !value.trim() ? 'transparent' : rgba(r1,g1,b1,0.18),
-              color: disabled || !value.trim() ? rgba(r1,g1,b1,0.25) : rgba(r1,g1,b1,0.95),
-              cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s', position: 'relative', zIndex: 2,
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-            </svg>
-          </button>
+          {/* send button is rendered outside the pill — see fixed button below */}
         </div>
       </div>
 
@@ -592,6 +575,36 @@ function InputBar({ value, onChange, onSubmit, disabled, modeKey, onModeChange, 
           {quotaLeft} query{quotaLeft === 1 ? '' : 's'} remaining
         </p>
       )}
+
+      {/* ── Send button — fixed bottom-right, fully opaque, covers Gemini watermark ── */}
+      <button
+        onClick={onSubmit}
+        disabled={disabled || !value.trim()}
+        style={{
+          position: 'fixed',
+          right: 0,
+          bottom: 0,
+          width: 56,
+          height: 72,
+          borderRadius: '28px 0 0 0',
+          border: 'none',
+          background: disabled || !value.trim()
+            ? `rgb(${Math.round(r1*0.08)},${Math.round(g1*0.08)},${Math.round(b1*0.08)})`
+            : `rgb(${r1},${g1},${b1})`,
+          color: disabled || !value.trim() ? rgba(r1,g1,b1,0.28) : 'rgba(0,0,0,0.88)',
+          cursor: disabled || !value.trim() ? 'default' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'background 0.25s, color 0.25s',
+          zIndex: 55,
+          paddingBottom: 8,
+          paddingLeft: 4,
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
     </div>
   );
 }
