@@ -246,13 +246,20 @@ function CosmicPortal({ phase, modeKey }: { phase: Phase; modeKey: CognitiveMode
 
   return (
     <>
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 2,
-        backgroundImage: "url('/medha-portal.png')",
-        backgroundSize: 'cover',
-        backgroundPosition: 'center top',
-        backgroundRepeat: 'no-repeat',
-      }} />
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        style={{
+          position: 'fixed', inset: 0, zIndex: 2,
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center top',
+        }}
+      >
+        <source src="/medha-portal.mp4" type="video/mp4" />
+      </video>
       <canvas
         ref={canvasRef}
         style={{
