@@ -13,9 +13,22 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '9.3'
+export const CURRENT_VERSION = '9.4'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '9.4',
+    date: '2026-11-13',
+    title: 'Medhā — Live Video Background',
+    summary: 'Replaced static portal PNG with the Gemini Veo generated 10-second seamless loop video (720×1280, H.264). Canvas 2D animation overlay remains on top.',
+    changes: [
+      'Background: medha-portal.mp4 (6.7MB, 720×1280, 10s loop) via <video autoPlay loop muted playsInline>',
+      'object-fit:cover / object-position:center top — same framing as the PNG it replaces',
+      'Canvas mix-blend-mode:screen overlay unchanged — still animates fire, arcs, orb, lotus, ripples on top',
+    ],
+    gitHash: '8462ae5',
+    pages: ['Medhā'],
+  },
   {
     version: '9.3',
     date: '2026-11-13',
