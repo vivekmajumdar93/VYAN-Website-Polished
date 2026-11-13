@@ -13,9 +13,24 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '9.1'
+export const CURRENT_VERSION = '9.2'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '9.2',
+    date: '2026-11-13',
+    title: 'Medhā — Opaque Send Button',
+    summary: 'Send button repositioned to fixed bottom-right corner as a fully opaque 56×72px element, precisely covering the Gemini Veo watermark at video coords x:649-701, y:1167-1205.',
+    changes: [
+      'Send button moved out of input pill flex row; now position:fixed right:0 bottom:0',
+      'Opaque background: dark near-black when inactive, solid mode colour (rgb(r,g,b)) when active',
+      'Shape: border-radius 28px 0 0 0 — quarter-arc top-left corner blending into bottom-right edge',
+      'Size: 56×72px — large enough to cover Gemini watermark across all device widths',
+      'Input pill now uses full available width without the button inside',
+    ],
+    gitHash: 'd9c3629',
+    pages: ['Medhā'],
+  },
   {
     version: '9.1',
     date: '2026-11-12',
