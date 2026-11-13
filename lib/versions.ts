@@ -13,9 +13,29 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '9.4'
+export const CURRENT_VERSION = '9.5'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '9.5',
+    date: '2026-11-13',
+    title: 'Medhā — Void-First UX Overhaul',
+    summary: 'Resolved 8 UX issues: fixed GSAP centering, removed duplicate responses, all Medhā answers now emerge from the void only, voice input added, faculty pills enlarged, mode flash visual, watermark fully covered.',
+    changes: [
+      'Fix: GSAP xPercent/yPercent now applied after active UI mounts (gatePhase dep + rAF) — response text was starting at left:50% and spilling right',
+      'Fix: All assistant messages removed from chat bubbles — only user queries show as bubbles; void holds all responses',
+      'Fix: Greeting / last response now appears in void on init (chat init effect pushes voidContent to GSAP)',
+      'Fix: Removed canvas inner ring ellipse and outer mode shimmer ellipses — extra circles on top of video gone',
+      'Fix: StreamBubble removed from chat scroll — streaming content already shows in GSAP void layer',
+      'Feature: Voice input via Web Speech API — mic button in input pill, pulsing red dot while listening',
+      'Feature: Mode change flash — radial colour pulse centred on portal when faculty is tapped',
+      'UX: Faculty pills enlarged (11px, more padding, opaque dark bg for inactive)',
+      'UX: Watermark cover — solid 80×68 black patch behind send button, no border-radius clipping',
+      'Fix: Response text webkit-box/line-clamp removed; clean overflow:hidden + maxHeight',
+    ],
+    gitHash: '3a22caa',
+    pages: ['Medhā'],
+  },
   {
     version: '9.4',
     date: '2026-11-13',
