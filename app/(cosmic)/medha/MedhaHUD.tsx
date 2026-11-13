@@ -363,23 +363,23 @@ function ChatBubble({
       <motion.div
         animate={!isU ? {
           boxShadow: [
-            `0 0 6px ${rgba(r1,g1,b1,0.07)}`,
-            `0 0 16px ${rgba(r1,g1,b1,0.20)}`,
-            `0 0 6px ${rgba(r1,g1,b1,0.07)}`,
+            `0 0 0 1px ${rgba(r1,g1,b1,0.12)}, 0 0 10px ${rgba(r1,g1,b1,0.05)}`,
+            `0 0 0 1px ${rgba(r1,g1,b1,0.38)}, 0 0 22px ${rgba(r1,g1,b1,0.14)}`,
+            `0 0 0 1px ${rgba(r1,g1,b1,0.12)}, 0 0 10px ${rgba(r1,g1,b1,0.05)}`,
           ],
         } : {}}
         transition={!isU ? { duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: Math.random() * 2 } : {}}
         style={{
           maxWidth: 'min(72vw, 320px)',
-          padding: isU ? '9px 13px' : '11px 14px',
-          background: isU ? 'rgba(255,255,255,0.05)' : rgba(r1, g1, b1, 0.07),
-          border: isU ? '1px solid rgba(255,255,255,0.08)' : `1px solid ${rgba(r1, g1, b1, 0.18)}`,
+          padding: isU ? '7px 11px' : '10px 14px',
+          background: 'transparent',
+          border: isU ? '1px solid rgba(255,255,255,0.07)' : 'none',
           borderRadius: isU ? '14px 14px 3px 14px' : '3px 14px 14px 14px',
           fontSize: 12.5, lineHeight: '1.68', letterSpacing: '0.018em',
-          color: isU ? 'rgba(255,255,255,0.78)' : 'rgba(255,230,210,0.90)',
+          color: isU ? 'rgba(255,255,255,0.65)' : 'rgba(255,230,210,0.90)',
           fontFamily: 'var(--font-vyan)',
           wordBreak: 'break-word', whiteSpace: 'pre-wrap',
-          textShadow: isU ? 'none' : `0 0 12px ${rgba(r1,g1,b1,0.35)}, 0 0 28px ${rgba(r1,g1,b1,0.15)}`,
+          textShadow: isU ? 'none' : `0 0 14px ${rgba(r1,g1,b1,0.40)}, 0 0 30px ${rgba(r1,g1,b1,0.18)}`,
         }}
       >
         {msg.role === 'assistant'
@@ -413,17 +413,17 @@ function StreamBubble({ text, modeKey }: { text: string; modeKey: CognitiveModeK
       <motion.div
         animate={{
           boxShadow: [
-            `0 0 8px ${rgba(r1,g1,b1,0.1)}`,
-            `0 0 20px ${rgba(r1,g1,b1,0.28)}`,
-            `0 0 8px ${rgba(r1,g1,b1,0.1)}`,
+            `0 0 0 1px ${rgba(r1,g1,b1,0.14)}, 0 0 12px ${rgba(r1,g1,b1,0.06)}`,
+            `0 0 0 1px ${rgba(r1,g1,b1,0.42)}, 0 0 26px ${rgba(r1,g1,b1,0.17)}`,
+            `0 0 0 1px ${rgba(r1,g1,b1,0.14)}, 0 0 12px ${rgba(r1,g1,b1,0.06)}`,
           ],
         }}
         transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
         style={{
           maxWidth: 'min(72vw, 320px)',
-          padding: '11px 14px',
-          background: rgba(r1, g1, b1, 0.07),
-          border: `1px solid ${rgba(r1, g1, b1, 0.18)}`,
+          padding: '10px 14px',
+          background: 'transparent',
+          border: 'none',
           borderRadius: '3px 14px 14px 14px',
           fontSize: 12.5, lineHeight: '1.68', letterSpacing: '0.018em',
           color: 'rgba(255,230,210,0.90)',
@@ -674,6 +674,7 @@ export default function MedhaHUD() {
   const [gatePhase, setGatePhase] = useState<'checking' | 'consent' | 'active'>('checking');
   const [guestMode, setGuestMode] = useState(false);
   const [quotaLeft, setQuota]     = useState(99);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const abortRef        = useRef<AbortController | null>(null);
   const chatBotRef      = useRef<HTMLDivElement>(null);
@@ -944,22 +945,110 @@ export default function MedhaHUD() {
                 The Consciousness of VYAN
               </span>
             </div>
-            {/* Sound toggle */}
-            <button
-              onClick={() => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('vyan:sound-toggle')); }}
-              title="Toggle Sound"
-              style={{
-                background: 'transparent', border: 'none', padding: 8, cursor: 'pointer',
-                color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center',
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-              </svg>
-            </button>
+            {/* Sound toggle + Settings */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <button
+                onClick={() => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('vyan:sound-toggle')); }}
+                title="Toggle Sound"
+                style={{
+                  background: 'transparent', border: 'none', padding: 8, cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                </svg>
+              </button>
+              <button
+                onClick={() => setSettingsOpen(o => !o)}
+                title="Settings"
+                style={{
+                  background: 'transparent', border: 'none', padding: 8, cursor: 'pointer',
+                  color: settingsOpen ? rgba(r1,g1,b1,0.85) : 'rgba(255,255,255,0.35)',
+                  display: 'flex', alignItems: 'center', transition: 'color 0.2s',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+            </div>
           </div>
+
+          {/* ── Settings panel ───────────────────────────────────────── */}
+          <AnimatePresence>
+            {settingsOpen && (
+              <motion.div
+                initial={{ opacity: 0, x: 60 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 60 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                style={{
+                  position: 'absolute', top: 52, right: 12, zIndex: 20,
+                  width: 220,
+                  background: 'rgba(4,2,12,0.88)',
+                  border: `1px solid ${rgba(r1,g1,b1,0.22)}`,
+                  borderRadius: 14,
+                  backdropFilter: 'blur(18px)',
+                  boxShadow: `0 0 32px ${rgba(r1,g1,b1,0.10)}`,
+                  padding: '14px 0',
+                }}
+              >
+                <p style={{
+                  fontSize: 8.5, letterSpacing: '0.22em', color: rgba(r1,g1,b1,0.5),
+                  textTransform: 'uppercase', fontFamily: 'var(--font-vyan)',
+                  padding: '0 16px 10px', borderBottom: `1px solid ${rgba(r1,g1,b1,0.10)}`,
+                  marginBottom: 6,
+                }}>Settings</p>
+                {[
+                  {
+                    label: 'Clear Conversation',
+                    icon: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6',
+                    action: () => {
+                      setMessages([]);
+                      setGsapQueryText('');
+                      setGsapResponseText('');
+                      setSettingsOpen(false);
+                    },
+                  },
+                  {
+                    label: 'Reset Session',
+                    icon: 'M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15',
+                    action: () => {
+                      clearLocalConsent();
+                      setGuestMode(false);
+                      setGatePhase('consent');
+                      setMessages([]);
+                      setSettingsOpen(false);
+                    },
+                  },
+                ].map(item => (
+                  <button
+                    key={item.label}
+                    onClick={item.action}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      width: '100%', background: 'transparent',
+                      border: 'none', padding: '9px 16px', cursor: 'pointer',
+                      color: 'rgba(255,255,255,0.60)', fontSize: 12,
+                      fontFamily: 'var(--font-vyan)', letterSpacing: '0.04em',
+                      textAlign: 'left', transition: 'color 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.color = `rgb(${r1},${g1},${b1})`)}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.60)')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={item.icon}/>
+                    </svg>
+                    {item.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* ── Guest mode banner ────────────────────────────────────── */}
           {guestMode && (
@@ -1001,11 +1090,11 @@ export default function MedhaHUD() {
               className="medha-md"
               style={{
                 position: 'absolute',
-                top: '42svh', left: '50%',
-                width: 'min(44vw, 300px)',
+                top: '38svh', left: '50%',
+                width: 'min(62vw, 380px)',
                 textAlign: 'center',
                 mixBlendMode: 'screen',
-                color: 'rgba(255,235,195,0.95)',
+                color: 'rgba(255,235,195,0.88)',
                 fontSize: 13,
                 lineHeight: 1.65,
                 letterSpacing: '0.018em',
@@ -1016,26 +1105,26 @@ export default function MedhaHUD() {
               }}
               dangerouslySetInnerHTML={{ __html: gsapQueryText }}
             />
-            {/* Response text — emerges from void */}
+            {/* Response text — emerges from void, constrained within ring */}
             <div
               ref={responseGSAPRef}
               className="medha-md"
               style={{
                 position: 'absolute',
-                top: '42svh', left: '50%',
-                width: 'min(44vw, 300px)',
-                maxHeight: '30svh',
+                top: '44svh', left: '50%',
+                width: 'min(62vw, 380px)',
+                maxHeight: '22svh',
                 overflow: 'hidden',
                 textAlign: 'center',
                 mixBlendMode: 'screen',
                 color: 'rgba(255,235,195,0.95)',
-                fontSize: 11,
-                lineHeight: 1.65,
-                letterSpacing: '0.018em',
+                fontSize: 12,
+                lineHeight: 1.72,
+                letterSpacing: '0.022em',
                 fontFamily: 'var(--font-vyan)',
-                textShadow: '0 0 18px rgba(255,160,0,0.55)',
+                textShadow: '0 0 20px rgba(255,160,0,0.60), 0 0 40px rgba(200,120,255,0.20)',
                 wordBreak: 'break-word',
-                WebkitLineClamp: 7,
+                WebkitLineClamp: 8,
                 display: '-webkit-box',
                 WebkitBoxOrient: 'vertical',
                 pointerEvents: 'none',
@@ -1057,8 +1146,8 @@ export default function MedhaHUD() {
             </AnimatePresence>
           </div>
 
-          {/* ── Layout spacer: reserves height for the ring in portrait ── */}
-          <div ref={portalRef} style={{ flex: '0 0 68svh', minHeight: 0, width: '100%' }} />
+          {/* ── Layout spacer: pushes chat history below lotus (void ends ~62vh, lotus+beads ~76vh) ── */}
+          <div ref={portalRef} style={{ flex: '0 0 76svh', minHeight: 0, width: '100%' }} />
 
           {/* ── Chat history (scrollable, below portal) ──────────────── */}
           <div
