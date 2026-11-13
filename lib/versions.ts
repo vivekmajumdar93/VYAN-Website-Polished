@@ -13,9 +13,25 @@ export interface VersionEntry {
   pages: string[]      // which pages / systems were touched
 }
 
-export const CURRENT_VERSION = '9.2'
+export const CURRENT_VERSION = '9.3'
 
 export const SITE_VERSIONS: VersionEntry[] = [
+  {
+    version: '9.3',
+    date: '2026-11-13',
+    title: 'Medhā — Cinematic UI',
+    summary: 'Chat bubbles redesigned as transparent glass with animated border glow. Text constrained within the portal void. Settings panel added.',
+    changes: [
+      'ChatBubble / StreamBubble: transparent background, animated mode-colour border glow (no fill)',
+      'User messages: minimal border, plain text only',
+      'GSAP void text widened min(62vw,380px) — fills void without overflowing ring',
+      'Portal spacer increased to 76svh — chat history starts below lotus, never overlaps ring',
+      'Settings button (gear icon) in header',
+      'Settings panel: Clear Conversation + Reset Session actions',
+    ],
+    gitHash: '56f4749',
+    pages: ['Medhā'],
+  },
   {
     version: '9.2',
     date: '2026-11-13',
